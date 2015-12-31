@@ -1,0 +1,83 @@
+\documentclass{amsbook}
+
+\usepackage{hyperref,url}
+
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{xca}[theorem]{Exercise}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\numberwithin{section}{chapter}
+\numberwithin{equation}{chapter}
+
+%    For a single index; for multiple indexes, see the manual
+%    "Instructions for preparation of papers and monographs:
+%    AMS-LaTeX" (instr-l.pdf in the AMS-LaTeX distribution).
+\makeindex
+
+\begin{document}
+
+\frontmatter
+
+\title{Formal Reasoning About Programs}
+
+%    Remove any unused author tags.
+
+%    author one information
+\author{Adam Chlipala}
+\address{MIT, Cambridge, MA, USA}
+\email{adamc@csail.mit.edu}
+
+\begin{abstract}
+  \emph{Briefly}, this book is about an approach to bringing software engineering up to speed with more traditional engineering disciplines, providing a mathematical foundation for rigorous analysis of realistic computer systems. As civil engineers apply their mathematical canon to reach high certainty that bridges will not fall down, the software engineer should apply a different canon to argue that programs behave properly. As other engineering disciplines have their computer-aided-design tools, computer science has proof assistants, IDEs for logical arguments. We will learn how to apply these tools to certify that programs behave as expected.
+
+  \emph{More specifically}: Introductions to two intertangled subjects: the Coq proof assistant, a tool for machine-checked mathematical theorem proving; and formal logical reasoning about the correctness of programs.
+\end{abstract}
+
+\maketitle
+
+\newpage
+
+For more information, see the book's home page:
+
+\begin{center} \url{http://adam.chlipala.net/frap/} \end{center}
+
+\thispagestyle{empty}
+\mbox{}\vfill
+\begin{center}
+
+Copyright Adam Chlipala 2015.
+
+
+This work is licensed under a
+Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License.
+The license text is available at:
+
+\end{center}
+
+\begin{center} \url{https://creativecommons.org/licenses/by-nc-nd/4.0/} \end{center}
+
+\newpage
+
+\setcounter{page}{4}
+
+\tableofcontents
+
+\mainmatter
+
+\appendix
+
+\backmatter
+%    Bibliography styles amsplain or harvard are also acceptable.
+\bibliographystyle{amsalpha}
+\bibliography{}
+%    See note above about multiple indexes.
+\printindex
+
+\end{document}

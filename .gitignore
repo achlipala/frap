@@ -9,3 +9,7 @@
 *.blg
 *.ilg
 *.ind
+Makefile.coq
+*.glob
+*.v.d
+*.vo

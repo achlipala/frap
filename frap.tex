@@ -85,12 +85,65 @@ Eventually, there will no doubt be some sort of historical overview here, as par
 There will also be plenty of scholarly citations (here and throughout the book).
 In this early version, you get to take the author's word for it that we are about to learn a promising approach!
 
+However, one overarching element of our strategy is important enough to deserve to be called out here.
+We will study a variety of different approaches for formalizing what a program should do and for proving that a program does what it should.
+At every step, we will pay close attention to the \emph{common foundation} that underlies everything.
+For one thing, we will be proving all of our theorems with the Coq proof assistant, a powerful framework for writing and machine-checking proofs.
+Coq itself is based on a relatively small set of core features, much like a well-designed programming language, and in both we build up increasingly sophisticated abstractions as libraries.
+Those features can be thought of as the core of all mathematical reasoning.
+
+We will also apply a recipe specific to program proof.
+When we encounter a new challenge, to prove a new kind of property about a new kind of program, we will generally be considering four broad elements that appear in nearly all techniques.
+
+\begin{itemize}
+  \item \index{encoding}\textbf{Encoding.}
+    Every programming language has both \index{syntax}\emph{syntax}, which defines what programs look like, and \index{semantics}\emph{semantics}, which defines how programs behave when run.
+    Even when these elements seem obvious intuitively, we often find that there are surprisingly subtle choices to be made in defining syntax and semantics at the highest level of rigor.
+    Seemingly minor decisions can have big impacts on how smoothly our proofs go.
+
+  \item \textbf{Invariants.}
+    Nearly every theorem about a program is stated in terms of a \index{transition system}\emph{transition system}, with some set of states and a relation for stepping from one state to the next, moving forward in time.
+    Nearly every program proof also works by finding an \index{invariant}\emph{invariant} of a transition system, or a property that always holds of every state reachable from some starting state.
+    The concept of invariant is very close to being a direct reinterpretation of mathematical induction, that glue of every serious mathematical development, known and loved by all.
+
+  \item \index{abstraction}\textbf{Abstraction.}
+    Often a transition system is too complex to analyze directly.
+    Instead, we \emph{abstract} it with another transition system that is somehow more tractable, proving that the new system preserves all relevant properties of the original.
+
+  \item \index{modularity}\textbf{Modularity.}
+    Similarly, when a transition system is too complex, we often break it into separate \emph{modules} and use some well-behaved composition operators to reassemble them into the whole.
+    Often abstraction and modularity go together, as we decompose a system both \index{horizontal decomposition}\emph{horizontally} (i.e., with modularity), splitting it into more manageable parts, and \index{vertical decomposition}\emph{vertically} (i.e., with abstraction), simplifying parts in ways that preserve key properties.
+    We can even alternate between strategies, breaking a system into parts, abstracting one as a simpler part, further decomposing that part into pieces, and so on.
+\end{itemize}
+
+In the course of the book, we will never quite define any of these meta-techniques in complete formality.
+Instead, we'll meet many examples of each, called out by eye-catching margin notes.
+Generalizing from the examples should help the reader start developing an intuition for when to use each element and for the common design patterns that apply.
+
+The core subject matter of the book is often grouped under traditional disciplinary headers like \index{semantics}\emph{semantics}, \index{programming-languages theory}\emph{programming-languages theory}, \index{formal methods}\emph{formal methods}, and \index{verification}\emph{verification}.
+Often these different traditions have their own competing terminology for shared concepts.
+We'll follow one particular set of unified terminology and notation, cherry-picked from the conventions of different communities.
+There really is a huge amount of commonality across everything that we'll study, so we don't want to distract by constantly translating between notations.
+It is quite important to be literate in the standard notational conventions, which are almost always implemented with \index{\LaTeX{}}\LaTeX{}, and we stick entirely to that kind of notation in this book.
+However, we follow another, much less usual convention: while we give theorem and lemma statements, we rarely give their proofs.
+The reason is that the author and many other researchers today feel that proofs on paper have outlived their usefulness.
+Instead, the proofs are all found in the parallel world of the accompanying Coq source code.
+
+That is, each chapter of this book has a corresponding Coq source file, distributed with the general book source code.
+The Coq sources are heavily commented and may even, in many cases, be feasible to read without also reading the book chapters.
+More importantly, the Coq sources aren't just meant to be \emph{read}.
+They are meant to be \emph{executed}.
+We suggest stepping through them interactively, seeing intermediate states of proofs as appropriate.
+The book proper can be read without the Coq sources, to learn the standard background material of program proof; and the Coq sources can be read without the book proper, to learn a particular concrete realization of those ideas.
+However, they go better together.
+
+
 \appendix
 
 \backmatter
 %    Bibliography styles amsplain or harvard are also acceptable.
-\bibliographystyle{amsalpha}
-\bibliography{}
+%% \bibliographystyle{amsalpha}
+%% \bibliography{}
 %    See note above about multiple indexes.
 \printindex
 

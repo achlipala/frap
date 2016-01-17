@@ -42,9 +42,9 @@ Ltac invert0 e := invert e; fail.
 Ltac invert1 e := invert0 e || (invert e; []).
 Ltac invert2 e := invert1 e || (invert e; [|]).
 
-Ltac simplify := simpl in *.
+Ltac simplify := simpl in *; intros; try autorewrite with core in *.
 
-Ltac linear_arithmetic :=
+Ltac linear_arithmetic := intros;
     repeat match goal with
            | [ |- context[max ?a ?b] ] =>
              let Heq := fresh "Heq" in destruct (Max.max_spec a b) as [[? Heq] | [? Heq]];
@@ -68,3 +68,5 @@ Ltac cases E :=
      | {_} + {_} => destruct E
      | _ => let Heq := fresh "Heq" in destruct E eqn:Heq
      end.
+
+Global Opaque max min.

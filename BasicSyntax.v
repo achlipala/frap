@@ -247,4 +247,115 @@ Module ArithWithVariables.
            end; equality || linear_arithmetic || ring.
   Qed.
 
+  Definition isConst (e : arith) : option nat :=
+    match e with
+    | Const n => Some n
+    | _ => None
+    end.
+
+  Fixpoint pushMultiplicationInside' (multiplyBy : nat) (e : arith) : arith :=
+    match e with
+    | Const n => Const (multiplyBy * n)
+    | Var _ => Times (Const multiplyBy) e
+    | Plus e1 e2 => Plus (pushMultiplicationInside' multiplyBy e1)
+                         (pushMultiplicationInside' multiplyBy e2)
+    | Times e1 e2 =>
+      match isConst e1 with
+      | Some k => pushMultiplicationInside' (k * multiplyBy) e2
+      | None => Times (pushMultiplicationInside' multiplyBy e1) e2
+      end
+    end.
+
+  Definition pushMultiplicationInside (e : arith) : arith :=
+    pushMultiplicationInside' 1 e.
+
+  Lemma n_times_0 : forall n, n * 0 = 0.
+  Proof.
+    linear_arithmetic.
+  Qed.
+
+  Lemma depth_pushMultiplicationInside'_irrelevance0 : forall e multiplyBy,
+    depth (pushMultiplicationInside' multiplyBy e)
+    = depth (pushMultiplicationInside' 0 e).
+  Proof.
+    induct e; simplify.
+
+    linear_arithmetic.
+
+    linear_arithmetic.
+
+    rewrite IHe1.
+    rewrite IHe2.
+    linear_arithmetic.
+
+    cases (isConst e1); simplify.
+
+    rewrite IHe2.
+    rewrite n_times_0.
+    linear_arithmetic.
+
+    rewrite IHe1.
+    linear_arithmetic.
+  Qed.
+
+  Lemma depth_pushMultiplicationInside'_irrelevance0_snazzy : forall e multiplyBy,
+    depth (pushMultiplicationInside' multiplyBy e)
+    = depth (pushMultiplicationInside' 0 e).
+  Proof.
+    induct e; simplify;
+    try match goal with
+        | [ |- context[match ?E with _ => _ end] ] => cases E; simplify
+        end; equality.
+  Qed.
+
+  Lemma depth_pushMultiplicationInside'_irrelevance : forall e multiplyBy1 multiplyBy2,
+    depth (pushMultiplicationInside' multiplyBy1 e)
+    = depth (pushMultiplicationInside' multiplyBy2 e).
+  Proof.
+    intros.
+    transitivity (depth (pushMultiplicationInside' 0 e)).
+    apply depth_pushMultiplicationInside'_irrelevance0.
+    symmetry.
+    apply depth_pushMultiplicationInside'_irrelevance0.
+  Qed.
+
+  Lemma depth_pushMultiplicationInside' : forall e,
+    depth (pushMultiplicationInside' 0 e) <= S (depth e).
+  Proof.
+    induct e; simplify.
+
+    linear_arithmetic.
+
+    linear_arithmetic.
+
+    linear_arithmetic.
+
+    cases (isConst e1); simplify.
+
+    rewrite n_times_0.
+    linear_arithmetic.
+
+    linear_arithmetic.
+  Qed.
+
+  Hint Rewrite n_times_0.
+
+  Lemma depth_pushMultiplicationInside'_snazzy : forall e,
+    depth (pushMultiplicationInside' 0 e) <= S (depth e).
+  Proof.
+    induct e; simplify;
+    try match goal with
+        | [ |- context[match ?E with _ => _ end] ] => cases E; simplify
+        end; linear_arithmetic.
+  Qed.
+
+  Theorem depth_pushMultiplicationInside : forall e,
+    depth (pushMultiplicationInside e) <= S (depth e).
+  Proof.
+    simplify.
+    unfold pushMultiplicationInside.
+    rewrite depth_pushMultiplicationInside'_irrelevance0.
+    apply depth_pushMultiplicationInside'.
+  Qed.
+
 End ArithWithVariables.

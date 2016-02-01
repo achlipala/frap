@@ -5,7 +5,7 @@
 
 Require Import Frap.
 (* This [Import] command is for including a library of code, theorems, tactics, etc.
- * Here we just including the standard library of the book.
+ * Here we just include the standard library of the book.
  * We won't distinguish carefully between built-in Coq features and those provided by that library. *)
 
 (* As a first example, let's look at the syntax of simple arithmetic expressions.
@@ -29,8 +29,7 @@ Module ArithWithConstants.
   (* How many nodes appear in the tree for an expression?
    * Unlike in many programming languages, in Coq,
    * recursive functions must be marked as recursive explicitly.
-   * That marking comes with the [Fixpoint] command,
-   * as opposed to [Definition].
+   * That marking comes with the [Fixpoint] command, as opposed to [Definition].
    * Note also that Coq checks termination of each recursive definition.
    * Intuitively, recursive calls must be on subterms of the original argument. *)
   Fixpoint size (e : arith) : nat :=
@@ -276,6 +275,9 @@ Module ArithWithVariables.
         end; equality.
   Qed.
 
+  (* *Constant folding* is one of the classic compiler optimizations.
+   * We replace find opportunities to replace fancier expressions
+   * with known constant values. *)
   Fixpoint constantFold (e : arith) : arith :=
     match e with
     | Const _ => e
@@ -302,6 +304,12 @@ Module ArithWithVariables.
       end
     end.
 
+  (* This is supposed to be an *optimization*, so it had better not *increase*
+   * the size of an expression!
+   * There are enough cases to consider here that we skip straight to
+   * the automation.
+   * A new scripting construct is [match] patterns with dummy bodies.
+   * Such a pattern matches *any* [match] in a goal, over any type! *)
   Theorem size_constantFold : forall e, size (constantFold e) <= size e.
   Proof.
     induct e; simplify;
@@ -310,6 +318,7 @@ Module ArithWithVariables.
            end; linear_arithmetic.
   Qed.
 
+  (* Business as usual, with another commuting law *)
   Theorem commuter_constantFold : forall e, commuter (constantFold e) = constantFold (commuter e).
   Proof.
     induct e; simplify;
@@ -318,14 +327,39 @@ Module ArithWithVariables.
            | [ H : ?f _ = ?f _ |- _ ] => invert H
            | [ |- ?f _ = ?f _ ] => f_equal
            end; equality || linear_arithmetic || ring.
+    (* [f_equal]: when the goal is an equality between two applications of
+     *   the same function, switch to proving that the function arguments are
+     *   pairwise equal.
+     * [invert H]: replace hypothesis [H] with other facts that can be deduced
+     *   from the structure of [H]'s statement.  This is admittedly a fuzzy
+     *   description for now; we'll learn much more about the logic shortly!
+     *   Here, what matters is that, when the hypothesis is an equality between
+     *   two applications of a constructor of an inductive type, we learn that
+     *   the arguments to the constructor must be pairwise equal.
+     * [ring]: prove goals that are equalities over some registered ring or
+     *   semiring, in the sense of algebra, where the goal follows solely from
+     *   the axioms of that algebraic structure. *)
   Qed.
 
+  (* To define a further transformation, we first write a roundabout way of
+   * testing whether an expression is a constant.
+   * This detour happens to be useful to avoid overhead in concert with
+   * pattern matching, since Coq internally elaborates wildcard [_] patterns
+   * into separate cases for all constructors not considered beforehand.
+   * That expansion can create serious code blow-ups, leading to serious
+   * proof blow-ups! *)
   Definition isConst (e : arith) : option nat :=
     match e with
     | Const n => Some n
     | _ => None
     end.
 
+  (* Our next target is a function that finds multiplications by constants
+   * and pushes the multiplications to the leaves of syntax trees,
+   * ideally finding constants, which can be replaced by larger constants,
+   * not affecting the meanings of expressions.
+   * This helper function takes a coefficient [multiplyBy] that should be
+   * applied to an expression. *)
   Fixpoint pushMultiplicationInside' (multiplyBy : nat) (e : arith) : arith :=
     match e with
     | Const n => Const (multiplyBy * n)
@@ -339,14 +373,19 @@ Module ArithWithVariables.
       end
     end.
 
+  (* The overall transformation just fixes the initial coefficient as [1]. *)
   Definition pushMultiplicationInside (e : arith) : arith :=
     pushMultiplicationInside' 1 e.
 
+  (* Let's prove this boring arithmetic property, so that we may use it below. *)
   Lemma n_times_0 : forall n, n * 0 = 0.
   Proof.
     linear_arithmetic.
   Qed.
 
+  (* A fun fact about pushing multiplication inside:
+   * the coefficient has no effect on depth!
+   * Let's start by showing any coefficient is equivalent to coefficient 0. *)
   Lemma depth_pushMultiplicationInside'_irrelevance0 : forall e multiplyBy,
     depth (pushMultiplicationInside' multiplyBy e)
     = depth (pushMultiplicationInside' 0 e).
@@ -358,6 +397,10 @@ Module ArithWithVariables.
     linear_arithmetic.
 
     rewrite IHe1.
+    (* [rewrite H]: where [H] is a hypothesis or previously proved theorem,
+     *  establishing [forall x1 .. xN, e1 = e2], find a subterm of the goal
+     *  that equals [e1], given the right choices of [xi] values, and replace
+     *  that subterm with [e2]. *)
     rewrite IHe2.
     linear_arithmetic.
 
@@ -371,6 +414,10 @@ Module ArithWithVariables.
     linear_arithmetic.
   Qed.
 
+  (* It can be remarkably hard to get Coq's automation to be dumb enough to
+   * help us demonstrate all of the primitive tactics. ;-)
+   * In particular, we can redo the proof in an automated way, without the
+   * explicit rewrites. *)
   Lemma depth_pushMultiplicationInside'_irrelevance0_snazzy : forall e multiplyBy,
     depth (pushMultiplicationInside' multiplyBy e)
     = depth (pushMultiplicationInside' 0 e).
@@ -381,17 +428,27 @@ Module ArithWithVariables.
         end; equality.
   Qed.
 
+  (* Now the general corollary about irrelevance of coefficients for depth. *)
   Lemma depth_pushMultiplicationInside'_irrelevance : forall e multiplyBy1 multiplyBy2,
     depth (pushMultiplicationInside' multiplyBy1 e)
     = depth (pushMultiplicationInside' multiplyBy2 e).
   Proof.
-    intros.
+    simplify.
     transitivity (depth (pushMultiplicationInside' 0 e)).
+    (* [transitivity X]: when proving [Y = Z], switch to proving [Y = X]
+     * and [X = Z]. *)
     apply depth_pushMultiplicationInside'_irrelevance0.
+    (* [apply H]: for [H] a hypothesis or previously proved theorem,
+     *   establishing some fact that matches the structure of the current
+     *   conclusion, switch to proving [H]'s own hypotheses.
+     *   This is *backwards reasoning* via a known fact. *)
     symmetry.
+    (* [symmetry]: when proving [X = Y], switch to proving [Y = X]. *)
     apply depth_pushMultiplicationInside'_irrelevance0.
   Qed.
 
+  (* Let's prove that pushing-inside has only a small effect on depth,
+   * considering for now only coefficient 0. *)
   Lemma depth_pushMultiplicationInside' : forall e,
     depth (pushMultiplicationInside' 0 e) <= S (depth e).
   Proof.
@@ -412,6 +469,8 @@ Module ArithWithVariables.
   Qed.
 
   Hint Rewrite n_times_0.
+  (* Registering rewrite hints will get [simplify] to apply them for us
+   * automatically! *)
 
   Lemma depth_pushMultiplicationInside'_snazzy : forall e,
     depth (pushMultiplicationInside' 0 e) <= S (depth e).
@@ -427,6 +486,7 @@ Module ArithWithVariables.
   Proof.
     simplify.
     unfold pushMultiplicationInside.
+    (* [unfold X]: replace [X] by its definition. *)
     rewrite depth_pushMultiplicationInside'_irrelevance0.
     apply depth_pushMultiplicationInside'.
   Qed.

@@ -4,18 +4,35 @@
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
 Require Import Frap.
+(* This [Import] command is for including a library of code, theorems, tactics, etc.
+ * Here we just including the standard library of the book.
+ * We won't distinguish carefully between built-in Coq features and those provided by that library. *)
 
-
+(* As a first example, let's look at the syntax of simple arithmetic expressions.
+ * We use the Coq feature of modules, which let us group related definitions together.
+ * A key benefit is that names can be reused across modules,
+ * which is helpful to define several variants of a suite of functionality,
+ * within a single source file. *)
 Module ArithWithConstants.
 
+  (* The following definition closely mirrors a standard BNF grammar for expressions.
+   * It defines abstract syntax trees of arithmetic expressions. *)
   Inductive arith : Set :=
   | Const (n : nat)
   | Plus (e1 e2 : arith)
   | Times (e1 e2 : arith).
 
+  (* Here are a few examples of specific expressions. *)
   Example ex1 := Const 42.
   Example ex2 := Plus (Const 1) (Times (Const 2) (Const 3)).
 
+  (* How many nodes appear in the tree for an expression?
+   * Unlike in many programming languages, in Coq,
+   * recursive functions must be marked as recursive explicitly.
+   * That marking comes with the [Fixpoint] command,
+   * as opposed to [Definition].
+   * Note also that Coq checks termination of each recursive definition.
+   * Intuitively, recursive calls must be on subterms of the original argument. *)
   Fixpoint size (e : arith) : nat :=
     match e with
     | Const _ => 1
@@ -23,9 +40,11 @@ Module ArithWithConstants.
     | Times e1 e2 => 1 + size e1 + size e2
     end.
 
+  (* Here's how to run a program (evaluate a term) in Coq. *)
   Compute size ex1.
   Compute size ex2.
 
+  (* What's the longest path from the root of a syntax tree to a leaf? *)
   Fixpoint depth (e : arith) : nat :=
     match e with
     | Const _ => 1
@@ -36,12 +55,35 @@ Module ArithWithConstants.
   Compute depth ex1.
   Compute size ex2.
 
+  (* Our first proof!
+   * Size is an upper bound on depth. *)
   Theorem depth_le_size : forall e, depth e <= size e.
   Proof.
+    (* Within a proof, we apply commands called *tactics*.
+     * Here's our first one.
+     * Throughout the book's Coq code, we give a brief note documenting each tactic,
+     * after its first use.
+     * Keep in mind that the best way to understand what's going on
+     * is to run the proof script for yourself, inspecting intermediate states! *)
     induct e.
+    (* [induct x]: where [x] is a variable in the theorem statement,
+     *   structure the proof by induction on the structure of [x].
+     *   You will get one generated subgoal per constructor in the
+     *   inductive definition of [x].  (Indeed, it is required that 
+     *   [x]'s type was introduced with [Inductive].) *)
 
     simplify.
+    (* [simplify]: simplify throughout the goal, applying the definitions of
+     *   recursive functions directly.  That is, when a subterm
+     *   matches one of the [match] cases in a defining [Fixpoint],
+     *   replace with the body of that case, then repeat. *)
     linear_arithmetic.
+    (* [linear_arithemtic]: a complete decision procedure for linear arithmetic.
+     *   Relevant formulas are essentially those built up from
+     *   variables and constant natural numbers and integers
+     *   using only addition, with equality and inequality
+     *   comparisons on top.  (Multiplication by constants
+     *   is supported, as a shorthand for repeated addition.) *)
 
     simplify.
     linear_arithmetic.
@@ -53,8 +95,12 @@ Module ArithWithConstants.
   Theorem depth_le_size_snazzy : forall e, depth e <= size e.
   Proof.
     induct e; simplify; linear_arithmetic.
+    (* Oo, look at that!  Chaining tactics with semicolon, as in [t1; t2],
+     * asks to run [t1] on the goal, then run [t2] on *every*
+     * generated subgoal.  This is an essential ingredient for automation. *)
   Qed.
 
+  (* A silly recursive function: swap the operand orders of all binary operators. *)
   Fixpoint commuter (e : arith) : arith :=
     match e with
     | Const _ => e
@@ -64,6 +110,8 @@ Module ArithWithConstants.
 
   Compute commuter ex1.
   Compute commuter ex2.
+
+  (* [commuter] has all the appropriate interactions with other functions (and itself). *)
 
   Theorem size_commuter : forall e, size (commuter e) = size e.
   Proof.
@@ -78,15 +126,23 @@ Module ArithWithConstants.
   Theorem commuter_inverse : forall e, commuter (commuter e) = e.
   Proof.
     induct e; simplify; equality.
+    (* [equality]: a complete decision procedure for the theory of equality
+     *   and uninterpreted functions.  That is, the goal must follow
+     *   from only reflexivity, symmetry, transitivity, and congruence
+     *   of equality, including that functions really do behave as functions. *)
   Qed.
 
 End ArithWithConstants.
 
+(* Let's shake things up a bit by adding variables to expressions.
+ * Note that all of the automated proof scripts from before will keep working
+ * with no changes!  That sort of "free" proof evolution is invaluable for
+ * theorems about real-world compilers, say. *)
 Module ArithWithVariables.
 
   Inductive arith : Set :=
   | Const (n : nat)
-  | Var (x : var)
+  | Var (x : var) (* <-- this is the new constructor! *)
   | Plus (e1 e2 : arith)
   | Times (e1 e2 : arith).
 
@@ -146,6 +202,12 @@ Module ArithWithVariables.
     induct e; simplify; equality.
   Qed.
 
+  (* Now that we have variables, we can consider new operations,
+   * like substituting an expression for a variable.
+   * We use an infix operator [==v] for equality tests on strings.
+   * It has a somewhat funny and very expressive type,
+   * whose details we will try to gloss over.
+   * (To dig into it more on your own, the appropriate keyword is "dependent types.") *)
   Fixpoint substitute (inThis : arith) (replaceThis : var) (withThis : arith) : arith :=
     match inThis with
     | Const _ => inThis
@@ -154,6 +216,7 @@ Module ArithWithVariables.
     | Times e1 e2 => Times (substitute e1 replaceThis withThis) (substitute e2 replaceThis withThis)
     end.
 
+  (* An intuitive property about how much [substitute] might increase depth. *)
   Theorem substitute_depth : forall replaceThis withThis inThis,
     depth (substitute inThis replaceThis withThis) <= depth inThis + depth withThis.
   Proof.
@@ -164,6 +227,9 @@ Module ArithWithVariables.
 
     simplify.
     cases (x ==v replaceThis).
+    (* [cases e]: break the proof into one case for each constructor that might have
+     *   been used to build the value of expression [e].  In the special case where
+     *   [e] essentially has a Boolean type, we consider whether [e] is true or false. *)
     linear_arithmetic.
     simplify.
     linear_arithmetic.
@@ -175,6 +241,12 @@ Module ArithWithVariables.
     linear_arithmetic.
   Qed.
 
+  (* Let's get fancier about automation, using [match goal] to pattern-match the goal
+   * and decide what to do next!
+   * The [|-] syntax separates hypotheses and conclusion in a goal.
+   * The [context] syntax is for matching against *any subterm* of a term.
+   * The construct [try] is also useful, for attempting a tactic and rolling back
+   * the effect if any error is encountered. *)
   Theorem substitute_depth_snazzy : forall replaceThis withThis inThis,
     depth (substitute inThis replaceThis withThis) <= depth inThis + depth withThis.
   Proof.
@@ -184,6 +256,7 @@ Module ArithWithVariables.
         end; linear_arithmetic.
   Qed.
 
+  (* A silly self-substitution has no effect. *)
   Theorem substitute_self : forall replaceThis inThis,
     substitute inThis replaceThis (Var replaceThis) = inThis.
   Proof.

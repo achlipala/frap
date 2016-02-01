@@ -1,6 +1,6 @@
 \documentclass{amsbook}
 
-\usepackage{hyperref,url}
+\usepackage{hyperref,url,amsmath,proof}
 
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -52,7 +52,7 @@ For more information, see the book's home page:
 \mbox{}\vfill
 \begin{center}
 
-Copyright Adam Chlipala 2015.
+Copyright Adam Chlipala 2015-2016.
 
 
 This work is licensed under a
@@ -70,6 +70,8 @@ The license text is available at:
 \tableofcontents
 
 \mainmatter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Why Prove the Correctness of Programs?}
 
@@ -136,6 +138,322 @@ They are meant to be \emph{executed}.
 We suggest stepping through them interactively, seeing intermediate states of proofs as appropriate.
 The book proper can be read without the Coq sources, to learn the standard background material of program proof; and the Coq sources can be read without the book proper, to learn a particular concrete realization of those ideas.
 However, they go better together.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Formalizing Program Syntax}
+
+\section{Concrete Syntax}
+
+The definition of a program starts with the definition of a programming language, and the definition of a programming language starts with its \emph{syntax}\index{syntax}, which covers which sorts of phrases are basically well-formed.
+In the next chapter, we turn to \emph{semantics}\index{semantics}, which, in the course of saying what programs \emph{mean}, may impose further validity conditions.
+Turning to examples, let's start with \emph{concrete syntax}\index{concrete syntax}, which decrees which sequences of characters are acceptable.
+For a simple language of arithmetic expressions, we might accept the following strings as valid.
+$$\begin{array}{l}
+  3 \\
+  x \\
+  3 + x \\
+  y * (3 + x)
+\end{array}$$
+
+Plenty of other strings might be invalid, like these.
+$$\begin{array}{l}
+  1 + + \; 2 \\
+  x \; y \; z
+\end{array}$$
+
+Rather than appeal to our intuition about grade-school arithmetic, we prefer to formalize concrete syntax with a \emph{grammar}\index{grammar}, following a style known as \emph{Backus-Naur Form (BNF)}\index{Backus-Naur Form}\index{BNF}.
+We have a set of \emph{nonterminals}\index{nonterminal} (e.g., $e$ below), standing for sets of allowable strings.
+Some are defined by appeal to existing sets, as below, when we define constants $n$ in terms of the well-known set $\mathbb N$\index{N@$\mathbb N$} of natural numbers\index{natural numbers} (nonnegative integers).
+$$\begin{array}{rrcl}
+  \textrm{Constants} & n &\in& \mathbb N \\
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e &::=& n \mid x \mid e + e \mid e \times e
+\end{array}$$
+
+To interpret the grammar in plain English: we assume sets of constants and variables, based on well-known sets of natural numbers and strings, respectively.
+We then define expressions to include constants, variables, addition, and multiplication.
+Crucially, the last two cases are specified \emph{recursively}: we show how to build bigger expressions out of smaller ones.
+
+Incidentally, we're already seeing how many different formal notations creep into the discussion of formal program proofs.
+All of this content is typeset in \LaTeX{}\index{\LaTeX{}}, and it may be helpful to consult the book sources, to see how it's all done.
+
+Throughout the subject, one of our most crucial tools will be \emph{inductive definitions}\index{inductive definition}, explaining how to build up bigger sets from smaller ones.
+The recursive nature of the grammar above is implicitly giving an inductive definition.
+A more general notation for inductive definitions provides a series of \emph{inference rules}\index{inference rules} that define a set.
+Formally, the set is defined to be \emph{the smallest one that satisfies all the rules}.
+Each rule has \emph{premises}\index{premise} and a \emph{conclusion}\index{conclusion}.
+We illustrate with four rules that together are equivalent to the BNF grammar above, for defining a set $\mathsf{Exp}$ of expressions.
+$$\infer{n \in \mathsf{Exp}}{
+  n \in \mathbb N
+}
+\quad \infer{x \in \mathsf{Exp}}{
+  x \in \mathsf{Strings}
+}
+\quad \infer{e_1 + e_2 \in \mathsf{Exp}}{
+  e_1 \in \mathsf{Exp}
+  & e_2 \in \mathsf{Exp}
+}
+\quad \infer{e_1 \times e_2 \in \mathsf{Exp}}{
+  e_1 \in \mathsf{Exp}
+  & e_2 \in \mathsf{Exp}
+}$$
+
+The general reading of an inference rule is: \textbf{if} all the facts above the horizontal line are true, \textbf{then} the fact below the line is true, too.
+The rule implicitly needs to hold for \emph{all} values of the \emph{metavariables}\index{metavariable} (like $n$ and $e_1$) that appear within it; we can model them more explicitly with a sort of top-level universal quantification.
+Newcomers to semantics often react negatively to seeing this style of definition, but very quickly it becomes apparent as a remarkably compact notation for expressing many concepts.
+Think of it as a domain-specific programming language for mathematical definitions, an analogy that becomes quite concrete in the associated Coq code!
+
+\section{Abstract Syntax}
+
+After that brief interlude with concrete syntax, we now drop all formal treatment of it, for the rest of the book!
+Instead, we concern ourselves with \emph{abstract syntax}\index{abstract syntax}, the real heart of language definitions.
+Now programs are \emph{abstract syntax trees}\index{abstract syntax tree} (\emph{ASTs}\index{AST}), corresponding to inductive type definitions in Coq or algebraic datatype\index{algebraic datatype} definitions in Haskell\index{Haskell}.
+Such types can be defined by enumerating their \emph{constructor}\index{constructor} functions with types.
+\begin{eqnarray*}
+  \mathsf{Const} &:& \mathbb{N} \to \mathsf{Exp} \\
+  \mathsf{Var} &:& \mathsf{Strings} \to \mathsf{Exp} \\
+  \mathsf{Plus} &:& \mathsf{Exp} \times \mathsf{Exp} \to \mathsf{Exp} \\
+  \mathsf{Times} &:& \mathsf{Exp} \times \mathsf{Exp} \to \mathsf{Exp}
+\end{eqnarray*}
+
+Such a list of constructors defines the set $\mathsf{Exp}$ to contain exactly those terms that can be built up with the constructors.
+In inference-rule notation:
+$$\infer{\mathsf{Const}(n) \in \mathsf{Exp}}{
+  n \in \mathbb N
+}
+\quad \infer{\mathsf{Var}(x) \in \mathsf{Exp}}{
+  x \in \mathsf{Strings}
+}
+\quad \infer{\mathsf{Plus}(e_1, e_2) \in \mathsf{Exp}}{
+  e_1 \in \mathsf{Exp}
+  & e_2 \in \mathsf{Exp}
+}
+\quad \infer{\mathsf{Times}(e_1, e_2) \in \mathsf{Exp}}{
+  e_1 \in \mathsf{Exp}
+  & e_2 \in \mathsf{Exp}
+}$$
+
+Actually, semanticists get tired of writing such verbose descriptions, so proofs on paper tend to use exactly the sort of notation that we associated with concrete syntax.
+The trick is mental desugaring of the concrete-syntax notation into abstract syntax!
+We will generally not dwell on the particularities of that process.
+Instead, we repeatedly illustrate it by example, using Coq code that starts with abstract syntax, accompanied by \LaTeX{}-based ``code'' in this book that applies concrete syntax freely.
+
+Abstract syntax is handy for writing \emph{recursive definitions}\index{recursive definition} of functions.
+Here is one in the clausal\index{clausal function definition} style of Haskell\index{Haskell}.
+\begin{eqnarray*}
+  \mathsf{size}(\mathsf{Const}(n)) &=& 1 \\
+  \mathsf{size}(\mathsf{Var}(x)) &=& 1 \\
+  \mathsf{size}(\mathsf{Plus}(e_1, e_2)) &=& \mathsf{size}(e_1) + \mathsf{size}(e_2) \\
+  \mathsf{size}(\mathsf{Times}(e_1, e_2)) &=& \mathsf{size}(e_1) + \mathsf{size}(e_2)
+\end{eqnarray*}
+
+It is important that we include \emph{one clause per constructor of the inductive type}.
+Otherwise, the function would not be \emph{total}\index{total function}.
+We also need to be careful to ensure \emph{termination}\index{termination of recursive definitions}, by making recursive calls only on the arguments of the constructors.
+This termination criterion, adopted by Coq, is called \emph{primitive recursion}\index{primitive recursion}.
+
+\newcommand{\size}[1]{{\left \lvert #1 \right \rvert}}
+
+It is also common to associate a recursive definition with a new notation.
+For example, we might prefer to write $\size{e}$ for $\mathsf{size}(e)$, as follows.
+\begin{eqnarray*}
+  \size{\mathsf{Const}(n)} &=& 1 \\
+  \size{\mathsf{Var}(x)} &=& 1 \\
+  \size{\mathsf{Plus}(e_1, e_2)} &=& 1 + \size{e_1} + \size{e_2} \\
+  \size{\mathsf{Times}(e_1, e_2)} &=& 1 + \size{e_1} + \size{e_2}
+\end{eqnarray*}
+
+\newcommand{\depth}[1]{{\left \lceil #1 \right \rceil}}
+
+Let's continue to exercise our creative license and write $\depth{e}$ for the \emph{depth} of $e$, that is, the length of the longest downward path from the syntax-tree root to any leaf.
+\begin{eqnarray*}
+  \depth{\mathsf{Const}(n)} &=& 1 \\
+  \depth{\mathsf{Var}(x)} &=& 1 \\
+  \depth{\mathsf{Plus}(e_1, e_2)} &=& 1 + \max(\depth{e_1}, \depth{e_2}) \\
+  \depth{\mathsf{Times}(e_1, e_2)} &=& 1 + \max(\depth{e_1}, \depth{e_2})
+\end{eqnarray*}
+
+
+\section{Structural Induction Principles}
+
+The main reason to prefer abstract syntax is that, while strings of text \emph{seem} natural and simple to our human brains, they are really a lot of trouble to treat in complete formality.
+Inductive trees are much nicer to manipulate.
+Considering the name, it's probably not surprising that the main thing we want to do on them is \emph{induction}\index{induction}, an activity most familiar in the form of \emph{mathematical induction}\index{mathematical induction} over the natural numbers.
+In this book, we will not dwell on many proofs about natural numbers, instead presenting the more general and powerful idea of \emph{structural induction}\index{structural induction} that subsumes mathematical induction in a formal sense, based on viewing the natural numbers as one simple inductively defined set.
+
+There is a general recipe to go from an inductive definition to its associated induction principle.
+When we define set $S$ inductively, we gain an induction principle for proving that some predicate $P$ holds for all elements of $S$.
+To make this conclusion, we must discharge one proof obligation per rule of the inductive definition.
+Recall our last rule-based definition above, for the abstract syntax of $\mathsf{Exp}$.
+To derive an $\mathsf{Exp}$ structural induction principle, we produce a new set of rules, cloning each rule with two key modifications:
+\begin{enumerate}
+  \item Replace each conclusion, of the form $E \in S$, with a conclusion $P(E)$.  That is, the obligations involve \emph{showing} that $P$ holds of certain terms.
+  \item For each premise $E \in S$, add a companion premise $P(E)$.  That is, the obligation allows \emph{assuming} that $P$ holds of certain terms.  Each such assumption is called an \emph{inductive hypothesis}\index{inductive hypothesis} (\emph{IH}\index{IH}).
+\end{enumerate}
+
+That mechanical procedure derives the following four proof obligations, associated with an inductive proof that $\forall x \in \mathsf{X}. \; P(x)$.
+$$\infer{P(\mathsf{Const}(n))}{
+  n \in \mathbb N
+}
+\quad \infer{P(\mathsf{Var}(x))}{
+  x \in \mathsf{Strings}
+}$$
+$$\quad \infer{P(\mathsf{Plus}(e_1, e_2))}{
+  e_1 \in \mathsf{Exp}
+  & P(e_1)
+  & e_2 \in \mathsf{Exp}
+  & P(e_2)
+}
+\quad \infer{P(\mathsf{Times}(e_1, e_2))}{
+  e_1 \in \mathsf{Exp}
+  & P(e_1)
+  & e_2 \in \mathsf{Exp}
+  & P(e_2)
+}$$
+
+In other words, to establish $\forall x \in \mathsf{X}. \; P(x)$, we need to prove that each of these inference rules is valid.
+
+To see induction in action, we prove a theorem giving a sanity check on our two recursive definitions from earlier: depth can never exceed size.
+\begin{theorem}
+  For all $e \in \mathsf{Exp}$, $\depth{e} \leq \size{e}$.
+\end{theorem}
+\begin{proof}
+  By induction on the structure of $e$.
+\end{proof}
+
+That sort of minimalist proof often surprises and frustrates newcomers.
+Our position here is that proof checking is an activity fit for machines, not people, so we will leave out gory details, which are to be found in the accompanying Coq code, for this theorem and many others associated with this chapter.
+Actually, even published proofs on paper tend to use ``proofs'' as brief as the one above, relying on the reader's experience to ``fill in the blanks''!
+Unsurprisingly, fairly often there are logical errors in such arguments, leading to acceptance of bogus theorems.
+For that reason, we stick to machine-checked proofs here, using the book chapters to introduce concepts, reasoning principles, and statements of key theorems and lemmas.
+
+\section{Decidable Theories}
+
+We do, however, need to get all the proof details filled in somehow.
+One of the most convenient cases is when a proof goal fits into some \emph{decidable theory}\index{decidable theory}.
+We follow the sense from computability theory\index{computability theory}, where we consider some \emph{decision problem}\index{decision problem}, as a (usually infinite) set $F$ of formulas and some subset $T \subseteq F$ of \emph{true} formulas, possibly considering only those provable using some limited set of inference rules.
+The decision problem is \emph{decidable} if and only if there exists some always terminating program that, when passed some $f \in F$ as input, returns ``true'' if and only if $f \in T$.
+Decidability of theories is handy because, whenever our goal belongs to the $F$ set of a decidable theory, we can discharge the goal automatically by running the deciding program that must exist.
+
+One common decidable theory is \emph{linear arithmetic}\index{linear arithmetic}, whose $F$ set is generated by the following grammar as $\phi$.
+$$\begin{array}{rrcl}
+  \textrm{Constants} & n &\in& \mathbb Z \\
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Terms} & e &::=& x \mid n \mid e + e \mid e - e \\
+  \textrm{Propositions} & \phi &::=& e = e \mid e < e \mid \neg \phi \mid \phi \land \phi
+\end{array}$$
+
+The arithmetic terms used here are \emph{linear} in the same sense as \emph{linear algebra}\index{linear algebra}: we never multiply together two terms containing variables.
+Actually, multiplication is prohibited outright, but we allow multiplication by a constant as an abbreviation (logically speaking) for repeated addition.
+Propositions are formed out of equality and less-than tests on terms, and we also have the Boolean negation (``not'') operator $\neg$ and conjunction (``and'') operator $\land$.
+This set of propositional operators is enough to encode the other usual inequality and propositional operators, so we allow them, too, as convenient shorthands.
+
+Applying decidable theories in a proof assistant like Coq, it is important to understand how a theory may apply to formulas that don't actually satisfy its grammar literally.
+For instance, we may want to prove $f(x) - f(x) = 0$, for some fancy function $f$ well outside the grammar above.
+However, we only need to introduce a new variable $y$, defined with the equation $y = f(x)$, to arrive at a new goal $y - y = 0$.
+A linear-arithmetic procedure makes short work of this goal, and we may then derive the original goal by substituting back in for $y$.
+Coq's tactics based on decidable theories do all that hard work for us.
+
+\medskip
+
+Another important decidable theory is of \emph{equality with uninterpreted functions}\index{theory of equality with uninterpreted functions}.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Functions} & f &\in& \mathsf{Strings} \\
+  \textrm{Terms} & e &::=& x \mid f(e, \ldots, e) \\
+  \textrm{Propositions} & \phi &::=& e = e \mid \neg \phi \mid \phi \land \phi
+\end{array}$$
+
+In this theory, we know nothing about the detailed properties of the variables or functions that we use.
+Instead, we must reason solely from the basic properties of equality:
+$$\infer[\mathsf{Reflexivity}]{e = e}{}
+\quad \infer[\mathsf{Symmetry}]{e_1 = e_2}{
+  e_2 = e_1
+}
+\quad \infer[\mathsf{Transitivity}]{e_1 = e_2}{
+  e_1 = e_3
+  & e_3 = e_2
+}$$
+$$\infer[\mathsf{Congruence}]{f_1(e_1) = f_2(e_2)}{
+  f_1 = f_2
+  & e_1 = e_2
+}$$
+
+\medskip
+
+As one more example of a decidable theory, consider the algebraic structure of \emph{semirings}\index{semirings}, which may profitably be remembered as ``things that act like natural numbers.''
+A semiring is any set containing two elements notated 0 and 1, closed under two binary operators notated $+$ and $\times$.
+The notations are suggestive, but in fact we have free reign in choosing the set, elements, and operators, so long as the following axioms\footnote{The equations are taken almost literally from \url{https://en.wikipedia.org/wiki/Semiring}.} are satisfied:
+\begin{eqnarray*}
+  (a + b) + c &=& a + (b + c) \\
+  0 + a &=& a \\
+  a + 0 &=& a \\
+  a + b &=& b + a \\
+  (a \times b) \times c &=& a \times (b \times c) \\
+  1 \times a &=& a \\
+  a \times 1 &=& a \\
+  a \times (b + c) &=& (a \times b) + (a \times c) \\
+  (a + b) \times c &=& (a \times c) + (b \times c) \\
+  0 \times a &=& 0 \\
+  a \times 0 &=& 0
+\end{eqnarray*}
+
+The formal theory is then as follows.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Functions} & f &\in& \mathsf{Strings} \\
+  \textrm{Terms} & e &::=& x \mid e + e \mid e \times e \\
+  \textrm{Propositions} & \phi &::=& e = e
+\end{array}$$
+
+Note how the applicability of the semiring theory is incomparable to the applicability of the linear-arithmetic theory.
+That is, while some goals are provable via either, some are provable only via the semiring theory and some provable only by linear arithmetic.
+For instance, by the semiring theory, we can prove $x \times y = y \times x$, while linear arithmetic can prove $x - x = 0$.
+
+\section{Simplification and Rewriting}
+
+While we leave most proof details to the accompanying Coq code, it does seem important to introduce two important principles that are often implicit in proofs on paper.
+
+The first is \emph{algebraic simplification}\index{algebraic simplification}, where we apply the defining equations of a recursive definition to simplify a goal.
+For example, recall that our definition of expression size included this clause.
+\begin{eqnarray*}
+  \size{\mathsf{Plus}(e_1, e_2)} &=& 1 + \size{e_1} + \size{e_2}
+\end{eqnarray*}
+Now imagine that we are trying to prove this formula.
+$$\size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 8 + \size{e}$$
+We may apply the defining equation to rewrite into a different formula, where we have essential pushed the definition of $\size{\cdot}$ through the $\mathsf{Plus}$.
+$$1 + \size{e} + \size{\mathsf{Const}(7)} = 7 + \size{e}$$
+Another application of a different defining equation, this time for $\mathsf{Const}$, takes us to here.
+$$1 + \size{e} + 7 = 8 + \size{e}$$
+From here, the goal follows by linear arithmetic.
+
+\medskip
+
+Such a proof establishes a theorem $\forall e \in \mathsf{Exp}. \; \size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 8 + \size{e}$.
+We may use already-proved theorems via a more general \emph{rewriting}\index{rewriting} mechanism, applying whenever we know some quantified equality.
+Within a new goal we are proving, we find some subterm that matches the lefthand side of that equality, after we choose the proper values of the quantified variables.
+The process of finding those values automatically is called \emph{unification}\index{unification}.
+Rewriting enables us to take the subterm we found and replace it with the righthand side of the equation.
+
+As an example, assume that, for some $P$, we know $P(8 + \size{\mathsf{Var}(x)})$ and are trying to prove $P(\size{\mathsf{Plus}(\mathsf{Var}(x), \mathsf{Const}(7))})$.
+We may use our earlier fact to rewrite the argument of $P$ in what we are trying to show, so that it now matches the argument from what we already know, at which point the proof is trivial to finish.
+Here, unification found the assignment $e = \mathsf{Var}(x)$.
+
+\medskip
+
+We close the chapter with an important note on terminology.
+A formula like $P(\size{\mathsf{Plus}(\mathsf{Var}(x), \mathsf{Const}(7))})$ combines several levels of notation.
+We consider that we are doing our mathematical reasoning in some \emph{metalanguage}\index{metalanguage}, which is often applicable to a wide variety of proof tasks.
+We also happen to be applying it here to reason about some \emph{object language}\index{object language}, a programming language whose syntax is defined formally, here the language of arithmetic expressions.
+We have $x$ as a variable of the metalanguage, while $\mathsf{Var}(x)$ is a variable expression of the object language.
+It is difficult to use English to explain the distinction between the two in complete formality, but be on the lookout for places where formulas mix concepts of the metalanguage and object language!
+The general patterns should soon become clear, as they are somehow already familiar to us from natural-language sentences like:
+\begin{quote}
+  The wise man said ``it is time to prove some theorems.''
+\end{quote}
+The quoted remark could just as well be in Spanish instead of English, in which case we have two languages nested in a nontrivial way.
 
 
 \appendix

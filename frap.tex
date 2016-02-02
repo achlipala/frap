@@ -335,7 +335,7 @@ Actually, even published proofs on paper tend to use ``proofs'' as brief as the 
 Unsurprisingly, fairly often there are logical errors in such arguments, leading to acceptance of bogus theorems.
 For that reason, we stick to machine-checked proofs here, using the book chapters to introduce concepts, reasoning principles, and statements of key theorems and lemmas.
 
-\section{Decidable Theories}
+\section{\label{decidable}Decidable Theories}
 
 We do, however, need to get all the proof details filled in somehow.
 One of the most convenient cases is when a proof goal fits into some \emph{decidable theory}\index{decidable theory}.
@@ -465,6 +465,80 @@ The quoted remark could just as well be in Spanish instead of English, in which 
 
 
 \appendix
+
+\chapter{The Coq Proof Assistant}
+
+Coq\index{Coq} is a proof-assistant software package developed as open source, primarily by Inria\index{Inria}, the French national computer-science lab.
+
+\section{Installation and Basic Use}
+
+The project home page is:
+\begin{center}
+  \url{https://coq.inria.fr/}
+\end{center}
+The code associated with this book is designed to work with Coq versions 8.4 and higher.
+The project Web site makes a number of versions available, and versions are also available in popular OS package distributions, along with binaries for platforms where open-source package systems are less common.
+We assume that readers have installed Coq by one of those means or another.
+It will also be almost essential to use some graphical interface for Coq editing.
+The author prefers Proof General\index{Proof General}, an Emacs\index{Emacs} mode:
+\begin{center}
+  \url{http://proofgeneral.inf.ed.ac.uk/}
+\end{center}
+It should be possible to follow along using CoqIDE\index{CoqIDE}, a standalone tool distributed with Coq itself, but we will not give any CoqIDE-specific instructions.
+
+The Proof General instructions are simple: after installing, within a regular Emacs session, open a file with the Coq extension \texttt{.v}.
+Move the point (cursor) to a position where you would like to examine the current state of a proof, etc.
+Then press C-C C-RET (``control-C, control-enter'') to run Coq up to that point.
+Several display panes will open, showing different aspects of Coq's state, any error messages it wants to report, etc.
+This feature is the main workhorse of Proof General.
+It can be used both to move \emph{forward}, checking that Coq accepts a command; and to move \emph{backward}, to undo commands processed previously.
+
+Proof General has plenty of other bells and whistles, but we won't go into them here.
+
+\section{Tactic Reference}
+
+\emph{Tactics} are the commands run in Coq to advance the state of a proof, corresponding to deduction steps at different granularities.
+Here we collect all of the short explanations of tactics that appear in Coq source files associated with the chapters included in this document.
+Note that many of these are specific to the \texttt{Frap} library distributed with this book, where built-in tactics often do quite similar things, but in a way that the author judges to be more of a hassle for beginners.
+
+\begin{description}
+  \item[\texttt{apply} $H$] For $H$ a hypothesis or previously proved theorem, establishing some fact that matches the structure of the current conclusion, switch to proving $H$'s own hypotheses.  This is \emph{backwards reasoning} via a known fact.
+  \item[\texttt{cases} $e$] Break the proof into one case for each constructor that might have been used to build the value of expression $e$.  In the special case where $e$ essentially has a Boolean type, we consider whether $e$ is true or false.
+  \item[\texttt{equality}] A complete decision procedure for the theory of equality and uninterpreted functions.  That is, the goal must follow from only reflexivity, symmetry, transitivity, and congruence of equality, including that functions really do behave as functions.  See Section \ref{decidable}.
+  \item[\texttt{f\_equal}] When the goal is an equality between two applications of the same function, switch to proving that the function arguments are pairwise equal.
+  \item[\texttt{induct} $x$] Where $x$ is a variable in the theorem statement, structure the proof by induction on the structure of $x$.  You will get one generated subgoal per constructor in the inductive definition of $x$.  (Indeed, it is required that $x$'s type was introduced with \texttt{Inductive}.)
+  \item[\texttt{invert} $H$] Replace hypothesis $H$ with other facts that can be deduced from the structure of $H$'s statement.  More detail to be added here soon!
+  \item[\texttt{linear\_arithemtic}] A complete decision procedure for linear arithmetic.  Relevant formulas are essentially those built up from variables and constant natural numbers and integers using only addition and subtraction, with equality and inequality comparisons on top.  (Multiplication by constants is supported, as a shorthand for repeated addition.) See Section \ref{decidable}.
+    \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
+  \item[\texttt{ring}] Prove goals that are equalities over some registered ring or semiring, in the sense of algebra, where the goal follows solely from the axioms of that algebraic structure.  See Section \ref{decidable}.
+  \item[\texttt{simplify}] Simplify throughout the goal, applying the definitions of recursive functions directly.  That is, when a subterm matches one of the \texttt{match} cases in a defining \texttt{Fixpoint}, replace with the body of that case, then repeat.
+  \item[\texttt{symmetry}] When proving $X = Y$, switch to proving $Y = X$.
+  \item[\texttt{transitivity} $X$] When proving $Y = Z$, switch to proving $Y = X$ and $X = Z$.
+  \item[\texttt{unfold} $X$] Replace $X$ by its definition.
+\end{description}
+
+\section{Proof-Automation Basics}
+
+Coming soon!
+
+\section{Further Reading}
+
+For more Coq information, we recommend a few books (beyond the Coq reference manual).  Some focus purely on introducing Coq:
+
+\begin{itemize}
+  \item Adam Chlipala, \emph{Certified Programming with Dependent Types}, MIT Press, \url{http://adam.chlipala.net/cpdt/}
+  \item Yves Bertot and Pierre Cast\'eran, \emph{Interactive Theorem Proving and Program Development: Coq'Art: The Calculus of Inductive Constructions}, Springer, \url{https://www.labri.fr/perso/casteran/CoqArt/}
+\end{itemize}
+
+The first of these two, especially, goes in-depth on the automated proof-scripting principles showcased from time to time in the Coq example code associated with the present book.
+
+There are also other sources that introduce program-reasoning principles at the same time, including:
+
+\begin{itemize}
+  \item Benjamin C. Pierce et al., \emph{Software Foundations}, \url{http://www.cis.upenn.edu/~bcpierce/sf/}
+\end{itemize}
+
+\emph{Software Foundations} generally proceeds at a slower pace than this book does.
 
 \backmatter
 %    Bibliography styles amsplain or harvard are also acceptable.

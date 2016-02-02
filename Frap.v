@@ -1,7 +1,7 @@
 Require Import String Arith Omega Program Sets Relations Map Var Invariant.
 Export String Arith Sets Relations Map Var Invariant.
 Require Import List.
-Export ListNotations.
+Export List ListNotations.
 Open Scope string_scope.
 
 Ltac inductN n :=

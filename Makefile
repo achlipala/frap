@@ -1,4 +1,4 @@
-.PHONY: all coq
+.PHONY: all coq install
 
 all: frap.pdf coq
 
@@ -18,3 +18,13 @@ Makefile.coq: Makefile _CoqProject *.v
 clean:: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq
+
+frap.tgz: *.v
+	git archive --format=tar.gz HEAD >frap.tgz
+
+WHERE=chlipala.net:sites/chlipala/adam/frap/
+
+install: index.html frap.pdf frap.tgz
+	rsync frap.pdf $(WHERE)
+	rsync frap.tgz $(WHERE)
+	rsync index.html $(WHERE)

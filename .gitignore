@@ -13,3 +13,4 @@ Makefile.coq
 *.glob
 *.v.d
 *.vo
+frap.tgz

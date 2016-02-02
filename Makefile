@@ -19,7 +19,7 @@ clean:: Makefile.coq
 	$(MAKE) -f Makefile.coq clean
 	rm -f Makefile.coq
 
-frap.tgz: *.v
+frap.tgz: *
 	git archive --format=tar.gz HEAD >frap.tgz
 
 WHERE=chlipala.net:sites/chlipala/adam/frap/

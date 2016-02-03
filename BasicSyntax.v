@@ -265,6 +265,7 @@ Module ArithWithVariables.
         end; equality.
   Qed.
 
+  (* We can do substitution and commuting in either order. *)
   Theorem substitute_commuter : forall replaceThis withThis inThis,
     commuter (substitute inThis replaceThis withThis)
     = substitute (commuter inThis) replaceThis (commuter withThis).
@@ -276,7 +277,7 @@ Module ArithWithVariables.
   Qed.
 
   (* *Constant folding* is one of the classic compiler optimizations.
-   * We replace find opportunities to replace fancier expressions
+   * We repeatedly find opportunities to replace fancier expressions
    * with known constant values. *)
   Fixpoint constantFold (e : arith) : arith :=
     match e with

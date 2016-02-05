@@ -68,7 +68,7 @@ Fixpoint commuter (e : arith) : arith :=
 Theorem commuter_ok : forall v e, interp (commuter e) v = interp e v.
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* Let's also revisit substitution. *)
 Fixpoint substitute (inThis : arith) (replaceThis : var) (withThis : arith) : arith :=
@@ -103,7 +103,7 @@ Fixpoint doSomeArithmetic (e : arith) : arith :=
 Theorem doSomeArithmetic_ok : forall e v, interp (doSomeArithmetic e) v = interp e v.
 Proof.
   admit.
-Qed.
+Admitted.
 
 
 
@@ -184,7 +184,7 @@ Fixpoint compile (e : arith) : list instruction :=
 Theorem compile_ok : forall e v, run (compile e) v nil = interp e v :: nil.
 Proof.
   admit.
-Qed.
+Admitted.
 
 
 
@@ -280,7 +280,7 @@ Theorem factorial_ok : forall v input,
   -> exec factorial v $? "output" = Some (fact input).
 Proof.
   admit.
-Qed.
+Admitted.
 
 
 

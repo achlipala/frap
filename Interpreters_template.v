@@ -304,22 +304,6 @@ Qed.
  * counts.  That is, we can duplicate the loop body instead of using an explicit
  * loop. *)
 
-Fixpoint seqself (c : cmd) (n : nat) : cmd :=
-  match n with
-  | O => Skip
-  | S n' => Sequence c (seqself c n')
-  end.
-
-Fixpoint unroll (c : cmd) : cmd :=
-  match c with
-  | Skip => c
-  | Assign _ _ => c
-  | Sequence c1 c2 => Sequence (unroll c1) (unroll c2)
-  | Repeat (Const n) c1 => seqself (unroll c1) n
-  (* ^-- the crucial case! *)
-  | Repeat e c1 => Repeat e (unroll c1)
-  end.
-
 (* This obvious-sounding fact will come in handy: self-composition gives the
  * same result, when passed two functions that map equal inputs to equal
  * outputs. *)
@@ -334,7 +318,7 @@ Proof.
   trivial.
 Qed.
 
-Theorem unroll_ok : forall c v, exec (unroll c) v = exec c v.
+(*Theorem unroll_ok : forall c v, exec (unroll c) v = exec c v.
 Proof.
-  admit.
-Qed.
+
+Qed.*)

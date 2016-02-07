@@ -1,6 +1,6 @@
 \documentclass{amsbook}
 
-\usepackage{hyperref,url,amsmath,proof}
+\usepackage{hyperref,url,amsmath,proof,stmaryrd,tikz-cd}
 
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -463,8 +463,99 @@ The general patterns should soon become clear, as they are somehow already famil
 \end{quote}
 The quoted remark could just as well be in Spanish instead of English, in which case we have two languages nested in a nontrivial way.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Semantics via Interpreters}
+
+That's enough about what programs \emph{look like}.
+Let's shift our attention to what programs \emph{mean}.
+
+\section{Semantics for Arithmetic Expressions via Finite Maps}
+
+\newcommand{\mempty}[0]{\bullet}
+\newcommand{\msel}[2]{#1(#2)}
+\newcommand{\mupd}[3]{#1[#2 \mapsto #3]}
+
+To explain the meaning of one of last chapter's arithmetic expressions, we need a way to indicate the value of each variable.
+A theory of \emph{finite maps}\index{finite map} is helpful here.
+We apply the following notations throughout the book: \\
+
+\begin{tabular}{rl}
+  $\mempty$ & empty map, with $\emptyset$ as its domain \\
+  $\msel{m}{k}$ & mapping of key $k$ in map $m$ \\
+  $\mupd{m}{k}{v}$ & extension of map $m$ to also map key $k$ to value $v$
+\end{tabular} \\
+
+As the name advertises, finite maps are functions with finite domains, where the domain may be expanded by each extension operation.
+Two axioms explain the essential interactions of the basic operators.
+
+$$\infer{\msel{\mupd{m}{k}{v}}{k} = v}{}
+\quad
+\infer{\msel{\mupd{m}{k_1}{v}}{k_2} = m(k_2)}{
+  k_1 \neq k_2
+}$$
+
+\newcommand{\denote}[1]{{\left \llbracket #1 \right \rrbracket}}
+
+With these operators in hand, we can write a semantics for arithmetic expressions.
+This is a recursive function that \emph{maps variable valuations to numbers}.
+We write $\denote{e}$ for the meaning of $e$; this notation is often referred to as \emph{Oxford brackets}\index{Oxford brackets}.
+Recall that we allow notations like this as syntactic sugar for arbitrary functions, even when giving the equations that define those functions.
+We write $v$ for a valuation (finite map).
+\begin{eqnarray*}
+  \denote{n}v &=& n \\
+  \denote{x}v &=& v(x) \\
+  \denote{e_1 + e_2}v &=& \denote{e_1}v + \denote{e_2}v \\
+  \denote{e_1 - e_2}v &=& \denote{e_1}v - \denote{e_2}v \\
+  \denote{e_1 \times e_2}v &=& \denote{e_1}v \times \denote{e_2}v
+\end{eqnarray*}
+
+Note how parts of the definition feel a little bit like cheating, as we just ``push notations inside the brackets.''
+It's important to remember that plus \emph{inside} the brackets is syntax, while plus \emph{outside} the brackets is the normal addition of math!
+
+\newcommand{\subst}[3]{[#3/#2]#1}
+
+To test our semantics, we define a \emph{variable substitution} function\index{substitution}.
+A substitution $\subst{e}{x}{e'}$ stands for the result of running through the syntax of $e$, replacing every occurrence of variable $x$ with expression $e'$.
+\begin{eqnarray*}
+  \subst{n}{x}{e} &=& n \\
+  \subst{x}{x}{e} &=& e \\
+  \subst{y}{x}{e} &=& y \textrm{, when $y \neq x$} \\
+  \subst{(e_1 + e_2)}{x}{e} &=& \subst{e_1}{x}{e} + \subst{e_2}{x}{e} \\
+  \subst{(e_1 - e_2)}{x}{e} &=& \subst{e_1}{x}{e} - \subst{e_2}{x}{e} \\
+  \subst{(e_1 \times e_2)}{x}{e} &=& \subst{e_1}{x}{e} \times \subst{e_2}{x}{e}
+\end{eqnarray*}
+
+We can prove a key compatibility property of these two recursive functions.
+
+\begin{theorem}
+  For all $e$, $e'$, $x$, and $v$, $\denote{\subst{e}{x}{e'}}{v} = \denote{e}{(\mupd{v}{x}{\denote{e'}{v}})}$.
+\end{theorem}
+
+That is, in some sense, the operations of interpretation and substitution \emph{commute} with each other.
+That intuition gives rise to the common notion of a \emph{commuting diagram}\index{commuting diagram}, like the one below for this particular example.
+
+\[
+\begin{tikzcd}
+(e, v) \arrow{r}{\subst{\ldots}{x}{e'}} \arrow{d}{\mupd{\ldots}{x}{\denote{e'}v}} & (\subst{e}{x}{e'}, v) \arrow{d}{\denote{\ldots}} \\
+(e, \mupd{v}{x}{\denote{e'}v}) \arrow{r}{\denote{\ldots}} & \denote{\subst{e}{x}{e'}}v
+\end{tikzcd}
+\]
+
+We start at the top left, with a given expresson $e$ and valuation $v$.
+The diagram shows the equivalence of \emph{two different paths} to the bottom right.
+Each individual arrow is labeled with some description of the transformation it performs, to get from the term at its source to the term at its destination.
+The right-then-down path is based on substituting and then interpreting, while the down-then-right path is based on extending the valuation and then interpreting.
+Since both paths wind up at the same spot, the diagram indicates an equality between the corresponding terms.
+
+It's a matter of taste whether the theorem statement or the diagram expresses the property more clearly!
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \appendix
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{The Coq Proof Assistant}
 

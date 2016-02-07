@@ -510,10 +510,12 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{invert} $H$] Replace hypothesis $H$ with other facts that can be deduced from the structure of $H$'s statement.  More detail to be added here soon!
   \item[\texttt{linear\_arithemtic}] A complete decision procedure for linear arithmetic.  Relevant formulas are essentially those built up from variables and constant natural numbers and integers using only addition and subtraction, with equality and inequality comparisons on top.  (Multiplication by constants is supported, as a shorthand for repeated addition.) See Section \ref{decidable}.
     \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
+    \item[\texttt{maps\_equal}] Prove that two finite maps are equal by considering all the relevant cases for mappings of different keys.
   \item[\texttt{ring}] Prove goals that are equalities over some registered ring or semiring, in the sense of algebra, where the goal follows solely from the axioms of that algebraic structure.  See Section \ref{decidable}.
   \item[\texttt{simplify}] Simplify throughout the goal, applying the definitions of recursive functions directly.  That is, when a subterm matches one of the \texttt{match} cases in a defining \texttt{Fixpoint}, replace with the body of that case, then repeat.
   \item[\texttt{symmetry}] When proving $X = Y$, switch to proving $Y = X$.
   \item[\texttt{transitivity} $X$] When proving $Y = Z$, switch to proving $Y = X$ and $X = Z$.
+  \item[\texttt{trivial}] Coq maintains a database of simple proof steps, such as proving a fact by direct appeal to a matching hypothesis.  \texttt{trivial} asks to try all such simple steps.
   \item[\texttt{unfold} $X$] Replace $X$ by its definition.
 \end{description}
 

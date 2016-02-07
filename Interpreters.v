@@ -15,6 +15,9 @@ Inductive arith : Set :=
 | Minus (e1 e2 : arith)
 | Times (e1 e2 : arith).
 
+Example ex1 := Const 42.
+Example ex2 := Plus (Var "y") (Times (Var "x") (Const 3)).
+
 (* The above definition only explains what programs *look like*.
  * We also care about what they *mean*.
  * The natural meaning of an expression is the number it evaluates to.
@@ -40,10 +43,29 @@ Fixpoint interp (e : arith) (v : valuation) : nat :=
   | Times e1 e2 => interp e1 v * interp e2 v
   end.
 
-(* Here's an example valuation.  Unfortunately, we can't execute code based on
- * finite maps, since, for convenience, they use uncomputable features. *)
+(* Here's an example valuation, using an infix operator for map extension. *)
 Definition valuation0 : valuation :=
-  $0 $+ ("x", 17).
+  $0 $+ ("x", 17) $+ ("y", 3).
+
+(* Unfortunately, we can't execute code based on finite maps, since, for
+ * convenience, they use uncomputable features.  The reason is that we need a
+ * comparison function, a hash function, etc., to do computable finite-map
+ * implementation, and such things are impossible to compute automatically for
+ * all types in Coq.  However, we can still prove theorems about execution of
+ * finite-map programs, and the [simplify] tactics knows how to reduce the
+ * key constructions. *)
+Theorem interp_ex1 : interp ex1 valuation0 = 42.
+Proof.
+  simplify.
+  equality.
+Qed.
+
+Theorem interp_ex2 : interp ex2 valuation0 = 54.
+Proof.
+  unfold valuation0.
+  simplify.
+  equality.
+Qed.
 
 (* Here's the silly transformation we defined last time. *)
 Fixpoint commuter (e : arith) : arith :=
@@ -309,14 +331,19 @@ Fixpoint fact (n : nat) : nat :=
   | S n' => n * fact n'
   end.
 
+(* To prove that [factorial] is correct, the real action is in a lemma, to be
+ * proved by induction, showing that the loop works correctly.  So, let's first
+ * assign a name to the loop body alone. *)
 Definition factorial_body :=
   "output" <- "output" * "input";
   "input" <- "input" - 1.
 
-(* Note that here we're careful to put the quantified variable [input] *first*,
+(* Now for that lemma: self-composition of the body's semantics produces the
+ * expected changes in the valuation.
+ * Note that here we're careful to put the quantified variable [input] *first*,
  * because the variables coming after it will need to *change* in the course of
  * the induction.  Try switching the order to see what goes wrong if we put
- * [input] later. *)
+e * [input] later. *)
 Lemma factorial_ok' : forall input output v,
   v $? "input" = Some input
   -> v $? "output" = Some output
@@ -325,22 +352,31 @@ Lemma factorial_ok' : forall input output v,
 Proof.
   induct input; simplify.
 
-  maps_equal; simplify.
+  maps_equal.
+  (* [maps_equal]: prove that two finite maps are equal by considering all
+   *   the relevant cases for mappings of different keys. *)
 
   rewrite H0.
   f_equal.
   linear_arithmetic.
 
   trivial.
+  (* [trivial]: Coq maintains a database of simple proof steps, such as proving
+   *   a fact by direct appeal to a matching hypothesis.  [trivial] asks to try
+   *   all such simple steps. *)
 
   rewrite H, H0.
+  (* Note the two arguments to one [rewrite]! *)
   rewrite (IHinput (output * S input)).
-  maps_equal; simplify.
+  (* Note the careful choice of a quantifier instantiation for the IH! *)
+  maps_equal.
   f_equal; ring.
   simplify; f_equal; linear_arithmetic.
   simplify; equality.
 Qed.
 
+(* Finally, we have the natural correctness condition for factorial as a whole
+ * program. *)
 Theorem factorial_ok : forall v input,
   v $? "input" = Some input
   -> exec factorial v $? "output" = Some (fact input).

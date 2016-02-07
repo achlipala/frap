@@ -43,7 +43,7 @@ Ltac invert0 e := invert e; fail.
 Ltac invert1 e := invert0 e || (invert e; []).
 Ltac invert2 e := invert1 e || (invert e; [|]).
 
-Ltac simplify := simpl in *; intros; try autorewrite with core in *.
+Ltac simplify := repeat progress (simpl in *; intros; try autorewrite with core in *).
 
 Ltac linear_arithmetic := intros;
     repeat match goal with
@@ -79,3 +79,5 @@ Global Opaque max min.
 Infix "==n" := eq_nat_dec (no associativity, at level 50).
 
 Export Frap.Map.
+
+Ltac maps_equal := Frap.Map.M.maps_equal; simplify.

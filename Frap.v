@@ -75,3 +75,7 @@ Ltac cases E :=
          end.
 
 Global Opaque max min.
+
+Infix "==n" := eq_nat_dec (no associativity, at level 50).
+
+Export Frap.Map.

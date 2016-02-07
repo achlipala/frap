@@ -6,39 +6,44 @@
 Require Import Frap.
 
 
-(* We begin with a return to our arithmetic language from the last chapter. *)
+(* We begin with a return to our arithmetic language from the last chapter,
+ * adding subtraction, which will come in handy later. *)
 Inductive arith : Set :=
 | Const (n : nat)
 | Var (x : var)
 | Plus (e1 e2 : arith)
+| Minus (e1 e2 : arith)
 | Times (e1 e2 : arith).
-
-Example ex1 := Const 42.
-Example ex2 := Plus (Const 1) (Times (Var "x") (Const 3)).
 
 (* The above definition only explains what programs *look like*.
  * We also care about what they *mean*.
  * The natural meaning of an expression is the number it evaluates to.
  * Actually, it's not quite that simple.
  * We need to consider the meaning to be a function over a valuation
- * to the variables, which in turn is itself a function from variable
- * names to numbers. *)
-Definition valuation := var -> nat.
+ * to the variables, which in turn is itself a finite map from variable
+ * names to numbers.  We use the book library's [map] type family. *)
+Definition valuation := map var nat.
 
 Fixpoint interp (e : arith) (v : valuation) : nat :=
   match e with
   | Const n => n
-  | Var x => v x
+  | Var x =>
+    (* Note use of infix operator to look up a key in a finite map. *)
+    match v $? x with
+    | None => 0 (* goofy default value! *)
+    | Some n => n
+    end
   | Plus e1 e2 => interp e1 v + interp e2 v
+  | Minus e1 e2 => interp e1 v - interp e2 v
+                   (* For anyone who's wondering: this [-] sticks at 0,
+                    * if we would otherwise underflow. *)
   | Times e1 e2 => interp e1 v * interp e2 v
   end.
 
-(* Let's sanity-check the interpretation. *)
+(* Here's an example valuation.  Unfortunately, we can't execute code based on
+ * finite maps, since, for convenience, they use uncomputable features. *)
 Definition valuation0 : valuation :=
-  fun x => if x ==v "x" then 17 else 23.
-
-Compute interp ex1 valuation0.
-Compute interp ex2 valuation0.
+  $0 $+ ("x", 17).
 
 (* Here's the silly transformation we defined last time. *)
 Fixpoint commuter (e : arith) : arith :=
@@ -46,6 +51,7 @@ Fixpoint commuter (e : arith) : arith :=
   | Const _ => e
   | Var _ => e
   | Plus e1 e2 => Plus (commuter e2) (commuter e1)
+  | Minus e1 e2 => Minus (commuter e1) (commuter e2)
   | Times e1 e2 => Times (commuter e2) (commuter e1)
   end.
 
@@ -62,6 +68,8 @@ Proof.
 
   linear_arithmetic.
 
+  equality.
+
   rewrite IHe1.
   rewrite IHe2.
   ring.
@@ -74,27 +82,21 @@ Fixpoint substitute (inThis : arith) (replaceThis : var) (withThis : arith) : ar
   | Const _ => inThis
   | Var x => if x ==v replaceThis then withThis else inThis
   | Plus e1 e2 => Plus (substitute e1 replaceThis withThis) (substitute e2 replaceThis withThis)
+  | Minus e1 e2 => Minus (substitute e1 replaceThis withThis) (substitute e2 replaceThis withThis)
   | Times e1 e2 => Times (substitute e1 replaceThis withThis) (substitute e2 replaceThis withThis)
   end.
 
-(* The natural semantic correctness condition for substitution,
- * drawing on a helper function for adding a new mapping to a valuation *)
-Definition extend_valuation (v : valuation) (x : var) (n : nat) : valuation :=
-  fun y => if y ==v x then n else v y.
-
+(* Note the use of an infix operator for overriding one entry in a finite
+ * map. *)
 Theorem substitute_ok : forall v replaceThis withThis inThis,
   interp (substitute inThis replaceThis withThis) v
-  = interp inThis (extend_valuation v replaceThis (interp withThis v)).
+  = interp inThis (v $+ (replaceThis, interp withThis v)).
 Proof.
   induct inThis; simplify; try equality.
 
   (* One case left after our basic heuristic:
-   * the variable case, naturally!
-   * A little trick: unfold a definition *before* case analysis,
-   * to expose an extra spot where our test expression appears,
-   * so that it can be handled by [cases] at the same time. *)
-  unfold extend_valuation.
-  cases (x ==v replaceThis); simplify; equality.
+   * the variable case, naturally! *)
+  cases (x ==v replaceThis); simplify; try equality.
 Qed.
 (* Great; we seem to have gotten that one right, too. *)
 
@@ -106,6 +108,7 @@ Fixpoint doSomeArithmetic (e : arith) : arith :=
   | Var _ => e
   | Plus (Const n1) (Const n2) => Const (n1 + n2)
   | Plus e1 e2 => Plus (doSomeArithmetic e1) (doSomeArithmetic e2)
+  | Minus e1 e2 => Minus (doSomeArithmetic e1) (doSomeArithmetic e2)
   | Times (Const n1) (Const n2) => Const (n1 * n2)
   | Times e1 e2 => Times (doSomeArithmetic e1) (doSomeArithmetic e2)
   end.
@@ -129,16 +132,25 @@ Inductive instruction :=
 | PushConst (n : nat)
 | PushVar (x : var)
 | Add
+| Subtract
 | Multiply.
 
 (* What does it all mean?  An interpreter tells us unambiguously! *)
 Definition run1 (i : instruction) (v : valuation) (stack : list nat) : list nat :=
   match i with
   | PushConst n => n :: stack
-  | PushVar x => v x :: stack
+  | PushVar x => (match v $? x with
+                  | None => 0
+                  | Some n => n
+                  end) :: stack
   | Add =>
     match stack with
     | arg2 :: arg1 :: stack' => arg1 + arg2 :: stack'
+    | _ => stack (* arbitrary behavior in erroneous case *)
+    end
+  | Subtract =>
+    match stack with
+    | arg2 :: arg1 :: stack' => arg1 - arg2 :: stack'
     | _ => stack (* arbitrary behavior in erroneous case *)
     end
   | Multiply =>
@@ -163,6 +175,7 @@ Fixpoint compile (e : arith) : list instruction :=
   | Const n => PushConst n :: nil
   | Var x => PushVar x :: nil
   | Plus e1 e2 => compile e1 ++ compile e2 ++ Add :: nil
+  | Minus e1 e2 => compile e1 ++ compile e2 ++ Subtract :: nil
   | Times e1 e2 => compile e1 ++ compile e2 ++ Multiply :: nil
   end.
 
@@ -197,6 +210,13 @@ Proof.
   rewrite IHe2.
   simplify.
   equality.
+
+  rewrite app_assoc_reverse.
+  rewrite IHe1.
+  rewrite app_assoc_reverse.
+  rewrite IHe2.
+  simplify.
+  equality.
 Qed.
 
 (* The overall theorem follows as a simple corollary. *)
@@ -215,4 +235,120 @@ Proof.
 
   apply compile_ok'.
   (* Direct appeal to a previously proved lemma *)
+Qed.
+
+
+(* Let's get a bit fancier, moving toward the level of general-purpose
+ * imperative languages.  Here's a language of commands, building on the
+ * language of expressions we have defined. *)
+Inductive cmd :=
+| Skip
+| Assign (x : var) (e : arith)
+| Sequence (c1 c2 : cmd)
+| Repeat (e : arith) (body : cmd).
+
+(* That last constructor is for repeating a body command some number of
+ * times.  Note that we sneakily avoid constructs that could introduce
+ * nontermination, since Coq only accepts terminating programs, and we want to
+ * write an interpreter for commands.
+ * In contrast to our last one, this interpreter *transforms valuations*.
+ * We use a helper function for self-composing a function some number of
+ * times. *)
+
+Fixpoint selfCompose {A} (f : A -> A) (n : nat) : A -> A :=
+  match n with
+  | O => fun x => x
+  | S n' => fun x => selfCompose f n' (f x)
+  end.
+
+Fixpoint exec (c : cmd) (v : valuation) : valuation :=
+  match c with
+  | Skip => v
+  | Assign x e => v $+ (x, interp e v)
+  | Sequence c1 c2 => exec c2 (exec c1 v)
+  | Repeat e body => selfCompose (exec body) (interp e v) v
+  end.
+
+(* Let's define some programs and prove that they operate in certain ways. *)
+
+Example factorial_ugly :=
+  Sequence
+    (Assign "output" (Const 1))
+    (Repeat (Var "input")
+            (Sequence
+               (Assign "output" (Times (Var "output") (Var "input")))
+               (Assign "input" (Minus (Var "input") (Const 1))))).
+
+(* Ouch; that code is hard to read.  Let's introduce some notations to make the
+ * concrete syntax more palatable.  We won't explain the general mechanisms on
+ * display here, but see the Coq manual for details, or try to reverse-engineer
+ * them from our examples. *)
+Coercion Const : nat >-> arith.
+Coercion Var : var >-> arith.
+Infix "+" := Plus : arith_scope.
+Infix "-" := Minus : arith_scope.
+Infix "*" := Times : arith_scope.
+Delimit Scope arith_scope with arith.
+Notation "x <- e" := (Assign x e%arith) (at level 75).
+Infix ";" := Sequence (at level 76).
+Notation "'repeat' e 'doing' body 'done'" := (Repeat e%arith body) (at level 75).
+
+(* OK, let's try that program again. *)
+Example factorial :=
+  "output" <- 1;
+  repeat "input" doing
+    "output" <- "output" * "input";
+    "input" <- "input" - 1
+  done.
+
+(* Now we prove that it really computes factorial.
+ * First, a reference implementation as a functional program. *)
+Fixpoint fact (n : nat) : nat :=
+  match n with
+  | O => 1
+  | S n' => n * fact n'
+  end.
+
+Definition factorial_body :=
+  "output" <- "output" * "input";
+  "input" <- "input" - 1.
+
+(* Note that here we're careful to put the quantified variable [input] *first*,
+ * because the variables coming after it will need to *change* in the course of
+ * the induction.  Try switching the order to see what goes wrong if we put
+ * [input] later. *)
+Lemma factorial_ok' : forall input output v,
+  v $? "input" = Some input
+  -> v $? "output" = Some output
+  -> selfCompose (exec factorial_body) input v
+     = v $+ ("input", 0) $+ ("output", output * fact input).
+Proof.
+  induct input; simplify.
+
+  maps_equal; simplify.
+
+  rewrite H0.
+  f_equal.
+  linear_arithmetic.
+
+  trivial.
+
+  rewrite H, H0.
+  rewrite (IHinput (output * S input)).
+  maps_equal; simplify.
+  f_equal; ring.
+  simplify; f_equal; linear_arithmetic.
+  simplify; equality.
+Qed.
+
+Theorem factorial_ok : forall v input,
+  v $? "input" = Some input
+  -> exec factorial v $? "output" = Some (fact input).
+Proof.
+  simplify.
+  rewrite H.
+  rewrite (factorial_ok' input 1); simplify.
+  f_equal; linear_arithmetic.
+  trivial.
+  trivial.
 Qed.

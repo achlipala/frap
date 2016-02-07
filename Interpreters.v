@@ -7,7 +7,8 @@ Require Import Frap.
 
 
 (* We begin with a return to our arithmetic language from the last chapter,
- * adding subtraction, which will come in handy later. *)
+ * adding subtraction*, which will come in handy later.
+ * *: good pun, right? *)
 Inductive arith : Set :=
 | Const (n : nat)
 | Var (x : var)
@@ -26,7 +27,10 @@ Example ex2 := Plus (Var "y") (Times (Var "x") (Const 3)).
  * to the variables, which in turn is itself a finite map from variable
  * names to numbers.  We use the book library's [map] type family. *)
 Definition valuation := map var nat.
+(* That is, the domain is [var] (a synonym for [string]) and the codomain/range
+ * is [nat]. *)
 
+(* The interpreter is a fairly innocuous-looking recursive function. *)
 Fixpoint interp (e : arith) (v : valuation) : nat :=
   match e with
   | Const n => n
@@ -52,7 +56,7 @@ Definition valuation0 : valuation :=
  * comparison function, a hash function, etc., to do computable finite-map
  * implementation, and such things are impossible to compute automatically for
  * all types in Coq.  However, we can still prove theorems about execution of
- * finite-map programs, and the [simplify] tactics knows how to reduce the
+ * finite-map programs, and the [simplify] tactic knows how to reduce the
  * key constructions. *)
 Theorem interp_ex1 : interp ex1 valuation0 = 42.
 Proof.
@@ -74,6 +78,7 @@ Fixpoint commuter (e : arith) : arith :=
   | Var _ => e
   | Plus e1 e2 => Plus (commuter e2) (commuter e1)
   | Minus e1 e2 => Minus (commuter e1) (commuter e2)
+                   (* ^-- NB: didn't change the operand order here! *)
   | Times e1 e2 => Times (commuter e2) (commuter e1)
   end.
 
@@ -108,8 +113,6 @@ Fixpoint substitute (inThis : arith) (replaceThis : var) (withThis : arith) : ar
   | Times e1 e2 => Times (substitute e1 replaceThis withThis) (substitute e2 replaceThis withThis)
   end.
 
-(* Note the use of an infix operator for overriding one entry in a finite
- * map. *)
 Theorem substitute_ok : forall v replaceThis withThis inThis,
   interp (substitute inThis replaceThis withThis) v
   = interp inThis (v $+ (replaceThis, interp withThis v)).
@@ -168,7 +171,7 @@ Definition run1 (i : instruction) (v : valuation) (stack : list nat) : list nat 
   | Add =>
     match stack with
     | arg2 :: arg1 :: stack' => arg1 + arg2 :: stack'
-    | _ => stack (* arbitrary behavior in erroneous case *)
+    | _ => stack (* arbitrary behavior in erroneous case (stack underflow) *)
     end
   | Subtract =>
     match stack with
@@ -343,7 +346,7 @@ Definition factorial_body :=
  * Note that here we're careful to put the quantified variable [input] *first*,
  * because the variables coming after it will need to *change* in the course of
  * the induction.  Try switching the order to see what goes wrong if we put
-e * [input] later. *)
+ * [input] later. *)
 Lemma factorial_ok' : forall input output v,
   v $? "input" = Some input
   -> v $? "output" = Some output
@@ -386,5 +389,73 @@ Proof.
   rewrite (factorial_ok' input 1); simplify.
   f_equal; linear_arithmetic.
   trivial.
+  trivial.
+Qed.
+
+
+(* One last example: let's try to do loop unrolling, for constant iteration
+ * counts.  That is, we can duplicate the loop body instead of using an explicit
+ * loop. *)
+
+Fixpoint seqself (c : cmd) (n : nat) : cmd :=
+  match n with
+  | O => Skip
+  | S n' => Sequence c (seqself c n')
+  end.
+
+Fixpoint unroll (c : cmd) : cmd :=
+  match c with
+  | Skip => c
+  | Assign _ _ => c
+  | Sequence c1 c2 => Sequence (unroll c1) (unroll c2)
+  | Repeat (Const n) c1 => seqself (unroll c1) n
+  (* ^-- the crucial case! *)
+  | Repeat e c1 => Repeat e (unroll c1)
+  end.
+
+(* This obvious-sounding fact will come in handy: self-composition gives the
+ * same result, when passed two functions that map equal inputs to equal
+ * outputs. *)
+Lemma selfCompose_extensional : forall {A} (f g : A -> A) n x,
+  (forall y, f y = g y)
+  -> selfCompose f n x = selfCompose g n x.
+Proof.
+  induct n; simplify; try equality.
+
+  rewrite H.
+  apply IHn.
+  trivial.
+Qed.
+
+(* Crucial lemma: [seqself] is acting just like [selfCompose], in a suitable
+ * sense. *)
+Lemma seqself_ok : forall c n v,
+  exec (seqself c n) v = selfCompose (exec c) n v.
+Proof.
+  induct n; simplify; equality.
+Qed.
+
+(* The two lemmas we just proved are the main ingredients to prove the natural
+ * correctness condition for [unroll]. *)
+Theorem unroll_ok : forall c v, exec (unroll c) v = exec c v.
+Proof.
+  induct c; simplify; try equality.
+
+  cases e; simplify; try equality.
+
+  rewrite seqself_ok.
+  apply selfCompose_extensional.
+  trivial.
+
+  apply selfCompose_extensional.
+  trivial.
+
+  apply selfCompose_extensional.
+  trivial.
+
+  apply selfCompose_extensional.
+  trivial.
+
+  apply selfCompose_extensional.
   trivial.
 Qed.

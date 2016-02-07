@@ -1,6 +1,6 @@
 \documentclass{amsbook}
 
-\usepackage{hyperref,url,amsmath,proof,stmaryrd,tikz-cd}
+\usepackage{hyperref,url,amsmath,amssymb,proof,stmaryrd,tikz-cd}
 
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -549,6 +549,81 @@ The right-then-down path is based on substituting and then interpreting, while t
 Since both paths wind up at the same spot, the diagram indicates an equality between the corresponding terms.
 
 It's a matter of taste whether the theorem statement or the diagram expresses the property more clearly!
+
+\section{A Stack Machine}
+
+As an example of a very different language, consider a \emph{stack machine}\index{stack machine}, similar at some level to, for instance, the Forth\index{Forth} programming language, or to various postfix\index{postfix} calculators.
+$$\begin{array}{rrcl}
+  \textrm{Instructions} & i &::=& \mathsf{PushConst}(n) \mid \mathsf{PushVar}(x) \mid \mathsf{Add} \mid \mathsf{Multiply} \\
+  \textrm{Programs} & \overline{i} &::=& \cdot \mid i; \overline{i}
+\end{array}$$
+
+Though here we defined an explicit grammar for programs, which are just sequences of instructions, in general we'll use the notation $\overline{X}$ to stand for sequences of $X$'s, and the associated concrete syntax won't be so important.
+We also freely use single instructions to stand for programs, writing just $i$ in place of $i; \cdot$.
+
+\newcommand{\push}[2]{#1 \rhd #2}
+
+Each instruction of this language transforms a \emph{stack}\index{stack}, a last-in-first-out list of numbers.
+Rather than spend more words on it, here is an interpreter that makes everythig precise.
+Here and elsewhere, we overload the Oxford brackets $\denote{\ldots}$ shamelessly, where context makes clear which language or interpreter we are dealing with.
+We write $s$ for stacks, and we write $\push{n}{s}$ for pushing number $n$ onto the top of stack $s$.
+
+\begin{eqnarray*}
+  \denote{\mathsf{PushConst}(n)}(v,s) &=& \push{n}{s} \\
+  \denote{\mathsf{PushVar}(x)}(v,s) &=& \push{\msel{v}{x}}{s} \\
+  \denote{\mathsf{Add}}(v,\push{n_2}{\push{n_1}{s}}) &=& \push{(n_1 + n_2)}{s} \\
+  \denote{\mathsf{Multiply}}(v,\push{n_2}{\push{n_1}{s}}) &=& \push{(n_1 \times n_2)}{s}
+\end{eqnarray*}
+
+The last two cases require the stack have at least a certain height.
+Here we'll ignore what happens when the stack is too short, though it suffices, for our purposes, to add pretty much any default behavior for the missing cases.
+We overload $\denote{\overline{i}}$ to refer to the \emph{composition} of the interpretations of the different instructions within $\overline{i}$, in order.
+
+Next, we give our first example of what might be called a \emph{compiler}\index{compiler}, or a translation from one language to another.
+Let's compile arithmetic expressions into stack programs, which then become easy to map onto the instructions of common assembly languages.
+In that sense, with this translation, we make progress toward efficient implementation on commodity hardware.
+
+\newcommand{\compile}[1]{{\left \lfloor #1 \right \rfloor}}
+\newcommand{\concat}[2]{#1 \bowtie #2}
+
+Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggestions \emph{moving downward} to a lower abstraction level.
+Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ for concatenation of two stacks $s_1$ and $s_2$.
+\begin{eqnarray*}
+  \compile{n} &=& \mathsf{PushConst}(n) \\
+  \compile{x} &=& \mathsf{PushVar}(n) \\
+  \compile{e_1 + e_2} &=& \concat{\compile{e_1}}{\concat{\compile{e_2}}{\mathsf{Add}}} \\
+  \compile{e_1 \times e_2} &=& \concat{\compile{e_1}}{\concat{\compile{e_2}}{\mathsf{Multiply}}}
+\end{eqnarray*}
+
+The first two cases are straightforward: their compilations just push the obvious values onto the stack.
+The binary operators are just slightly more tricky.
+Each first evaluates its operands in order, where each operand leaves its final result on the stack.
+With both of them in place, we run the instruction to pop them, combine them, and push the result back onto the stack.
+
+The correctness theorem for compilation must refer to both of our interpreters.
+From here on, we consider that all unaccounted-for variables in a theorem statement are quantified universally.
+
+\begin{theorem}
+  $\denote{\compile{e}}(v, \cdot) = \denote{e}v$.
+\end{theorem}
+
+Here's a restatement as a commuting diagram.
+
+\[
+\begin{tikzcd}
+e \arrow{r}{\compile{\ldots}} \arrow{dr}{\denote{\ldots}} & \compile{e} \arrow{d}{\denote{\ldots}} \\
+& \denote{e}
+\end{tikzcd}
+\]
+
+As usual, we leave proof details for the associated Coq code, but the key insight of the proof is to strengthen the induction hypothesis via a lemma.
+
+\begin{lemma}
+  $\denote{\concat{\compile{e}}{\overline{i}}}(v, s) = \denote{\overline{i}}(v, \concat{\denote{e}v}{s})$.
+\end{lemma}
+
+We strengthen the statement by considering both an arbitrary initial stack $s$ and a sequence of extra instructions $\overline{i}$ to be run after $e$.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

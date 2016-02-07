@@ -477,6 +477,7 @@ Let's shift our attention to what programs \emph{mean}.
 \newcommand{\mupd}[3]{#1[#2 \mapsto #3]}
 
 To explain the meaning of one of last chapter's arithmetic expressions, we need a way to indicate the value of each variable.
+\encoding
 A theory of \emph{finite maps}\index{finite map} is helpful here.
 We apply the following notations throughout the book: \\
 
@@ -502,6 +503,7 @@ This is a recursive function that \emph{maps variable valuations to numbers}.
 We write $\denote{e}$ for the meaning of $e$; this notation is often referred to as \emph{Oxford brackets}\index{Oxford brackets}.
 Recall that we allow notations like this as syntactic sugar for arbitrary functions, even when giving the equations that define those functions.
 We write $v$ for a valuation (finite map).
+\encoding
 \begin{eqnarray*}
   \denote{n}v &=& n \\
   \denote{x}v &=& v(x) \\
@@ -553,6 +555,7 @@ It's a matter of taste whether the theorem statement or the diagram expresses th
 \section{A Stack Machine}
 
 As an example of a very different language, consider a \emph{stack machine}\index{stack machine}, similar at some level to, for instance, the Forth\index{Forth} programming language, or to various postfix\index{postfix} calculators.
+\encoding
 $$\begin{array}{rrcl}
   \textrm{Instructions} & i &::=& \mathsf{PushConst}(n) \mid \mathsf{PushVar}(x) \mid \mathsf{Add} \mid \mathsf{Multiply} \\
   \textrm{Programs} & \overline{i} &::=& \cdot \mid i; \overline{i}
@@ -568,6 +571,7 @@ Rather than spend more words on it, here is an interpreter that makes everythig 
 Here and elsewhere, we overload the Oxford brackets $\denote{\ldots}$ shamelessly, where context makes clear which language or interpreter we are dealing with.
 We write $s$ for stacks, and we write $\push{n}{s}$ for pushing number $n$ onto the top of stack $s$.
 
+\encoding
 \begin{eqnarray*}
   \denote{\mathsf{PushConst}(n)}(v,s) &=& \push{n}{s} \\
   \denote{\mathsf{PushVar}(x)}(v,s) &=& \push{\msel{v}{x}}{s} \\
@@ -588,6 +592,7 @@ In that sense, with this translation, we make progress toward efficient implemen
 
 Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggests \emph{moving downward} to a lower abstraction level.
 Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ for concatenation of two stacks $s_1$ and $s_2$.
+\encoding
 \begin{eqnarray*}
   \compile{n} &=& \mathsf{PushConst}(n) \\
   \compile{x} &=& \mathsf{PushVar}(n) \\
@@ -633,7 +638,8 @@ Coq requires that all programs terminate, and that requirement is effectively al
 Instead, with math, we worry about whether recursive systems of equations are well-founded, in appropriate senses.
 From either perspective, extra encoding tricks are required to write a well-formed interpreter for a Turing-complete\index{Turing-completeness} language.
 We will dodge those complexities for now by defining a simple imperative language with bounded loops, where termination is easy to prove.
-We take the arithemtic expression language as a base.
+We take the arithmetic expression language as a base.
+\encoding
 $$\begin{array}{rrcl}
   \textrm{Command} & c &::=& \mathsf{skip} \mid x \leftarrow e \mid c; c \mid \repet{e}{c}
 \end{array}$$
@@ -653,6 +659,7 @@ We also have iterated self-composition\index{self-composition}, written like \em
 \end{eqnarray*}
 
 From here, $\denote{\ldots}$ is easy to define yet again, as a transformer over variable valuations.
+\encoding
 \begin{eqnarray*}
   \denote{\mathsf{skip}}v &=& v \\
   \denote{x \leftarrow e}v &=& \mupd{v}{x}{\denote{e}v} \\
@@ -677,6 +684,7 @@ To define the transformation, we'll want a recursive function and notation for s
 
 Now the optimization itself is easy to define.
 We'll write $\opt{\ldots}$ for this and other optimizations, which move neither down nor up a tower of program abstraction levels.
+\encoding
 \begin{eqnarray*}
   \opt{\mathsf{skip}} &=& \mathsf{skip} \\
   \opt{x \leftarrow e} &=& x \leftarrow e \\

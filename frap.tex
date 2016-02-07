@@ -506,7 +506,6 @@ We write $v$ for a valuation (finite map).
   \denote{n}v &=& n \\
   \denote{x}v &=& v(x) \\
   \denote{e_1 + e_2}v &=& \denote{e_1}v + \denote{e_2}v \\
-  \denote{e_1 - e_2}v &=& \denote{e_1}v - \denote{e_2}v \\
   \denote{e_1 \times e_2}v &=& \denote{e_1}v \times \denote{e_2}v
 \end{eqnarray*}
 
@@ -516,13 +515,14 @@ It's important to remember that plus \emph{inside} the brackets is syntax, while
 \newcommand{\subst}[3]{[#3/#2]#1}
 
 To test our semantics, we define a \emph{variable substitution} function\index{substitution}.
-A substitution $\subst{e}{x}{e'}$ stands for the result of running through the syntax of $e$, replacing every occurrence of variable $x$ with expression $e'$.
+A substitution $\subst{e}{x}{e'}$ stands for the result of running through the syntax of $e$, repla
+cing every occurrence of variable $x$ with expression $e'$.
+
 \begin{eqnarray*}
   \subst{n}{x}{e} &=& n \\
   \subst{x}{x}{e} &=& e \\
   \subst{y}{x}{e} &=& y \textrm{, when $y \neq x$} \\
   \subst{(e_1 + e_2)}{x}{e} &=& \subst{e_1}{x}{e} + \subst{e_2}{x}{e} \\
-  \subst{(e_1 - e_2)}{x}{e} &=& \subst{e_1}{x}{e} - \subst{e_2}{x}{e} \\
   \subst{(e_1 \times e_2)}{x}{e} &=& \subst{e_1}{x}{e} \times \subst{e_2}{x}{e}
 \end{eqnarray*}
 
@@ -586,7 +586,7 @@ In that sense, with this translation, we make progress toward efficient implemen
 \newcommand{\compile}[1]{{\left \lfloor #1 \right \rfloor}}
 \newcommand{\concat}[2]{#1 \bowtie #2}
 
-Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggestions \emph{moving downward} to a lower abstraction level.
+Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggests \emph{moving downward} to a lower abstraction level.
 Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ for concatenation of two stacks $s_1$ and $s_2$.
 \begin{eqnarray*}
   \compile{n} &=& \mathsf{PushConst}(n) \\
@@ -624,6 +624,100 @@ As usual, we leave proof details for the associated Coq code, but the key insigh
 
 We strengthen the statement by considering both an arbitrary initial stack $s$ and a sequence of extra instructions $\overline{i}$ to be run after $e$.
 
+\section{A Simple Higher-Level Imperative Language}
+
+\newcommand{\repet}[2]{\mathsf{repeat} \; #1 \; \mathsf{do} \; #2 \; \mathsf{done}}
+
+The interpreter approach to semantics is usually the most convenient one, when it applies.
+Coq requires that all programs terminate, and that requirement is effectively also present in informal math, though it is seldom called out with the same terms.
+Instead, with math, we worry about whether recursive systems of equations are well-founded, in appropriate senses.
+From either perspective, extra encoding tricks are required to write a well-formed interpreter for a Turing-complete\index{Turing-completeness} language.
+We will dodge those complexities for now by defining a simple imperative language with bounded loops, where termination is easy to prove.
+We take the arithemtic expression language as a base.
+$$\begin{array}{rrcl}
+  \textrm{Command} & c &::=& \mathsf{skip} \mid x \leftarrow e \mid c; c \mid \repet{e}{c}
+\end{array}$$
+
+Now the implicit state, read and written by a command, is a variable valuation, as we used in the interpreter for expressions.
+A $\mathsf{skip}$ command does nothing, while $x \leftarrow e$ extends the valuation to map $x$ to the value of expression $e$.
+We have simple command sequencing $c_1; c_2$, in addition to the bounded loop $\repet{e}{c}$, which executes $c$ a number of times equal to the value of $e$.
+
+\newcommand{\id}[0]{\mathsf{id}}
+
+To give the semantics, we need a few commonplace notations that are worth reviewing.
+We write $\id$ for the identity function\index{identity function}, where $\id(x) = x$; and we write $f \circ g$ for composition of functions\index{composition of functions} $f$ and $g$, where $(f \circ g)(x) = f(g(x))$.
+We also have iterated self-composition\index{self-composition}, written like \emph{exponentiation} of functions\index{exponentiation of functions} $f^n$, defined as follows.
+\begin{eqnarray*}
+  f^0 &=& \id \\
+  f^{n+1} &=& f^n \circ f
+\end{eqnarray*}
+
+From here, $\denote{\ldots}$ is easy to define yet again, as a transformer over variable valuations.
+\begin{eqnarray*}
+  \denote{\mathsf{skip}}v &=& v \\
+  \denote{x \leftarrow e}v &=& \mupd{v}{x}{\denote{e}v} \\
+  \denote{c_1; c_2}v &=& \denote{c_2}(\denote{c_1}v) \\
+  \denote{\repet{e}{c}}v &=& \denote{c}^{\denote{e}v}(v)
+\end{eqnarray*}
+
+To put this semantics through a workout, let's consider a simple \emph{optimization}\index{optimization}, a transformation whose input and output programs are in the same language.
+There's an additional, fuzzier criterion for an optimization, which is that it should improve the program somehow, usually in terms of running time, memory usage, etc.
+The optimization we choose here may be a bit dubious in that respect, though it is related to an optimization found in every serious C\index{C programming language} compiler.
+
+In particular, let's tackle \emph{loop unrolling}\index{loop unrolling}.
+When the iteration count of a loop is a constant $n$, we can replace the loop with $n$ sequenced copies of its body.
+C compilers need to work harder to find the iteration count of a loop, but luckily our language includes loops with very explicit iteration counts!
+To define the transformation, we'll want a recursive function and notation for sequencing of $n$ copies of a command $c$, written $^nc$.
+\begin{eqnarray*}
+  ^0c &=& \mathsf{skip} \\
+  ^{n+1}c &=& c; {^nc}
+\end{eqnarray*}
+
+\newcommand{\opt}[1]{{\left | #1 \right |}}
+
+Now the optimization itself is easy to define.
+We'll write $\opt{\ldots}$ for this and other optimizations, which move neither down nor up a tower of program abstraction levels.
+\begin{eqnarray*}
+  \opt{\mathsf{skip}} &=& \mathsf{skip} \\
+  \opt{x \leftarrow e} &=& x \leftarrow e \\
+  \opt{c_1; c_2} &=& \opt{c_1}; \opt{c_2} \\
+  \opt{\repet{n}{c}} &=& ^n\opt{c} \\
+  \opt{\repet{e}{c}} &=& \repet{e}{\opt{c}}
+\end{eqnarray*}
+
+Note that, when multiple defining equations apply to some function input, by convention we apply the \emph{earliest} equation that matches.
+
+Let's prove that this optimization preserves program behavior; that is, we prove that it is \emph{semantics preserving}\index{semantics preservation}.
+
+\begin{theorem}\label{unroll}
+  $\denote{\opt{c}}v = \denote{c}v$.
+\end{theorem}
+
+It all looks so straightforward from that statement, doesn't it?
+Indeed, there actually isn't so much work to do to prove this theorem.
+We can also present it as a commuting diagram much like the prior one.
+
+\[
+\begin{tikzcd}
+c \arrow{r}{\opt{\ldots}} \arrow{dr}{\denote{\ldots}} & \opt{c} \arrow{d}{\denote{\ldots}} \\
+& \denote{c}
+\end{tikzcd}
+\]
+
+The statement of Theorem \ref{unroll} happens to already be in the right form to do induction directly, but we need a helper lemma, capturing the interaction of $^nc$ and the semantics.
+
+\begin{lemma}
+  $\denote{^nc} = \denote{c}^n$.
+\end{lemma}
+
+Let us end the chapter with the commuting-diagram version of the lemma statement.
+
+\[
+\begin{tikzcd}
+c \arrow{r}{^n\ldots} \arrow{d}{\denote{\ldots}} & ^nc \arrow{d}{\denote{\ldots}} \\
+\denote{c} \arrow{r}{\ldots^n} & \denote{c}^n
+\end{tikzcd}
+\]
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

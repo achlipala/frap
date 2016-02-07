@@ -34,8 +34,9 @@ Module Type S.
     m $<= m'
     -> add m k v $<= add m' k v.
 
-  Axiom lookup_add_eq : forall A B (m : map A B) k v,
-    add m k v $? k = Some v.
+  Axiom lookup_add_eq : forall A B (m : map A B) k1 k2 v,
+    k1 = k2
+    -> add m k1 v $? k2 = Some v.
 
   Axiom lookup_add_ne : forall A B (m : map A B) k k' v,
     k' <> k
@@ -142,11 +143,13 @@ Module M : S.
     destruct (decide (k0 = k)); auto.
   Qed.
 
-  Theorem lookup_add_eq : forall A B (m : map A B) k v,
-    lookup (add m k v) k = Some v.
+  Theorem lookup_add_eq : forall A B (m : map A B) k1 k2 v,
+    k1 = k2
+    -> lookup (add m k1 v) k2 = Some v.
   Proof.
     unfold lookup, add; intuition.
-    destruct (decide (k = k)); tauto.
+    destruct (decide (k2 = k1)); try tauto.
+    congruence.
   Qed.
 
   Theorem lookup_add_ne : forall A B (m : map A B) k k' v,

@@ -3,6 +3,7 @@ Export String Arith Sets Relations Map Var Invariant.
 Require Import List.
 Export List ListNotations.
 Open Scope string_scope.
+Open Scope list_scope.
 
 Ltac inductN n :=
   match goal with
@@ -63,10 +64,18 @@ Ltac linear_arithmetic := intros;
 Ltac equality := congruence.
 
 Ltac cases E :=
-  (is_var E; destruct E)
-  || match type of E with
-     | {_} + {_} => destruct E
-     | _ => let Heq := fresh "Heq" in destruct E eqn:Heq
-     end.
+  ((is_var E; destruct E)
+   || match type of E with
+      | {_} + {_} => destruct E
+      | _ => let Heq := fresh "Heq" in destruct E eqn:Heq
+      end);
+  repeat match goal with
+         | [ H : _ = left _ |- _ ] => clear H
+         | [ H : _ = right _ |- _ ] => clear H
+         end.
 
 Global Opaque max min.
+
+Infix "==n" := eq_nat_dec (no associativity, at level 50).
+
+Export Frap.Map.

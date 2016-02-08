@@ -1,30 +1,38 @@
 Require Import Relations.
 
-Set Implicit Arguments.
 
+Definition invariantFor {state} (initial : state -> Prop) (step : state -> state -> Prop) (invariant : state -> Prop) :=
+  forall s, initial s
+            -> forall s', step^* s s'
+                          -> invariant s'.
 
-Section Invariant.
-  Variable state : Type.
-  Variable step : state -> state -> Prop.
-  Variable invariant : state -> Prop.
+Theorem use_invariant : forall {state} (initial : state -> Prop)
+  (step : state -> state -> Prop) (invariant : state -> Prop) s s',
+  step^* s s'
+  -> initial s
+  -> invariantFor initial step invariant
+  -> invariant s'.
+Proof.
+  firstorder.
+Qed.
 
-  Hint Constructors trc.
+Theorem invariantFor_monotone : forall {state} (initial : state -> Prop)
+  (step : state -> state -> Prop) (invariant1 invariant2 : state -> Prop),
+  (forall s, invariant1 s -> invariant2 s)
+  -> invariantFor initial step invariant1
+  -> invariantFor initial step invariant2.
+Proof.
+  unfold invariantFor; intuition eauto.
+Qed.
 
-  Definition safe (s : state) :=
-    forall s', step^* s s' -> invariant s'.
-
-  Variable s0 : state.
-
-  Hypothesis Hinitial : invariant s0.
-
-  Hypothesis Hstep : forall s s', invariant s -> step s s' -> invariant s'.
-
-  Lemma safety : safe s0.
-  Proof.
-    generalize dependent s0.
-    unfold safe.
-    induction 2; eauto.
-  Qed.
-End Invariant.
-
-Hint Resolve safety.
+Theorem invariant_induction : forall {state} (initial : state -> Prop)
+  (step : state -> state -> Prop) (invariant : state -> Prop),
+  (forall s, initial s -> invariant s)
+  -> (forall s, invariant s -> forall s', step s s' -> invariant s')
+  -> invariantFor initial step invariant.
+Proof.
+  unfold invariantFor; intros.
+  assert (invariant s) by eauto.
+  clear H1.
+  induction H2; eauto.
+Qed.

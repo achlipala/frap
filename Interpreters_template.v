@@ -14,7 +14,7 @@ Inductive arith : Set :=
 Example ex1 := Const 42.
 Example ex2 := Plus (Var "y") (Times (Var "x") (Const 3)).
 
-Definition valuation := map var nat.
+Definition valuation := fmap var nat.
 (* A valuation is a finite map from [var] to [nat]. *)
 
 (* The interpreter is a fairly innocuous-looking recursive function. *)

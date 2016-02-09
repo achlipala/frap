@@ -26,7 +26,7 @@ Example ex2 := Plus (Var "y") (Times (Var "x") (Const 3)).
  * We need to consider the meaning to be a function over a valuation
  * to the variables, which in turn is itself a finite map from variable
  * names to numbers.  We use the book library's [map] type family. *)
-Definition valuation := map var nat.
+Definition valuation := fmap var nat.
 (* That is, the domain is [var] (a synonym for [string]) and the codomain/range
  * is [nat]. *)
 

@@ -3,13 +3,13 @@ Require Import Classical Sets ClassicalEpsilon FunctionalExtensionality.
 Set Implicit Arguments.
 
 Module Type S.
-  Parameter map : Type -> Type -> Type.
+  Parameter fmap : Type -> Type -> Type.
 
-  Parameter empty : forall A B, map A B.
-  Parameter add : forall A B, map A B -> A -> B -> map A B.
-  Parameter join : forall A B, map A B -> map A B -> map A B.
-  Parameter lookup : forall A B, map A B -> A -> option B.
-  Parameter includes : forall A B, map A B -> map A B -> Prop.
+  Parameter empty : forall A B, fmap A B.
+  Parameter add : forall A B, fmap A B -> A -> B -> fmap A B.
+  Parameter join : forall A B, fmap A B -> fmap A B -> fmap A B.
+  Parameter lookup : forall A B, fmap A B -> A -> option B.
+  Parameter includes : forall A B, fmap A B -> fmap A B -> Prop.
 
   Notation "$0" := (empty _ _).
   Notation "m $+ ( k , v )" := (add m k v) (at level 50, left associativity).
@@ -17,51 +17,51 @@ Module Type S.
   Infix "$?" := lookup (at level 50, no associativity).
   Infix "$<=" := includes (at level 90).
 
-  Parameter dom : forall A B, map A B -> set A.
+  Parameter dom : forall A B, fmap A B -> set A.
 
-  Axiom map_ext : forall A B (m1 m2 : map A B),
+  Axiom fmap_ext : forall A B (m1 m2 : fmap A B),
     (forall k, m1 $? k = m2 $? k)
     -> m1 = m2.
 
   Axiom lookup_empty : forall A B k, empty A B $? k = None.
 
-  Axiom includes_lookup : forall A B (m m' : map A B) k v,
+  Axiom includes_lookup : forall A B (m m' : fmap A B) k v,
     m $? k = Some v
     -> m $<= m'
     -> lookup m' k = Some v.
 
-  Axiom includes_add : forall A B (m m' : map A B) k v,
+  Axiom includes_add : forall A B (m m' : fmap A B) k v,
     m $<= m'
     -> add m k v $<= add m' k v.
 
-  Axiom lookup_add_eq : forall A B (m : map A B) k1 k2 v,
+  Axiom lookup_add_eq : forall A B (m : fmap A B) k1 k2 v,
     k1 = k2
     -> add m k1 v $? k2 = Some v.
 
-  Axiom lookup_add_ne : forall A B (m : map A B) k k' v,
+  Axiom lookup_add_ne : forall A B (m : fmap A B) k k' v,
     k' <> k
     ->  add m k v $? k' = m $? k'.
 
-  Axiom lookup_join1 : forall A B (m1 m2 : map A B) k,
+  Axiom lookup_join1 : forall A B (m1 m2 : fmap A B) k,
     k \in dom m1
     -> (m1 $++ m2) $? k = m1 $? k.
 
-  Axiom lookup_join2 : forall A B (m1 m2 : map A B) k,
+  Axiom lookup_join2 : forall A B (m1 m2 : fmap A B) k,
     ~k \in dom m1
     -> (m1 $++ m2) $? k = m2 $? k.
 
-  Axiom join_comm : forall A B (m1 m2 : map A B),
+  Axiom join_comm : forall A B (m1 m2 : fmap A B),
     dom m1 \cap dom m2 = {}
     -> m1 $++ m2 = m2 $++ m1.
 
-  Axiom join_assoc : forall A B (m1 m2 m3 : map A B),
+  Axiom join_assoc : forall A B (m1 m2 m3 : fmap A B),
     (m1 $++ m2) $++ m3 = m1 $++ (m2 $++ m3).
 
-  Axiom empty_includes : forall A B (m : map A B), empty A B $<= m.
+  Axiom empty_includes : forall A B (m : fmap A B), empty A B $<= m.
 
   Axiom dom_empty : forall A B, dom (empty A B) = {}.
 
-  Axiom dom_add : forall A B (m : map A B) (k : A) (v : B),
+  Axiom dom_add : forall A B (m : fmap A B) (k : A) (v : B),
     dom (add m k v) = {k} \cup dom m.
 
   Hint Extern 1 => match goal with
@@ -74,7 +74,7 @@ Module Type S.
   Hint Rewrite lookup_add_eq lookup_add_ne using congruence.
 
   Ltac maps_equal :=
-    apply map_ext; intros;
+    apply fmap_ext; intros;
       repeat (subst; autorewrite with core; try reflexivity;
         match goal with
           | [ |- context[lookup (add _ ?k _) ?k' ] ] => destruct (classic (k = k')); subst
@@ -84,9 +84,9 @@ Module Type S.
 End S.
 
 Module M : S.
-  Definition map (A B : Type) := A -> option B.
+  Definition fmap (A B : Type) := A -> option B.
 
-  Definition empty A B : map A B := fun _ => None.
+  Definition empty A B : fmap A B := fun _ => None.
 
   Section decide.
     Variable P : Prop.
@@ -102,20 +102,20 @@ Module M : S.
       epsilon decided (fun _ => True).
   End decide.
 
-  Definition add A B (m : map A B) (k : A) (v : B) : map A B :=
+  Definition add A B (m : fmap A B) (k : A) (v : B) : fmap A B :=
     fun k' => if decide (k' = k) then Some v else m k'.
-  Definition join A B (m1 m2 : map A B) : map A B :=
+  Definition join A B (m1 m2 : fmap A B) : fmap A B :=
     fun k => match m1 k with
                | None => m2 k
                | x => x
              end.
-  Definition lookup A B (m : map A B) (k : A) := m k.
-  Definition includes A B (m1 m2 : map A B) :=
+  Definition lookup A B (m : fmap A B) (k : A) := m k.
+  Definition includes A B (m1 m2 : fmap A B) :=
     forall k v, m1 k = Some v -> m2 k = Some v.
 
-  Definition dom A B (m : map A B) : set A := fun x => m x <> None.
+  Definition dom A B (m : fmap A B) : set A := fun x => m x <> None.
 
-  Theorem map_ext : forall A B (m1 m2 : map A B),
+  Theorem fmap_ext : forall A B (m1 m2 : fmap A B),
     (forall k, lookup m1 k = lookup m2 k)
     -> m1 = m2.
   Proof.
@@ -127,7 +127,7 @@ Module M : S.
     auto.
   Qed.
 
-  Theorem includes_lookup : forall A B (m m' : map A B) k v,
+  Theorem includes_lookup : forall A B (m m' : fmap A B) k v,
     lookup m k = Some v
     -> includes m m'
     -> lookup m' k = Some v.
@@ -135,7 +135,7 @@ Module M : S.
     auto.
   Qed.
 
-  Theorem includes_add : forall A B (m m' : map A B) k v,
+  Theorem includes_add : forall A B (m m' : fmap A B) k v,
     includes m m'
     -> includes (add m k v) (add m' k v).
   Proof.
@@ -143,7 +143,7 @@ Module M : S.
     destruct (decide (k0 = k)); auto.
   Qed.
 
-  Theorem lookup_add_eq : forall A B (m : map A B) k1 k2 v,
+  Theorem lookup_add_eq : forall A B (m : fmap A B) k1 k2 v,
     k1 = k2
     -> lookup (add m k1 v) k2 = Some v.
   Proof.
@@ -152,7 +152,7 @@ Module M : S.
     congruence.
   Qed.
 
-  Theorem lookup_add_ne : forall A B (m : map A B) k k' v,
+  Theorem lookup_add_ne : forall A B (m : fmap A B) k k' v,
     k' <> k
     -> lookup (add m k v) k' = lookup m k'.
   Proof.
@@ -160,7 +160,7 @@ Module M : S.
     destruct (decide (k' = k)); intuition.
   Qed.
 
-  Theorem lookup_join1 : forall A B (m1 m2 : map A B) k,
+  Theorem lookup_join1 : forall A B (m1 m2 : fmap A B) k,
     k \in dom m1
     -> lookup (join m1 m2) k = lookup m1 k.
   Proof.
@@ -168,7 +168,7 @@ Module M : S.
     destruct (m1 k); congruence.
   Qed.
 
-  Theorem lookup_join2 : forall A B (m1 m2 : map A B) k,
+  Theorem lookup_join2 : forall A B (m1 m2 : fmap A B) k,
     ~k \in dom m1
     -> lookup (join m1 m2) k = lookup m2 k.
   Proof.
@@ -177,11 +177,11 @@ Module M : S.
     exfalso; apply H; congruence.
   Qed.
 
-  Theorem join_comm : forall A B (m1 m2 : map A B),
+  Theorem join_comm : forall A B (m1 m2 : fmap A B),
     dom m1 \cap dom m2 = {}
     -> join m1 m2 = join m2 m1.
   Proof.
-    intros; apply map_ext; unfold join, lookup; intros.
+    intros; apply fmap_ext; unfold join, lookup; intros.
     apply (f_equal (fun f => f k)) in H.
     unfold dom, intersection, constant in H; simpl in H.
     destruct (m1 k), (m2 k); auto.
@@ -189,14 +189,14 @@ Module M : S.
     intuition congruence.
   Qed.
 
-  Theorem join_assoc : forall A B (m1 m2 m3 : map A B),
+  Theorem join_assoc : forall A B (m1 m2 m3 : fmap A B),
     join (join m1 m2) m3 = join m1 (join m2 m3).
   Proof.
-    intros; apply map_ext; unfold join, lookup; intros.
+    intros; apply fmap_ext; unfold join, lookup; intros.
     destruct (m1 k); auto.
   Qed.
 
-  Theorem empty_includes : forall A B (m : map A B), includes (empty (A := A) B) m.
+  Theorem empty_includes : forall A B (m : fmap A B), includes (empty (A := A) B) m.
   Proof.
     unfold includes, empty; intuition congruence.
   Qed.
@@ -206,7 +206,7 @@ Module M : S.
     unfold dom, empty; intros; sets idtac.
   Qed.
 
-  Theorem dom_add : forall A B (m : map A B) (k : A) (v : B),
+  Theorem dom_add : forall A B (m : fmap A B) (k : A) (v : B),
     dom (add m k v) = {k} \cup dom m.
   Proof.
     unfold dom, add; simpl; intros.

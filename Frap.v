@@ -1,5 +1,5 @@
-Require Import String Arith Omega Program Sets Relations Map Var Invariant.
-Export String Arith Sets Relations Map Var Invariant.
+Require Import String Arith Omega Program Sets Relations Map Var Invariant Bool.
+Export String Arith Sets Relations Map Var Invariant Bool.
 Require Import List.
 Export List ListNotations.
 Open Scope string_scope.
@@ -44,6 +44,7 @@ Ltac invert1 e := invert0 e || (invert e; []).
 Ltac invert2 e := invert1 e || (invert e; [|]).
 
 Ltac simplify := repeat progress (simpl in *; intros; try autorewrite with core in *).
+Ltac propositional := intuition idtac.
 
 Ltac linear_arithmetic := intros;
     repeat match goal with

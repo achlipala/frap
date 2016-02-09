@@ -3,28 +3,42 @@ Require Import Relations.
 Set Implicit Arguments.
 
 
-Section Invariant.
-  Variable state : Type.
-  Variable step : state -> state -> Prop.
-  Variable invariant : state -> Prop.
+Record trsys state := {
+  Initial : state -> Prop;
+  Step : state -> state -> Prop
+}.
 
-  Hint Constructors trc.
+Definition invariantFor {state} (sys : trsys state) (invariant : state -> Prop) :=
+  forall s, sys.(Initial) s
+            -> forall s', sys.(Step)^* s s'
+                          -> invariant s'.
 
-  Definition safe (s : state) :=
-    forall s', step^* s s' -> invariant s'.
+Theorem use_invariant : forall {state} (sys : trsys state) (invariant : state -> Prop) s s',
+  sys.(Step)^* s s'
+  -> sys.(Initial) s
+  -> invariantFor sys invariant
+  -> invariant s'.
+Proof.
+  firstorder.
+Qed.
 
-  Variable s0 : state.
+Theorem invariantFor_monotone : forall {state} (sys : trsys state)
+  (invariant1 invariant2 : state -> Prop),
+  (forall s, invariant1 s -> invariant2 s)
+  -> invariantFor sys invariant1
+  -> invariantFor sys invariant2.
+Proof.
+  unfold invariantFor; intuition eauto.
+Qed.
 
-  Hypothesis Hinitial : invariant s0.
-
-  Hypothesis Hstep : forall s s', invariant s -> step s s' -> invariant s'.
-
-  Lemma safety : safe s0.
-  Proof.
-    generalize dependent s0.
-    unfold safe.
-    induction 2; eauto.
-  Qed.
-End Invariant.
-
-Hint Resolve safety.
+Theorem invariant_induction : forall {state} (sys : trsys state)
+  (invariant : state -> Prop),
+  (forall s, sys.(Initial) s -> invariant s)
+  -> (forall s, invariant s -> forall s', sys.(Step) s s' -> invariant s')
+  -> invariantFor sys invariant.
+Proof.
+  unfold invariantFor; intros.
+  assert (invariant s) by eauto.
+  clear H1.
+  induction H2; eauto.
+Qed.

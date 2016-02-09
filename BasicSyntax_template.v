@@ -38,8 +38,7 @@ Compute size ex2.
  * Size is an upper bound on depth. *)
 Theorem depth_le_size : forall e, depth e <= size e.
 Proof.
-  admit.
-Qed.
+Admitted.
 
 (* A silly recursive function: swap the operand orders of all binary operators. *)
 Fixpoint commuter (e : arith) : arith :=
@@ -56,18 +55,16 @@ Compute commuter ex2.
 
 Theorem size_commuter : forall e, size (commuter e) = size e.
 Proof.
-  admit.
-Qed.
+Admitted.
 
 Theorem depth_commuter : forall e, depth (commuter e) = depth e.
 Proof.
-  admit.
-Qed.
+Admitted.
 
 Theorem commuter_inverse : forall e, commuter (commuter e) = e.
 Proof.
-  admit.
-Qed.
+Admitted.
+
 
 
 

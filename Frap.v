@@ -62,7 +62,7 @@ Ltac linear_arithmetic := intros;
                rewrite Heq in *; clear Heq
            end; omega.
 
-Ltac equality := congruence.
+Ltac equality := intuition congruence.
 
 Ltac cases E :=
   ((is_var E; destruct E)

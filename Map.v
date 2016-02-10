@@ -7,12 +7,14 @@ Module Type S.
 
   Parameter empty : forall A B, fmap A B.
   Parameter add : forall A B, fmap A B -> A -> B -> fmap A B.
+  Parameter remove : forall A B, fmap A B -> A -> fmap A B.
   Parameter join : forall A B, fmap A B -> fmap A B -> fmap A B.
   Parameter lookup : forall A B, fmap A B -> A -> option B.
   Parameter includes : forall A B, fmap A B -> fmap A B -> Prop.
 
   Notation "$0" := (empty _ _).
   Notation "m $+ ( k , v )" := (add m k v) (at level 50, left associativity).
+  Infix "$-" := remove (at level 50, left associativity).
   Infix "$++" := join (at level 50, left associativity).
   Infix "$?" := lookup (at level 50, no associativity).
   Infix "$<=" := includes (at level 90).
@@ -41,6 +43,14 @@ Module Type S.
   Axiom lookup_add_ne : forall A B (m : fmap A B) k k' v,
     k' <> k
     ->  add m k v $? k' = m $? k'.
+
+  Axiom lookup_remove_eq : forall A B (m : fmap A B) k1 k2,
+    k1 = k2
+    -> remove m k1 $? k2 = None.
+
+  Axiom lookup_remove_ne : forall A B (m : fmap A B) k k',
+    k' <> k
+    ->  remove m k $? k' = m $? k'.
 
   Axiom lookup_join1 : forall A B (m1 m2 : fmap A B) k,
     k \in dom m1
@@ -71,7 +81,7 @@ Module Type S.
 
   Hint Resolve includes_lookup includes_add empty_includes.
 
-  Hint Rewrite lookup_add_eq lookup_add_ne using congruence.
+  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne using congruence.
 
   Ltac maps_equal :=
     apply fmap_ext; intros;
@@ -104,6 +114,8 @@ Module M : S.
 
   Definition add A B (m : fmap A B) (k : A) (v : B) : fmap A B :=
     fun k' => if decide (k' = k) then Some v else m k'.
+  Definition remove A B (m : fmap A B) (k : A) : fmap A B :=
+    fun k' => if decide (k' = k) then None else m k'.
   Definition join A B (m1 m2 : fmap A B) : fmap A B :=
     fun k => match m1 k with
                | None => m2 k
@@ -158,6 +170,23 @@ Module M : S.
   Proof.
     unfold lookup, add; intuition.
     destruct (decide (k' = k)); intuition.
+  Qed.
+
+  Theorem lookup_remove_eq : forall A B (m : fmap A B) k1 k2,
+    k1 = k2
+    -> lookup (remove m k1) k2 = None.
+  Proof.
+    unfold lookup, remove; intuition.
+    destruct (decide (k2 = k1)); try tauto.
+    congruence.
+  Qed.
+
+  Theorem lookup_remove_ne : forall A B (m : fmap A B) k k',
+    k' <> k
+    -> lookup (remove m k) k' = lookup m k'.
+  Proof.
+    unfold lookup, remove; intuition.
+    destruct (decide (k' = k)); try tauto.
   Qed.
 
   Theorem lookup_join1 : forall A B (m1 m2 : fmap A B) k,

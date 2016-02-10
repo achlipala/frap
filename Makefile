@@ -1,13 +1,13 @@
 .PHONY: all coq install
 
-all: frap.pdf coq
+all: frap_book.pdf coq
 
-frap.pdf: frap.tex Makefile
-	pdflatex frap
-	pdflatex frap
-	makeindex frap
-	pdflatex frap
-	pdflatex frap
+frap_book.pdf: frap_book.tex Makefile
+	pdflatex frap_book
+	pdflatex frap_book
+	makeindex frap_book
+	pdflatex frap_book
+	pdflatex frap_book
 
 coq: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -24,7 +24,7 @@ frap.tgz: Makefile _CoqProject *.v *.tex *.html
 
 WHERE=chlipala.net:sites/chlipala/adam/frap/
 
-install: index.html frap.pdf frap.tgz
-	rsync frap.pdf $(WHERE)
+install: index.html frap_book.pdf frap.tgz
+	rsync frap_book.pdf $(WHERE)
 	rsync frap.tgz $(WHERE)
 	rsync index.html $(WHERE)

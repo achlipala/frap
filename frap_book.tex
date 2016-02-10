@@ -429,22 +429,22 @@ For example, recall that our definition of expression size included this clause.
   \size{\mathsf{Plus}(e_1, e_2)} &=& 1 + \size{e_1} + \size{e_2}
 \end{eqnarray*}
 Now imagine that we are trying to prove this formula.
-$$\size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 8 + \size{e}$$
+$$\size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 2 + \size{e}$$
 We may apply the defining equation to rewrite into a different formula, where we have essential pushed the definition of $\size{\cdot}$ through the $\mathsf{Plus}$.
-$$1 + \size{e} + \size{\mathsf{Const}(7)} = 8 + \size{e}$$
+$$1 + \size{e} + \size{\mathsf{Const}(7)} = 2 + \size{e}$$
 Another application of a different defining equation, this time for $\mathsf{Const}$, takes us to here.
-$$1 + \size{e} + 7 = 8 + \size{e}$$
+$$1 + \size{e} + 1 = 2 + \size{e}$$
 From here, the goal follows by linear arithmetic.
 
 \medskip
 
-Such a proof establishes a theorem $\forall e \in \mathsf{Exp}. \; \size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 8 + \size{e}$.
+Such a proof establishes a theorem $\forall e \in \mathsf{Exp}. \; \size{\mathsf{Plus}(e, \mathsf{Const}(7))} = 2 + \size{e}$.
 We may use already-proved theorems via a more general \emph{rewriting}\index{rewriting} mechanism, applying whenever we know some quantified equality.
 Within a new goal we are proving, we find some subterm that matches the lefthand side of that equality, after we choose the proper values of the quantified variables.
 The process of finding those values automatically is called \emph{unification}\index{unification}.
 Rewriting enables us to take the subterm we found and replace it with the righthand side of the equation.
 
-As an example, assume that, for some $P$, we know $P(8 + \size{\mathsf{Var}(x)})$ and are trying to prove $P(\size{\mathsf{Plus}(\mathsf{Var}(x), \mathsf{Const}(7))})$.
+As an example, assume that, for some $P$, we know $P(2 + \size{\mathsf{Var}(x)})$ and are trying to prove $P(\size{\mathsf{Plus}(\mathsf{Var}(x), \mathsf{Const}(7))})$.
 We may use our earlier fact to rewrite the argument of $P$ in what we are trying to show, so that it now matches the argument from what we already know, at which point the proof is trivial to finish.
 Here, unification found the assignment $e = \mathsf{Var}(x)$.
 
@@ -517,8 +517,8 @@ It's important to remember that plus \emph{inside} the brackets is syntax, while
 \newcommand{\subst}[3]{[#3/#2]#1}
 
 To test our semantics, we define a \emph{variable substitution} function\index{substitution}.
-A substitution $\subst{e}{x}{e'}$ stands for the result of running through the syntax of $e$, repla
-cing every occurrence of variable $x$ with expression $e'$.
+A substitution $\subst{e}{x}{e'}$ stands for the result of running through the syntax of $e$,
+replacing every occurrence of variable $x$ with expression $e'$.
 
 \begin{eqnarray*}
   \subst{n}{x}{e} &=& n \\
@@ -776,7 +776,7 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{f\_equal}] When the goal is an equality between two applications of the same function, switch to proving that the function arguments are pairwise equal.
   \item[\texttt{induct} $x$] Where $x$ is a variable in the theorem statement, structure the proof by induction on the structure of $x$.  You will get one generated subgoal per constructor in the inductive definition of $x$.  (Indeed, it is required that $x$'s type was introduced with \texttt{Inductive}.)
   \item[\texttt{invert} $H$] Replace hypothesis $H$ with other facts that can be deduced from the structure of $H$'s statement.  More detail to be added here soon!
-  \item[\texttt{linear\_arithemtic}] A complete decision procedure for linear arithmetic.  Relevant formulas are essentially those built up from variables and constant natural numbers and integers using only addition and subtraction, with equality and inequality comparisons on top.  (Multiplication by constants is supported, as a shorthand for repeated addition.) See Section \ref{decidable}.
+  \item[\texttt{linear\_arithmetic}] A complete decision procedure for linear arithmetic.  Relevant formulas are essentially those built up from variables and constant natural numbers and integers using only addition and subtraction, with equality and inequality comparisons on top.  (Multiplication by constants is supported, as a shorthand for repeated addition.) See Section \ref{decidable}.
     \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
     \item[\texttt{maps\_equal}] Prove that two finite maps are equal by considering all the relevant cases for mappings of different keys.
   \item[\texttt{ring}] Prove goals that are equalities over some registered ring or semiring, in the sense of algebra, where the goal follows solely from the axioms of that algebraic structure.  See Section \ref{decidable}.

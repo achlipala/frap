@@ -39,7 +39,7 @@ Compute size ex2.
 Theorem depth_le_size : forall e, depth e <= size e.
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* A silly recursive function: swap the operand orders of all binary operators. *)
 Fixpoint commuter (e : arith) : arith :=
@@ -57,17 +57,17 @@ Compute commuter ex2.
 Theorem size_commuter : forall e, size (commuter e) = size e.
 Proof.
   admit.
-Qed.
+Admitted.
 
 Theorem depth_commuter : forall e, depth (commuter e) = depth e.
 Proof.
   admit.
-Qed.
+Admitted.
 
 Theorem commuter_inverse : forall e, commuter (commuter e) = e.
 Proof.
   admit.
-Qed.
+Admitted.
 
 
 
@@ -105,14 +105,14 @@ Theorem substitute_depth : forall replaceThis withThis inThis,
   depth (substitute inThis replaceThis withThis) <= depth inThis + depth withThis.
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* A silly self-substitution has no effect. *)
 Theorem substitute_self : forall replaceThis inThis,
   substitute inThis replaceThis (Var replaceThis) = inThis.
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* We can do substitution and commuting in either order. *)
 Theorem substitute_commuter : forall replaceThis withThis inThis,
@@ -120,7 +120,7 @@ Theorem substitute_commuter : forall replaceThis withThis inThis,
   = substitute (commuter inThis) replaceThis (commuter withThis).
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* *Constant folding* is one of the classic compiler optimizations.
  * We repeatedly find opportunities to replace fancier expressions
@@ -156,13 +156,13 @@ Fixpoint constantFold (e : arith) : arith :=
 Theorem size_constantFold : forall e, size (constantFold e) <= size e.
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* Business as usual, with another commuting law *)
 Theorem commuter_constantFold : forall e, commuter (constantFold e) = constantFold (commuter e).
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* To define a further transformation, we first write a roundabout way of
  * testing whether an expression is a constant. *)
@@ -207,7 +207,7 @@ Lemma depth_pushMultiplicationInside'_irrelevance0 : forall e multiplyBy,
   = depth (pushMultiplicationInside' 0 e).
 Proof.
   admit.
-Qed.
+Admitted.
 
 (* Let's prove that pushing-inside has only a small effect on depth,
  * considering for now only coefficient 0. *)
@@ -215,11 +215,11 @@ Lemma depth_pushMultiplicationInside' : forall e,
   depth (pushMultiplicationInside' 0 e) <= S (depth e).
 Proof.
   admit.
-Qed.
+Admitted.
 
 Theorem depth_pushMultiplicationInside : forall e,
   depth (pushMultiplicationInside e) <= S (depth e).
 Proof.
   admit.
-Qed.
+Admitted.
 *)

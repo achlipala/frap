@@ -730,6 +730,99 @@ c \arrow{r}{^n\ldots} \arrow{d}{\denote{\ldots}} & ^nc \arrow{d}{\denote{\ldots}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Transition Systems and Invariants}
+
+For simple programming languages where programs always terminate, it is often most convenient to formalize them using interpreters, as in the last chapter.
+However, many important languages don't fall into that category, and for them we need different techniques.
+Nontermination isn't always a bug; for instance, we expect a network server to run indefinitely.
+We still need to be able to talk about the correct behavior of programs that run forever, by design.
+For that reason, in this chapter and in most of the rest of the book, we model programs using relations, in much the same way that may be familiar from automata theory\index{automata theory}.
+An important difference, though, is that, while undergraduate automata-theory classes generally study \emph{finite-state machines}\index{finite-state machines}, for general program reasoning we want to allow infinite sets of states, otherwise referred to as \emph{infinite-state systems}\index{infnite-state systems}.
+
+Let's start with an example that almost seems too mundane to be associated with such terms.
+
+\section{Factorial as a State Machine}
+
+We're familiar with the factorial operation, implemented as an imperative program with a loop.
+\begin{verbatim}
+factorial(n) {
+  a = 1;
+  while (n > 0) {
+    a = a * n;
+    n = n - 1;
+  }
+  return a;
+}
+\end{verbatim}
+
+In the analysis to follow, consider some value $n_0 \in \mathbb N$ fixed, as the input passed to this operation.
+A state machine is lurking within the surface syntax of the program.
+In fact, we have a variety of choices in modeling it as a state machine.
+Here is the set of states that we choose to use here:
+$$\begin{array}{rrcl}
+  \textrm{Natural numbers} & n &\in& \mathbb N \\
+  \textrm{States} & s &::=& \mathsf{AnswerIs}(n) \mid \mathsf{WithAccumulator}(n, n)
+\end{array}$$
+
+There are two types of states.
+An $\mathsf{AnswerIs}(n)$ state corresponds to the \texttt{return} statement.
+It records the final result $n$ of the factorial operation.
+A $\mathsf{WithAccumulator}(n, a)$ records an intermediate state, giving the values of the two local variables, just before a loop iteration begins.
+
+Following the more familiar parts of automata theory, let's define a set of \emph{initial states}\index{initial state} for this machine.
+$$\infer{\mathsf{WithAccumulator}(n_0, 1) \in \mathcal F_0}{}$$
+For consistency with the notation we will be using later, we define the set $\mathcal F_0$ using an inference rule.
+Equivalently, we could just write $\mathcal F_0 = \{\mathsf{WithAccumulator}(n_0, 1)\}$, essentially reading off the initial variable values from the first lines of the code above.
+
+Similarly, we also define a set of \emph{final states}\index{final state}.
+$$\infer{\mathsf{AnswerIs}(n) \in \mathcal F_\omega}{}$$
+Equivalently: $\mathcal F_\omega = \{\mathsf{AnswerIs}(n) \mid n \in \mathbb N\}$.
+Note that this definition only captures when the program is \emph{done}, not when it \emph{returns the right answer}.
+It follows from the last line of the code.
+
+The last and most important ingredient of our state machine is its \emph{transition relation}, where we write $s \to s'$ to indicate that state $s$ advances to state $s'$ in one step, following the semantics of the program.
+Here inference rules are more obviously a good fit.
+$$\infer{\mathsf{WithAccumulator}(0, a) \to \mathsf{AnswerIs}(a)}{}$$
+$$\infer{\mathsf{WithAccumulator}(n+1, a) \to \mathsf{WithAccumulator}(n, a \times (n+1))}{}$$
+The first rule corresponds to the case where the program ends, because the loop test has failed and we now know the final answer.
+The second rule corresponds to going once around the loop, following directly from the code in the loop body.
+
+We can fit these ingredients into the general concept of a \emph{transition system}\index{transition system}, the term we will use throughout this book for this sort of state machine.
+Actually, the words ``state machine'' suggest to many people that the state set must be finite, hence our preference for ``transition system,'' which is also used fairly frequently in semantics.
+
+\newcommand{\angled}[1]{{\left \langle #1 \right \rangle}}
+
+\begin{definition}
+  A \emph{transition system} is a triple $\angled{S, S_0, \to}$, with $S$ a set of states, $S_0 \subseteq S$ a set of initial states, and $\to \; \subseteq S \times S$ a transition relation.
+\end{definition}
+
+For an arbitrary transition relation $\to$, not just the one defined above for factorial, we define its \emph{transitive-reflexive closure}\index{transitive-reflexive closure} $\to^*$ with two inference rules:
+$$\infer{s \to^* s}{}
+\quad \infer{s \to^* s''}{
+  s \to s'
+  & s' \to^* s''
+}$$
+That is, a formal claim $s \to^* s'$ corresponds exactly to the informal claim that ``starting from state $s$, we can reach state $s'$.''
+
+\begin{definition}
+  For transition system $\angled{S, S_0, \to}$, we say that a state $s$ is \emph{reachable} if and only if there exists $s_0 \in S_0$ such that $s_0 \to^* s$.
+\end{definition}
+
+Building on these notations, here is one way to state the correctness of our factorial program, which, defining $S$ according to the state grammar above, we model as $\mathcal F = \angled{S, \mathcal F_0, \to}$.
+
+\begin{theorem}
+  For any state $s$ reachable in $\mathcal F$, if $s \in \mathcal F_\omega$, then $s = \mathsf{AnswerIs}(n_0!)$.
+\end{theorem}
+
+That is, whenever the program finishes, it returns the right answer.
+(Recall that $n_0$ is the initial value of the input variable.)
+
+We could prove this theorem now in a relatively ad-hoc way.
+Instead, let's develop the general machinery of \emph{invariants}.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

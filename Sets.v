@@ -18,6 +18,7 @@ Section set.
 
   Definition union (s1 s2 : set) : set := fun x => s1 x \/ s2 x.
   Definition intersection (s1 s2 : set) : set := fun x => s1 x /\ s2 x.
+  Definition minus (s1 s2 : set) : set := fun x => s1 x /\ ~s2 x.
   Definition complement (s : set) : set := fun x => ~s x.
 
   Definition subseteq (s1 s2 : set) := forall x, s1 x -> s2 x.
@@ -39,6 +40,7 @@ Notation "{ x1 , .. , xN }" := (constant (cons x1 (.. (cons xN nil) ..))).
 Notation "[ P ]" := (check P).
 Infix "\cup" := union (at level 40).
 Infix "\cap" := intersection (at level 40).
+Infix "\setminus" := minus (at level 70).
 Infix "\subseteq" := subseteq (at level 70).
 Infix "\subset" := subset (at level 70).
 Notation "[ x | P ]" := (scomp (fun x => P)).
@@ -174,4 +176,65 @@ Ltac removeDups :=
       by repeat (apply RdNil
                  || (apply RdNew; [ simpl; intuition congruence | ])
                  || (apply RdDup; [ simpl; intuition congruence | ]))
+  end.
+
+
+(** * Simplifying set subtraction with constant sets *)
+
+Inductive doSubtract A : list A -> list A -> list A -> Prop :=
+| DsNil : forall ls, doSubtract nil ls nil
+| DsKeep : forall x ls ls0 ls',
+  ~List.In x ls0
+  -> doSubtract ls ls0 ls'
+  -> doSubtract (x :: ls) ls0 (x :: ls')
+| DsDrop : forall x ls ls0 ls',
+  List.In x ls
+  -> doSubtract ls ls0 ls'
+  -> doSubtract (x :: ls) ls0 ls'.
+
+Theorem doSubtract_fwd : forall A x (ls ls0 ls' : list A),
+  doSubtract ls ls0 ls'
+  -> List.In x ls
+  -> ~List.In x ls0
+  -> List.In x ls'.
+Proof.
+  induction 1; simpl; intuition.
+  subst; eauto.
+Qed.
+
+Theorem doSubtract_bwd1 : forall A x (ls ls0 ls' : list A),
+  doSubtract ls ls0 ls'
+  -> List.In x ls'
+  -> List.In x ls.
+Proof.
+  induction 1; simpl; intuition.
+Qed.
+
+Theorem doSubtract_bwd2 : forall A x (ls ls0 ls' : list A),
+  doSubtract ls ls0 ls'
+  -> List.In x ls'
+  -> List.In x ls0
+  -> False.
+Proof.
+  induction 1; simpl; intuition.
+  subst; eauto.
+Qed.
+
+Theorem doSubtract_ok : forall A (ls ls0 ls' : list A),
+  doSubtract ls ls0 ls'
+  -> constant ls \setminus constant ls0 = constant ls'.
+Proof.
+  unfold minus.
+  intros.
+  apply sets_equal.
+  unfold constant; intuition eauto using doSubtract_fwd, doSubtract_bwd1, doSubtract_bwd2.
+Qed.
+
+Ltac doSubtract :=
+  match goal with
+  | [ |- context[constant ?ls \setminus constant ?ls0] ] =>
+    erewrite (@doSubtract_ok _ ls ls0)
+      by repeat (apply DsNil
+                 || (apply DsKeep; [ simpl; intuition congruence | ])
+                 || (apply DsDrop; [ simpl; intuition congruence | ]))
   end.

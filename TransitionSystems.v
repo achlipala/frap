@@ -133,6 +133,13 @@ Definition factorial_sys (original_input : nat) : trsys fact_state := {|
   Step := fact_step
 |}.
 
+(* A useful general notion for transition systems: reachable states *)
+Inductive reachable {state} (sys : trsys state) (st : state) : Prop :=
+| Reachable : forall st0,
+  sys.(Initial) st0
+  -> sys.(Step)^* st0 st
+  -> reachable sys st.
+
 (* To prove that our state machine is correct, we rely on the crucial technique
  * of *invariants*.  What is an invariant?  Here's a general definition, in
  * terms of an arbitrary *transition system* defined by a set of states,
@@ -146,7 +153,7 @@ Definition invariantFor {state} (sys : trsys state) (invariant : state -> Prop) 
 
 (* Here's a simple lemma to help us apply an invariant usefully,
  * really just restating the definition. *)
-Theorem use_invariant : forall {state} (sys : trsys state)
+Lemma use_invariant' : forall {state} (sys : trsys state)
   (invariant : state -> Prop) s s',
   invariantFor sys invariant
   -> sys.(Initial) s
@@ -156,6 +163,20 @@ Proof.
   unfold invariantFor.
   simplify.
   eapply H.
+  eassumption.
+  assumption.
+Qed.
+
+Theorem use_invariant : forall {state} (sys : trsys state)
+  (invariant : state -> Prop) s,
+  invariantFor sys invariant
+  -> reachable sys s
+  -> invariant s.
+Proof.
+  simplify.
+  invert H0.
+  eapply use_invariant'.
+  eassumption.
   eassumption.
   assumption.
 Qed.
@@ -234,15 +255,13 @@ Proof.
 Qed.
 
 (* Therefore, every reachable state satisfies this invariant. *)
-Theorem fact_invariant_always : forall original_input s s',
-  (factorial_sys original_input).(Step)^* s s'
-  -> (factorial_sys original_input).(Initial) s
-  -> fact_invariant original_input s'.
+Theorem fact_invariant_always : forall original_input s,
+  reachable (factorial_sys original_input) s
+  -> fact_invariant original_input s.
 Proof.
   simplify.
   eapply use_invariant.
   apply fact_invariant_ok.
-  eassumption.
   assumption.
 Qed.
 
@@ -255,16 +274,417 @@ Proof.
   invert 1; simplify; equality.
 Qed.
 
-Theorem fact_ok : forall original_input s s',
-  (factorial_sys original_input).(Step)^* s s'
-  -> (factorial_sys original_input).(Initial) s
-  -> fact_final s'
-  -> s' = AnswerIs (fact original_input).
+Theorem fact_ok : forall original_input s,
+  reachable (factorial_sys original_input) s
+  -> fact_final s
+  -> s = AnswerIs (fact original_input).
 Proof.
   simplify.
   apply fact_ok'.
   assumption.
-  eapply fact_invariant_always.
+  apply fact_invariant_always.
+  assumption.
+Qed.
+
+
+(** * A simple example of another program as a state transition system *)
+
+(* We'll formalize this pseudocode for one thread of a concurrent, shared-memory program.
+  lock();
+  local = global;
+  global = local + 1;
+  unlock();
+*)
+
+(* This inductive state effectively encodes all possible combinations of two
+ * kinds of *local*state* in a thread:
+ * - program counter
+ * - values of local variables that may be ready eventually *)
+Inductive increment_program : Set :=
+| Lock : increment_program
+| Read : increment_program
+| Write : nat -> increment_program
+| Unlock : increment_program
+| Done : increment_program.
+
+(* Next, a type for state shared between threads. *)
+Record inc_state := {
+  Locked : bool; (* Does a thread hold the lock? *)
+  Global : nat   (* A shared counter *)
+}.
+
+(* The combined state, from one thread's perspective, using a general
+ * definition. *)
+Record threaded_state shared private := {
+  Shared : shared;
+  Private : private
+}.
+
+Definition increment_state := threaded_state inc_state increment_program.
+
+(* Now a routine definition of the three key relations of a transition system.
+ * The most interesting logic surrounds saving the counter value in the local
+ * state after reading. *)
+
+Inductive increment_init : increment_state -> Prop :=
+| IncInit :
+  increment_init {| Shared := {| Locked := false; Global := O |};
+                    Private := Lock |}.
+
+Inductive increment_step : increment_state -> increment_state -> Prop :=
+| IncLock : forall g,
+  increment_step {| Shared := {| Locked := false; Global := g |};
+                    Private := Lock |}
+                 {| Shared := {| Locked := true; Global := g |};
+                    Private := Read |}
+| IncRead : forall l g,
+  increment_step {| Shared := {| Locked := l; Global := g |};
+                    Private := Read |}
+                 {| Shared := {| Locked := l; Global := g |};
+                    Private := Write g |}
+| IncWrite : forall l g v,
+  increment_step {| Shared := {| Locked := l; Global := g |};
+                    Private := Write v |}
+                 {| Shared := {| Locked := l; Global := S v |};
+                    Private := Unlock |}
+| IncUnlock : forall l g,
+  increment_step {| Shared := {| Locked := l; Global := g |};
+                    Private := Unlock |}
+                 {| Shared := {| Locked := false; Global := g |};
+                    Private := Done |}.
+
+Inductive increment_final : increment_state -> Prop :=
+| IncFinal : forall l g,
+  increment_final {| Shared := {| Locked := l; Global := g |};
+                     Private := Done |}.
+
+Definition increment_sys := {|
+  Initial := increment_init;
+  Step := increment_step
+|}.
+
+
+(** * Running transition systems in parallel *)
+
+(* That last example system is a cop-out: it only runs a single thread.  We want
+ * to run several threads in parallel, sharing the global state.  Here's how we
+ * can do it for just two threads.  The key idea is that, while in the new
+ * system the type of shared state remains the same, we take the Cartesian
+ * product of the sets of private state. *)
+
+Inductive parallel1 shared private1 private2
+  (init1 : threaded_state shared private1 -> Prop)
+  (init2 : threaded_state shared private2 -> Prop)
+  : threaded_state shared (private1 * private2) -> Prop :=
+| Pinit : forall sh pr1 pr2,
+  init1 {| Shared := sh; Private := pr1 |}
+  -> init2 {| Shared := sh; Private := pr2 |}
+  -> parallel1 init1 init2 {| Shared := sh; Private := (pr1, pr2) |}.
+
+Inductive parallel2 shared private1 private2
+          (step1 : threaded_state shared private1 -> threaded_state shared private1 -> Prop)
+          (step2 : threaded_state shared private2 -> threaded_state shared private2 -> Prop)
+          : threaded_state shared (private1 * private2)
+            -> threaded_state shared (private1 * private2) -> Prop :=
+| Pstep1 : forall sh pr1 pr2 sh' pr1',
+  (* First thread gets to run. *)
+  step1 {| Shared := sh; Private := pr1 |} {| Shared := sh'; Private := pr1' |}
+  -> parallel2 step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
+               {| Shared := sh'; Private := (pr1', pr2) |}
+| Pstep2 : forall sh pr1 pr2 sh' pr2',
+  (* Second thread gets to run. *)
+  step2 {| Shared := sh; Private := pr2 |} {| Shared := sh'; Private := pr2' |}
+  -> parallel2 step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
+               {| Shared := sh'; Private := (pr1, pr2') |}.
+
+Definition parallel shared private1 private2
+           (sys1 : trsys (threaded_state shared private1))
+           (sys2 : trsys (threaded_state shared private2)) := {|
+  Initial := parallel1 sys1.(Initial) sys2.(Initial);
+  Step := parallel2 sys1.(Step) sys2.(Step)
+|}.
+
+(* Example: composing two threads of the kind we formalized earlier *)
+Definition increment2_sys := parallel increment_sys increment_sys.
+
+(* Let's prove that the counter is always 2 when the composed program terminates. *)
+
+(* First big idea: the program counter of a thread tells us how much it has
+ * added to the shared counter so far. *)
+Definition contribution_from (pr : increment_program) : nat :=
+  match pr with
+  | Unlock => 1
+  | Done => 1
+  | _ => 0
+  end.
+
+(* Second big idea: the program counter also tells us whether a thread holds the lock. *)
+Definition has_lock (pr : increment_program) : bool :=
+  match pr with
+  | Read => true
+  | Write _ => true
+  | Unlock => true
+  | _ => false
+  end.
+
+(* Now we see that the shared state is a function of the two program counters,
+ * as follows. *)
+Definition shared_from_private (pr1 pr2 : increment_program) :=
+  {| Locked := has_lock pr1 || has_lock pr2;
+     Global := contribution_from pr1 + contribution_from pr2 |}.
+
+(* We also need a condition to formalize compatibility between program counters,
+ * e.g. that they shouldn't both be in the critical section at once. *)
+Definition instruction_ok (self other : increment_program) :=
+  match self with
+  | Lock => True
+  | Read => has_lock other = false
+  | Write n => has_lock other = false /\ n = contribution_from other
+  | Unlock => has_lock other = false
+  | Done => True
+  end.
+
+(** Now we have the ingredients to state the invariant. *)
+Inductive increment2_invariant :
+  threaded_state inc_state (increment_program * increment_program) -> Prop :=
+| Inc2Inv : forall pr1 pr2,
+  instruction_ok pr1 pr2
+  -> instruction_ok pr2 pr1
+  -> increment2_invariant {| Shared := shared_from_private pr1 pr2; Private := (pr1, pr2) |}.
+
+(** It's convenient to prove this alternative equality-based "constructor" for the invariant. *)
+Lemma Inc2Inv' : forall sh pr1 pr2,
+  sh = shared_from_private pr1 pr2
+  -> instruction_ok pr1 pr2
+  -> instruction_ok pr2 pr1
+  -> increment2_invariant {| Shared := sh; Private := (pr1, pr2) |}.
+Proof.
+  intros.
+  rewrite H.
+  apply Inc2Inv; assumption.
+Qed.
+
+(* Now, to show it really is an invariant. *)
+Theorem increment2_invariant_ok : invariantFor increment2_sys increment2_invariant.
+Proof.
+  apply invariant_induction; simplify.
+
+  invert H.
+  invert H0.
+  invert H1.
+  apply Inc2Inv'.
+
+  unfold shared_from_private.
+  simplify.
+  equality.
+
+  simplify.
+  propositional.
+
+  simplify.
+  propositional.
+
+  invert H.
+  invert H0.
+
+  invert H6; simplify.
+
+  cases pr2; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  (* Note that [equality] derives a contradiction from [false = true]! *)
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr2; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr2; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr2; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+
+  invert H6.
+
+  cases pr1; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  (* Note that [equality] derives a contradiction from [false = true]! *)
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr1; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  (* Note that [equality] derives a contradiction from [false = true]! *)
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr1; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  (* Note that [equality] derives a contradiction from [false = true]! *)
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  cases pr1; simplify.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+
+  equality.
+  (* Note that [equality] derives a contradiction from [false = true]! *)
+  equality.
+  equality.
+
+  apply Inc2Inv'; unfold shared_from_private; simplify.
+  equality.
+  equality.
+  equality.
+Qed.
+
+(* We can remove the repetitive proving with a more automated proof script,
+ * whose details are beyond the scope of this book, but which may be interesting
+ * anyway! *)
+Theorem increment2_invariant_ok_snazzy : invariantFor increment2_sys increment2_invariant.
+Proof.
+  apply invariant_induction; simplify;
+  repeat match goal with
+         | [ H : increment2_invariant _ |- _ ] => invert H
+         | [ H : parallel1 _ _ _ |- _ ] => invert H
+         | [ H : increment_init _ |- _ ] => invert H
+         | [ H : parallel2 _ _ _ _ |- _ ] => invert H
+         | [ H : increment_step _ _ |- _ ] => invert H
+         | [ pr : increment_program |- _ ] => cases pr; simplify
+         end; try equality;
+  apply Inc2Inv'; unfold shared_from_private; simplify; equality.
+Qed.
+
+(* Now, to prove our final result about the two incrementing threads, let's use
+ * a more general fact, about when one invariant implies another. *)
+Theorem invariantFor_weaken : forall {state} (sys : trsys state)
+  (invariant1 invariant2 : state -> Prop),
+  (forall s, invariant1 s -> invariant2 s)
+  -> invariantFor sys invariant1
+  -> invariantFor sys invariant2.
+Proof.
+  unfold invariantFor; simplify.
+  apply H.
+  eapply H0.
   eassumption.
+  assumption.
+Qed.
+
+(* Here's another, much weaker invariant, corresponding exactly to the overall
+ * correctness property we want to establish for this system. *)
+Definition increment2_right_answer
+  (s : threaded_state inc_state (increment_program * increment_program)) :=
+  s.(Private) = (Done, Done)
+  -> s.(Shared).(Global) = 2.
+
+(** Now we can prove that the system only runs to happy states. *)
+Theorem increment2_sys_correct : forall s,
+  reachable increment2_sys s
+  -> increment2_right_answer s.
+Proof.
+  simplify.
+  eapply use_invariant.
+  apply invariantFor_weaken with (invariant1 := increment2_invariant).
+  (* Note the use of a [with] clause to specify a quantified variable's
+   * value. *)
+
+  simplify.
+  invert H0.
+  unfold increment2_right_answer; simplify.
+  invert H0.
+  (* Here we use inversion on an equality, to derive more primitive
+   * equalities. *)
+  simplify.
+  equality.
+
+  apply increment2_invariant_ok.
   assumption.
 Qed.

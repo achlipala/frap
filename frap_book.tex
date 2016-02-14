@@ -765,8 +765,8 @@ $$\begin{array}{rrcl}
 \end{array}$$
 
 There are two types of states.
-An $\mathsf{AnswerIs}(n)$ state corresponds to the \texttt{return} statement.
-It records the final result $n$ of the factorial operation.
+An $\mathsf{AnswerIs}(a)$ state corresponds to the \texttt{return} statement.
+It records the final result $a$ of the factorial operation.
 A $\mathsf{WithAccumulator}(n, a)$ records an intermediate state, giving the values of the two local variables, just before a loop iteration begins.
 
 Following the more familiar parts of automata theory, let's define a set of \emph{initial states}\index{initial state} for this machine.
@@ -775,8 +775,8 @@ For consistency with the notation we will be using later, we define the set $\ma
 Equivalently, we could just write $\mathcal F_0 = \{\mathsf{WithAccumulator}(n_0, 1)\}$, essentially reading off the initial variable values from the first lines of the code above.
 
 Similarly, we also define a set of \emph{final states}\index{final state}.
-$$\infer{\mathsf{AnswerIs}(n) \in \mathcal F_\omega}{}$$
-Equivalently: $\mathcal F_\omega = \{\mathsf{AnswerIs}(n) \mid n \in \mathbb N\}$.
+$$\infer{\mathsf{AnswerIs}(a) \in \mathcal F_\omega}{}$$
+Equivalently: $\mathcal F_\omega = \{\mathsf{AnswerIs}(a) \mid a \in \mathbb N\}$.
 Note that this definition only captures when the program is \emph{done}, not when it \emph{returns the right answer}.
 It follows from the last line of the code.
 
@@ -810,7 +810,7 @@ That is, a formal claim $s \to^* s'$ corresponds exactly to the informal claim t
 
 Building on these notations, here is one way to state the correctness of our factorial program, which, defining $S$ according to the state grammar above, we model as $\mathcal F = \angled{S, \mathcal F_0, \to}$.
 
-\begin{theorem}
+\begin{theorem}\label{factorial_ok}
   For any state $s$ reachable in $\mathcal F$, if $s \in \mathcal F_\omega$, then $s = \mathsf{AnswerIs}(n_0!)$.
 \end{theorem}
 
@@ -819,6 +819,63 @@ That is, whenever the program finishes, it returns the right answer.
 
 We could prove this theorem now in a relatively ad-hoc way.
 Instead, let's develop the general machinery of \emph{invariants}.
+
+
+\section{Invariants}
+
+The concept of ``invariant'' may be familiar from such relatively informal notions as ``loop invariant''\index{loop invariant} in introductory programming classes.
+Intuitively, an invariant is a property of program state that \emph{starts true and stays true}, but let's make that idea a bit more formal, as applied to our transition-system formalism.
+
+\begin{definition}
+  An \emph{invariant} of a transition system is a property that is always true, in all reachable states of a transition system.  That is, for transition system $\angled{S, S_0, \to}$, where $R$ is the set of all its reachable states, some $I \subseteq S$ is an invariant iff $R \subseteq I$.
+\end{definition}
+
+At first look, the definition may appear a bit silly.
+Why not always just take the reachable states $R$ as the invariant, instead of scrambling to invent something new?
+The reason is the same as for strengthening induction hypotheses to make proofs easier.
+Often it is easier to characterize an invariant that isn't fully precise, admitting some states that the system can never actually reach.
+Additionally, it can be easier to prove existence of an approximate invariant by induction, by the method that this key theorem formalizes.
+
+\begin{theorem}\label{invariant_induction}
+  Consider a transition system $\angled{S, S_0, \to}$ and its candidate invariant $I$.  The candidate is truly an invariant if (1) $S_0 \subseteq I$ and (2) for every $s \in I$ where $s \to s'$, we also have $s' \in I$.
+\end{theorem}
+
+That's enough generalities for now.
+Let's define a suitable invariant for factorial.
+\begin{eqnarray*}
+  I(\mathsf{AnswerIs}(a)) &=& n_0! = a \\
+  I(\mathsf{WithAccumulator}(n, a)) &=& n_0! = n! \times a
+\end{eqnarray*}
+
+It is an almost-routine exercise to prove that $I$ really is an invariant, using Theorem \ref{invariant_induction}.
+The key new ingredient we need is \emph{inversion}, a principle for deducing which inference rules may have been used to prove a fact.
+
+For instance, at one point in the proof, we need to draw a conclusion from a premise $s \in \mathcal F_0$, meaning that $s$ is an initial state.
+By inversion, because set $\mathcal F_0$ is defined by a single inference rule, that rule must have been used to conclude the premise, so it must be that $s = \mathsf{WithAccumulator}(n_0, 1)$.
+
+Similarly, at another point in the proof, we must reason from a premise $s \to s$'.
+The relation $\to$ is defined by two inference rules, so inversion leads us to two cases to consider.
+In the first case, corresponding to the first rule, $s = \mathsf{WithAccumulator}(0, a)$ and $s' = \mathsf{AnswerIs}(a)$.
+In the second case, corresponding to the second rule, $s = \mathsf{WithAccumulator}(n+1, a)$ and $s' = \mathsf{WithAccumulator}(n, a \times (n+1))$.
+It's worth checking that these values of $s$ and $s'$ are read off directly from the rules.
+
+Though a completely formal and exhaustive treatment of inversion is beyond the scope of this text, generally it follows standard intuitions about ``reverse-engineering'' a set of rules that could have been used to derive some premise.
+
+Another important property of invariants formalizes the connection with weakening an induction hypothesis.
+
+\begin{theorem}\label{invariant_weaken}
+  If $I$ is an invariant of a transition system, then $I' \supseteq I$ (a superset of the original) is also an invariant of the same system.
+\end{theorem}
+
+Note that the larger $I'$ above may not be suitable to use in an inductive proof by Theorem \ref{invariant_induction}!
+For instance, for factorial, we might define $I' = \mathcal \{\mathsf{AnswerIs}(n_0)\} \cup \{\mathsf{WithAccumulator}(n, a) \mid n, a \in \mathbb N\}$, clearly a superset of $I$.
+However, by forgetting everything that we know about intermediate $\mathsf{WithAccumulator}$ states, we will get stuck on the inductive step of the proof.
+Thus, what we call invariants here needn't also be \emph{inductive invariants}\index{inductive invariants}, and there may be slight terminology mismatches with other sources.
+
+Combining Theorems \ref{invariant_induction} and \ref{invariant_weaken}, it is now easy to prove Theorem \ref{factorial_ok}, establishing the correctness of our particular factorial system $\mathcal F$.
+First, we use Theorem \ref{invariant_induction} to deduce that $I$ is an invariant of $\mathcal F$.
+Then, we choose the very same $I'$ that we warned above is not an inductive invariant, but which is fairly easily shown to be a superset of $I$.
+Therefore, by Theorem \ref{invariant_weaken}, $I'$ is also an invariant of $\mathcal F$, and Theorem \ref{factorial_ok} follows quite directly from that fact, as $I'$ is essentially a restatement of Theorem \ref{factorial_ok}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

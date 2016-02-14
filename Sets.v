@@ -126,3 +126,52 @@ End properties.
 Hint Resolve subseteq_refl subseteq_In.
 
 Hint Rewrite union_constant.
+
+
+(** * Removing duplicates from constant sets *)
+
+Inductive removeDups A : list A -> list A -> Prop :=
+| RdNil : removeDups nil nil
+| RdNew : forall x ls ls',
+  ~List.In x ls
+  -> removeDups ls ls'
+  -> removeDups (x :: ls) (x :: ls')
+| RdDup : forall x ls ls',
+  List.In x ls
+  -> removeDups ls ls'
+  -> removeDups (x :: ls) ls'.
+
+Theorem removeDups_fwd : forall A x (ls ls' : list A),
+  removeDups ls ls'
+  -> List.In x ls
+  -> List.In x ls'.
+Proof.
+  induction 1; simpl; intuition.
+  subst; eauto.
+Qed.
+
+Theorem removeDups_bwd : forall A x (ls ls' : list A),
+  removeDups ls ls'
+  -> List.In x ls'
+  -> List.In x ls.
+Proof.
+  induction 1; simpl; intuition.
+Qed.
+
+Theorem removeDups_ok : forall A (ls ls' : list A),
+  removeDups ls ls'
+  -> constant ls = constant ls'.
+Proof.
+  intros.
+  apply sets_equal.
+  unfold constant; intuition eauto using removeDups_fwd, removeDups_bwd.
+Qed.
+
+Ltac removeDups :=
+  match goal with
+  | [ |- context[constant ?ls] ] =>
+    erewrite (@removeDups_ok _ ls)
+      by repeat (apply RdNil
+                 || (apply RdNew; [ simpl; intuition congruence | ])
+                 || (apply RdDup; [ simpl; intuition congruence | ]))
+  end.

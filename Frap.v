@@ -43,7 +43,7 @@ Ltac invert0 e := invert e; fail.
 Ltac invert1 e := invert0 e || (invert e; []).
 Ltac invert2 e := invert1 e || (invert e; [|]).
 
-Ltac simplify := repeat progress (simpl in *; intros; try autorewrite with core in *).
+Ltac simplify := repeat progress (simpl in *; intros; try autorewrite with core in *); repeat removeDups.
 Ltac propositional := intuition idtac.
 
 Ltac linear_arithmetic := intros;

@@ -190,9 +190,6 @@ Proof.
   apply oneStepClosure_split; simplify.
   invert H; simplify.
   apply singleton_in.
-  apply oneStepClosure_split; simplify.
-  invert H; simplify.
-  apply singleton_in.
   apply oneStepClosure_empty.
   simplify.
 
@@ -202,10 +199,55 @@ Proof.
   propositional; invert H0; try equality.
   invert H; equality.
   invert H1; equality.
-  invert H; equality.
-  invert H; try equality.
 
   simplify.
   propositional; subst; simplify; propositional.
               (* ^-- *)
+Qed.
+
+Hint Rewrite fact_init_is.
+
+Ltac model_check_done :=
+  apply MscDone; apply prove_oneStepClosure; simplify; propositional; subst;
+  repeat match goal with
+         | [ H : _ |- _ ] => invert H
+         end; simplify; equality.
+
+Ltac model_check_step :=
+  eapply MscStep; [
+    repeat ((apply oneStepClosure_empty; simplify)
+            || (apply oneStepClosure_split; [ simplify;
+                                              repeat match goal with
+                                                     | [ H : _ |- _ ] => invert H
+                                                     end; apply singleton_in | ]))
+  | simplify ].
+
+Ltac model_check_steps1 := model_check_done || model_check_step.
+Ltac model_check_steps := repeat model_check_steps1.
+
+Ltac model_check_finish := simplify; propositional; subst; simplify; equality.
+
+Ltac model_check_find_invariant :=
+  simplify; eapply invariantFor_weaken; [
+    apply multiStepClosure_ok; simplify; model_check_steps
+  | ].
+
+Ltac model_check := model_check_find_invariant; model_check_finish.
+
+Theorem factorial_ok_2_snazzy :
+  invariantFor (factorial_sys 2) (fact_correct 2).
+Proof.
+  model_check.
+Qed.
+
+Theorem factorial_ok_3 :
+  invariantFor (factorial_sys 3) (fact_correct 3).
+Proof.
+  model_check.
+Qed.
+
+Theorem factorial_ok_4 :
+  invariantFor (factorial_sys 4) (fact_correct 4).
+Proof.
+  model_check.
 Qed.

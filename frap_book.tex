@@ -757,6 +757,7 @@ factorial(n) {
 
 In the analysis to follow, consider some value $n_0 \in \mathbb N$ fixed, as the input passed to this operation.
 A state machine is lurking within the surface syntax of the program.
+\encoding
 In fact, we have a variety of choices in modeling it as a state machine.
 Here is the set of states that we choose to use here:
 $$\begin{array}{rrcl}
@@ -826,6 +827,9 @@ Instead, let's develop the general machinery of \emph{invariants}.
 The concept of ``invariant'' may be familiar from such relatively informal notions as ``loop invariant''\index{loop invariant} in introductory programming classes.
 Intuitively, an invariant is a property of program state that \emph{starts true and stays true}, but let's make that idea a bit more formal, as applied to our transition-system formalism.
 
+\newcommand{\invariants}[0]{\marginpar{\fbox{\textbf{Invariants}}}}
+
+\invariants
 \begin{definition}
   An \emph{invariant} of a transition system is a property that is always true, in all reachable states of a transition system.  That is, for transition system $\angled{S, S_0, \to}$, where $R$ is the set of all its reachable states, some $I \subseteq S$ is an invariant iff $R \subseteq I$.
 \end{definition}
@@ -834,7 +838,7 @@ At first look, the definition may appear a bit silly.
 Why not always just take the reachable states $R$ as the invariant, instead of scrambling to invent something new?
 The reason is the same as for strengthening induction hypotheses to make proofs easier.
 Often it is easier to characterize an invariant that isn't fully precise, admitting some states that the system can never actually reach.
-Additionally, it can be easier to prove existence of an approximate invariant by induction, by the method that this key theorem formalizes.
+Additionally, it can be easier to prove existence of an approximate invariant by induction, by the method that the next key theorem formalizes.
 
 \begin{theorem}\label{invariant_induction}
   Consider a transition system $\angled{S, S_0, \to}$ and its candidate invariant $I$.  The candidate is truly an invariant if (1) $S_0 \subseteq I$ and (2) for every $s \in I$ where $s \to s'$, we also have $s' \in I$.
@@ -842,6 +846,7 @@ Additionally, it can be easier to prove existence of an approximate invariant by
 
 That's enough generalities for now.
 Let's define a suitable invariant for factorial.
+\invariants
 \begin{eqnarray*}
   I(\mathsf{AnswerIs}(a)) &=& n_0! = a \\
   I(\mathsf{WithAccumulator}(n, a)) &=& n_0! = n! \times a
@@ -853,7 +858,7 @@ The key new ingredient we need is \emph{inversion}, a principle for deducing whi
 For instance, at one point in the proof, we need to draw a conclusion from a premise $s \in \mathcal F_0$, meaning that $s$ is an initial state.
 By inversion, because set $\mathcal F_0$ is defined by a single inference rule, that rule must have been used to conclude the premise, so it must be that $s = \mathsf{WithAccumulator}(n_0, 1)$.
 
-Similarly, at another point in the proof, we must reason from a premise $s \to s$'.
+Similarly, at another point in the proof, we must reason from a premise $s \to s'$.
 The relation $\to$ is defined by two inference rules, so inversion leads us to two cases to consider.
 In the first case, corresponding to the first rule, $s = \mathsf{WithAccumulator}(0, a)$ and $s' = \mathsf{AnswerIs}(a)$.
 In the second case, corresponding to the second rule, $s = \mathsf{WithAccumulator}(n+1, a)$ and $s' = \mathsf{WithAccumulator}(n, a \times (n+1))$.
@@ -888,9 +893,9 @@ $$\infer{s \to^* s}{}
   & s' \to^* s''
 }$$
 
-The relation $\to$ is a subset of $S \times S$.
+The relation $\to^*$ is a subset of $S \times S$.
 Imagine that we want to prove that some relation $P$ holds of all pairs of states, where the first can reach the second.
-That is, we want to prove $\forall s, s'. \; (s \to s') \Rightarrow P(s, s')$, where $\Rightarrow$ is logical implication.
+That is, we want to prove $\forall s, s'. \; (s \to^* s') \Rightarrow P(s, s')$, where $\Rightarrow$ is logical implication.
 We can actually derive a suitable induction principle, in the same way that we produced structural induction principles from definitions of inductive datatypes.
 We modify each defining rule of $\to^*$, replacing its conclusion with a use of $P$ and adding a $P$ induction hypothesis for each recursive premise.
 $$\infer{P(s, s)}{}
@@ -917,6 +922,135 @@ As a simpler example than the invariant-induction theorem, consider transitivity
 
 This sort of proof really is easier to follow in Coq code, so we especially encourage the reader to consult the mechanized version here!
 
+In general, any inductive definition of a predicate, via a set of inference rules, implies a rule-induction principle.
+We will meet many such definitions throughout the book, and we will apply rule induction to most of them.
+It is valuable to understand basically how the rule-induction principle of a definition is read off from its original rules, but it is also true that Coq comes up with these principles automatically.
+
+
+\section{An Example with a Concurrent Program}
+
+Imagine that we want to verify a multithreaded\index{multithreaded programs}, shared-memory program\index{shared-memory programming} where multiple threads run this code at once.
+\begin{verbatim}
+f() {
+  lock();
+  local = global;
+  global = local + 1;
+  unlock();
+}
+\end{verbatim}
+
+Consider \texttt{global} as a variable shared across all threads, while each thread has its own version of variable \texttt{local}.
+The meaning of \texttt{lock()} and \texttt{unlock()} is as usual\index{locks}, where at most one thread can hold the lock at once, claiming it via \texttt{lock()} and relinquishing it via \texttt{unlock()}.
+When variable \texttt{global} is initialized to 0 and $n$ threads run this code at once and all terminate, we expect that \texttt{global} finishes with value $n$.
+Of course, bugs in this program, like forgetting to include the locking, could lead to all sorts of wrong answers, with any value between 1 and $n$ possible with the right demonic thread interleaving.
+
+\encoding
+To prove that we got the program right, let's formalize it as a transition system.  First, our state set:
+$$\begin{array}{rrcl}
+  \textrm{States} & S &::=& \mathsf{Lock} \mid \mathsf{Read} \mid \mathsf{Write}(n) \mid \mathsf{Unlock} \mid \mathsf{Done}
+\end{array}$$
+
+Compared to the last example, here we see more clearly that kinds of states correspond to \emph{program counters}\index{program counters} in the imperative code.
+The first four state kinds respectively mean that the program counter is right before the matching line in the program's code.
+The last state kind means the program counter is past the end of the function.
+Only $\mathsf{Write}$ states carry extra information, in this case the value of variable \texttt{local}.
+At every other program counter, we can prove that the value of variable \texttt{local} has no effect on further transitions, so we don't bother to store it.
+We will account for the value of variable \texttt{global} separately, in a way to be described shortly.
+
+In particular, we will define a transition system for a single thread as $\mathcal L = \angled{(\mathbb N \times \mathbb B) \times S, \mathcal L_0, \to_{\mathcal L}}$.
+We define the state to include not only the thread-local state $S$ but also the value of \texttt{global} (in $\mathbb N$) and whether the lock is currently taken (in $\mathbb B$, the Booleans, with values $\top$ [true] and $\bot$ [false]).
+There is one designated initial state.
+
+$$\infer{((0, \bot), \mathsf{Lock}) \in \mathcal L_0}{}$$
+
+Four inference rules explain the four transitions between program counters that a single thread can make, reading and writing shared state as needed.
+
+$$\infer{((\bot, g), \mathsf{Lock}) \to_{\mathcal L} ((\top, g), \mathsf{Read})}{}
+\quad \infer{((\ell, g), \mathsf{Read}) \to_{\mathcal L} ((\ell, g), \mathsf{Write}(g))}{}$$
+$$\infer{((\ell, g), \mathsf{Write}(n)) \to_{\mathcal L} ((\ell, n+1), \mathsf{Unlock})}{}
+\quad \infer{((\ell, g), \mathsf{Unlock}) \to_{\mathcal L} ((\bot, g), \mathsf{Done})}{}$$
+
+\smallskip
+
+Note that these rules will allow a thread to read and write the shared state even without holding the lock.
+The rules also allow any thread to unlock the lock, with no consideration for whether that thread must be the current lock holder.
+We must use an invariant-based proof to show that there are, in fact, no lurking violations of the lock-based concurrency discipline.
+
+Of course, with just a single thread running, there aren't any interesting violations!
+However, we have been careful to describe system $\mathcal L$ in a generic way, with its state a pair of shared and private components.
+We can define a generic notion of a multithreaded system, with two systems that share some state and maintain their own private state.
+
+\encoding
+\begin{definition}
+  Let $T^1 = \angled{S \times P^1, S_0 \times P^1_0, \to^1}$ and $T^2 = \angled{S \times P^2, S_0 \times P^2_0, \to^2}$ be two transition systems, with a shared-state type $S$ in common between their state sets, also agreeing on the initial values $S_0$ for that shared state.  We define the \emph{parallel composition} $T^1 \mid T^2$ as $\angled{S \times (P^1 \times P^2), S_0 \times (P^1_0 \times P^2_0), \to}$, defining new transition relation $\to$ with the following inference rules, which capture the usual notion of thread interleaving.
+  $$\infer{(s, (p_1, p_2)) \to (s', (p'_1, p_2))}{
+    (s, p_1) \to^1 (s', p'_1)
+  }
+  \quad \infer{(s, (p_1, p_2)) \to (s', (p_1, p'_2))}{
+    (s, p_2) \to^2 (s', p'_2)
+  }$$
+\end{definition}
+
+Note that the operator $\mid$ is carefully defined so that its output is suitable as input to a further instance of itself.
+As a result, while $\mathcal L \mid \mathcal L$ is a transition system modeling two threads running the code from above, we also have $\mathcal L \mid (\mathcal L \mid \mathcal L)$ as a three-thread system based on that code, $(\mathcal L \mid \mathcal L) \mid (\mathcal L \mid \mathcal L)$ as a four-thread system based on that code, etc.
+
+Also note that $\mid$ constructs transition systems with our first examples of \emph{nondeterminism}\index{nondeterminism} in transition relations.
+That is, given a particular starting state, there are multiple different places it may wind up after a given number of execution steps.
+In general, with thread-interleaving concurrency, the set of possible final states grows exponentially in the number of steps, a fact that torments concurrent-software testers to no end!
+Rather than consider all possible runs of the program, we will use an invariant to tame the complexity.
+
+First, we should be clear on what we mean to prove about this program.
+Let's also restrict our attention to the two-thread case for the rest of this section; the $n$-thread case is left as an exercise for the reader!
+\begin{theorem}
+  For any reachable state $((\ell, g), (p^1, p^2))$ of $\mathcal L \mid \mathcal L$, if $p^1 = p^2 = \mathsf{Done}$, then $g = 2$.
+\end{theorem}
+That is, when both threads terminate, \texttt{global} equals 2.
+
+As a first step toward an invariant, define function $\mathcal C$ from private states to numbers, capturing the \emph{contribution of} a thread with that state, summarizing how much that thread has added to \texttt{globals}.
+\begin{eqnarray*}
+  \mathcal C(p) &=& \begin{cases}
+    1 & p \in \{\mathsf{Unlock}, \mathsf{Done}\} \\
+    0 & \mathrm{otherwise}
+  \end{cases}
+\end{eqnarray*}
+
+Next, we define a function that, given a thread's private state, determines whether that thread \emph{holds the lock}.
+\begin{eqnarray*}
+  \mathcal H(p) &=& \begin{cases}
+    \bot & p \in \{\mathsf{Lock}, \mathsf{Done}\} \\
+    \top & \mathrm{otherwise}
+  \end{cases}
+\end{eqnarray*}
+
+Now, the main insight: we can reconstruct the shared state uniquely from the two private states!
+Function $\mathcal S$ does exactly that.
+\begin{eqnarray*}
+  \mathcal S(p^1, p^2) &=& (\mathcal H(p^1) \lor \mathcal H(p^2), \mathcal C(p^1) + \mathcal C(p^2))
+\end{eqnarray*}
+
+One last ingredient will help us write the invariant: a predicate $\mathcal O(p, p')$ capturing when, given the state $p$ of one thread, the state $p'$ is compatible with all of the implications of $p$'s state, primarily in terms of mutual exclusion\index{mutual exclusion} for the lock.
+\begin{eqnarray*}
+  \mathcal O(p, p') &=& \begin{cases}
+    \top & p \in \{\mathsf{Lock}, \mathsf{Done}\} \\
+    \neg \mathcal H(p') & p \in \{\mathsf{Read}, \mathsf{Unlock}\} \\
+    \neg \mathcal H(p') \land n = \mathcal C(p') & p = \mathsf{Write}(n)
+  \end{cases}
+\end{eqnarray*}
+
+Finally, we can write the invariant.
+\invariants
+\begin{eqnarray*}
+  I(s, (p^1, p^2)) &=& \mathcal O(p^1, p^2) \land \mathcal O(p^2, p^1) \land s = \mathcal S(p^1, p^2)
+\end{eqnarray*}
+
+As is often the case, defining the invariant is the hard part of the proof, and the rest follows by the standard methodology that we used for factorial.
+To recap that method, first we use Theorem \ref{invariant_induction} to show that $I$ really is an invariant of $\mathcal L \mid \mathcal L$.
+Next, we use Theorem \ref{invariant_weaken} to show that $I$ implies the original property of interest, that finished program states have value 2 for \texttt{global}.
+Most of the action is in the first step, where we must work through fussy details of all the different steps that could happen from a state within the invariant, using arithmetic reasoning in each case to either derive a contradiction (that step couldn't happen from this starting state) or show that a specific new state also belongs to the invariant.
+We leave those details to the Coq code, as usual.
+
+The reader may be worried at this point that coming up with invariants can be rather tedious!
+In the next chapter, we meet a technique for finding invariants automatically, in some limited but important circumstances.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

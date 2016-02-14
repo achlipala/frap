@@ -5,6 +5,10 @@
 
 Require Import Frap.
 
+Set Implicit Arguments.
+(* This command will treat type arguments to functions as implicit, like in
+ * Haskell or ML. *)
+
 
 (* Here's a classic recursive, functional program for factorial. *)
 Fixpoint fact (n : nat) : nat :=
@@ -59,6 +63,8 @@ Theorem trc_trans : forall {A} (R : A -> A -> Prop) x y, trc R x y
     -> trc R x z.
 Proof.
   induct 1; simplify.
+  (* Note how we pass a *number* to [induct], to ask for induction on
+   * *the first hypothesis in the theorem statement*. *)
 
   assumption.
   (* [assumption]: prove a conclusion that matches some hypothesis exactly. *)
@@ -117,28 +123,57 @@ Record trsys state := {
   Initial : state -> Prop;
   Step : state -> state -> Prop
 }.
+(* Probably it's intuitively clear what a record type must be.
+ * See usage examples below to fill in more of the details.
+ * Note that [state] is a polymorphic type parameter. *)
 
+(* The example of our factorial program: *)
+Definition factorial_sys (original_input : nat) : trsys fact_state := {|
+  Initial := fact_init original_input;
+  Step := fact_step
+|}.
+
+(* To prove that our state machine is correct, we rely on the crucial technique
+ * of *invariants*.  What is an invariant?  Here's a general definition, in
+ * terms of an arbitrary *transition system* defined by a set of states,
+ * an initial-state relation, and a step relation. *)
 Definition invariantFor {state} (sys : trsys state) (invariant : state -> Prop) :=
   forall s, sys.(Initial) s
             -> forall s', sys.(Step)^* s s'
                           -> invariant s'.
+(* That is, when we begin in an initial state and take any number of steps, the
+ * place we wind up always satisfies the invariant. *)
 
-Theorem use_invariant : forall {state} (sys : trsys state) (invariant : state -> Prop) s s',
-  sys.(Step)^* s s'
+(* Here's a simple lemma to help us apply an invariant usefully,
+ * really just restating the definition. *)
+Theorem use_invariant : forall {state} (sys : trsys state)
+  (invariant : state -> Prop) s s',
+  invariantFor sys invariant
   -> sys.(Initial) s
-  -> invariantFor sys invariant
+  -> sys.(Step)^* s s'
   -> invariant s'.
 Proof.
-  firstorder.
+  unfold invariantFor.
+  simplify.
+  eapply H.
+  eassumption.
+  assumption.
 Qed.
 
-Theorem invariantFor_monotone : forall {state} (sys : trsys state)
-  (invariant1 invariant2 : state -> Prop),
-  (forall s, invariant1 s -> invariant2 s)
-  -> invariantFor sys invariant1
-  -> invariantFor sys invariant2.
+(* What's the most fundamental way to establish an invariant?  Induction! *)
+Lemma invariant_induction' : forall {state} (sys : trsys state)
+  (invariant : state -> Prop),
+  (forall s, invariant s -> forall s', sys.(Step) s s' -> invariant s')
+  -> forall s s', sys.(Step)^* s s'
+     -> invariant s
+     -> invariant s'.
 Proof.
-  unfold invariantFor; intuition eauto.
+  induct 2; propositional.
+
+  apply IHtrc.
+  eapply H.
+  eassumption.
+  assumption.
 Qed.
 
 Theorem invariant_induction : forall {state} (sys : trsys state)
@@ -148,53 +183,15 @@ Theorem invariant_induction : forall {state} (sys : trsys state)
   -> invariantFor sys invariant.
 Proof.
   unfold invariantFor; intros.
-  assert (invariant s) by eauto.
-  clear H1.
-  induction H2; eauto.
-Qed.
-
-
-(* To prove that our state machine is correct, we rely on the crucial technique
- * of *invariants*.  What is an invariant?  Here's a general definition, in
- * terms of an arbitrary *transition system* defined by a set of states,
- * an initial-state relation, and a step relation. *)
-Definition invariantFor {state} (initial : state -> Prop) (step : state -> state -> Prop) (invariant : state -> Prop) :=
-  forall s, initial s
-            -> forall s', step^* s s'
-                          -> invariant s'.
-(* That is, when we begin in an initial state and take any number of steps, the
- * place we wind up always satisfied the invariant. *)
-
-(* Here's a simple lemma to help us apply an invariant usefully,
- * really just restating the definition. *)
-Theorem use_invariant : forall {state} (initial : state -> Prop)
-  (step : state -> state -> Prop) (invariant : state -> Prop) s s',
-  step^* s s'
-  -> initial s
-  -> invariantFor initial step invariant
-  -> invariant s'.
-Proof.
-  unfold invariantFor.
-  simplify.
-  eapply H1.
+  eapply invariant_induction'.
   eassumption.
+  eassumption.
+  apply H.
   assumption.
 Qed.
 
-(* What's the most fundamental way to establish an invariant?  Induction! *)
-Theorem invariant_induction : forall {state} (initial : state -> Prop)
-  (step : state -> state -> Prop) (invariant : state -> Prop),
-  (forall s, initial s -> invariant s)
-  -> (forall s, invariant s -> forall s', step s s' -> invariant s')
-  -> invariantFor initial step invariant.
-Proof.
-  unfold invariantFor; intros.
-  assert (invariant s) by eauto.
-  clear H1.
-  induction H2; eauto.
-Qed.
-
-(* Here's a good invariant for factorial, parameterized on the original input
+(* That's enough abstract results for now.  Let's apply them to our example.
+ * Here's a good invariant for factorial, parameterized on the original input
  * to the program. *)
 Definition fact_invariant (original_input : nat) (st : fact_state) : Prop :=
   match st with
@@ -205,7 +202,7 @@ Definition fact_invariant (original_input : nat) (st : fact_state) : Prop :=
 (* We can use [invariant_induction] to prove that it really is a good
  * invariant. *)
 Theorem fact_invariant_ok : forall original_input,
-  invariantFor (fact_init original_input) fact_step (fact_invariant original_input).
+  invariantFor (factorial_sys original_input) (fact_invariant original_input).
 Proof.
   simplify.
   apply invariant_induction; simplify.
@@ -234,4 +231,40 @@ Proof.
   simplify.
   rewrite H.
   ring.
+Qed.
+
+(* Therefore, every reachable state satisfies this invariant. *)
+Theorem fact_invariant_always : forall original_input s s',
+  (factorial_sys original_input).(Step)^* s s'
+  -> (factorial_sys original_input).(Initial) s
+  -> fact_invariant original_input s'.
+Proof.
+  simplify.
+  eapply use_invariant.
+  apply fact_invariant_ok.
+  eassumption.
+  assumption.
+Qed.
+
+(* Therefore, any final state has the right answer! *)
+Lemma fact_ok' : forall original_input s,
+  fact_final s
+  -> fact_invariant original_input s
+  -> s = AnswerIs (fact original_input).
+Proof.
+  invert 1; simplify; equality.
+Qed.
+
+Theorem fact_ok : forall original_input s s',
+  (factorial_sys original_input).(Step)^* s s'
+  -> (factorial_sys original_input).(Initial) s
+  -> fact_final s'
+  -> s' = AnswerIs (fact original_input).
+Proof.
+  simplify.
+  apply fact_ok'.
+  assumption.
+  eapply fact_invariant_always.
+  eassumption.
+  assumption.
 Qed.

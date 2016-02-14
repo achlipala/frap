@@ -877,6 +877,47 @@ First, we use Theorem \ref{invariant_induction} to deduce that $I$ is an invaria
 Then, we choose the very same $I'$ that we warned above is not an inductive invariant, but which is fairly easily shown to be a superset of $I$.
 Therefore, by Theorem \ref{invariant_weaken}, $I'$ is also an invariant of $\mathcal F$, and Theorem \ref{factorial_ok} follows quite directly from that fact, as $I'$ is essentially a restatement of Theorem \ref{factorial_ok}.
 
+\section{Rule Induction}
+
+Another crucial reasoning technique was hidden within the elided proof of Theorem \ref{invariant_induction}.
+That technique is \emph{rule induction}\index{rule induction}, which generalizes inversion just as normal structural induction generalizes case analysis.
+As an example, consider again the definition of transitive-reflexive closure by inference rules.
+$$\infer{s \to^* s}{}
+\quad \infer{s \to^* s''}{
+  s \to s'
+  & s' \to^* s''
+}$$
+
+The relation $\to$ is a subset of $S \times S$.
+Imagine that we want to prove that some relation $P$ holds of all pairs of states, where the first can reach the second.
+That is, we want to prove $\forall s, s'. \; (s \to s') \Rightarrow P(s, s')$, where $\Rightarrow$ is logical implication.
+We can actually derive a suitable induction principle, in the same way that we produced structural induction principles from definitions of inductive datatypes.
+We modify each defining rule of $\to^*$, replacing its conclusion with a use of $P$ and adding a $P$ induction hypothesis for each recursive premise.
+$$\infer{P(s, s)}{}
+\quad \infer{P(s, s'')}{
+  s \to s'
+  & s' \to^* s''
+  & P(s', s'')
+}$$
+As before, where the defining rules of $\to^*$ show us how to \emph{conclude} facts, the two new rules here are \emph{proof obligations}.
+To apply rule induction and establish $P$ for all reachability pairs, we must prove that each new rule is correct, as a kind of quantified implication.
+
+As a simpler example than the invariant-induction theorem, consider transitivity for reachability.
+
+\begin{theorem}
+  If $s \to^* s'$ and $s' \to^* s''$, then $s \to^* s''$.
+\end{theorem}
+\begin{proof}
+  By rule induction on the derivation of $s \to^* s'$, taking $P(s_1, s_2)$ to be that, if $s_2 = s'$, then $s_1 \to^* s''$.  We consider variables $s'$ and $s''$ fixed throughout the induction, along with their associated premise $s' \to^* s''$.
+
+  \emph{Base case:} We must show $P(s, s)$ for an arbitrary $s$.  Given that (based on the definition of $P$) we may assume $s = s'$, our premise $s' \to^* s''$ precisely matches the desired conclusion $s \to^* s''$.
+
+  \emph{Induction step:} Assume $s \to s_1$, $s_1 \to^* s'$, and $P(s_1, s')$.  We may apply the second rule defining $\to^*$, whose two premises become $s \to s_1$ and $s_1 \to^* s''$.  The first is one of the available premises of the induction step.  The second follows by the induction hypothesis about $P$.
+\end{proof}
+
+This sort of proof really is easier to follow in Coq code, so we especially encourage the reader to consult the mechanized version here!
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

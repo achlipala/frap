@@ -190,6 +190,8 @@ Lemma invariant_induction' : forall {state} (sys : trsys state)
      -> invariant s'.
 Proof.
   induct 2; propositional.
+  (* [propositional]: simplify the goal according to the rules of propositional
+   *   logic. *)
 
   apply IHtrc.
   eapply H.
@@ -647,13 +649,13 @@ Qed.
  * a more general fact, about when one invariant implies another. *)
 Theorem invariantFor_weaken : forall {state} (sys : trsys state)
   (invariant1 invariant2 : state -> Prop),
-  (forall s, invariant1 s -> invariant2 s)
-  -> invariantFor sys invariant1
+  invariantFor sys invariant1
+  -> (forall s, invariant1 s -> invariant2 s)
   -> invariantFor sys invariant2.
 Proof.
   unfold invariantFor; simplify.
-  apply H.
-  eapply H0.
+  apply H0.
+  eapply H.
   eassumption.
   assumption.
 Qed.
@@ -676,6 +678,8 @@ Proof.
   (* Note the use of a [with] clause to specify a quantified variable's
    * value. *)
 
+  apply increment2_invariant_ok.
+
   simplify.
   invert H0.
   unfold increment2_right_answer; simplify.
@@ -685,6 +689,5 @@ Proof.
   simplify.
   equality.
 
-  apply increment2_invariant_ok.
   assumption.
 Qed.

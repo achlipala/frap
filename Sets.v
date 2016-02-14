@@ -112,6 +112,17 @@ Section properties.
     specialize (H1 x0).
     tauto.
   Qed.
+
+  Variables ss1 ss2 : list A.
+
+  Theorem union_constant : constant ss1 \cup constant ss2 = constant (ss1 ++ ss2).
+  Proof.
+    unfold constant, union; simpl.
+
+    apply sets_equal; simpl; intuition.
+  Qed.
 End properties.
 
 Hint Resolve subseteq_refl subseteq_In.
+
+Hint Rewrite union_constant.

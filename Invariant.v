@@ -22,7 +22,7 @@ Proof.
   firstorder.
 Qed.
 
-Theorem invariantFor_monotone : forall {state} (sys : trsys state)
+Theorem invariant_weaken : forall {state} (sys : trsys state)
   (invariant1 invariant2 : state -> Prop),
   invariantFor sys invariant1
   -> (forall s, invariant1 s -> invariant2 s)

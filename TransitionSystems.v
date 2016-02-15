@@ -647,7 +647,7 @@ Qed.
 
 (* Now, to prove our final result about the two incrementing threads, let's use
  * a more general fact, about when one invariant implies another. *)
-Theorem invariantFor_weaken : forall {state} (sys : trsys state)
+Theorem invariant_weaken : forall {state} (sys : trsys state)
   (invariant1 invariant2 : state -> Prop),
   invariantFor sys invariant1
   -> (forall s, invariant1 s -> invariant2 s)
@@ -674,7 +674,7 @@ Theorem increment2_sys_correct : forall s,
 Proof.
   simplify.
   eapply use_invariant.
-  apply invariantFor_weaken with (invariant1 := increment2_invariant).
+  apply invariant_weaken with (invariant1 := increment2_invariant).
   (* Note the use of a [with] clause to specify a quantified variable's
    * value. *)
 

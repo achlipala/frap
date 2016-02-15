@@ -238,3 +238,14 @@ Ltac doSubtract :=
                  || (apply DsKeep; [ simpl; intuition congruence | ])
                  || (apply DsDrop; [ simpl; intuition congruence | ]))
   end.
+
+
+(** Undetermined set variables in fixed points should be turned into the empty set. *)
+Ltac unifyTails :=
+  match goal with
+  | [ |- context[_ \cup ?x] ] => is_evar x;
+    match type of x with
+    | set ?A => unify x (constant (@nil A))
+    | ?A -> Prop => unify x (constant (@nil A))
+    end
+  end.

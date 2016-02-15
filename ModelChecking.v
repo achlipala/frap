@@ -146,11 +146,22 @@ Proof.
   constructor.
 Qed.
 
-Theorem singleton_in : forall {A} (x : A),
-  {x} x.
+Theorem singleton_in : forall {A} (x : A) rest,
+  ({x} \cup rest) x.
 Proof.
   simplify.
+  left.
+  simplify.
   equality.
+Qed.
+
+Theorem singleton_in_other : forall {A} (x : A) (s1 s2 : set A),
+  s2 x
+  -> (s1 \cup s2) x.
+Proof.
+  simplify.
+  right.
+  assumption.
 Qed.
 
 Theorem factorial_ok_2 :
@@ -213,13 +224,19 @@ Ltac model_check_done :=
          | [ H : _ |- _ ] => invert H
          end; simplify; equality.
 
+Ltac singletoner :=
+  repeat match goal with
+         | _ => apply singleton_in
+         | [ |- (_ \cup _) _ ] => apply singleton_in_other
+         end.
+
 Ltac model_check_step :=
   eapply MscStep; [
     repeat ((apply oneStepClosure_empty; simplify)
             || (apply oneStepClosure_split; [ simplify;
                                               repeat match goal with
                                                      | [ H : _ |- _ ] => invert H
-                                                     end; apply singleton_in | ]))
+                                                     end; solve [ singletoner ] | ]))
   | simplify ].
 
 Ltac model_check_steps1 := model_check_done || model_check_step.
@@ -246,29 +263,14 @@ Proof.
   model_check.
 Qed.
 
-Theorem factorial_ok_4 :
-  invariantFor (factorial_sys 4) (fact_correct 4).
+Theorem factorial_ok_5 :
+  invariantFor (factorial_sys 5) (fact_correct 5).
 Proof.
   model_check.
 Qed.
 
 
 (** * Getting smarter about not exploring from the same state twice *)
-
-(*Theorem oneStepClosure_new_done : forall state (sys : trsys state) (invariant : state -> Prop),
-  (forall st, sys.(Initial) st -> invariant st)
-  -> oneStepClosure_new sys invariant invariant
-  -> invariantFor sys invariant.
-Proof.
-  unfold oneStepClosure_new.
-  propositional.
-  apply invariant_induction.
-  assumption.
-  simplify.
-  eapply H2.
-  eassumption.
-  assumption.
-Qed.*)
 
 Inductive multiStepClosure_smarter {state} (sys : trsys state)
   : (state -> Prop) -> (state -> Prop) -> (state -> Prop) -> Prop :=
@@ -383,20 +385,22 @@ Ltac smodel_check_done :=
 
 Ltac smodel_check_step :=
   eapply MscsStep; [
-    repeat ((apply oneStepClosure_new_empty; simplify)
+    repeat ((apply oneStepClosure_new_empty; solve [ simplify ])
             || (apply oneStepClosure_new_split; [ simplify;
                                                   repeat match goal with
                                                          | [ H : _ |- _ ] => invert H
-                                                         end; apply singleton_in | ]))
+                                                         end; solve [ singletoner ] | ]))
   | simplify ].
 
 Ltac smodel_check_steps1 := smodel_check_done || smodel_check_step.
 Ltac smodel_check_steps := repeat smodel_check_steps1.
 
-Ltac smodel_check_find_invariant :=
+Ltac smodel_check_setup :=
   simplify; eapply invariantFor_weaken; [
-    apply multiStepClosure_smarter_ok; simplify; smodel_check_steps
+    apply multiStepClosure_smarter_ok; simplify
   | ].
+
+Ltac smodel_check_find_invariant := smodel_check_setup; [ smodel_check_steps | ].
 
 Ltac smodel_check := smodel_check_find_invariant; model_check_finish.
 
@@ -416,4 +420,74 @@ Theorem factorial_ok_5_smarter_snazzy :
   invariantFor (factorial_sys 5) (fact_correct 5).
 Proof.
   smodel_check.
+Qed.
+
+
+(** * Back to the multithreaded example from last time *)
+
+Theorem increment2_init_is :
+  parallel1 increment_init increment_init = { {| Shared := {| Global := 0; Locked := false |};
+                                                 Private := (Lock, Lock) |} }.
+Proof.
+  simplify.
+  apply sets_equal; simplify.
+  propositional.
+
+  invert H.
+  invert H2.
+  invert H4.
+  equality.
+
+  rewrite <- H0.
+  constructor.
+  constructor.
+  constructor.
+Qed.
+
+Hint Rewrite increment2_init_is.
+
+(*Theorem increment2_ok :
+  invariantFor increment2_sys increment2_right_answer.
+Proof.
+  unfold increment2_right_answer.
+  smodel_check.
+Qed.*)
+
+Definition increment3_sys := parallel increment_sys increment2_sys.
+
+Definition increment3_right_answer
+  (s : threaded_state inc_state (increment_program * (increment_program * increment_program))) :=
+  s.(Private) = (Done, (Done, Done))
+  -> s.(Shared).(Global) = 3.
+
+Theorem increment3_init_is :
+  parallel1 increment_init (parallel1 increment_init increment_init)
+  = { {| Shared := {| Global := 0; Locked := false |};
+         Private := (Lock, (Lock, Lock)) |} }.
+Proof.
+  simplify.
+  apply sets_equal; simplify.
+  propositional.
+
+  invert H.
+  invert H2.
+  invert H4.
+  equality.
+  invert H.
+
+  rewrite <- H0.
+  constructor.
+  constructor.
+  constructor.
+  constructor.
+Qed.
+
+Hint Rewrite increment3_init_is.
+
+Theorem increment3_ok :
+  invariantFor increment3_sys increment3_right_answer.
+Proof.
+  unfold increment3_right_answer.
+  smodel_check_find_invariant.
+  model_check_finish.
 Qed.

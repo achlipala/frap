@@ -14,9 +14,9 @@ Definition invariantFor {state} (sys : trsys state) (invariant : state -> Prop) 
                           -> invariant s'.
 
 Theorem use_invariant : forall {state} (sys : trsys state) (invariant : state -> Prop) s s',
-  sys.(Step)^* s s'
+  invariantFor sys invariant
+  -> sys.(Step)^* s s'
   -> sys.(Initial) s
-  -> invariantFor sys invariant
   -> invariant s'.
 Proof.
   firstorder.
@@ -24,8 +24,8 @@ Qed.
 
 Theorem invariantFor_monotone : forall {state} (sys : trsys state)
   (invariant1 invariant2 : state -> Prop),
-  (forall s, invariant1 s -> invariant2 s)
-  -> invariantFor sys invariant1
+  invariantFor sys invariant1
+  -> (forall s, invariant1 s -> invariant2 s)
   -> invariantFor sys invariant2.
 Proof.
   unfold invariantFor; intuition eauto.

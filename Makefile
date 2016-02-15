@@ -1,4 +1,4 @@
-.PHONY: all coq install
+.PHONY: all lib coq install
 
 all: frap_book.pdf coq
 
@@ -11,6 +11,9 @@ frap_book.pdf: frap_book.tex Makefile
 
 coq: Makefile.coq
 	$(MAKE) -f Makefile.coq
+
+lib: Makefile.coq
+	$(MAKE) -f Makefile.coq Frap.vo
 
 Makefile.coq: Makefile _CoqProject *.v
 	coq_makefile -f _CoqProject -o Makefile.coq

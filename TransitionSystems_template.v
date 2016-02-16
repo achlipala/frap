@@ -24,18 +24,11 @@ Inductive fact_state :=
 | AnswerIs (answer : nat)
 | WithAccumulator (input accumulator : nat).
 
-(* This *predicate* captures which states are starting states.
- * Before the main colon of [Inductive], we list *parameters*, which stay fixed
- * throughout recursive invocations of a predicate (though this definition does
- * not use recursion).  After the colon, we give a type that expresses which
- * additional arguments exist, followed by [Prop] for "proposition."
- * Putting this inductive definition in [Prop] is what marks at as a predicate.
- * Our prior definitions have implicitly been in [Set], the normal universe
- * of mathematical objects. *)
+(* *Initial* states *)
 Inductive fact_init (original_input : nat) : fact_state -> Prop :=
 | FactInit : fact_init original_input (WithAccumulator original_input 1).
 
-(** And here are the states where we declare execution complete. *)
+(** *Final* states *)
 Inductive fact_final : fact_state -> Prop :=
 | FactFinal : forall ans, fact_final (AnswerIs ans).
 
@@ -56,65 +49,13 @@ Inductive trc {A} (R : A -> A -> Prop) : A -> A -> Prop :=
   -> trc R y z
   -> trc R x z.
 
-(* Ironically, this definition is not obviously transitive!
- * Let's prove transitivity as a lemma. *)
-Theorem trc_trans : forall {A} (R : A -> A -> Prop) x y, trc R x y
-  -> forall z, trc R y z
-    -> trc R x z.
-Proof.
-  induct 1; simplify.
-  (* Note how we pass a *number* to [induct], to ask for induction on
-   * *the first hypothesis in the theorem statement*. *)
-
-  assumption.
-  (* [assumption]: prove a conclusion that matches some hypothesis exactly. *)
-
-  eapply TrcFront.
-  (* [eapply H]: like [apply], but works when it is not obvious how to
-   *   instantiate the quantifiers of theorem/hypothesis [H].  Instead,
-   *   placeholders are inserted for those quantifiers, to be determined
-   *   later. *)
-  eassumption.
-  (* [eassumption]: prove a conclusion that matches some hypothesis, when we
-   *   choose the right clever instantiation of placeholders.  Those placehoders
-   *   are then replaced everywhere with their new values. *)
-  apply IHtrc.
-  assumption.
-  (* [assumption]: like [eassumption], but never figures out placeholder
-   *   values. *)
-Qed.
-
 (* Transitive-reflexive closure is so common that it deserves a shorthand notation! *)
 Notation "R ^*" := (trc R) (at level 0).
 
 (* Now let's use it to execute the factorial program. *)
 Example factorial_3 : fact_step^* (WithAccumulator 3 1) (AnswerIs 6).
 Proof.
-  eapply TrcFront.
-  apply FactStep.
-  simplify.
-  eapply TrcFront.
-  apply FactStep.
-  simplify.
-  eapply TrcFront.
-  apply FactStep.
-  simplify.
-  eapply TrcFront.
-  apply FactDone.
-  apply TrcRefl.
-Qed.
-
-(* That was exhausting yet uninformative.  We can use a different tactic to blow
- * through such obvious proof trees. *)
-Example factorial_3_auto : fact_step^* (WithAccumulator 3 1) (AnswerIs 6).
-Proof.
-  repeat econstructor.
-  (* [econstructor]: tries all declared rules of the predicate in the
-   *   conclusion, attempting each with [eapply] until one works. *)
-
-  (* Note that here [econstructor] is doing double duty, applying the rules of
-   * both [trc] and [fact_step]. *)
-Qed.
+Admitted.
 
 (* It will be useful to give state machines more first-class status, as
  * *transition systems*, formalized by this record type.  It has one type
@@ -123,9 +64,6 @@ Record trsys state := {
   Initial : state -> Prop;
   Step : state -> state -> Prop
 }.
-(* Probably it's intuitively clear what a record type must be.
- * See usage examples below to fill in more of the details.
- * Note that [state] is a polymorphic type parameter. *)
 
 (* The example of our factorial program: *)
 Definition factorial_sys (original_input : nat) : trsys fact_state := {|
@@ -212,48 +150,14 @@ Proof.
   assumption.
 Qed.
 
-(* That's enough abstract results for now.  Let's apply them to our example.
- * Here's a good invariant for factorial, parameterized on the original input
- * to the program. *)
 Definition fact_invariant (original_input : nat) (st : fact_state) : Prop :=
-  match st with
-  | AnswerIs ans => fact original_input = ans
-  | WithAccumulator n acc => fact original_input = fact n * acc
-  end.
+  True.
+(* We must fill in a better invariant. *)
 
-(* We can use [invariant_induction] to prove that it really is a good
- * invariant. *)
 Theorem fact_invariant_ok : forall original_input,
   invariantFor (factorial_sys original_input) (fact_invariant original_input).
 Proof.
-  simplify.
-  apply invariant_induction; simplify.
-
-  (* Step 1: invariant holds at the start. (base case) *)
-  (* We have a hypothesis establishing [fact_init original_input s].
-   * By inspecting the definition of [fact_init], we can draw conclusions about
-   * what [s] must be.  The [invert] tactic formalizes that intuition,
-   * replacing a hypothesis with certain "obvious inferences" from the original.
-   * In general, when multiple different rules may have been used to conclude a
-   * fact, [invert] may generate one new subgoal per eligible rule, but here the
-   * predicate is only defined with one rule. *)
-  invert H.
-  (* We magically learn [s = WithAccumulator original_input 1]! *)
-  simplify.
-  ring.
-
-  (* Step 2: steps preserve the invariant. (induction step) *)
-  invert H0.
-  (* This time, [invert] is used on a predicate with two rules, neither of which
-   * can be ruled out for this case, so we get two subgoals from one. *)
-
-  simplify.
-  linear_arithmetic.
-
-  simplify.
-  rewrite H.
-  ring.
-Qed.
+Admitted.
 
 (* Therefore, every reachable state satisfies this invariant. *)
 Theorem fact_invariant_always : forall original_input s,
@@ -271,9 +175,7 @@ Lemma fact_ok' : forall original_input s,
   fact_final s
   -> fact_invariant original_input s
   -> s = AnswerIs (fact original_input).
-Proof.
-  invert 1; simplify; equality.
-Qed.
+Admitted.
 
 Theorem fact_ok : forall original_input s,
   reachable (factorial_sys original_input) s
@@ -405,239 +307,17 @@ Definition increment2_sys := parallel increment_sys increment_sys.
 
 (* Let's prove that the counter is always 2 when the composed program terminates. *)
 
-(* First big idea: the program counter of a thread tells us how much it has
- * added to the shared counter so far. *)
-Definition contribution_from (pr : increment_program) : nat :=
-  match pr with
-  | Unlock => 1
-  | Done => 1
-  | _ => 0
-  end.
-
-(* Second big idea: the program counter also tells us whether a thread holds the lock. *)
-Definition has_lock (pr : increment_program) : bool :=
-  match pr with
-  | Read => true
-  | Write _ => true
-  | Unlock => true
-  | _ => false
-  end.
-
-(* Now we see that the shared state is a function of the two program counters,
- * as follows. *)
-Definition shared_from_private (pr1 pr2 : increment_program) :=
-  {| Locked := has_lock pr1 || has_lock pr2;
-     Global := contribution_from pr1 + contribution_from pr2 |}.
-
-(* We also need a condition to formalize compatibility between program counters,
- * e.g. that they shouldn't both be in the critical section at once. *)
-Definition instruction_ok (self other : increment_program) :=
-  match self with
-  | Lock => True
-  | Read => has_lock other = false
-  | Write n => has_lock other = false /\ n = contribution_from other
-  | Unlock => has_lock other = false
-  | Done => True
-  end.
-
-(** Now we have the ingredients to state the invariant. *)
+(** We must write an invariant. *)
 Inductive increment2_invariant :
   threaded_state inc_state (increment_program * increment_program) -> Prop :=
-| Inc2Inv : forall pr1 pr2,
-  instruction_ok pr1 pr2
-  -> instruction_ok pr2 pr1
-  -> increment2_invariant {| Shared := shared_from_private pr1 pr2; Private := (pr1, pr2) |}.
-
-(** It's convenient to prove this alternative equality-based "constructor" for the invariant. *)
-Lemma Inc2Inv' : forall sh pr1 pr2,
-  sh = shared_from_private pr1 pr2
-  -> instruction_ok pr1 pr2
-  -> instruction_ok pr2 pr1
-  -> increment2_invariant {| Shared := sh; Private := (pr1, pr2) |}.
-Proof.
-  intros.
-  rewrite H.
-  apply Inc2Inv; assumption.
-Qed.
+| Inc2Inv : forall sh pr1 pr2,
+  increment2_invariant {| Shared := sh; Private := (pr1, pr2) |}.
+(* This isn't it yet! *)
 
 (* Now, to show it really is an invariant. *)
 Theorem increment2_invariant_ok : invariantFor increment2_sys increment2_invariant.
 Proof.
-  apply invariant_induction; simplify.
-
-  invert H.
-  invert H0.
-  invert H1.
-  apply Inc2Inv'.
-
-  unfold shared_from_private.
-  simplify.
-  equality.
-
-  simplify.
-  propositional.
-
-  simplify.
-  propositional.
-
-  invert H.
-  invert H0.
-
-  invert H6; simplify.
-
-  cases pr2; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  (* Note that [equality] derives a contradiction from [false = true]! *)
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr2; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr2; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr2; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-
-  invert H6.
-
-  cases pr1; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  (* Note that [equality] derives a contradiction from [false = true]! *)
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr1; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  (* Note that [equality] derives a contradiction from [false = true]! *)
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr1; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  (* Note that [equality] derives a contradiction from [false = true]! *)
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  cases pr1; simplify.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-
-  equality.
-  (* Note that [equality] derives a contradiction from [false = true]! *)
-  equality.
-  equality.
-
-  apply Inc2Inv'; unfold shared_from_private; simplify.
-  equality.
-  equality.
-  equality.
-Qed.
-
-(* We can remove the repetitive proving with a more automated proof script,
- * whose details are beyond the scope of this book, but which may be interesting
- * anyway! *)
-Theorem increment2_invariant_ok_snazzy : invariantFor increment2_sys increment2_invariant.
-Proof.
-  apply invariant_induction; simplify;
-  repeat match goal with
-         | [ H : increment2_invariant _ |- _ ] => invert H
-         | [ H : parallel1 _ _ _ |- _ ] => invert H
-         | [ H : increment_init _ |- _ ] => invert H
-         | [ H : parallel2 _ _ _ _ |- _ ] => invert H
-         | [ H : increment_step _ _ |- _ ] => invert H
-         | [ pr : increment_program |- _ ] => cases pr; simplify
-         end; try equality;
-  apply Inc2Inv'; unfold shared_from_private; simplify; equality.
-Qed.
+Admitted.
 
 (* Now, to prove our final result about the two incrementing threads, let's use
  * a more general fact, about when one invariant implies another. *)
@@ -666,7 +346,8 @@ Theorem increment2_sys_correct : forall s,
   reachable increment2_sys s
   -> increment2_right_answer s.
 Proof.
-  simplify.
+Admitted.
+(*simplify.
   eapply use_invariant.
   apply invariant_weaken with (invariant1 := increment2_invariant).
   (* Note the use of a [with] clause to specify a quantified variable's
@@ -684,4 +365,4 @@ Proof.
   equality.
 
   assumption.
-Qed.
+Qed.*)

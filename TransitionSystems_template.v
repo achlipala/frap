@@ -203,12 +203,12 @@ Qed.
  * kinds of *local*state* in a thread:
  * - program counter
  * - values of local variables that may be ready eventually *)
-Inductive increment_program : Set :=
-| Lock : increment_program
-| Read : increment_program
-| Write : nat -> increment_program
-| Unlock : increment_program
-| Done : increment_program.
+Inductive increment_program :=
+| Lock
+| Read
+| Write (local : nat)
+| Unlock
+| Done.
 
 (* Next, a type for state shared between threads. *)
 Record inc_state := {

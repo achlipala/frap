@@ -794,3 +794,543 @@ Proof.
 
   invert H2.
 Qed.
+
+
+(** * Modularity *)
+
+Inductive stepWithInterference shared private (inv : shared -> Prop)
+          (step : threaded_state shared private -> threaded_state shared private -> Prop)
+          : threaded_state shared private -> threaded_state shared private -> Prop :=
+| StepSelf : forall st st',
+  step st st'
+  -> stepWithInterference inv step st st'
+| StepEnvironment : forall sh pr sh',
+  inv sh'
+  -> stepWithInterference inv step
+                          {| Shared := sh; Private := pr |}
+                          {| Shared := sh'; Private := pr |}.
+
+Definition withInterference shared private (inv : shared -> Prop)
+           (sys : trsys (threaded_state shared private))
+  : trsys (threaded_state shared private) := {|
+  Initial := sys.(Initial);
+  Step := stepWithInterference inv sys.(Step)
+|}.
+
+Inductive sharedInvariant shared private (inv : shared -> Prop)
+  : threaded_state shared private -> Prop :=
+| SharedInvariant : forall sh pr,
+  inv sh
+  -> sharedInvariant inv {| Shared := sh; Private := pr |}.
+
+Theorem withInterference_abstracts : forall shared private (inv : shared -> Prop)
+                                           (sys : trsys (threaded_state shared private)),
+  simulates (fun st st' => st = st') sys (withInterference inv sys).
+Proof.
+  simplify.
+  constructor; simplify.
+
+  exists st1; propositional.
+
+  exists st1'; propositional.
+  constructor.
+  equality.
+Qed.
+
+Lemma withInterference_parallel1 : forall shared private1 private2
+                                          (invs : shared -> Prop)
+                                          (sys1 : trsys (threaded_state shared private1))
+                                          (sys2 : trsys (threaded_state shared private2))
+                                          st st',
+  (withInterference invs (parallel sys1 sys2)).(Step)^* st st'
+  -> forall st1 st2,
+      (forall st1', (withInterference invs sys1).(Step)^* st1 st1' -> invs st1'.(Shared))
+      -> (forall st2', (withInterference invs sys2).(Step)^* st2 st2' -> invs st2'.(Shared))
+      -> (withInterference invs sys1).(Step)^* st1
+                                            {| Shared := st.(Shared);
+                                               Private := fst st.(Private) |}
+      -> (withInterference invs sys2).(Step)^* st2
+                                            {| Shared := st.(Shared);
+                                               Private := snd st.(Private) |}
+      -> (withInterference invs sys1).(Step)^* st1
+                                            {| Shared := st'.(Shared);
+                                               Private := fst st'.(Private) |}.
+Proof.
+  induct 1; simplify.
+
+  assumption.
+
+  invert H; simplify.
+  invert H5; simplify.
+
+  apply IHtrc with (st2 := {| Shared := sh'; Private := pr2 |}).
+  simplify.
+  apply H1.
+  assumption.
+  simplify.
+  eapply H2.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  apply H1 with (st1' := {| Shared := sh'; Private := pr1' |}).
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  econstructor.
+  eassumption.
+  constructor.
+  assumption.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  econstructor.
+  eassumption.
+  constructor.
+  constructor.
+
+  apply IHtrc with (st2 := {| Shared := sh'; Private := pr2' |}).
+  assumption.
+  simplify.
+  apply H2.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  constructor.
+  eassumption.
+  eassumption.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  apply H2 with (st2' := {| Shared := sh'; Private := pr2' |}).
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  econstructor.
+  eassumption.
+  constructor.
+  constructor.
+  constructor.
+
+  apply IHtrc with (st2 := {| Shared := sh'; Private := snd pr |}).
+  assumption.
+  simplify.
+  eapply H2.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  assumption.
+  assumption.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').  
+  assumption.
+  constructor.
+  constructor.
+Qed.
+
+Lemma withInterference_parallel2 : forall shared private1 private2
+                                          (invs : shared -> Prop)
+                                          (sys1 : trsys (threaded_state shared private1))
+                                          (sys2 : trsys (threaded_state shared private2))
+                                          st st',
+  (withInterference invs (parallel sys1 sys2)).(Step)^* st st'
+  -> forall st1 st2,
+      (forall st1', (withInterference invs sys1).(Step)^* st1 st1' -> invs st1'.(Shared))
+      -> (forall st2', (withInterference invs sys2).(Step)^* st2 st2' -> invs st2'.(Shared))
+      -> (withInterference invs sys1).(Step)^* st1
+                                            {| Shared := st.(Shared);
+                                               Private := fst st.(Private) |}
+      -> (withInterference invs sys2).(Step)^* st2
+                                            {| Shared := st.(Shared);
+                                               Private := snd st.(Private) |}
+      -> (withInterference invs sys2).(Step)^* st2
+                                            {| Shared := st'.(Shared);
+                                               Private := snd st'.(Private) |}.
+Proof.
+  induct 1; simplify.
+
+  assumption.
+
+  invert H; simplify.
+  invert H5; simplify.
+
+  apply IHtrc with (st1 := {| Shared := sh'; Private := pr1' |}).
+  simplify.
+  apply H1.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  econstructor.
+  eassumption.
+  assumption.
+  assumption.
+  constructor.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  apply H1 with (st1' := {| Shared := sh'; Private := pr1' |}).
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  econstructor.
+  eassumption.
+  constructor.
+  constructor.
+
+  apply IHtrc with (st1 := {| Shared := sh'; Private := pr1 |}).
+  simplify.
+  apply H1.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  apply H2 with (st2' := {| Shared := sh'; Private := pr2' |}).
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  constructor.
+  eassumption.
+  constructor.
+  assumption.
+  assumption.
+  constructor.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  constructor.
+  eassumption.
+  constructor.
+
+  apply IHtrc with (st1 := {| Shared := sh'; Private := fst pr |}).
+  simplify.
+  eapply H1.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').
+  assumption.
+  assumption.
+  assumption.
+  constructor.
+  eapply trc_trans.
+  eassumption.
+  eapply TrcFront.
+  apply StepEnvironment with (sh' := sh').  
+  assumption.
+  constructor.
+Qed.
+
+Theorem withInterference_parallel : forall shared private1 private2
+                                           (invs : shared -> Prop)
+                                           (sys1 : trsys (threaded_state shared private1))
+                                           (sys2 : trsys (threaded_state shared private2)),
+    invariantFor (withInterference invs sys1)
+                 (fun st => invs st.(Shared))
+    -> invariantFor (withInterference invs sys2)
+                    (fun st => invs st.(Shared))
+    -> invariantFor (withInterference invs (parallel sys1 sys2))
+                    (fun st => invs st.(Shared)).
+Proof.
+  unfold invariantFor.
+  simplify.
+  invert H1.
+
+  assert ((withInterference invs sys1).(Step)^*
+             {| Shared := sh; Private := pr1 |}
+             {| Shared := s'.(Shared); Private := fst s'.(Private) |}).
+  apply withInterference_parallel1 with (sys2 := sys2)
+                                          (st := {| Shared := sh; Private := (pr1, pr2) |})
+                                          (st2 := {| Shared := sh; Private := pr2 |});
+    simplify; propositional.
+  apply H in H1; propositional.
+  apply H0 in H1; propositional.
+  constructor.
+  constructor.
+
+  assert ((withInterference invs sys2).(Step)^*
+             {| Shared := sh; Private := pr2 |}
+             {| Shared := s'.(Shared); Private := snd s'.(Private) |}).
+  apply withInterference_parallel2 with (sys1 := sys1)
+                                          (st := {| Shared := sh; Private := (pr1, pr2) |})
+                                          (st1 := {| Shared := sh; Private := pr1 |});
+    simplify; propositional.
+  apply H in H5; propositional.
+  apply H0 in H5; propositional.
+  constructor.
+  constructor.
+
+  apply H in H1; try assumption.
+Qed.
+
+(*
+
+  int global = 0;
+
+  f() {
+    int local = 0;
+
+    while (true) {
+      local = global;
+      local = 3 + local;
+      local = 7 + local;
+      global = local;
+    }
+  }
+*)
+
+Inductive twoadd_pc := ReadIt | Add3 | Add7 | WriteIt.
+
+Definition twoadd_initial := { {| Shared := 0; Private := (ReadIt, 0) |} }.
+
+Inductive twoadd_step : threaded_state nat (twoadd_pc * nat)
+                        -> threaded_state nat (twoadd_pc * nat) -> Prop :=
+| Step_ReadIt : forall g l,
+  twoadd_step {| Shared := g; Private := (ReadIt, l) |}
+              {| Shared := g; Private := (Add3, g) |}
+| Step_Add3 : forall g l,
+  twoadd_step {| Shared := g; Private := (Add3, l) |}
+              {| Shared := g; Private := (Add7, 3 + l) |}
+| Step_Add7 : forall g l,
+  twoadd_step {| Shared := g; Private := (Add7, l) |}
+              {| Shared := g; Private := (WriteIt, 7 + l) |}
+| Step_WriteIt : forall g l,
+  twoadd_step {| Shared := g; Private := (WriteIt, l) |}
+              {| Shared := l; Private := (ReadIt, l) |}.
+
+Definition twoadd_sys := {|
+  Initial := twoadd_initial;
+  Step := twoadd_step
+|}.
+
+Definition twoadd_correct private (st : threaded_state nat private) :=
+  isEven st.(Shared).
+
+Definition twoadd_ainitial := { {| Shared := true; Private := (ReadIt, true) |} }.
+
+Inductive twoadd_astep : threaded_state bool (twoadd_pc * bool)
+                        -> threaded_state bool (twoadd_pc * bool) -> Prop :=
+| AStep_ReadIt : forall g l,
+  twoadd_astep {| Shared := g; Private := (ReadIt, l) |}
+               {| Shared := g; Private := (Add3, g) |}
+| AStep_Add3 : forall g l,
+  twoadd_astep {| Shared := g; Private := (Add3, l) |}
+               {| Shared := g; Private := (Add7, negb l) |}
+| AStep_Add7 : forall g l,
+  twoadd_astep {| Shared := g; Private := (Add7, l) |}
+               {| Shared := g; Private := (WriteIt, negb l) |}
+| AStep_WriteIt : forall g l,
+  twoadd_astep {| Shared := g; Private := (WriteIt, l) |}
+               {| Shared := l; Private := (ReadIt, l) |}
+| AStep_Someone_Made_It_Even : forall g pr,
+  twoadd_astep {| Shared := g; Private := pr |}
+               {| Shared := true; Private := pr |}.
+
+Definition twoadd_asys := {|
+  Initial := twoadd_ainitial;
+  Step := twoadd_astep
+|}.
+
+Definition even_R (n : nat) (b : bool) :=
+  isEven n <-> b = true.
+
+Lemma even_R_0 : even_R 0 true.
+Proof.
+  unfold even_R; propositional.
+  constructor.
+Qed.
+
+Lemma even_R_forward : forall n, isEven n -> even_R n true.
+Proof.
+  unfold even_R; propositional.
+Qed.
+
+Lemma even_R_backward : forall n, even_R n true -> isEven n.
+Proof.
+  unfold even_R; propositional.
+Qed.
+
+Lemma even_R_add2 : forall n b,
+  even_R n b
+  -> even_R (S (S n)) b.
+Proof.
+  unfold even_R; propositional.
+  invert H; propositional.
+  constructor; assumption.
+Qed.
+
+Lemma isEven_decide : forall n,
+  (isEven n /\ ~isEven (S n)) \/ (~isEven n /\ isEven (S n)).
+Proof.
+  induct n; simplify; propositional.
+
+  left; propositional.
+  constructor.
+  invert H.
+
+  right; propositional.
+  constructor; assumption.
+
+  left; propositional.
+  invert H.
+  propositional.
+Qed.
+
+Lemma even_R_add1 : forall n b,
+  even_R n b
+  -> even_R (S n) (negb b).
+Proof.
+  unfold even_R; simplify.
+  assert ((isEven n /\ ~isEven (S n)) \/ (~isEven n /\ isEven (S n))).
+  apply isEven_decide.
+  cases b; simplify; propositional.
+  equality.
+  equality.
+Qed.
+
+Inductive twoadd_R : threaded_state nat (twoadd_pc * nat)
+                     -> threaded_state bool (twoadd_pc * bool) -> Prop :=
+| Twoadd_R : forall pc gn ln gb lb,
+  even_R gn gb
+  -> even_R ln lb
+  -> twoadd_R {| Shared := gn; Private := (pc, ln) |}
+              {| Shared := gb; Private := (pc, lb) |}.
+
+Lemma twoadd_ok :
+  invariantFor (withInterference isEven twoadd_sys)
+               (fun st => isEven (Shared st)).
+Proof.
+  eapply invariant_weaken.
+  apply invariant_simulates with (sys2 := twoadd_asys) (R := twoadd_R).
+
+  constructor; simplify.
+
+  invert H.
+  exists {| Shared := true; Private := (ReadIt, true) |}; propositional.
+  constructor; propositional.
+  apply even_R_0.
+  apply even_R_0.
+  constructor.
+  equality.
+  simplify.
+  propositional.
+
+  invert H0.
+  invert H1.
+
+  invert H.
+  exists {| Shared := gb; Private := (Add3, gb) |}; propositional.
+  constructor; propositional.
+  constructor.
+
+  invert H.
+  exists {| Shared := gb; Private := (Add7, negb lb) |}; propositional.
+  constructor; propositional.
+  apply even_R_add2.
+  apply even_R_add1.
+  assumption.
+  constructor.
+
+  invert H.
+  exists {| Shared := gb; Private := (WriteIt, negb lb) |}; propositional.
+  constructor; propositional.
+  repeat apply even_R_add2.
+  apply even_R_add1.
+  assumption.
+  constructor.
+
+  invert H.
+  exists {| Shared := lb; Private := (ReadIt, lb) |}; propositional.
+  constructor; propositional.
+  constructor.
+
+  invert H.
+  exists {| Shared := true; Private := (pc0, lb) |}; propositional.
+  constructor; propositional.
+  apply even_R_forward.
+  assumption.
+  constructor.
+
+  model_check_infer.
+
+  invert 1.
+  invert H0.
+  simplify.
+  propositional.
+
+  invert H0.
+  apply even_R_backward.
+  assumption.
+
+  invert H1.
+  apply even_R_backward.
+  assumption.
+
+  invert H0.
+  apply even_R_backward.
+  assumption.
+
+  invert H1.
+  apply even_R_backward.
+  assumption.
+Qed.
+
+Theorem twoadd2_ok :
+  invariantFor (parallel twoadd_sys twoadd_sys) (twoadd_correct (private := _)).
+Proof.
+  eapply invariant_weaken.
+  eapply invariant_simulates.
+  apply withInterference_abstracts.
+  apply withInterference_parallel.
+  apply twoadd_ok.
+  apply twoadd_ok.
+
+  unfold twoadd_correct.
+  invert 1.
+  assumption.
+Qed.
+
+Ltac twoadd := eapply invariant_weaken; [ eapply invariant_simulates; [
+                                          apply withInterference_abstracts
+                                          | repeat (apply withInterference_parallel
+                                                    || apply twoadd_ok) ]
+                                        | unfold twoadd_correct; invert 1; assumption ].
+
+Theorem twoadd3_ok :
+  invariantFor (parallel twoadd_sys (parallel twoadd_sys twoadd_sys)) (twoadd_correct (private := _)).
+Proof.
+  twoadd.
+Qed.
+
+Fixpoint manyadds_state (n : nat) : Type :=
+  match n with
+  | O => twoadd_pc * nat
+  | S n' => manyadds_state n' * manyadds_state n'
+  end%type.
+
+Fixpoint manyadds (n : nat) : trsys (threaded_state nat (manyadds_state n)) :=
+  match n with
+  | O => twoadd_sys
+  | S n' => parallel (manyadds n') (manyadds n')
+  end.
+
+Eval simpl in manyadds 0.
+Eval simpl in manyadds 1.
+Eval simpl in manyadds 2.
+Eval simpl in manyadds 3.
+
+Theorem twoadd4_ok :
+  invariantFor (manyadds 4) (twoadd_correct (private := _)).
+Proof.
+  twoadd.
+Qed.
+
+Theorem twoadd6_ok :
+  invariantFor (manyadds 6) (twoadd_correct (private := _)).
+Proof.
+  twoadd.
+Qed.

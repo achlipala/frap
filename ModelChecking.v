@@ -168,7 +168,7 @@ Theorem factorial_ok_2 :
   invariantFor (factorial_sys 2) (fact_correct 2).
 Proof.
   simplify.
-  eapply invariantFor_weaken.
+  eapply invariant_weaken.
 
   apply multiStepClosure_ok.
   simplify.
@@ -244,10 +244,11 @@ Ltac model_check_steps := repeat model_check_steps1.
 
 Ltac model_check_finish := simplify; propositional; subst; simplify; equality.
 
+Ltac model_check_infer :=
+  apply multiStepClosure_ok; simplify; model_check_steps.
+
 Ltac model_check_find_invariant :=
-  simplify; eapply invariantFor_weaken; [
-    apply multiStepClosure_ok; simplify; model_check_steps
-  | ].
+  simplify; eapply invariant_weaken; [ model_check_infer | ].
 
 Ltac model_check := model_check_find_invariant; model_check_finish.
 
@@ -270,224 +271,286 @@ Proof.
 Qed.
 
 
-(** * Getting smarter about not exploring from the same state twice *)
+(** * Abstraction *)
 
-Inductive multiStepClosure_smarter {state} (sys : trsys state)
-  : (state -> Prop) -> (state -> Prop) -> (state -> Prop) -> Prop :=
-| MscsDone : forall inv worklist,
-    oneStepClosure sys inv inv
-    -> multiStepClosure_smarter sys inv worklist inv
-| MscsStep : forall inv worklist inv' inv'',
-    oneStepClosure_new sys worklist inv'
-    -> multiStepClosure_smarter sys (inv \cup inv') (inv' \setminus inv) inv''
-    -> multiStepClosure_smarter sys inv worklist inv''.
+(*
 
-Lemma multiStepClosure_smarter_ok' : forall state (sys : trsys state)
-  (inv worklist inv' : state -> Prop),
-  multiStepClosure_smarter sys inv worklist inv'
-  -> (forall st, sys.(Initial) st -> inv st)
-  -> invariantFor sys inv'.
+int global = 0;
+
+thread() {
+  int local;
+
+  while (true) {
+    local = global;
+    global = local + 2;
+  }
+}
+*)
+
+Inductive isEven : nat -> Prop :=
+| EvenO : isEven 0
+| EvenSS : forall n, isEven n -> isEven (S (S n)).
+
+Inductive add2_thread :=
+| Read
+| Write (local : nat).
+
+Inductive add2_init : threaded_state nat add2_thread -> Prop :=
+| Add2Init : add2_init {| Shared := 0; Private := Read |}.
+
+Inductive add2_step : threaded_state nat add2_thread -> threaded_state nat add2_thread -> Prop :=
+| StepRead : forall global,
+    add2_step {| Shared := global; Private := Read |}
+              {| Shared := global; Private := Write global |}
+| StepWrite : forall global local,
+    add2_step {| Shared := global; Private := Write local |}
+              {| Shared := S (S local); Private := Read |}.
+
+Definition add2_sys1 := {|
+  Initial := add2_init;
+  Step := add2_step
+|}.
+
+Definition add2_sys := parallel add2_sys1 add2_sys1.
+
+Inductive simulates state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2) : Prop :=
+| Simulates :
+  (forall st1, sys1.(Initial) st1
+               -> exists st2, R st1 st2
+                              /\ sys2.(Initial) st2)
+  -> (forall st1 st2, R st1 st2
+                      -> forall st1', sys1.(Step) st1 st1'
+                                      -> exists st2', R st1' st2'
+                                                      /\ sys2.(Step) st2 st2')
+  -> simulates R sys1 sys2.
+
+Inductive invariantViaSimulation state1 state2 (R : state1 -> state2 -> Prop)
+  (inv2 : state2 -> Prop)
+  : state1 -> Prop :=
+| InvariantViaSimulation : forall st1 st2, R st1 st2
+  -> inv2 st2
+  -> invariantViaSimulation R inv2 st1.
+
+Lemma invariant_simulates' : forall state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2),
+  (forall st1 st2, R st1 st2
+                   -> forall st1', sys1.(Step) st1 st1'
+                                   ->  exists st2', R st1' st2'
+                                                    /\ sys2.(Step) st2 st2')
+  -> forall st1 st1', sys1.(Step)^* st1 st1'
+                      -> forall st2, R st1 st2
+                                     -> exists st2', R st1' st2'
+                                                     /\ sys2.(Step)^* st2 st2'.
 Proof.
-  induct 1; simplify.
+  induct 2.
 
-  apply oneStepClosure_done.
-  assumption.
-  assumption.
-
-  apply IHmultiStepClosure_smarter.
   simplify.
-  left.
-  apply H1.
-  assumption.
-Qed.
-
-Theorem multiStepClosure_smarter_ok : forall state (sys : trsys state) (inv : state -> Prop),
-  multiStepClosure_smarter sys sys.(Initial) sys.(Initial) inv
-  -> invariantFor sys inv.
-Proof.
-  simplify.
-  eapply multiStepClosure_smarter_ok'.
-  eassumption.
+  exists st2.
   propositional.
+  constructor.
+
+  simplify.
+  eapply H in H2.
+  first_order.
+  apply IHtrc in H2.
+  first_order.
+  exists x1.
+  propositional.
+  econstructor.
+  eassumption.
+  assumption.
+  assumption.
 Qed.
 
-Theorem oneStepClosure_new_empty : forall state (sys : trsys state),
-  oneStepClosure_new sys (constant nil) (constant nil).
+Theorem invariant_simulates : forall state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2) (inv2 : state2 -> Prop),
+  simulates R sys1 sys2
+  -> invariantFor sys2 inv2
+  -> invariantFor sys1 (invariantViaSimulation R inv2).
 Proof.
-  unfold oneStepClosure_new; propositional.
+  simplify.
+  invert H.
+  unfold invariantFor; simplify.
+  apply H1 in H.
+  first_order.
+  apply invariant_simulates' with (sys2 := sys2) (R := R) (st2 := x) in H3; try assumption.
+  first_order.
+  unfold invariantFor in H0.
+  apply H0 with (s' := x0) in H4; try assumption.
+  econstructor.
+  eassumption.
+  assumption.
 Qed.
 
-Theorem oneStepClosure_new_split : forall state (sys : trsys state) st sts (inv1 inv2 : state -> Prop),
-  (forall st', sys.(Step) st st' -> inv1 st')
-  -> oneStepClosure_new sys (constant sts) inv2
-  -> oneStepClosure_new sys (constant (st :: sts)) (inv1 \cup inv2).
+(* Abstracted program:
+
+bool global = true;
+
+thread() {
+  bool local;
+
+  while (true) {
+    local = global;
+    global = local;
+  }
+}
+*)
+
+Inductive add2_bthread :=
+| BRead
+| BWrite (local : bool).
+
+Inductive add2_binit : threaded_state bool add2_bthread -> Prop :=
+| Add2BInit : add2_binit {| Shared := true; Private := BRead |}.
+
+Inductive add2_bstep : threaded_state bool add2_bthread -> threaded_state bool add2_bthread -> Prop :=
+| StepBRead : forall global,
+    add2_bstep {| Shared := global; Private := BRead |}
+               {| Shared := global; Private := BWrite global |}
+| StepBWrite : forall global local,
+    add2_bstep {| Shared := global; Private := BWrite local |}
+               {| Shared := local; Private := BRead |}.
+
+Definition add2_bsys1 := {|
+  Initial := add2_binit;
+  Step := add2_bstep
+|}.
+
+Definition add2_bsys := parallel add2_bsys1 add2_bsys1.
+
+Definition add2_correct (st : threaded_state nat (add2_thread * add2_thread)) :=
+  isEven st.(Shared).
+
+Inductive R_private1 : add2_thread -> add2_bthread -> Prop :=
+| RpRead : R_private1 Read BRead
+| RpWrite : forall n b, (b = true <-> isEven n)
+                        -> R_private1 (Write n) (BWrite b).
+
+Inductive add2_R : threaded_state nat (add2_thread * add2_thread)
+                   -> threaded_state bool (add2_bthread * add2_bthread)
+                   -> Prop :=
+| Add2_R : forall n b th1 th2 th1' th2',
+  (b = true <-> isEven n)
+  -> R_private1 th1 th1'
+  -> R_private1 th2 th2'
+  -> add2_R {| Shared := n; Private := (th1, th2) |}
+            {| Shared := b; Private := (th1', th2') |}.
+
+Theorem add2_init_is :
+  parallel1 add2_binit add2_binit = { {| Shared := true; Private := (BRead, BRead) |} }.
 Proof.
-  unfold oneStepClosure_new; propositional.
+  simplify.
+  apply sets_equal; simplify.
+  propositional.
+
+  invert H.
+  invert H2.
+  invert H4.
+  equality.
+
+  invert H0.
+  constructor.
+  constructor.
+  constructor.
+Qed.
+
+Hint Rewrite add2_init_is.
+
+Theorem add2_ok :
+  invariantFor add2_sys add2_correct.
+Proof.
+  eapply invariant_weaken with (invariant1 := invariantViaSimulation add2_R _).
+  apply invariant_simulates with (sys2 := add2_bsys).
+
+  constructor; simplify.
+
+  invert H.
+  invert H0.
+  invert H1.
+  exists {| Shared := true; Private := (BRead, BRead) |}; simplify.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  constructor.
+  constructor.
+
+  invert H.
+  invert H0; simplify.
+
+  invert H7.
+
+  invert H2.
+  exists {| Shared := b; Private := (BWrite b, th2') |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  propositional.
+  assumption.
+  constructor.
+  constructor.
+
+  invert H2.
+  exists {| Shared := b0; Private := (BRead, th2') |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  assumption.
+  invert H0.
+  propositional.
+  constructor.
+  assumption.
+  constructor.
+  constructor.
+
+  invert H7.
+
+  invert H3.
+  exists {| Shared := b; Private := (th1', BWrite b) |}.
+  propositional.
+  constructor.
+  propositional.
+  assumption.
+  constructor.
+  propositional.
+  constructor.
+  constructor.
+
+  invert H3.
+  exists {| Shared := b0; Private := (th1', BRead) |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  assumption.
+  invert H0.
+  propositional.
+  assumption.
+  constructor.
+  constructor.
+  constructor.
+
+  model_check_infer.
+
+  invert 1.
+  invert H0.
+  simplify.
+  unfold add2_correct.
+  simplify.
+  propositional; subst.
+
+  invert H.
+  propositional.
 
   invert H1.
-
-  left.
-  apply H.
-  assumption.
-
-  right.
-  eapply H0.
-  eassumption.
-  assumption.
-Qed.
-
-Theorem factorial_ok_2_smarter :
-  invariantFor (factorial_sys 2) (fact_correct 2).
-Proof.
-  simplify.
-  eapply invariantFor_weaken.
-
-  apply multiStepClosure_smarter_ok.
-  simplify.
-
-  eapply MscsStep.
-  apply oneStepClosure_new_split; simplify.
-  invert H; simplify.
-  apply singleton_in.
-  apply oneStepClosure_new_empty.
-  simplify.
-
-  eapply MscsStep.
-  apply oneStepClosure_new_split; simplify.
-  invert H; simplify.
-  apply singleton_in.
-  apply oneStepClosure_empty.
-  simplify.
-
-  eapply MscsStep.
-  apply oneStepClosure_new_split; simplify.
-  invert H; simplify.
-  apply singleton_in.
-  apply oneStepClosure_empty.
-  simplify.
-
-  apply MscsDone.
-  apply prove_oneStepClosure; simplify.
-  propositional.
-  propositional; invert H0; try equality.
-  invert H; equality.
-  invert H1; equality.
-
-  simplify.
-  propositional; subst; simplify; propositional.
-Qed.
-
-Ltac smodel_check_done :=
-  apply MscsDone; apply prove_oneStepClosure; simplify; propositional; subst;
-  repeat match goal with
-         | [ H : _ |- _ ] => invert H
-         end; simplify; equality.
-
-Ltac smodel_check_step :=
-  eapply MscsStep; [
-    repeat ((apply oneStepClosure_new_empty; solve [ simplify ])
-            || (apply oneStepClosure_new_split; [ simplify;
-                                                  repeat match goal with
-                                                         | [ H : _ |- _ ] => invert H
-                                                         end; solve [ singletoner ] | ]))
-  | simplify ].
-
-Ltac smodel_check_steps1 := smodel_check_done || smodel_check_step.
-Ltac smodel_check_steps := repeat smodel_check_steps1.
-
-Ltac smodel_check_setup :=
-  simplify; eapply invariantFor_weaken; [
-    apply multiStepClosure_smarter_ok; simplify
-  | ].
-
-Ltac smodel_check_find_invariant := smodel_check_setup; [ smodel_check_steps | ].
-
-Ltac smodel_check := smodel_check_find_invariant; model_check_finish.
-
-Theorem factorial_ok_2_smarter_snazzy :
-  invariantFor (factorial_sys 2) (fact_correct 2).
-Proof.
-  smodel_check.
-Qed.
-
-Theorem factorial_ok_3_smarter_snazzy :
-  invariantFor (factorial_sys 3) (fact_correct 3).
-Proof.
-  smodel_check.
-Qed.
-
-Theorem factorial_ok_5_smarter_snazzy :
-  invariantFor (factorial_sys 5) (fact_correct 5).
-Proof.
-  smodel_check.
-Qed.
-
-
-(** * Back to the multithreaded example from last time *)
-
-Theorem increment2_init_is :
-  parallel1 increment_init increment_init = { {| Shared := {| Global := 0; Locked := false |};
-                                                 Private := (Lock, Lock) |} }.
-Proof.
-  simplify.
-  apply sets_equal; simplify.
   propositional.
 
   invert H.
-  invert H2.
-  invert H4.
-  equality.
-
-  rewrite <- H0.
-  constructor.
-  constructor.
-  constructor.
-Qed.
-
-Hint Rewrite increment2_init_is.
-
-(*Theorem increment2_ok :
-  invariantFor increment2_sys increment2_right_answer.
-Proof.
-  unfold increment2_right_answer.
-  smodel_check.
-Qed.*)
-
-Definition increment3_sys := parallel increment_sys increment2_sys.
-
-Definition increment3_right_answer
-  (s : threaded_state inc_state (increment_program * (increment_program * increment_program))) :=
-  s.(Private) = (Done, (Done, Done))
-  -> s.(Shared).(Global) = 3.
-
-Theorem increment3_init_is :
-  parallel1 increment_init (parallel1 increment_init increment_init)
-  = { {| Shared := {| Global := 0; Locked := false |};
-         Private := (Lock, (Lock, Lock)) |} }.
-Proof.
-  simplify.
-  apply sets_equal; simplify.
   propositional.
 
-  invert H.
-  invert H2.
-  invert H4.
-  equality.
-  invert H.
-
-  rewrite <- H0.
-  constructor.
-  constructor.
-  constructor.
-  constructor.
-Qed.
-
-Hint Rewrite increment3_init_is.
-
-Theorem increment3_ok :
-  invariantFor increment3_sys increment3_right_answer.
-Proof.
-  unfold increment3_right_answer.
-  smodel_check_find_invariant.
-  model_check_finish.
+  invert H1.
+  propositional.
 Qed.

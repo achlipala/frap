@@ -235,7 +235,7 @@ Ltac model_check_step :=
     repeat ((apply oneStepClosure_empty; simplify)
             || (apply oneStepClosure_split; [ simplify;
                                               repeat match goal with
-                                                     | [ H : _ |- _ ] => invert H
+                                                     | [ H : _ |- _ ] => invert H; try congruence
                                                      end; solve [ singletoner ] | ]))
   | simplify ].
 
@@ -553,4 +553,244 @@ Proof.
 
   invert H1.
   propositional.
+Qed.
+
+
+(** * Another abstraction example *)
+
+(*
+
+f(int n) {
+  int i, j;
+
+  i = 0;
+  j = 0;
+  while (n > 0) {
+    i = i + n;
+    j = j + n;
+    n = n - 1;
+  }
+}
+*)
+
+Inductive pc :=
+| i_gets_0
+| j_gets_0
+| Loop
+| i_add_n
+| j_add_n
+| n_sub_1
+| Done.
+
+Record vars := {
+  N : nat;
+  I : nat;
+  J : nat
+}.
+
+Record state := {
+  Pc : pc;
+  Vars : vars
+}.
+
+Inductive initial : state -> Prop :=
+| Init : forall vs, initial {| Pc := i_gets_0; Vars := vs |}.
+
+Inductive step : state -> state -> Prop :=
+| Step_i_gets_0 : forall n i j,
+  step {| Pc := i_gets_0; Vars := {| N := n;
+                                     I := i;
+                                     J := j |} |}
+       {| Pc := j_gets_0; Vars := {| N := n;
+                                     I := 0;
+                                     J := j |} |}
+| Step_j_gets_0 : forall n i j,
+  step {| Pc := j_gets_0; Vars := {| N := n;
+                                     I := i;
+                                     J := j |} |}
+       {| Pc := Loop; Vars := {| N := n;
+                                 I := i;
+                                 J := 0 |} |}
+| Step_Loop_done : forall i j,
+  step {| Pc := Loop; Vars := {| N := 0;
+                                 I := i;
+                                 J := j |} |}
+       {| Pc := Done; Vars := {| N := 0;
+                                 I := i;
+                                 J := j |} |}
+| Step_Loop_enter : forall n i j,
+  step {| Pc := Loop; Vars := {| N := S n;
+                                 I := i;
+                                 J := j |} |}
+       {| Pc := i_add_n; Vars := {| N := S n;
+                                    I := i;
+                                    J := j |} |}
+| Step_i_add_n : forall n i j,
+  step {| Pc := i_add_n; Vars := {| N := n;
+                                    I := i;
+                                    J := j |} |}
+       {| Pc := j_add_n; Vars := {| N := n;
+                                    I := i + n;
+                                    J := j |} |}
+| Step_j_add_n : forall n i j,
+  step {| Pc := j_add_n; Vars := {| N := n;
+                                    I := i;
+                                    J := j |} |}
+       {| Pc := n_sub_1; Vars := {| N := n;
+                                    I := i;
+                                    J := j + n |} |}
+| Step_n_sub_1 : forall n i j,
+  step {| Pc := n_sub_1; Vars := {| N := n;
+                                    I := i;
+                                    J := j |} |}
+       {| Pc := Loop; Vars := {| N := n - 1;
+                                 I := i;
+                                 J := j |} |}.
+
+Definition loopy_sys := {|
+  Initial := initial;
+  Step := step
+|}.
+
+Inductive absvars := Unknown | i_is_0 | i_eq_j | i_eq_j_plus_n.
+
+Record absstate := {
+  APc : pc;
+  AVars : absvars
+}.
+
+Inductive absstep : absstate -> absstate -> Prop :=
+| AStep_i_gets_0 : forall vs,
+  absstep {| APc := i_gets_0; AVars := vs |}
+          {| APc := j_gets_0; AVars := i_is_0 |}
+| AStep_j_gets_0_i_is_0 :
+  absstep {| APc := j_gets_0; AVars := i_is_0 |}
+          {| APc := Loop; AVars := i_eq_j |}
+| AStep_j_gets_0_Other : forall vs,
+  vs <> i_is_0
+  -> absstep {| APc := j_gets_0; AVars := vs |}
+             {| APc := Loop; AVars := Unknown |}
+| AStep_Loop_done : forall vs,
+  absstep {| APc := Loop; AVars := vs |}
+          {| APc := Done; AVars := vs |}
+| AStep_Loop_enter : forall vs,
+  absstep {| APc := Loop; AVars := vs |}
+          {| APc := i_add_n; AVars := vs |}
+| AStep_i_add_n_i_eq_j :
+  absstep {| APc := i_add_n; AVars := i_eq_j |}
+          {| APc := j_add_n; AVars := i_eq_j_plus_n |}
+| AStep_i_add_n_Other : forall vs,
+  vs <> i_eq_j
+  -> absstep {| APc := i_add_n; AVars := vs |}
+             {| APc := j_add_n; AVars := Unknown |}
+| AStep_j_add_n_i_eq_j_plus_n :
+  absstep {| APc := j_add_n; AVars := i_eq_j_plus_n |}
+          {| APc := n_sub_1; AVars := i_eq_j |}
+| AStep_j_add_n_i_Other : forall vs,
+  vs <> i_eq_j_plus_n
+  -> absstep {| APc := j_add_n; AVars := vs |}
+             {| APc := n_sub_1; AVars := Unknown |}
+| AStep_n_sub_1_bad :
+  absstep {| APc := n_sub_1; AVars := i_eq_j_plus_n |}
+          {| APc := Loop; AVars := Unknown |}
+| AStep_n_sub_1_good : forall vs,
+  vs <> i_eq_j_plus_n
+  -> absstep {| APc := n_sub_1; AVars := vs |}
+             {| APc := Loop; AVars := vs |}.
+
+Definition absloopy_sys := {|
+  Initial := { {| APc := i_gets_0; AVars := Unknown |} };
+  Step := absstep
+|}.
+
+Inductive Rvars : vars -> absvars -> Prop :=
+| Rv_Unknown : forall vs, Rvars vs Unknown
+| Rv_i_is_0 : forall vs, vs.(I) = 0 -> Rvars vs i_is_0
+| Rv_i_eq_j : forall vs, vs.(I) = vs.(J) -> Rvars vs i_eq_j
+| Rv_i_eq_j_plus_n : forall vs, vs.(I) = vs.(J) + vs.(N) -> Rvars vs i_eq_j_plus_n.
+
+Inductive R : state -> absstate -> Prop :=
+| Rcon : forall pc vs avs, Rvars vs avs -> R {| Pc := pc; Vars := vs |}
+                                             {| APc := pc; AVars := avs |}.
+
+Definition loopy_correct (st : state) :=
+  st.(Pc) = Done -> st.(Vars).(I) = st.(Vars).(J).
+
+Theorem loopy_ok :
+  invariantFor loopy_sys loopy_correct.
+Proof.
+  eapply invariant_weaken with (invariant1 := invariantViaSimulation R _).
+  apply invariant_simulates with (sys2 := absloopy_sys).
+
+  constructor; simplify.
+
+  invert H.
+  exists {| APc := i_gets_0; AVars := Unknown |}.
+  propositional.
+  constructor.
+  constructor.
+
+  invert H0.
+
+  invert H.
+  exists {| APc := j_gets_0; AVars := i_is_0 |}.
+  propositional; repeat constructor.
+
+  invert H.
+  invert H3.
+  exists {| APc := Loop; AVars := Unknown |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := i_eq_j |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := Unknown |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := Unknown |}; propositional; repeat constructor; equality.
+
+  exists {| APc := Done; AVars := st2.(AVars) |}.
+  invert H; simplify; propositional; repeat constructor; equality.
+
+  exists {| APc := i_add_n; AVars := st2.(AVars) |}.
+  invert H; simplify; propositional; repeat constructor; equality.
+
+  invert H.
+  invert H3.
+  exists {| APc := j_add_n; AVars := Unknown |}; repeat constructor; equality.
+  exists {| APc := j_add_n; AVars := Unknown |}; repeat constructor; equality.
+  exists {| APc := j_add_n; AVars := i_eq_j_plus_n |}; repeat constructor; simplify; equality.
+  exists {| APc := j_add_n; AVars := Unknown |}; repeat constructor; equality.
+
+  invert H.
+  invert H3.
+  exists {| APc := n_sub_1; AVars := Unknown |}; repeat constructor; equality.
+  exists {| APc := n_sub_1; AVars := Unknown |}; repeat constructor; equality.
+  exists {| APc := n_sub_1; AVars := Unknown |}; repeat constructor; equality.
+  exists {| APc := n_sub_1; AVars := i_eq_j |}; repeat constructor; simplify; equality.
+
+  invert H.
+  invert H3.
+  exists {| APc := Loop; AVars := Unknown |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := i_is_0 |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := i_eq_j |}; propositional; repeat constructor; equality.
+  exists {| APc := Loop; AVars := Unknown |}; propositional; repeat constructor; equality.
+
+  model_check_infer.
+
+  invert 1.
+  invert H0.
+  unfold loopy_correct.
+  simplify.
+  propositional; subst.
+
+  invert H2.
+
+  invert H1.
+
+  invert H2.
+
+  invert H1.
+  invert H.
+  assumption.
+
+  invert H2.
+
+  invert H1.
+
+  invert H2.
 Qed.

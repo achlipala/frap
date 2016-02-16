@@ -83,3 +83,5 @@ Infix "==n" := eq_nat_dec (no associativity, at level 50).
 Export Frap.Map.
 
 Ltac maps_equal := Frap.Map.M.maps_equal; simplify.
+
+Ltac first_order := firstorder idtac.

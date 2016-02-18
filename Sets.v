@@ -169,9 +169,22 @@ Proof.
   unfold constant; intuition eauto using removeDups_fwd, removeDups_bwd.
 Qed.
 
+Ltac someMatch ls :=
+  match ls with
+  | ?x :: ?ls' =>
+    let rec someMatch' ls :=
+        match ls with
+        | x :: _ => idtac
+        | _ :: ?ls' => someMatch' ls'
+        end
+    in someMatch' ls'
+  | _ :: ?ls' => someMatch ls'
+  end.
+
 Ltac removeDups :=
   match goal with
   | [ |- context[constant ?ls] ] =>
+    someMatch ls;
     erewrite (@removeDups_ok _ ls)
       by repeat (apply RdNil
                  || (apply RdNew; [ simpl; intuition congruence | ])

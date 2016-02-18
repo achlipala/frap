@@ -248,7 +248,7 @@ Ltac model_check_infer :=
   apply multiStepClosure_ok; simplify; model_check_steps.
 
 Ltac model_check_find_invariant :=
-  simplify; eapply invariant_weaken; [ model_check_infer | ].
+  simplify; eapply invariant_weaken; [ model_check_infer | ]; cbv beta in *.
 
 Ltac model_check := model_check_find_invariant; model_check_finish.
 

@@ -1108,6 +1108,7 @@ At each step, we check whether the expanded set is actually equal to the previou
 If so, our process of \emph{multi-step closure}\index{multi-step closure} has terminated, and we have an invariant, by construction.
 Again, keep in mind that multi-step closure will not terminate for most transition systems, and there is an art to phrasing a problem in terms of systems where it \emph{will} terminate.
 
+
 \section{Abstracting a Transition System}
 
 When analyzing an infinite-state system, it is not necessary to give up hope for model checking.
@@ -1202,6 +1203,91 @@ We show that every concrete execution is matched abstractly, but there may also 
 In model checking the abstract system, we may do extra work to handle these ``useless'' paths!
 If we do manage to handle them all, then Theorem \ref{abstract_simulation} applies perfectly well.
 However, we should be careful, in our choices of abstractions, to bias our designs toward those that don't introduce extra complexities.
+
+
+\section{Modular Decomposition of Invariant-Finding}
+
+Many transition systems are straightforward to abstract into others, as single global steps.
+Other times, the right way to tame a complex system is to decompose it into others and analyze them separately for invariants.
+In such cases, the key is a proof principle to combine the invariants of the component systems into an invariant of the overall system.
+We will refer to this style of proof decomposition as \emph{modularity}\index{modularity}, and this section gives our first example of modularity, for multithreaded systems.
+
+Imagine that we have a system consisting of $n$ different copies of a transition system $\angled{S, S_0, \to}$ running as concurrent threads, modeled in the way introduced in the previous chapter.
+It's not obvious that we can analyze each thread separately, since, during that thread's execution, the other threads are constantly interrupting and modifying global state.
+To make matters worse, we can only understand their patterns of state modification by analyzing their thread-local state.
+The situation seems inherently unmodular.
+
+However, consider the following construction on transition systems.
+Given a transition relation $\to$ and an invariant $I$ on the global state shared by all threads, we define a new transition relation $\to^I$ as follows.
+$$\infer{s \to^I s'}{
+  s \to s'
+}
+\quad \infer{(g, \ell) \to^I (g', \ell)}{
+  I(g')
+}$$
+
+The first rule says that any step of the original relation is also a step of the new relation.
+However, the second rule adds a new kind of step: the global state may change \emph{arbitrarily}, so long as the new value satisfies invariant $I$.
+We lift this operation to full transition systems, defining $\angled{S, S_0, \to}^I = \angled{S, S_0, \to^I}$.
+
+This construction trivially acts as an abstraction.
+\begin{theorem}\label{shared_invariant_abstract}
+  \abstraction
+  $\mathbb S \simulate_\mathsf{id} {\mathbb S}^I$, for any system $\mathbb S$ and property $I$.
+\end{theorem}
+
+\newcommand{\modularity}[0]{\marginpar{\fbox{\textbf{Modularity}}}}
+
+However, we wouldn't want to make this abstraction step in a proof about a single thread.
+We needlessly complicate our model checking by forcing ourselves to consider all modifications of the global state that obey $I$.
+The payoff comes in analyzing multithreaded systems.
+\begin{theorem}\label{shared_invariant_modular}
+  \modularity
+  Where $I$ is an invariant over only the shared state of a multithreaded system, let $I' = \{(g, \ell) \mid I(g)\}$ be the lifting of $I$ to cover full states, local parts included.  If $I'$ is an invariant for both ${\mathbb S}_1^I$ and ${\mathbb S}_2^I$, then $I'$ is also an invariant for $({\mathbb S}_1 \mid {\mathbb S}_2)^I$.
+\end{theorem}
+
+This theorem gives us a way to analyze the threads in a system separately.
+As an example, consider this program, where multiple threads will run \texttt{f()} simultaneously.
+\begin{verbatim}
+int global = 0;
+
+f() {
+  int local = 0;
+
+  while (true) {
+    local = global;
+    local = 3 + local;
+    local = 7 + local;
+    global = local;
+  }
+}
+\end{verbatim}
+
+Call the transition-system encoding of this code $\mathbb S$.
+We can apply the Boolean-for-evenness abstraction to model a single thread with finite state, but we are left needing to account for interference by other threads.
+However, we can apply Theorem \ref{shared_invariant_modular} to analyze threads separately.
+
+For instance, we want to show that ``\texttt{global} is always even'' is an invariant of ${\mathbb S} \mid {\mathbb S}$.
+By Theorem \ref{shared_invariant_abstract}, we can switch to analyzing system $({\mathbb S} \mid {\mathbb S})^I$, where $I$ is the evenness invariant.
+By Theorem \ref{shared_invariant_modular}, we can switch to proving the same invariant separately for systems ${\mathbb S}^I$ and ${\mathbb S}^I$, which are, of course, the same system in this case.
+We apply the Boolean-for-evenness abstraction to this system, to get one with a finite state space, so we can check the invariant automatically by model checking.
+Following the chain of reasoning backward, we have proved the invariant for ${\mathbb S} \mid {\mathbb S}$.
+
+Even better, that last proof includes the hardest steps that carry over to the proof for an arbitrary number of threads.
+Define an exponentially growing system of threads ${\mathbb S}^n$ by:
+\begin{eqnarray*}
+  {\mathbb S}^0 &=& \mathbb S \\
+  {\mathbb S}^{n+1} &=& {\mathbb S}^n \mid {\mathbb S}^n
+\end{eqnarray*}
+
+\begin{theorem}
+  For any $n$, it is an invariant of ${\mathbb S}^n$ that the global variable is always even.
+\end{theorem}
+
+\begin{proof}
+  By induction on $n$, repeatedly using Theorem \ref{shared_invariant_modular} to push the obligation down to the leaves of the tree of concurrent compositions, after applying Theorem \ref{shared_invariant_abstract} at the start to introduce the use of $\ldots^I$.
+  Every leaf is the same system $\mathbb S$, for which we abstract and apply model checking, appealing to the step above where we ran the same analysis.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

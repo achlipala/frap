@@ -1016,14 +1016,6 @@ Definition withInterference shared private (inv : shared -> Prop)
   Step := stepWithInterference inv sys.(Step)
 |}.
 
-(* We also have a ready-made invariant we could try to prove for any such
- * system, asserting that [inv] always holds of the shared state. *) 
-Inductive sharedInvariant shared private (inv : shared -> Prop)
-  : threaded_state shared private -> Prop :=
-| SharedInvariant : forall sh pr,
-  inv sh
-  -> sharedInvariant inv {| Shared := sh; Private := pr |}.
-
 (* Tired of simulation proofs yet?  Then you'll love this theorem, which shows
  * a free simulation for any use of [withInterference]!  We even get to pick the
  * trivial simulation relation, state equality. *)

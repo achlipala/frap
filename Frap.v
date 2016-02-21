@@ -96,8 +96,11 @@ Ltac first_order := firstorder idtac.
 Ltac model_check_done :=
   apply MscDone; apply prove_oneStepClosure; simplify; propositional; subst;
   repeat match goal with
-         | [ H : _ |- _ ] => invert H
-         end; simplify; equality.
+         | [ H : ?P |- _ ] =>
+           match type of P with
+           | Prop => invert H; simplify
+           end
+         end; equality.
 
 Ltac singletoner :=
   repeat match goal with
@@ -110,7 +113,10 @@ Ltac model_check_step :=
     repeat (apply oneStepClosure_empty
             || (apply oneStepClosure_split; [ simplify;
                                               repeat match goal with
-                                                     | [ H : _ |- _ ] => invert H; simplify; try congruence
+                                                     | [ H : ?P |- _ ] =>
+                                                       match type of P with
+                                                       | Prop => invert H; simplify; try congruence
+                                                       end
                                                      end; solve [ singletoner ] | ]))
   | simplify ].
 

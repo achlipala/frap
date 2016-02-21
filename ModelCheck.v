@@ -1,4 +1,7 @@
-Require Import Invariant Sets.
+Require Import Invariant Relations Sets.
+
+Set Implicit Arguments.
+
 
 Definition oneStepClosure_current {state} (sys : trsys state)
            (invariant1 invariant2 : state -> Prop) :=
@@ -94,4 +97,62 @@ Theorem singleton_in_other : forall {A} (x : A) (s1 s2 : set A),
   -> (s1 \cup s2) x.
 Proof.
   unfold union; simpl; auto.
+Qed.
+
+
+(** * Abstraction *)
+
+Inductive simulates state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2) : Prop :=
+| Simulates :
+  (forall st1, sys1.(Initial) st1
+               -> exists st2, R st1 st2
+                              /\ sys2.(Initial) st2)
+  -> (forall st1 st2, R st1 st2
+                      -> forall st1', sys1.(Step) st1 st1'
+                                      -> exists st2', R st1' st2'
+                                                      /\ sys2.(Step) st2 st2')
+  -> simulates R sys1 sys2.
+
+Inductive invariantViaSimulation state1 state2 (R : state1 -> state2 -> Prop)
+  (inv2 : state2 -> Prop)
+  : state1 -> Prop :=
+| InvariantViaSimulation : forall st1 st2, R st1 st2
+  -> inv2 st2
+  -> invariantViaSimulation R inv2 st1.
+
+Lemma invariant_simulates' : forall state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2),
+  (forall st1 st2, R st1 st2
+                   -> forall st1', sys1.(Step) st1 st1'
+                                   ->  exists st2', R st1' st2'
+                                                    /\ sys2.(Step) st2 st2')
+  -> forall st1 st1', sys1.(Step)^* st1 st1'
+                      -> forall st2, R st1 st2
+                                     -> exists st2', R st1' st2'
+                                                     /\ sys2.(Step)^* st2 st2'.
+Proof.
+  induction 2; simpl; intuition eauto.
+
+  eapply H in H2.
+  firstorder.
+  apply IHtrc in H2.
+  firstorder; eauto.
+  eauto.
+Qed.
+
+Local Hint Constructors invariantViaSimulation.
+
+Theorem invariant_simulates : forall state1 state2 (R : state1 -> state2 -> Prop)
+  (sys1 : trsys state1) (sys2 : trsys state2) (inv2 : state2 -> Prop),
+  simulates R sys1 sys2
+  -> invariantFor sys2 inv2
+  -> invariantFor sys1 (invariantViaSimulation R inv2).
+Proof.
+  inversion_clear 1; intros.
+  unfold invariantFor; intros.
+  apply H0 in H2.
+  firstorder.
+  apply invariant_simulates' with (sys2 := sys2) (R := R) (st2 := x) in H3; auto.
+  firstorder; eauto.
 Qed.

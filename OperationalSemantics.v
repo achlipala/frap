@@ -225,3 +225,226 @@ Proof.
   f_equal.
   ring.
 Qed.
+
+
+(** * Small-step semantics *)
+
+Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
+| StepAssign : forall v x e,
+  step (v, Assign x e) (v $+ (x, interp e v), Skip)
+| StepSeq1 : forall v c1 c2 v' c1',
+  step (v, c1) (v', c1')
+  -> step (v, Sequence c1 c2) (v', Sequence c1' c2)
+| StepSeq2 : forall v c2,
+  step (v, Sequence Skip c2) (v, c2)
+| StepIfTrue : forall v e then_ else_,
+  interp e v <> 0
+  -> step (v, If e then_ else_) (v, then_)
+| StepIfFalse : forall v e then_ else_,
+  interp e v = 0
+  -> step (v, If e then_ else_) (v, else_)
+| StepWhileTrue : forall v e body,
+  interp e v <> 0
+  -> step (v, While e body) (v, Sequence body (While e body))
+| StepWhileFalse : forall v e body,
+  interp e v = 0
+  -> step (v, While e body) (v, Skip).
+
+(* Here's a small-step factorial execution. *)
+Theorem factorial_2_small : exists v, step^* ($0 $+ ("input", 2), factorial) (v, Skip)
+                                      /\ v $? "output" = Some 2.
+Proof.
+  eexists; propositional.
+
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  apply StepSeq2.
+  econstructor.
+  econstructor.
+  simplify.
+  equality.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  apply StepSeq2.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  apply StepSeq2.
+  econstructor.
+  econstructor.
+  simplify.
+  equality.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  apply StepSeq2.
+  econstructor.
+  econstructor.
+  econstructor.
+  econstructor.
+  apply StepSeq2.
+  econstructor.
+  apply StepWhileFalse.
+  simplify.
+  equality.
+  econstructor.
+  
+  simplify.
+  equality.
+Qed.
+
+Ltac step1 :=
+  apply TrcRefl || eapply TrcFront
+  || apply StepAssign || apply StepSeq2 || eapply StepSeq1
+  || (apply StepIfTrue; [ simplify; equality ])
+  || (apply StepIfFalse; [ simplify; equality ])
+  || (eapply StepWhileTrue; [ simplify; equality ])
+  || (apply StepWhileFalse; [ simplify; equality ]).
+Ltac stepper := simplify; try equality; repeat step1.
+
+Theorem factorial_2_small_snazzy : exists v, step^* ($0 $+ ("input", 2), factorial) (v, Skip)
+                                             /\ v $? "output" = Some 2.
+Proof.
+  eexists; propositional.
+
+  stepper.
+  stepper.
+Qed.
+
+(* It turns out that these two semantics styles are equivalent.  Let's prove
+ * it. *)
+
+Lemma step_star_Seq : forall v c1 c2 v' c1',
+  step^* (v, c1) (v', c1')
+  -> step^* (v, Sequence c1 c2) (v', Sequence c1' c2).
+Proof.
+  induct 1.
+
+  constructor.
+
+  cases y.
+  econstructor.
+  econstructor.
+  eassumption.
+  apply IHtrc.
+  equality.
+  equality.
+Qed.
+
+Theorem big_small : forall v c v', eval v c v'
+  -> step^* (v, c) (v', Skip).
+Proof.
+  induct 1; simplify.
+
+  constructor.
+
+  econstructor.
+  constructor.
+  constructor.
+
+  eapply trc_trans.
+  apply step_star_Seq.
+  eassumption.
+  econstructor.
+  apply StepSeq2.
+  assumption.
+  
+  econstructor.
+  constructor.
+  assumption.
+  assumption.
+
+  econstructor.
+  apply StepIfFalse.
+  assumption.
+  assumption.
+
+  econstructor.
+  constructor.
+  assumption.
+  eapply trc_trans.
+  apply step_star_Seq.
+  eassumption.
+  econstructor.
+  apply StepSeq2.
+  assumption.
+
+  econstructor.
+  apply StepWhileFalse.
+  assumption.
+  constructor.
+Qed.
+
+Lemma small_big'' : forall v c v' c', step (v, c) (v', c')
+                                      -> forall v'', eval v' c' v''
+                                                     -> eval v c v''.
+Proof.
+  induct 1; simplify.
+
+  invert H.
+  constructor.
+
+  invert H0.
+  econstructor.
+  apply IHstep.
+  eassumption.
+  assumption.
+
+  econstructor.
+  constructor.
+  assumption.
+
+  constructor.
+  assumption.
+  assumption.
+
+  apply EvalIfFalse.
+  assumption.
+  assumption.
+
+  invert H0.
+  econstructor.
+  assumption.
+  eassumption.
+  assumption.
+
+  invert H0.
+  apply EvalWhileFalse.
+  assumption.
+Qed.
+
+Lemma small_big' : forall v c v' c', step^* (v, c) (v', c')
+                                     -> forall v'', eval v' c' v''
+                                                    -> eval v c v''.
+Proof.
+  induct 1; simplify.
+
+  trivial.
+
+  cases y.
+  eapply small_big''.
+  eassumption.
+  eapply IHtrc.
+  equality.
+  equality.
+  assumption.
+Qed.
+
+Theorem small_big : forall v c v', step^* (v, c) (v', Skip)
+                                   -> eval v c v'.
+Proof.
+  simplify.
+  eapply small_big'.
+  eassumption.
+  constructor.
+Qed.

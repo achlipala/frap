@@ -103,7 +103,7 @@ Proof.
 
   apply IHmultiStepClosure.
   simplify.
-  unfold oneStepClosure, oneStepClosure_current in *. (* <-- *)
+  unfold oneStepClosure, oneStepClosure_current in *.
   propositional.
   apply H3.
   apply H1.

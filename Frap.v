@@ -1,5 +1,5 @@
-Require Import String Arith Omega Program Sets Relations Map Var Invariant Bool.
-Export String Arith Sets Relations Map Var Invariant Bool.
+Require Import String Arith Omega Program Sets Relations Map Var Invariant Bool ModelCheck.
+Export String Arith Sets Relations Map Var Invariant Bool ModelCheck.
 Require Import List.
 Export List ListNotations.
 Open Scope string_scope.
@@ -89,3 +89,40 @@ Export Frap.Map.
 Ltac maps_equal := Frap.Map.M.maps_equal; simplify.
 
 Ltac first_order := firstorder idtac.
+
+
+(** * Model checking *)
+
+Ltac model_check_done :=
+  apply MscDone; apply prove_oneStepClosure; simplify; propositional; subst;
+  repeat match goal with
+         | [ H : _ |- _ ] => invert H
+         end; simplify; equality.
+
+Ltac singletoner :=
+  repeat match goal with
+         | _ => apply singleton_in
+         | [ |- (_ \cup _) _ ] => apply singleton_in_other
+         end.
+
+Ltac model_check_step :=
+  eapply MscStep; [
+    repeat ((apply oneStepClosure_empty; simplify)
+            || (apply oneStepClosure_split; [ simplify;
+                                              repeat match goal with
+                                                     | [ H : _ |- _ ] => invert H; try congruence
+                                                     end; solve [ singletoner ] | ]))
+  | simplify ].
+
+Ltac model_check_steps1 := model_check_done || model_check_step.
+Ltac model_check_steps := repeat model_check_steps1.
+
+Ltac model_check_finish := simplify; propositional; subst; simplify; equality.
+
+Ltac model_check_infer :=
+  apply multiStepClosure_ok; simplify; model_check_steps.
+
+Ltac model_check_find_invariant :=
+  simplify; eapply invariant_weaken; [ model_check_infer | ]; cbv beta in *.
+
+Ltac model_check := model_check_find_invariant; model_check_finish.

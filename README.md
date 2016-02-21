@@ -9,3 +9,4 @@ Just run `make` here to build everything, including the book `frap.pdf` and the 
 * Chapter 2: `BasicSyntax.v`
 * Chapter 3: `Interpreters.v`
 * Chapter 4: `TransitionSystems.v`
+* Chapter 5: `ModelChecking.v`

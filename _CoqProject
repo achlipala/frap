@@ -4,6 +4,7 @@ Var.v
 Sets.v
 Relations.v
 Invariant.v
+ModelCheck.v
 Frap.v
 BasicSyntax_template.v
 BasicSyntax.v

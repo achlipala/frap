@@ -516,3 +516,126 @@ Qed.
 (* We'll return to these systems and their abstractions in the next few
  * chapters. *)
 
+
+(** * Contextual small-step semantics *)
+
+Inductive context :=
+| Hole
+| CSeq (C : context) (c : cmd).
+
+Inductive plug : context -> cmd -> cmd -> Prop :=
+| PlugHole : forall c, plug Hole c c
+| PlugSeq : forall c C c' c2,
+  plug C c c'
+  -> plug (CSeq C c2) c (Sequence c' c2).
+
+Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
+| Step0Assign : forall v x e,
+  step0 (v, Assign x e) (v $+ (x, interp e v), Skip)
+| Step0Seq : forall v c2,
+  step0 (v, Sequence Skip c2) (v, c2)
+| Step0IfTrue : forall v e then_ else_,
+  interp e v <> 0
+  -> step0 (v, If e then_ else_) (v, then_)
+| Step0IfFalse : forall v e then_ else_,
+  interp e v = 0
+  -> step0 (v, If e then_ else_) (v, else_)
+| Step0WhileTrue : forall v e body,
+  interp e v <> 0
+  -> step0 (v, While e body) (v, Sequence body (While e body))
+| Step0WhileFalse : forall v e body,
+  interp e v = 0
+  -> step0 (v, While e body) (v, Skip).
+
+Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
+| CStep : forall C v c v' c' c1 c2,
+  plug C c c1
+  -> step0 (v, c) (v', c')
+  -> plug C c' c2
+  -> cstep (v, c1) (v', c2).
+
+Theorem step_cstep : forall v c v' c',
+  step (v, c) (v', c')
+  -> cstep (v, c) (v', c').
+Proof.
+  induct 1.
+
+  econstructor.
+  constructor.
+  constructor.
+  constructor.
+
+  invert IHstep.
+  econstructor.
+  apply PlugSeq.
+  eassumption.
+  eassumption.
+  constructor.
+  eassumption.
+
+  econstructor.
+  constructor.
+  constructor.
+  constructor.
+
+  econstructor.
+  constructor.
+  constructor.
+  assumption.
+  constructor.
+
+  econstructor.
+  constructor.
+  apply Step0IfFalse.
+  assumption.
+  constructor.
+
+  econstructor.
+  constructor.
+  constructor.
+  assumption.
+  constructor.
+
+  econstructor.
+  constructor.
+  apply Step0WhileFalse.
+  assumption.
+  constructor.
+Qed.
+
+Lemma step0_step : forall v c v' c',
+  step0 (v, c) (v', c')
+  -> step (v, c) (v', c').
+Proof.
+  induct 1; constructor; assumption.
+Qed.
+
+Lemma cstep_step' : forall C c0 c,
+  plug C c0 c
+  -> forall v' c'0 v c', step0 (v, c0) (v', c'0)
+  -> plug C c'0 c'
+  -> step (v, c) (v', c').
+Proof.
+  induct 1; simplify.
+
+  invert H0.
+  apply step0_step.
+  assumption.
+
+  invert H1.
+  econstructor.
+  eapply IHplug.
+  eassumption.
+  assumption.
+Qed.
+
+Theorem cstep_step : forall v c v' c',
+  cstep (v, c) (v', c')
+  -> step (v, c) (v', c').
+Proof.
+  induct 1.
+  eapply cstep_step'.
+  eassumption.
+  eassumption.
+  assumption.
+Qed.

@@ -448,3 +448,52 @@ Proof.
   eassumption.
   constructor.
 Qed.
+
+(* Bonus material: here's how to make these proofs much more automatic.  We
+ * won't explain the features being used here. *)
+
+Hint Constructors trc step eval.
+
+Lemma step_star_Seq_snazzy : forall v c1 c2 v' c1',
+  step^* (v, c1) (v', c1')
+  -> step^* (v, Sequence c1 c2) (v', Sequence c1' c2).
+Proof.
+  induct 1; eauto.
+  cases y; eauto.
+Qed.
+
+Hint Resolve step_star_Seq_snazzy.
+
+Theorem big_small_snazzy : forall v c v', eval v c v'
+  -> step^* (v, c) (v', Skip).
+Proof.
+  induct 1; eauto 6 using trc_trans.
+Qed.
+
+Lemma small_big''_snazzy : forall v c v' c', step (v, c) (v', c')
+                                             -> forall v'', eval v' c' v''
+                                                            -> eval v c v''.
+Proof.
+  induct 1; simplify;
+  repeat match goal with
+         | [ H : eval _ _ _ |- _ ] => invert1 H
+         end; eauto.
+Qed.
+
+Hint Resolve small_big''_snazzy.
+
+Lemma small_big'_snazzy : forall v c v' c', step^* (v, c) (v', c')
+                                            -> forall v'', eval v' c' v''
+                                                           -> eval v c v''.
+Proof.
+  induct 1; eauto.
+  cases y; eauto.
+Qed.
+
+Hint Resolve small_big'_snazzy.
+
+Theorem small_big_snazzy : forall v c v', step^* (v, c) (v', Skip)
+                                   -> eval v c v'.
+Proof.
+  eauto.
+Qed.

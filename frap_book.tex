@@ -1333,20 +1333,37 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
 
 \begin{description}
   \item[\texttt{apply} $H$] For $H$ a hypothesis or previously proved theorem, establishing some fact that matches the structure of the current conclusion, switch to proving $H$'s own hypotheses.  This is \emph{backwards reasoning} via a known fact.
+  \item[\texttt{apply} $H$ \texttt{with} \texttt{(}$x_1$\texttt{ := }$e_1$\texttt{) ... (}$x_n$\texttt{ := }$e_n$\texttt{)}] Like the last one, supplying values for quantified variables in $H$'s statement, especially for those variables whose values aren't immediately implied by the current goal.
+  \item[\texttt{apply} $H_1$ \texttt{in} $H_2$] Like \texttt{apply} $H_1$, but used in a \emph{forward} direction rather than \emph{backward}.  For instance, if $H_1$ proves $P \Rightarrow Q$ and $H_2$ proves $P$, then the effect is to change $H_2$ to $Q$.
+  \item[\texttt{assert} $P$] First prove proposition $P$, then continue with it as a new hypothesis.
+  \item[\texttt{assumption}] Prove a conclusion that matches a hypothesis exactly.
   \item[\texttt{cases} $e$] Break the proof into one case for each constructor that might have been used to build the value of expression $e$.  In the special case where $e$ essentially has a Boolean type, we consider whether $e$ is true or false.
+  \item[\texttt{constructor}] When proving an instance of an inductive predicate, \texttt{apply} the first matching rule of that predicate.
+  \item[\texttt{eapply} $H$] Like \texttt{apply} but will work even when some quantified variables from $H$ do not have their values determined immediately by the form of the goal.  Instead, \emph{existential variables} (with names starting with question marks) are introduced for those values.
+  \item[\texttt{eassumption}] Like \texttt{assumption} but will figure out values of existential variables.
+  \item[\texttt{econstructor}] When proving an instance of an inductive predicate, \texttt{eapply} the first matching rule of that predicate.
   \item[\texttt{equality}] A complete decision procedure for the theory of equality and uninterpreted functions.  That is, the goal must follow from only reflexivity, symmetry, transitivity, and congruence of equality, including that functions really do behave as functions.  See Section \ref{decidable}.
+  \item[\texttt{exfalso}] From any proof state, switch to proving \texttt{False}.  In other words, indicate a switch to a proof by contradiction.
+  \item[\texttt{exists} $e$] Prove $\exists x. \; P(x)$ by proving $P(e)$.
+  \item[\texttt{first\_order}] Simplify a goal into zero or more new goals, based on the rules of first-order logic alone.  \emph{Warning:} this tactic is especially likely to run forever, on complex enough goals!  (While entailment for propositional logic is decidable, entailment for first-order logic isn't.)
   \item[\texttt{f\_equal}] When the goal is an equality between two applications of the same function, switch to proving that the function arguments are pairwise equal.
   \item[\texttt{induct} $x$] Where $x$ is a variable in the theorem statement, structure the proof by induction on the structure of $x$.  You will get one generated subgoal per constructor in the inductive definition of $x$.  (Indeed, it is required that $x$'s type was introduced with \texttt{Inductive}.)
   \item[\texttt{invert} $H$] Replace hypothesis $H$ with other facts that can be deduced from the structure of $H$'s statement.  More detail to be added here soon!
   \item[\texttt{linear\_arithmetic}] A complete decision procedure for linear arithmetic.  Relevant formulas are essentially those built up from variables and constant natural numbers and integers using only addition and subtraction, with equality and inequality comparisons on top.  (Multiplication by constants is supported, as a shorthand for repeated addition.) See Section \ref{decidable}.
-    \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
-    \item[\texttt{maps\_equal}] Prove that two finite maps are equal by considering all the relevant cases for mappings of different keys.
+  \item[\texttt{left}] Prove a disjunction by proving its left side.
+  \item[\texttt{maps\_equal}] Prove that two finite maps are equal by considering all the relevant cases for mappings of different keys.
+  \item[\texttt{propositional}] Simplify a goal into zero or more new goals, based on the rules of propositional logic alone.
+  \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
+  \item[\texttt{rewrite} $H_1$ \texttt{in} $H_2$] Like \texttt{rewrite} $H_1$ but performs the rewrite in hypothesis $H_2$ instead of in the conclusion.
+  \item[\texttt{right}] Prove a disjunction by proving its right side.
   \item[\texttt{ring}] Prove goals that are equalities over some registered ring or semiring, in the sense of algebra, where the goal follows solely from the axioms of that algebraic structure.  See Section \ref{decidable}.
   \item[\texttt{simplify}] Simplify throughout the goal, applying the definitions of recursive functions directly.  That is, when a subterm matches one of the \texttt{match} cases in a defining \texttt{Fixpoint}, replace with the body of that case, then repeat.
+  \item[\texttt{subst}] Remove all hypotheses like $x = e$ for variables $x$, simply replacing all uses of $x$ by $e$.
   \item[\texttt{symmetry}] When proving $X = Y$, switch to proving $Y = X$.
   \item[\texttt{transitivity} $X$] When proving $Y = Z$, switch to proving $Y = X$ and $X = Z$.
   \item[\texttt{trivial}] Coq maintains a database of simple proof steps, such as proving a fact by direct appeal to a matching hypothesis.  \texttt{trivial} asks to try all such simple steps.
   \item[\texttt{unfold} $X$] Replace $X$ by its definition.
+  \item[\texttt{unfold} $X$ \texttt{in} \texttt{*}] Like the last one, but unfolds in hypotheses as well as conclusion.
 \end{description}
 
 \section{Proof-Automation Basics}

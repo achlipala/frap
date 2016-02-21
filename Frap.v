@@ -107,10 +107,10 @@ Ltac singletoner :=
 
 Ltac model_check_step :=
   eapply MscStep; [
-    repeat ((apply oneStepClosure_empty; simplify)
+    repeat (apply oneStepClosure_empty
             || (apply oneStepClosure_split; [ simplify;
                                               repeat match goal with
-                                                     | [ H : _ |- _ ] => invert H; try congruence
+                                                     | [ H : _ |- _ ] => invert H; simplify; try congruence
                                                      end; solve [ singletoner ] | ]))
   | simplify ].
 

@@ -36,15 +36,15 @@ Infix "-" := Minus : arith_scope.
 Infix "*" := Times : arith_scope.
 Delimit Scope arith_scope with arith.
 Notation "x <- e" := (Assign x e%arith) (at level 75).
-Infix ";" := Sequence (at level 76).
+Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
 Notation "'when' e 'do' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
 Notation "'while' e 'do' body 'done'" := (While e%arith body) (at level 75).
 
 (* Here's an adaptation of our factorial example from Chapter 3. *)
 Example factorial :=
-  "output" <- 1;
+  "output" <- 1;;
   while "input" do
-    "output" <- "output" * "input";
+    "output" <- "output" * "input";;
     "input" <- "input" - 1
   done.
 
@@ -160,7 +160,7 @@ Fixpoint fact (n : nat) : nat :=
 
 Example factorial_loop :=
   while "input" do
-    "output" <- "output" * "input";
+    "output" <- "output" * "input";;
     "input" <- "input" - 1
   done.
 
@@ -497,3 +497,22 @@ Theorem small_big_snazzy : forall v c v', step^* (v, c) (v', Skip)
 Proof.
   eauto.
 Qed.
+
+
+(** * Small-step semantics gives rise to transition systems. *)
+
+Definition trsys_of (v : valuation) (c : cmd) : trsys (valuation * cmd) := {|
+  Initial := {(v, c)};
+  Step := step
+|}.
+
+Theorem simple_invariant :
+  invariantFor (trsys_of ($0 $+ ("a", 1)) ("b" <- "a" + 1;; "c" <- "b" + "b"))
+               (fun s => snd s = Skip -> fst s $? "c" = Some 4).
+Proof.
+  model_check.
+Qed.
+
+(* We'll return to these systems and their abstractions in the next few
+ * chapters. *)
+

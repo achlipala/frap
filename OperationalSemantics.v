@@ -639,3 +639,48 @@ Proof.
   eassumption.
   assumption.
 Qed.
+
+(* Bonus material: here's how to make these proofs much more automatic.  We
+ * won't explain the features being used here. *)
+
+Hint Constructors plug step0 cstep.
+
+Theorem step_cstep_snazzy : forall v c v' c',
+  step (v, c) (v', c')
+  -> cstep (v, c) (v', c').
+Proof.
+  induct 1; repeat match goal with
+                   | [ H : cstep _ _ |- _ ] => invert H
+                   end; eauto.
+Qed.
+
+Hint Resolve step_cstep_snazzy.
+
+Lemma step0_step_snazzy : forall v c v' c',
+  step0 (v, c) (v', c')
+  -> step (v, c) (v', c').
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Resolve step0_step_snazzy.
+
+Lemma cstep_step'_snazzy : forall C c0 c,
+  plug C c0 c
+  -> forall v' c'0 v c', step0 (v, c0) (v', c'0)
+  -> plug C c'0 c'
+  -> step (v, c) (v', c').
+Proof.
+  induct 1; simplify; repeat match goal with
+                             | [ H : plug _ _ _ |- _ ] => invert1 H
+                             end; eauto.
+Qed.
+
+Hint Resolve cstep_step'_snazzy.
+
+Theorem cstep_step_snazzy : forall v c v' c',
+  cstep (v, c) (v', c')
+  -> step (v, c) (v', c').
+Proof.
+  induct 1; eauto.
+Qed.

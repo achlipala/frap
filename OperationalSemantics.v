@@ -513,6 +513,201 @@ Proof.
   model_check.
 Qed.
 
+Inductive isEven : nat -> Prop :=
+| EvenO : isEven 0
+| EvenSS : forall n, isEven n -> isEven (S (S n)).
+
+Definition my_loop :=
+  while "n" do
+    "a" <- "a" + "n";;
+    "n" <- "n" - 2
+  done.
+
+Definition all_programs := {
+  (while "n" do
+     "a" <- "a" + "n";;
+     "n" <- "n" - 2
+   done),
+  ("a" <- "a" + "n";;
+   "n" <- "n" - 2),
+  (Skip;;
+   "n" <- "n" - 2),
+  ("n" <- "n" - 2),
+  (("a" <- "a" + "n";;
+    "n" <- "n" - 2);;
+   while "n" do
+     "a" <- "a" + "n";;
+     "n" <- "n" - 2
+   done),
+  ((Skip;;
+    "n" <- "n" - 2);;
+   while "n" do
+     "a" <- "a" + "n";;
+     "n" <- "n" - 2
+   done),
+  ("n" <- "n" - 2;;
+   while "n" do
+     "a" <- "a" + "n";;
+     "n" <- "n" - 2
+   done),
+  (Skip;;
+   while "n" do
+     "a" <- "a" + "n";;
+     "n" <- "n" - 2
+   done),
+  Skip
+}.
+
+Lemma isEven_minus2 : forall n, isEven n -> isEven (n - 2).
+Proof.
+  induct 1; simplify.
+
+  constructor.
+
+  replace (n - 0) with n by linear_arithmetic.
+  assumption.
+Qed.
+
+Lemma isEven_plus : forall n m,
+  isEven n
+  -> isEven m
+  -> isEven (n + m).
+Proof.
+  induct 1; simplify.
+
+  assumption.
+
+  constructor.
+  apply IHisEven.
+  assumption.
+Qed.
+
+Lemma manually_proved_invariant' :
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+               (fun s => all_programs (snd s)
+                         /\ exists n a, fst s $? "n" = Some n
+                                        /\ fst s $? "a" = Some a
+                                        /\ isEven n
+                                        /\ isEven a).
+Proof.
+  apply invariant_induction; simplify.
+
+  first_order.
+  unfold all_programs.
+  subst; simplify; equality.
+  subst; simplify.
+  exists 0, 0.
+  propositional.
+  constructor.
+  constructor.
+
+  invert H.
+  invert H2.
+  invert H.
+  invert H2.
+  invert H3.
+  invert H4.
+  (* Note our use here of [invert] to break down hypotheses with [exists] and
+   * [/\]. *)
+  invert H0; simplify.
+
+  unfold all_programs in *; simplify; propositional; try equality.
+  invert H1; simplify.
+  rewrite H.
+  exists (x - 2), x0; propositional.
+  apply isEven_minus2; assumption.
+
+  unfold all_programs in *; simplify; propositional; try equality.
+  invert H1.
+  invert H4; equality.
+  invert H1.
+  invert H4.
+  rewrite H, H2; simplify.
+  eexists; eexists.
+  propositional; try eassumption.
+  apply isEven_plus; assumption.
+  invert H0.
+  invert H4.
+  invert H0.
+  invert H4.
+  invert H0.
+  invert H4.
+  invert H1.
+  equality.
+  invert H0.
+  invert H4.
+  invert H1.
+  rewrite H, H2; simplify.
+  eexists; eexists; propositional; try eassumption.
+  apply isEven_plus; assumption.
+  invert H1.
+  invert H4.
+  invert H1.
+  equality.
+  invert H1.
+  invert H4.
+  invert H1.
+  eexists; eexists; propositional; eassumption.
+  invert H0.
+  invert H4.
+  equality.
+  invert H0.
+  invert H4.
+  rewrite H; simplify.
+  do 2 eexists; propositional; try eassumption.
+  apply isEven_minus2; assumption.
+  invert H1.
+  invert H4.
+  invert H1.
+  invert H4.
+  unfold all_programs in *; simplify; propositional; try equality.
+  invert H0.
+  do 2 eexists; propositional; try eassumption.
+  invert H1.
+  do 2 eexists; propositional; try eassumption.
+  unfold all_programs in *; simplify; propositional; equality.
+  unfold all_programs in *; simplify; propositional; equality.
+  unfold all_programs in *; simplify; propositional; try equality.
+  invert H0.
+  do 2 eexists; propositional; try eassumption.
+  unfold all_programs in *; simplify; propositional; try equality.
+  invert H0.
+  do 2 eexists; propositional; try eassumption.
+Qed.
+
+(* That manual proof was quite a pain.  Here's a bonus automated proof. *)
+Hint Constructors isEven.
+Hint Resolve isEven_minus2 isEven_plus.
+
+Lemma manually_proved_invariant'_snazzy :
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+               (fun s => all_programs (snd s)
+                         /\ exists n a, fst s $? "n" = Some n
+                                        /\ fst s $? "a" = Some a
+                                        /\ isEven n
+                                        /\ isEven a).
+Proof.
+  apply invariant_induction; simplify; unfold all_programs in *; first_order; subst; simplify;
+  try match goal with
+      | [ H : step _ _ |- _ ] => invert H; simplify
+      end;
+  repeat (match goal with
+          | [ H : _ = Some _ |- _ ] => rewrite H
+          | [ H : @eq cmd (_ _ _) _ |- _ ] => invert H
+          | [ H : @eq cmd (_ _ _ _) _ |- _ ] => invert H
+          | [ H : step _ _ |- _ ] => invert2 H
+          end; simplify); equality || eauto 7.
+Qed.
+
+Theorem manually_proved_invariant :
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+               (fun s => exists a, fst s $? "a" = Some a /\ isEven a).
+Proof.
+  eapply invariant_weaken.
+  apply manually_proved_invariant'.
+  first_order.
+Qed.
+
 (* We'll return to these systems and their abstractions in the next few
  * chapters. *)
 
@@ -683,4 +878,57 @@ Theorem cstep_step_snazzy : forall v c v' c',
   -> step (v, c) (v', c').
 Proof.
   induct 1; eauto.
+Qed.
+
+
+(** * Determinism *)
+
+(* Each of the relations we have defined turns out to be deterministic.  Let's
+ * prove it. *)
+
+Theorem eval_det : forall v c v1,
+  eval v c v1
+  -> forall v2, eval v c v2
+  -> v1 = v2.
+Proof.
+  induct 1; invert 1; try first_order.
+
+  apply IHeval2.
+  apply IHeval1 in H5.
+  subst.
+  assumption.
+
+  apply IHeval2.
+  apply IHeval1 in H7.
+  subst.
+  assumption.
+Qed.
+
+Theorem step_det : forall s out1,
+  step s out1
+  -> forall out2, step s out2
+  -> out1 = out2.
+Proof.
+  induct 1; invert 1; try first_order.
+
+  apply IHstep in H5.
+  equality.
+
+  invert H.
+
+  invert H4.
+Qed.
+
+Theorem cstep_det : forall s out1,
+  cstep s out1
+  -> forall out2, cstep s out2
+  -> out1 = out2.
+Proof.
+  simplify.
+  cases s; cases out1; cases out2.
+  eapply step_det.
+  apply cstep_step.
+  eassumption.
+  apply cstep_step.
+  eassumption.
 Qed.

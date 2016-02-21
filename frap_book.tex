@@ -1108,6 +1108,101 @@ At each step, we check whether the expanded set is actually equal to the previou
 If so, our process of \emph{multi-step closure}\index{multi-step closure} has terminated, and we have an invariant, by construction.
 Again, keep in mind that multi-step closure will not terminate for most transition systems, and there is an art to phrasing a problem in terms of systems where it \emph{will} terminate.
 
+\section{Abstracting a Transition System}
+
+When analyzing an infinite-state system, it is not necessary to give up hope for model checking.
+For instance, consider this program.
+\begin{verbatim}
+int global = 0;
+
+thread() {
+ int local;
+
+ while (true) {
+   local = global;
+   global = local + 2;
+ }
+}
+\end{verbatim}
+
+If we assume infinite-precision integers, then the state space is infinite.
+Considering just the global variable, every even number is reachable, even if we only run a single thread.
+However, there is a high degree of regularity across this state space.
+In particular, those values really are all even.
+Consider this other program, which is hauntingly similar to the last one, in a way that we will make precise shortly.
+\begin{verbatim}
+bool global = true;
+
+thread() {
+  bool local;
+
+  while (true) {
+    local = global;
+    global = local;
+  }
+}
+\end{verbatim}
+
+We replaced every use of an integer with \emph{a Boolean that is true iff the integer is even}.
+Notice that now the program has a finite state space, and model checking applies easily!
+We can formalize such a transformation via the general principle of \emph{abstraction of a transition system}\index{abstraction}.
+
+\newcommand{\simulate}[0]{\prec}
+
+The key idea is that every state of the concrete system (with relatively many states) can be associated to one or more states of the abstract system (with relatively few states).
+We formalize this association via a \emph{simulation relation}\index{simulation relation} $R$, and we define what makes a choice of $R$ sound, via a notion of \emph{simulation}\index{simulation} via a binary operator $\simulate$, subscripted by $R$.
+
+$$\infer{\angled{S, S_0, \to} \simulate_R \angled{S', S'_0, \to'}}{
+  (\forall s \in S_0. \; \exists s' \in S'_0. \; s \; R \; s')
+  & (\forall s, s', s_1. \; s \; R \; s' \land s \to s_1 \Rightarrow \exists s'_1. \; s' \to' s'_1 \land s_1 \; R \; s'_1)
+}$$
+
+The simpler condition is that every concrete initial state must be related to at least one abstract initial state.
+The second, more complex condition essentially says that every step in the concrete world must be matchable by some related step in the abstract world.
+A commuting diagram may express the second condition more clearly.
+\[
+\begin{tikzcd}
+s \arrow{r}{\to} \arrow{d}{R} & s_1 \arrow{d}{R} \\
+s' \arrow{r}{\exists \to'} & s'_1
+\end{tikzcd}
+\]
+
+At an even higher intuitive level, what simulation says is that every execution of the concrete system may be matched, step for step, by an execution of the abstract system.
+The relation $R$ explains the rules for which states match across systems.
+For our purposes, the key pay-off from this connection is that we may translate any invariant of the abstract system into an invariant of the concrete system.
+
+\newcommand{\abstraction}[0]{\marginpar{\fbox{\textbf{Abstraction}}}}
+
+\begin{theorem}\label{abstract_simulation}
+  \abstraction
+  If $\angled{S, S_0, \to} \simulate_R \angled{S', S'_0, \to'}$, and if $I$ is an invariant of $\angled{S', S'_0, \to'}$, then $R^{-1}(I)$ is an invariant of $\angled{S, S_0, \to}$.
+\end{theorem}
+
+We can apply this theorem to the two example programs from earlier in the section.
+The concrete system can be represented with thread-local states $\{\mathsf{Read}\} \cup \{\mathsf{Write}(n) \mid n \in \mathbb N\}$ and the abstract system with $\{\mathsf{BRead}\} \cup \{\mathsf{BWrite}(b) \mid b \in \mathbb B\}$, for the Booleans $\mathbb B$.
+We define compatibility between local states.
+
+$$\infer{\mathsf{Read} \sim \mathsf{BRead}}{}
+\quad \infer{\mathsf{Write}(n) \sim \mathsf{BWrite}(b)}{
+  n \; \textrm{even} \Leftrightarrow b = \mathsf{true}
+}$$
+
+We also define the overall state simulation relation $R$, which also covers state shared by threads.
+
+$$\infer{(n, (\ell_1, \ell_2)) \; R \; (b, (\ell'_1, \ell'_2))}{
+  (n \; \textrm{even} \Leftrightarrow b = \mathsf{true})
+  & \ell_1 \sim \ell'_1
+  & \ell_2 \sim \ell'_2
+}$$
+
+By proving that $R$ is truly a simulation relation, we reduce the problem to finding an invariant for the abstract system, which is easy to do with model checking.
+
+One crucial consequence of abstraction-by-simulation deserves mentioning:
+We show that every concrete execution is matched abstractly, but there may also be additional abstract executions that don't match any concrete ones.
+In model checking the abstract system, we may do extra work to handle these ``useless'' paths!
+If we do manage to handle them all, then Theorem \ref{abstract_simulation} applies perfectly well.
+However, we should be careful, in our choices of abstractions, to bias our designs toward those that don't introduce extra complexities.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

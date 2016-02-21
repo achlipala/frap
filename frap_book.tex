@@ -1055,6 +1055,62 @@ In the next chapter, we meet a technique for finding invariants automatically, i
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Model Checking}
+
+Our analyses so far have been tedious for at least two different reasons.
+First, we've hand-crafted definitions of transition systems, rather than just writing programs in conventional programming languages.
+The next chapter will clear that obstacle, by introducing operational semantics, for building transition systems automatically from programs.
+The other inconvenience we've faced is defining invariants manually.
+There isn't a silver bullet to get us out of this duty, when working with Turing-complete languages\index{Turing-completeness}, where almost all interesting questions, this one included, are undecidable.
+However, when we can phrase problems in terms of transition systems with \emph{finitely many reachable states}, we can construct invariants automatically by \emph{exhaustive exploration of the state space}, an approach otherwise known as \emph{model checking}\index{model checking}.
+Surprisingly many real programs can be reduced to finite state spaces, using the techniques introduced in this chapter.
+First, though, let's formalize our intuitions about exhaustive state-space exploration as a sound way to find invariants.
+
+\section{Exhaustive Exploration}
+
+For an arbitrary binary relation $R$, we write $R^n$ for the $n$-times self-composition of $R$\index{self-composition of relations}.
+Formally, where $\mathsf{id}$ is the identity relation\index{identity relation} that only relates values to themselves, we have:
+\begin{eqnarray*}
+  R^0 &=& \mathsf{id} \\
+  R^{n+1} &=& R \circ R^n
+\end{eqnarray*}
+
+For some set $S$ and binary relation $R$, we also write $R(S)$ for the composition of $R$ and $S$\index{composition of a relation and a set}, namely $\{x \mid \exists y \in S. \; y \; R \; x\}$.
+
+\newcommand{\ns}[0]{\hspace{-.05in}}
+
+Which states of transition system $\angled{S, S_0, \to}$ are reachable after 0 steps?
+That would be precisely the initial states $S_0$, which we can also write as $\to^0\ns(S_0)$.
+
+Which states are reachable after exactly 1 step?
+That is $\to\ns(S_0)$, or $\to^1\ns(S_0)$.
+
+How about 2, 3, and 4 steps?
+There we have $\to^2\ns(S_0)$, $\to^3\ns(S_0)$, and $\to^4\ns(S_0$).
+
+It follows that the set of states reachable after $n$ steps is:
+\begin{eqnarray*}
+  \mathsf{reach}(n) &=& \bigcup_{i < n} \to^i\ns(S_0)
+\end{eqnarray*}
+
+This iteration process is not obviously executable yet, because, a priori, we seem to need to consider all possible $n$ values, to characterize the state space fully.
+However, a crucial property allows us to terminate our search soundly under some conditions.
+
+\begin{theorem}
+  \invariants
+  If $\mathsf{reach}(n+1) = \mathsf{reach}(n)$ for some $n$, then $\mathsf{reach}(n)$ is an invariant of the system.
+\end{theorem}
+
+Here we call $\mathsf{reach}(n)$ a \emph{fixed point}\index{fixed point} of the transition system, because it is closed under further exploration.
+To find a fixed point with a concrete system, we start with $S_0$.
+We repeatedly take the \emph{single-step closure}\index{single-step closure} corresponding to composition with $\to$.
+At each step, we check whether the expanded set is actually equal to the previous set.
+If so, our process of \emph{multi-step closure}\index{multi-step closure} has terminated, and we have an invariant, by construction.
+Again, keep in mind that multi-step closure will not terminate for most transition systems, and there is an art to phrasing a problem in terms of systems where it \emph{will} terminate.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

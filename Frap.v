@@ -124,7 +124,7 @@ Ltac model_check_step :=
 Ltac model_check_steps1 := model_check_done || model_check_step.
 Ltac model_check_steps := repeat model_check_steps1.
 
-Ltac model_check_finish := simplify; propositional; subst; simplify; equality.
+Ltac model_check_finish := simplify; propositional; subst; simplify; try equality; try linear_arithmetic.
 
 Ltac model_check_infer :=
   apply multiStepClosure_ok; simplify; model_check_steps.
@@ -133,3 +133,20 @@ Ltac model_check_find_invariant :=
   simplify; eapply invariant_weaken; [ model_check_infer | ]; cbv beta in *.
 
 Ltac model_check := model_check_find_invariant; model_check_finish.
+
+Inductive ordering (n m : nat) :=
+| Lt (_ : n < m)
+| Eq (_ : n = m)
+| Gt (_ : n > m).
+
+Local Hint Constructors ordering.
+Local Hint Extern 1 (_ < _) => omega.
+Local Hint Extern 1 (_ > _) => omega.
+
+Theorem totally_ordered : forall n m, ordering n m.
+Proof.
+  induction n; destruct m; simpl; eauto.
+  destruct (IHn m); eauto.
+Qed.
+
+Ltac total_ordering N M := destruct (totally_ordered N M).

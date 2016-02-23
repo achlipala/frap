@@ -43,6 +43,34 @@ Ltac invert0 e := invert e; fail.
 Ltac invert1 e := invert0 e || (invert e; []).
 Ltac invert2 e := invert1 e || (invert e; [|]).
 
+Ltac maps_neq :=
+  match goal with
+  | [ H : ?m1 = ?m2 |- _ ] =>
+    let rec recur E :=
+        match E with
+        | ?E' $+ (?k, _) => 
+          (apply (f_equal (fun m => m $? k)) in H; simpl in *; autorewrite with core in *; simpl in *; congruence)
+          || recur E'
+        end in
+    recur m1 || recur m2
+end.
+
+Ltac fancy_neq :=
+  repeat match goal with
+         | _ => maps_neq
+         | [ H : _ = _ |- _ ] => invert H
+         end.
+
+Ltac removeDups :=
+  match goal with
+  | [ |- context[constant ?ls] ] =>
+    someMatch ls;
+    erewrite (@removeDups_ok _ ls)
+      by repeat (apply RdNil
+                 || (apply RdNew; [ simpl; intuition (congruence || solve [ fancy_neq ]) | ])
+                 || (apply RdDup; [ simpl; intuition congruence | ]))
+  end.
+
 Ltac simplify := repeat (unifyTails; pose proof I);
                 repeat match goal with
                        | [ H : True |- _ ] => clear H

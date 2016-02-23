@@ -104,7 +104,8 @@ Ltac model_check_done :=
 
 Ltac singletoner :=
   repeat match goal with
-         | _ => apply singleton_in
+         (* | _ => apply singleton_in *)
+         | [ |- _ ?S ] => idtac S; apply singleton_in
          | [ |- (_ \cup _) _ ] => apply singleton_in_other
          end.
 

@@ -37,13 +37,13 @@ Infix "*" := Times : arith_scope.
 Delimit Scope arith_scope with arith.
 Notation "x <- e" := (Assign x e%arith) (at level 75).
 Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
-Notation "'when' e 'do' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
-Notation "'while' e 'do' body 'done'" := (While e%arith body) (at level 75).
+Notation "'when' e 'loop' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
+Notation "'while' e 'loop' body 'done'" := (While e%arith body) (at level 75).
 
 (* Here's an adaptation of our factorial example from Chapter 3. *)
 Example factorial :=
   "output" <- 1;;
-  while "input" do
+  while "input" loop
     "output" <- "output" * "input";;
     "input" <- "input" - 1
   done.
@@ -159,7 +159,7 @@ Fixpoint fact (n : nat) : nat :=
   end.
 
 Example factorial_loop :=
-  while "input" do
+  while "input" loop
     "output" <- "output" * "input";;
     "input" <- "input" - 1
   done.
@@ -518,13 +518,13 @@ Inductive isEven : nat -> Prop :=
 | EvenSS : forall n, isEven n -> isEven (S (S n)).
 
 Definition my_loop :=
-  while "n" do
+  while "n" loop
     "a" <- "a" + "n";;
     "n" <- "n" - 2
   done.
 
 Definition all_programs := {
-  (while "n" do
+  (while "n" loop
      "a" <- "a" + "n";;
      "n" <- "n" - 2
    done),
@@ -535,23 +535,23 @@ Definition all_programs := {
   ("n" <- "n" - 2),
   (("a" <- "a" + "n";;
     "n" <- "n" - 2);;
-   while "n" do
+   while "n" loop
      "a" <- "a" + "n";;
      "n" <- "n" - 2
    done),
   ((Skip;;
     "n" <- "n" - 2);;
-   while "n" do
+   while "n" loop
      "a" <- "a" + "n";;
      "n" <- "n" - 2
    done),
   ("n" <- "n" - 2;;
-   while "n" do
+   while "n" loop
      "a" <- "a" + "n";;
      "n" <- "n" - 2
    done),
   (Skip;;
-   while "n" do
+   while "n" loop
      "a" <- "a" + "n";;
      "n" <- "n" - 2
    done),
@@ -583,7 +583,7 @@ Proof.
 Qed.
 
 Lemma manually_proved_invariant' :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => all_programs (snd s)
                          /\ exists n a, fst s $? "n" = Some n
                                         /\ fst s $? "a" = Some a
@@ -680,7 +680,7 @@ Hint Constructors isEven.
 Hint Resolve isEven_minus2 isEven_plus.
 
 Lemma manually_proved_invariant'_snazzy :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => all_programs (snd s)
                          /\ exists n a, fst s $? "n" = Some n
                                         /\ fst s $? "a" = Some a
@@ -700,7 +700,7 @@ Proof.
 Qed.
 
 Theorem manually_proved_invariant :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" do "a" <- "a" + "n";; "n" <- "n" - 2 done))
+  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => exists a, fst s $? "a" = Some a /\ isEven a).
 Proof.
   eapply invariant_weaken.

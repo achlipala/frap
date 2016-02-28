@@ -1292,6 +1292,105 @@ Define an exponentially growing system of threads ${\mathbb S}^n$ by:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Operational Semantics}
+
+It gets tedious to define a relation from first principles, to explain the behaviors of any concrete program.
+We do more things with programs than just reason about them.
+For instance, we compile them into other languages.
+To get the most mileage out of our correctness proofs, we should connect them to the same program syntax that we pass to compilers.
+\emph{Operational semantics}\index{operational semantics} is a family of techniques for automatically defining a transition system, or other relational characterization, from program syntax.
+
+\newcommand{\assign}[2]{#1 \leftarrow #2}
+\newcommand{\skipe}[0]{\mathsf{skip}}
+\newcommand{\ifte}[3]{\mathsf{if} \; #1 \; \mathsf{then} \; #2 \; \mathsf{else} \; #3}
+\newcommand{\while}[2]{\mathsf{while} \; #1 \; \mathsf{do} \; #2}
+
+Throughout this chapter, we will demonstrate the different operational-semantics techniques on a single source language, defined like so.
+$$\begin{array}{rrcl}
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e &::=& n \mid x \mid e + e \mid e - e \mid e \times e \\
+  \textrm{Commands} & c &::=& \skipe \mid \assign{x}{e} \mid c; c \mid \ifte{e}{c}{c} \mid \while{e}{c}
+\end{array}$$
+
+
+\section{Big-Step Semantics}
+
+\newcommand{\bigstep}[2]{#1 \Downarrow #2}
+
+\emph{Big-step operational semantics}\index{big-step operational semantics} explains what it means to run a program to completion.
+For our example relation, we will define a relation written $\bigstep{(v, c)}{v'}$, for ``command $c$, run with variable valuation $v$, terminates, modifying the valuation to $v'$.''
+
+This relation is fairly straightforward to define with inference rules.
+$$\infer{\bigstep{(v, \skipe)}{v}}{}
+\quad \infer{\bigstep{(v, \assign{x}{e})}{\mupd{v}{x}{\denote{e}v}}}{}
+\quad \infer{\bigstep{(v, c_1; c_2)}{v_2}}{
+  \bigstep{(v, c_1)}{v_1}
+  & \bigstep{(v_1, c_2)}{v_2}
+}$$
+$$\infer{\bigstep{(v, \ifte{e}{c_1}{c_2})}{v'}}{
+  \denote{e}{v} \neq 0
+  & \bigstep{(v, c_1)}{v'}
+}
+\quad \infer{\bigstep{(v, \ifte{e}{c_1}{c_2})}{v'}}{
+  \denote{e}{v} = 0
+  & \bigstep{(v, c_2)}{v'}
+}$$
+$$\infer{\bigstep{(v, \while{e}{c_1})}{v_2}}{
+  \denote{e}{v} \neq 0
+  & \bigstep{(v, c_1)}{v_1}
+  & \bigstep{(v_1, \while{e}{c_1})}{v_2}
+}
+\quad \infer{\bigstep{(v, \while{e}{c_1})}{v}}{
+  \denote{e}{v} = 0
+}$$
+
+Notice how the definition is quite similar to a recursive interpreter\index{interpreters} written in a high-level programming language, though we write with the language of relations instead of functional programming.
+For instance, consider the simple case of the rule for sequencing, ``;''.
+We first ``call the interpreter'' on the first subcommand $c_1$ with the original valuation $v$.
+The result of the ``recursive call'' is a new valuation $v_1$, which we then feed into another ``recursive call'' on $c_2$, whose result becomes the overall result.
+
+Why write this interpreter relationally instead of as a functional program?
+The most relevant answer applies to situations like ours as users of Coq or even of informal mathematics, where we must be very careful that all of our recursive definitions are well-founded.
+The recursive version of this relation is clearly not well-founded, as it would run forever on a nonterminating $\mathsf{while}$ loop.
+It is also easier to incorporate \emph{nondeterminism}\index{nondeterminism} in the relational style, a possibility that we will return to at the end of the chapter.
+
+The big-step semantics is easy to apply to concrete programs.
+For instance, define $\mathtt{factorial}$ as the program $\assign{\mathtt{output}}{1}; \while{\mathtt{input}}{(\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1})}$.
+
+\begin{theorem}
+  There exists $v$ such that $\bigstep{(\mupd{\mempty}{\mathtt{input}}{2}, \mathtt{factorial})}{v}$ and $\msel{v}{\mathtt{output}} = 2$.
+\end{theorem}
+
+\begin{proof}
+  By repeated application of the big-step inference rules.
+\end{proof}
+
+We can even prove that $\mathtt{factorial}$ behaves correctly on all inputs, by way of a lemma about $\mathtt{factorial\_loop}$ defined as $\while{\mathtt{input}}{(\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1})}$.
+
+\begin{lemma}\label{factorial_loop}
+  If $\msel{v}{\mathtt{input}} = n$ and $\msel{v}{\mathtt{output}} = o$, then there exists $v'$ such that $\bigstep{(v, \mathtt{factorial\_loop})}{v'}$ and $\msel{v'}{\mathtt{output}} = n! \times o$.
+\end{lemma}
+
+\begin{proof}
+  By induction on $n$.
+\end{proof}
+
+\begin{lemma}
+  If $\msel{v}{\mathtt{input}} = n$, then there exists $v'$ such that $\bigstep{(v, \mathtt{factorial})}{v'}$ and $\msel{v'}{\mathtt{output}} = n!$.
+\end{lemma}
+
+\begin{proof}
+  Largely by direct appeal to Lemma \ref{factorial_loop}.
+\end{proof}
+
+Most of our program proofs in this book establish \emph{safety properties}\index{safety properties}, or invariants of transition systems.
+However, these last two examples with big-step semantics also establish program termination, taking us a few steps into the world of \emph{liveness properties}\index{liveness properties}.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

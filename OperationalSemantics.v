@@ -590,96 +590,97 @@ Proof.
   assumption.
 Qed.
 
-Lemma manually_proved_invariant' :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
+Lemma manually_proved_invariant' : forall n,
+  isEven n
+  -> invariantFor (trsys_of ($0 $+ ("n", n) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => all_programs (snd s)
                          /\ exists n a, fst s $? "n" = Some n
                                         /\ fst s $? "a" = Some a
                                         /\ isEven n
                                         /\ isEven a).
 Proof.
+  simplify.
   apply invariant_induction; simplify.
 
   first_order.
   unfold all_programs.
   subst; simplify; equality.
   subst; simplify.
-  exists 0, 0.
+  exists n, 0.
   propositional.
   constructor.
-  constructor.
 
-  invert H.
-  invert H2.
-  invert H.
-  invert H2.
+  invert H0.
+  invert H3.
+  invert H0.
   invert H3.
   invert H4.
+  invert H5.
   (* Note our use here of [invert] to break down hypotheses with [exists] and
    * [/\]. *)
-  invert H0; simplify.
+  invert H1; simplify.
 
   unfold all_programs in *; simplify; propositional; try equality.
-  invert H1; simplify.
-  rewrite H.
+  invert H2; simplify.
+  rewrite H0.
   exists (x - 2), x0; propositional.
   apply isEven_minus2; assumption.
 
   unfold all_programs in *; simplify; propositional; try equality.
-  invert H1.
-  invert H4; equality.
-  invert H1.
-  invert H4.
-  rewrite H, H2; simplify.
+  invert H2.
+  invert H5; equality.
+  invert H2.
+  invert H5.
+  rewrite H0, H3; simplify.
   eexists; eexists.
   propositional; try eassumption.
   apply isEven_plus; assumption.
-  invert H0.
-  invert H4.
-  invert H0.
-  invert H4.
-  invert H0.
-  invert H4.
   invert H1.
+  invert H5.
+  invert H1.
+  invert H5.
+  invert H1.
+  invert H5.
+  invert H2.
   equality.
-  invert H0.
-  invert H4.
   invert H1.
-  rewrite H, H2; simplify.
+  invert H5.
+  invert H2.
+  rewrite H0, H3; simplify.
   eexists; eexists; propositional; try eassumption.
   apply isEven_plus; assumption.
-  invert H1.
-  invert H4.
-  invert H1.
+  invert H2.
+  invert H5.
+  invert H2.
   equality.
-  invert H1.
-  invert H4.
-  invert H1.
+  invert H2.
+  invert H5.
+  invert H2.
   eexists; eexists; propositional; eassumption.
-  invert H0.
-  invert H4.
+  invert H1.
+  invert H5.
   equality.
-  invert H0.
-  invert H4.
-  rewrite H; simplify.
+  invert H1.
+  invert H5.
+  rewrite H0; simplify.
   do 2 eexists; propositional; try eassumption.
   apply isEven_minus2; assumption.
-  invert H1.
-  invert H4.
-  invert H1.
-  invert H4.
+  invert H2.
+  invert H5.
+  invert H2.
+  invert H5.
   unfold all_programs in *; simplify; propositional; try equality.
-  invert H0.
-  do 2 eexists; propositional; try eassumption.
   invert H1.
+  do 2 eexists; propositional; try eassumption.
+  invert H2.
   do 2 eexists; propositional; try eassumption.
   unfold all_programs in *; simplify; propositional; equality.
   unfold all_programs in *; simplify; propositional; equality.
   unfold all_programs in *; simplify; propositional; try equality.
-  invert H0.
+  invert H1.
   do 2 eexists; propositional; try eassumption.
   unfold all_programs in *; simplify; propositional; try equality.
-  invert H0.
+  invert H1.
   do 2 eexists; propositional; try eassumption.
 Qed.
 
@@ -687,15 +688,16 @@ Qed.
 Hint Constructors isEven.
 Hint Resolve isEven_minus2 isEven_plus.
 
-Lemma manually_proved_invariant'_snazzy :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
+Lemma manually_proved_invariant'_snazzy : forall n,
+  isEven n
+  -> invariantFor (trsys_of ($0 $+ ("n", n) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => all_programs (snd s)
                          /\ exists n a, fst s $? "n" = Some n
                                         /\ fst s $? "a" = Some a
                                         /\ isEven n
                                         /\ isEven a).
 Proof.
-  apply invariant_induction; simplify; unfold all_programs in *; first_order; subst; simplify;
+  simplify; apply invariant_induction; simplify; unfold all_programs in *; first_order; subst; simplify;
   try match goal with
       | [ H : step _ _ |- _ ] => invert H; simplify
       end;
@@ -707,12 +709,14 @@ Proof.
           end; simplify); equality || eauto 7.
 Qed.
 
-Theorem manually_proved_invariant :
-  invariantFor (trsys_of ($0 $+ ("n", 0) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
+Theorem manually_proved_invariant : forall n,
+  isEven n
+  -> invariantFor (trsys_of ($0 $+ ("n", n) $+ ("a", 0)) (while "n" loop "a" <- "a" + "n";; "n" <- "n" - 2 done))
                (fun s => exists a, fst s $? "a" = Some a /\ isEven a).
 Proof.
+  simplify.
   eapply invariant_weaken.
-  apply manually_proved_invariant'.
+  apply manually_proved_invariant'; assumption.
   first_order.
 Qed.
 

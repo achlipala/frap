@@ -1319,7 +1319,7 @@ $$\begin{array}{rrcl}
 \newcommand{\bigstep}[2]{#1 \Downarrow #2}
 
 \emph{Big-step operational semantics}\index{big-step operational semantics} explains what it means to run a program to completion.
-For our example relation, we will define a relation written $\bigstep{(v, c)}{v'}$, for ``command $c$, run with variable valuation $v$, terminates, modifying the valuation to $v'$.''
+For our example language, we define a relation written $\bigstep{(v, c)}{v'}$, for ``command $c$, run with variable valuation $v$, terminates, modifying the valuation to $v'$.''
 
 This relation is fairly straightforward to define with inference rules.
 \encoding
@@ -1499,20 +1499,20 @@ Different theorems are easier to prove with different semantics, so it is helpfu
 \subsection{Transition Systems from Small-Step Semantics}
 
 The small-step semantics is a natural fit with our working definition of transition systems.
-We can define a transition system from any valuation and command, where $\mathbb V$ is the set of valuations and $\mathbb C$ the set of commands, by $\mathbb T(v, c) = \angled{\mathbb V \times \mathbb C, {(v, c)}, \to}$.
+We can define a transition system from any valuation and command, where $\mathbb V$ is the set of valuations and $\mathbb C$ the set of commands, by $\mathbb T(v, c) = \angled{\mathbb V \times \mathbb C, \{(v, c)\}, \to}$.
 Now we bring to bear all of our machinery about invariants and their proof methods.
 
 For instance, consider program $P = \while{\mathtt{n}}{\assign{\mathtt{a}}{\mathtt{a} + \mathtt{n}}; \assign{\mathtt{n}}{\mathtt{n} - 2}}$.
 
 \invariants
 \begin{theorem}
-  For $\mathbb T(\mupd{\mupd{\mempty}{\mathtt{n}}{0}}{\mathtt{a}}{0}, P)$, it is an invariant that the valuation maps variable $\mathtt{a}$ to an even number.
+  Given even $n$, for $\mathbb T(\mupd{\mupd{\mempty}{\mathtt{n}}{n}}{\mathtt{a}}{0}, P)$, it is an invariant that the valuation maps variable $\mathtt{a}$ to an even number.
 \end{theorem}
 
 \begin{proof}
   First, we strengthen the invariant.
   We compute the set $\overline{P}$ of all commands that can be reached from $P$ by stepping the small-step semantics.
-  This set is finite, even though the set of \emph{reachable valuations} is infinite.
+  This set is finite, even though the set of \emph{reachable valuations} is infinite, considering all potential $n$ values.
   Our strengthened invariant is $I(v, c) = c \in \overline{P} \land (\exists n. \; \msel{v}{\mathtt{n}} = n \land \textrm{even}(n)) \land (\exists a. \; \msel{v}{\mathtt{a}} = a \land \textrm{even}(a))$.
   In other words, we strengthen by adding the constraints that (1) we do not stray from the expected set of reachable commands and (2) variable \texttt{n} also remains even.
 
@@ -1523,16 +1523,15 @@ For instance, consider program $P = \while{\mathtt{n}}{\assign{\mathtt{a}}{\math
 \section{Contextual Small-Step Semantics}
 
 The reader may have noticed some tedium in certain rules of the small-step semantics, like this one.
-$$\infer{\bigstep{(v, c_1; c_2)}{v_2}}{
-  \bigstep{(v, c_1)}{v_1}
-  & \bigstep{(v_1, c_2)}{v_2}
+$$\infer{\smallstep{(v, c_1; c_2)}{(v', c'_1; c_2)}}{
+    \smallstep{(v, c_1)}{(v', c'_1)}
 }$$
 This rule is an example of a \emph{congruence rule}\index{congruence rule}, which shows how to take a step and \emph{lift} it into a step within a larger command, whose other subcommands are unaffected.
 Complex languages can require many congruence rules, and yet we feel like we should be able to avoid repeating all this boilerplate logic somehow.
 A common way to do so is switching to \emph{contextual small-step semantics}\index{contextual small-step semantics}.
 
 We illustrate with our running example language.
-The first step is to define a set of \emph{evaluation contexts}\index{evaluation contexts}, which formalize the spots within a larger command where interesting steps are enabled.
+The first step is to define a set of \emph{evaluation contexts}\index{evaluation contexts}, which formalize the spots within a larger command where steps are enabled.
 \encoding
 $$\begin{array}{rrcl}
   \textrm{Evaluation contexts} & C &::=& \Box \mid C; c
@@ -1593,7 +1592,7 @@ Let's revisit last section's example, to see contextual semantics in action, esp
     \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, (\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
     = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \plug{(\Box; \mathtt{factorial\_loop})}{\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1})} \\
     \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \assign{\mathtt{input}}{\mathtt{input} - 1}; \mathtt{factorial\_loop}) \\
-    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \plug{\Box; \mathtt{factorial\_loop}}{\assign{\mathtt{input}}{\mathtt{input} - 1}}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \plug{(\Box; \mathtt{factorial\_loop})}{\assign{\mathtt{input}}{\mathtt{input} - 1}}) \\
     \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \skipe; \mathtt{factorial\_loop}) \\
     = & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \plug{\Box}{\skipe; \mathtt{factorial\_loop}}) \\
     \to^*_\mathsf{c} & \ldots \\
@@ -1642,7 +1641,6 @@ This new semantics formulation is equivalent to the other two, as we establish n
 \subsection{Evaluation Contexts Pay Off: Adding Concurrency}
 
 To showcase the convenience of contextual semantics, let's extend our example language with a simple construct for running two commands in parallel\index{parallel composition of threads}, implicitly extending the definition of plugging accordingly.
-
 $$\begin{array}{rrcl}
   \textrm{Commands} & c &::=& \ldots \mid c || c
 \end{array}$$
@@ -1661,6 +1659,41 @@ The new system faithfully captures our usual idea of threads executing in parall
 All of the theorems proved previously about contextual steps continue to hold.
 In fact, in the accompanying Coq code, literally the same proof scripts establish the new versions of the theorems, with no new human proof effort.
 It's not often that concurrency comes for free in a rigorous proof!
+
+
+\section{Determinism}
+
+Our last extension with parallelism introduced intentional nondeterminism in the semantics: a single starting state can step to multiple different next states.
+However, the three semantics for the original language are deterministic, and we can prove it.
+
+\begin{theorem}
+  If $\bigstep{(v, c)}{v_1}$ and $\bigstep{(v, c)}{v_2}$, then $v_1 = v_2$.
+\end{theorem}
+
+\begin{proof}
+  By induction on the derivation of $\bigstep{(v, c)}{v_1}$ and inversion on the derivation of $\bigstep{(v, c)}{v_2}$.
+\end{proof}
+
+\begin{theorem}
+  If $\smallstep{(v, c)}{(v_1, c_1)}$ and $\smallstep{(v, c)}{(v_2, c_2)}$, then $v_1 = v_2$ and $c_1 = c_2$.
+\end{theorem}
+
+\begin{proof}
+  By induction on the derivation of $\smallstep{(v, c)}{(v_1, c_1)}$ and inversion on the derivation of $\smallstep{(v, c)}{(v_2, c_2)}$.
+\end{proof}
+
+\begin{theorem}
+  If $\smallstepc{(v, c)}{(v_1, c_1)}$ and $\smallstepc{(v, c)}{(v_2, c_2)}$, then $v_1 = v_2$ and $c_1 = c_2$.
+\end{theorem}
+
+\begin{proof}
+  Follows from the last theorem and the equivalence we proved between $\to$ and $\to_\mathsf{c}$.
+\end{proof}
+
+We'll stop, for now, in our tour of useful properties of operational semantics.
+All of the rest of the book is based on small-step semantics, with or without evaluation contexts.
+As we study new kinds of programming languages, we will see how to model them operationally.
+Almost every new proof technique is phrased as an approach to establishing invariants of transition systems based on small-step semantics.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

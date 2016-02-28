@@ -99,6 +99,8 @@ Theorem factorial_2 : exists v, eval ($0 $+ ("input", 2)) factorial v
                                 /\ v $? "output" = Some 2.
 Proof.
   eexists; propositional.
+  (* [eexists]: to prove [exists x, P(x)], switch to proving [P(?y)], for a new
+   *   existential variable [?y]. *)
 
   econstructor.
   econstructor.
@@ -228,6 +230,12 @@ Qed.
 
 
 (** * Small-step semantics *)
+
+(* Big-step semantics only tells us something about the behavior of terminating
+ * programs.  Our imperative language clearly supports nontermination, thanks to
+ * the inclusion of general "while" loops.  A switch to *small-step* semantics
+ * lets us also explain what happens with nonterminating executions, and this
+ * style will also come in handy for more advanced features like concurrency. *)
 
 Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
 | StepAssign : forall v x e,
@@ -714,16 +722,25 @@ Qed.
 
 (** * Contextual small-step semantics *)
 
+(* There is a common way to factor a small-step semantics into different parts,
+ * to make the semantics easier to understand and extend.  First, we define a
+ * notion of *evaluation contexts*, which are commands with *holes* in them. *)
 Inductive context :=
 | Hole
 | CSeq (C : context) (c : cmd).
 
+(* This relation explains how to plug the hole in a context with a specific
+ * term.  Note that we use an inductive relation instead of a recursive
+ * definition, because Coq's proof automation is better at working with
+ * relations. *)
 Inductive plug : context -> cmd -> cmd -> Prop :=
 | PlugHole : forall c, plug Hole c c
 | PlugSeq : forall c C c' c2,
   plug C c c'
   -> plug (CSeq C c2) c (Sequence c' c2).
 
+(* Now we define almost the same step relation as before, with one omission:
+ * only the more trivial of the [Sequence] rules remains. *)
 Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
 | Step0Assign : forall v x e,
   step0 (v, Assign x e) (v $+ (x, interp e v), Skip)
@@ -742,12 +759,16 @@ Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
   interp e v = 0
   -> step0 (v, While e body) (v, Skip).
 
+(* We recover the meaning of the original with one top-level rule, combining
+ * plugging of contexts with basic steps. *)
 Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
 | CStep : forall C v c v' c' c1 c2,
   plug C c c1
   -> step0 (v, c) (v', c')
   -> plug C c' c2
   -> cstep (v, c1) (v', c2).
+
+(* We can prove equivalence between the two formulations. *)
 
 Theorem step_cstep : forall v c v' c',
   step (v, c) (v', c')
@@ -937,6 +958,8 @@ Qed.
 (** * Example of how easy it is to add concurrency to a contextual semantics *)
 
 Module Concurrent.
+  (* Let's add a construct for *parallel execution* of two commands.  Such
+   * parallelism may be nested arbitrarily. *)
   Inductive cmd :=
   | Skip
   | Assign (x : var) (e : arith)
@@ -945,12 +968,24 @@ Module Concurrent.
   | While (e : arith) (body : cmd)
   | Parallel (c1 c2 : cmd).
 
+  Notation "x <- e" := (Assign x e%arith) (at level 75).
+  Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
+  Notation "'when' e 'loop' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
+  Notation "'while' e 'loop' body 'done'" := (While e%arith body) (at level 75).
+  Infix "||" := Parallel.
+
+
+  (* We need surprisingly few changes to the contextual semantics, to explain
+   * this new feature.  First, we allow a hole to appear on *either side* of a
+   * [Parallel].  In other words, the "scheduler" may choose either "thread" to
+   * run next. *)
   Inductive context :=
   | Hole
   | CSeq (C : context) (c : cmd)
   | CPar1 (C : context) (c : cmd)
   | CPar2 (c : cmd) (C : context).
 
+  (* We explain the meaning of plugging the new contexts in the obvious way. *)
   Inductive plug : context -> cmd -> cmd -> Prop :=
   | PlugHole : forall c, plug Hole c c
   | PlugSeq : forall c C c' c2,
@@ -963,6 +998,8 @@ Module Concurrent.
     plug C c c'
     -> plug (CPar2 c1 C) c (Parallel c1 c').
 
+  (* The only new step rules are for "cleaning up" finished "threads," which
+   * have reached the point of being [Skip] commands. *)
   Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
   | Step0Assign : forall v x e,
     step0 (v, Assign x e) (v $+ (x, interp e v), Skip)
@@ -992,8 +1029,92 @@ Module Concurrent.
     -> plug C c' c2
     -> cstep (v, c1) (v', c2).
 
+  (** Example: stepping a specific program. *)
+
+  (* Here's the classic cautionary-tale program about remembering to lock your
+   * concurrent threads. *)
+  Definition prog :=
+    ("a" <- "n";;
+     "n" <- "a" + 1)
+    || ("b" <- "n";;
+        "n" <- "b" + 1).
+
+  Hint Constructors plug step0 cstep.
+
+  (* The naive "expected" answer is attainable. *)
+  Theorem correctAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
+                                              /\ v $? "n" = Some (n + 2).
+  Proof.
+    eexists; propositional.
+    unfold prog.
+
+    econstructor.
+    eapply CStep with (C := CPar1 (CSeq Hole _) _); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar1 Hole _); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar1 Hole _); eauto.
+
+    econstructor.
+    eapply CStep with (C := Hole); eauto.
+
+    econstructor.
+    eapply CStep with (C := CSeq Hole _); eauto.
+
+    econstructor.
+    eapply CStep with (C := Hole); eauto.
+
+    econstructor.
+    eapply CStep with (C := Hole); eauto.
+
+    econstructor.
+
+    simplify.
+    f_equal.
+    ring.
+  Qed.
+
+  (* But so is the "wrong" answer! *)
+  Theorem wrongAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
+                                            /\ v $? "n" = Some (n + 1).
+  Proof.
+    eexists; propositional.
+    unfold prog.
+
+    econstructor.
+    eapply CStep with (C := CPar1 (CSeq Hole _) _); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar2 _ (CSeq Hole _)); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar1 Hole _); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar2 _ Hole); eauto.
+
+    econstructor.
+    eapply CStep with (C := CPar1 Hole _); eauto.
+
+    econstructor.
+    eapply CStep with (C := Hole); eauto.
+
+    econstructor.
+    eapply CStep with (C := Hole); eauto.
+
+    econstructor.
+
+    simplify.
+    equality.
+  Qed.
+
+  (** Proving equivalence with non-contextual semantics *)
+
   (* To give us something interesting to prove, let's also define a
-   * non-contextual small-step semantics. *)
+   * non-contextual small-step semantics.  Note how we have to do some more
+   * explicit threading of mutable state through recursive invocations. *)
   Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
   | StepAssign : forall v x e,
     step (v, Assign x e) (v $+ (x, interp e v), Skip)
@@ -1025,10 +1146,10 @@ Module Concurrent.
     step (v, c2) (v', c2')
     -> step (v, Parallel c1 c2) (v', Parallel c1 c2').
 
-  (* Bonus material: here's how to make these proofs much more automatic.  We
-   * won't explain the features being used here. *)
+  Hint Constructors step.
 
-  Hint Constructors plug step0 cstep step.
+  (* Now, an automated proof of equivalence.  Actually, it's *exactly* the same
+   * proof we used for the old feature set! *)
 
   Theorem step_cstep : forall v c v' c',
     step (v, c) (v', c')
@@ -1063,7 +1184,7 @@ Module Concurrent.
 
   Hint Resolve cstep_step'.
 
-  Theorem cstep_step_snazzy : forall v c v' c',
+  Theorem cstep_step : forall v c v' c',
     cstep (v, c) (v', c')
     -> step (v, c) (v', c').
   Proof.

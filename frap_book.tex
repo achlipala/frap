@@ -1748,6 +1748,7 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{eapply} $H$] Like \texttt{apply} but will work even when some quantified variables from $H$ do not have their values determined immediately by the form of the goal.  Instead, \emph{existential variables} (with names starting with question marks) are introduced for those values.
   \item[\texttt{eassumption}] Like \texttt{assumption} but will figure out values of existential variables.
   \item[\texttt{econstructor}] When proving an instance of an inductive predicate, \texttt{eapply} the first matching rule of that predicate.
+  \item[\texttt{eexists}] To prove $\exists x. \; P(x)$, switch to proving $P(?y)$, for a new existential variable $?y$.
   \item[\texttt{equality}] A complete decision procedure for the theory of equality and uninterpreted functions.  That is, the goal must follow from only reflexivity, symmetry, transitivity, and congruence of equality, including that functions really do behave as functions.  See Section \ref{decidable}.
   \item[\texttt{exfalso}] From any proof state, switch to proving \texttt{False}.  In other words, indicate a switch to a proof by contradiction.
   \item[\texttt{exists} $e$] Prove $\exists x. \; P(x)$ by proving $P(e)$.
@@ -1759,6 +1760,7 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{left}] Prove a disjunction by proving its left side.
   \item[\texttt{maps\_equal}] Prove that two finite maps are equal by considering all the relevant cases for mappings of different keys.
   \item[\texttt{propositional}] Simplify a goal into zero or more new goals, based on the rules of propositional logic alone.
+  \item[\texttt{replace} $e_1$ \texttt{with} $e_2$ \texttt{by} \texttt{tac}] Replace occurrences of $e_1$ with $e_2$, proving $e_2 = e_1$ with tactic \texttt{tac}.
   \item[\texttt{rewrite} $H$] Where $H$ is a hypothesis or previously proved theorem, establishing \texttt{forall x1 .. xN, e1 = e2}, find a subterm of the goal that equals \texttt{e1}, given the right choices of \texttt{xi} values, and replace that subterm with \texttt{e2}.
   \item[\texttt{rewrite} $H_1$ \texttt{in} $H_2$] Like \texttt{rewrite} $H_1$ but performs the rewrite in hypothesis $H_2$ instead of in the conclusion.
   \item[\texttt{right}] Prove a disjunction by proving its right side.

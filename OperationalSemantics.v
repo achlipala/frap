@@ -932,3 +932,141 @@ Proof.
   apply cstep_step.
   eassumption.
 Qed.
+
+
+(** * Example of how easy it is to add concurrency to a contextual semantics *)
+
+Module Concurrent.
+  Inductive cmd :=
+  | Skip
+  | Assign (x : var) (e : arith)
+  | Sequence (c1 c2 : cmd)
+  | If (e : arith) (then_ else_ : cmd)
+  | While (e : arith) (body : cmd)
+  | Parallel (c1 c2 : cmd).
+
+  Inductive context :=
+  | Hole
+  | CSeq (C : context) (c : cmd)
+  | CPar1 (C : context) (c : cmd)
+  | CPar2 (c : cmd) (C : context).
+
+  Inductive plug : context -> cmd -> cmd -> Prop :=
+  | PlugHole : forall c, plug Hole c c
+  | PlugSeq : forall c C c' c2,
+    plug C c c'
+    -> plug (CSeq C c2) c (Sequence c' c2)
+  | PlugPar1 : forall c C c' c2,
+    plug C c c'
+    -> plug (CPar1 C c2) c (Parallel c' c2)
+  | PlugPar2 : forall c C c' c1,
+    plug C c c'
+    -> plug (CPar2 c1 C) c (Parallel c1 c').
+
+  Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
+  | Step0Assign : forall v x e,
+    step0 (v, Assign x e) (v $+ (x, interp e v), Skip)
+  | Step0Seq : forall v c2,
+    step0 (v, Sequence Skip c2) (v, c2)
+  | Step0IfTrue : forall v e then_ else_,
+    interp e v <> 0
+    -> step0 (v, If e then_ else_) (v, then_)
+  | Step0IfFalse : forall v e then_ else_,
+    interp e v = 0
+    -> step0 (v, If e then_ else_) (v, else_)
+  | Step0WhileTrue : forall v e body,
+    interp e v <> 0
+    -> step0 (v, While e body) (v, Sequence body (While e body))
+  | Step0WhileFalse : forall v e body,
+    interp e v = 0
+    -> step0 (v, While e body) (v, Skip)
+  | Step0Par1 : forall v c,
+    step0 (v, Parallel Skip c) (v, c)
+  | Step0Par2 : forall v c,
+    step0 (v, Parallel c Skip) (v, c).
+
+  Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
+  | CStep : forall C v c v' c' c1 c2,
+    plug C c c1
+    -> step0 (v, c) (v', c')
+    -> plug C c' c2
+    -> cstep (v, c1) (v', c2).
+
+  (* To give us something interesting to prove, let's also define a
+   * non-contextual small-step semantics. *)
+  Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
+  | StepAssign : forall v x e,
+    step (v, Assign x e) (v $+ (x, interp e v), Skip)
+  | StepSeq1 : forall v c1 c2 v' c1',
+    step (v, c1) (v', c1')
+    -> step (v, Sequence c1 c2) (v', Sequence c1' c2)
+  | StepSeq2 : forall v c2,
+    step (v, Sequence Skip c2) (v, c2)
+  | StepIfTrue : forall v e then_ else_,
+    interp e v <> 0
+    -> step (v, If e then_ else_) (v, then_)
+  | StepIfFalse : forall v e then_ else_,
+    interp e v = 0
+    -> step (v, If e then_ else_) (v, else_)
+  | StepWhileTrue : forall v e body,
+    interp e v <> 0
+    -> step (v, While e body) (v, Sequence body (While e body))
+  | StepWhileFalse : forall v e body,
+    interp e v = 0
+    -> step (v, While e body) (v, Skip)
+  | StepParSkip1 : forall v c,
+    step (v, Parallel Skip c) (v, c)
+  | StepParSkip2 : forall v c,
+    step (v, Parallel c Skip) (v, c)
+  | StepPar1 : forall v c1 c2 v' c1',
+    step (v, c1) (v', c1')
+    -> step (v, Parallel c1 c2) (v', Parallel c1' c2)
+  | StepPar2 : forall v c1 c2 v' c2',
+    step (v, c2) (v', c2')
+    -> step (v, Parallel c1 c2) (v', Parallel c1 c2').
+
+  (* Bonus material: here's how to make these proofs much more automatic.  We
+   * won't explain the features being used here. *)
+
+  Hint Constructors plug step0 cstep step.
+
+  Theorem step_cstep : forall v c v' c',
+    step (v, c) (v', c')
+    -> cstep (v, c) (v', c').
+  Proof.
+    induct 1; repeat match goal with
+                     | [ H : cstep _ _ |- _ ] => invert H
+                     end; eauto.
+  Qed.
+
+  Hint Resolve step_cstep.
+
+  Lemma step0_step : forall v c v' c',
+    step0 (v, c) (v', c')
+    -> step (v, c) (v', c').
+  Proof.
+    induct 1; eauto.
+  Qed.
+
+  Hint Resolve step0_step.
+
+  Lemma cstep_step' : forall C c0 c,
+    plug C c0 c
+    -> forall v' c'0 v c', step0 (v, c0) (v', c'0)
+    -> plug C c'0 c'
+    -> step (v, c) (v', c').
+  Proof.
+    induct 1; simplify; repeat match goal with
+                               | [ H : plug _ _ _ |- _ ] => invert1 H
+                               end; eauto.
+  Qed.
+
+  Hint Resolve cstep_step'.
+
+  Theorem cstep_step_snazzy : forall v c v' c',
+    cstep (v, c) (v', c')
+    -> step (v, c) (v', c').
+  Proof.
+    induct 1; eauto.
+  Qed.
+End Concurrent.

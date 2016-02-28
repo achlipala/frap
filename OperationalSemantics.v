@@ -1018,9 +1018,7 @@ Module Concurrent.
     interp e v = 0
     -> step0 (v, While e body) (v, Skip)
   | Step0Par1 : forall v c,
-    step0 (v, Parallel Skip c) (v, c)
-  | Step0Par2 : forall v c,
-    step0 (v, Parallel c Skip) (v, c).
+    step0 (v, Parallel Skip c) (v, c).
 
   Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
   | CStep : forall C v c v' c' c1 c2,
@@ -1137,8 +1135,6 @@ Module Concurrent.
     -> step (v, While e body) (v, Skip)
   | StepParSkip1 : forall v c,
     step (v, Parallel Skip c) (v, c)
-  | StepParSkip2 : forall v c,
-    step (v, Parallel c Skip) (v, c)
   | StepPar1 : forall v c1 c2 v' c1',
     step (v, c1) (v', c1')
     -> step (v, Parallel c1 c2) (v', Parallel c1' c2)

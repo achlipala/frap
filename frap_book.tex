@@ -1434,6 +1434,7 @@ The intuition behind the rules may come best from working out an example.
   Here is a step-by-step (literally!) derivation that finds $v$.
   $$\begin{array}{cl}
     & (\mupd{\mempty}{\mathtt{input}}{2}, \assign{\mathtt{output}}{1}; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \skipe; \mathtt{factorial\_loop}) \\
     \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \mathtt{factorial\_loop}) \\
     \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, (\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
     \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, (\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
@@ -1517,6 +1518,149 @@ For instance, consider program $P = \while{\mathtt{n}}{\assign{\mathtt{a}}{\math
 
   The strengthened invariant is straightforward to prove by invariant induction, using repeated inversion on $\to$ facts.
 \end{proof}
+
+
+\section{Contextual Small-Step Semantics}
+
+The reader may have noticed some tedium in certain rules of the small-step semantics, like this one.
+$$\infer{\bigstep{(v, c_1; c_2)}{v_2}}{
+  \bigstep{(v, c_1)}{v_1}
+  & \bigstep{(v_1, c_2)}{v_2}
+}$$
+This rule is an example of a \emph{congruence rule}\index{congruence rule}, which shows how to take a step and \emph{lift} it into a step within a larger command, whose other subcommands are unaffected.
+Complex languages can require many congruence rules, and yet we feel like we should be able to avoid repeating all this boilerplate logic somehow.
+A common way to do so is switching to \emph{contextual small-step semantics}\index{contextual small-step semantics}.
+
+We illustrate with our running example language.
+The first step is to define a set of \emph{evaluation contexts}\index{evaluation contexts}, which formalize the spots within a larger command where interesting steps are enabled.
+\encoding
+$$\begin{array}{rrcl}
+  \textrm{Evaluation contexts} & C &::=& \Box \mid C; c
+\end{array}$$
+
+\newcommand{\plug}[2]{#1[#2]}
+We define the operator of \emph{plugging}\index{plugging evaluation contexts} an evaluation context in the natural way.
+\begin{eqnarray*}
+  \plug{\Box}{c} &=& c \\
+  \plug{(C; c_2)}{c} &=& \plug{C}{c}; c_2
+\end{eqnarray*}
+
+For this language, the only interesting case of evaluation contexts is the one that allows us to \emph{descend into the left subcommand}, because the old congruence rule invoked the step relation recursively for that position.
+
+\newcommand{\smallstepo}[2]{#1 \to_0 #2}
+
+The next ingredient is a reduced set of basic step rules, where we have dropped the congruence rule.
+$$\infer{\smallstepo{(v, \assign{x}{e})}{(\mupd{v}{x}{\denote{e}v}, \skipe)}}{}
+\quad \infer{\smallstepo{(v, \skipe; c_2)}{(v, c_2)}}{}$$
+$$\infer{\smallstepo{(v, \ifte{e}{c_1}{c_2})}{(v, c_1)}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstepo{(v, \ifte{e}{c_1}{c_2})}{(v, c_2)}}{
+  \denote{e}v = 0
+}$$
+$$\infer{\smallstepo{(v, \while{e}{c_1})}{(v, c_1; \while{e}{c_1})}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstepo{(v, \while{e}{c_1})}{(v, \skipe)}}{
+  \denote{e}v = 0
+}$$
+
+\newcommand{\smallstepc}[2]{#1 \to_\mathsf{c} #2}
+
+We regain the full coverage of the original rules with a new relation $\to_\mathsf{c}$, saying that we may apply $\to_0$ at the active subcommand within a larger command.
+$$\infer{\smallstepc{(v, C[c])}{(v', C[c'])}}{
+  \smallstepo{(v, c)}{(v', c')}
+}$$
+
+Let's revisit last section's example, to see contextual semantics in action, especially to demonstrate how to express an arbitrary command as an evaluation context plugged with another command.
+
+\newcommand{\smallstepcs}[2]{#1 \to^*_\mathsf{c} #2}
+
+\begin{theorem}
+  There exists valuation $v$ such that $\smallstepcs{(\mupd{\mempty}{\mathtt{input}}{2}, \mathtt{factorial})}{(v, \skipe)}$ and $\msel{v}{\mathtt{output}} = 2$.
+\end{theorem}
+
+\begin{proof}
+  $$\begin{array}{cl}
+    & (\mupd{\mempty}{\mathtt{input}}{2}, \assign{\mathtt{output}}{1}; \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mempty}{\mathtt{input}}{2}, \plug{(\Box; \mathtt{factorial\_loop})}{\assign{\mathtt{output}}{1}}) \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \skipe; \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \plug{\Box}{\skipe; \mathtt{factorial\_loop}}) \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \plug{\Box}{\mathtt{factorial\_loop}}) \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, (\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \plug{((\Box; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop})}{\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}}) \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, (\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \plug{(\Box; \mathtt{factorial\_loop})}{\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1})} \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \assign{\mathtt{input}}{\mathtt{input} - 1}; \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \plug{\Box; \mathtt{factorial\_loop}}{\assign{\mathtt{input}}{\mathtt{input} - 1}}) \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \skipe; \mathtt{factorial\_loop}) \\
+    = & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \plug{\Box}{\skipe; \mathtt{factorial\_loop}}) \\
+    \to^*_\mathsf{c} & \ldots \\
+    \to_\mathsf{c} & (\mupd{\mupd{\mempty}{\mathtt{input}}{0}}{\mathtt{output}}{2}, \skipe)
+  \end{array}$$
+
+  Clearly the final valuation assigns $\mathtt{output}$ to 2.
+\end{proof}
+
+\subsection{Equivalence of Small-Step, With and Without Evaluation Contexts}
+
+This new semantics formulation is equivalent to the other two, as we establish now.
+
+\begin{theorem}
+  If $\smallstep{(v, c)}{(v', c')}$, then $\smallstepc{(v, c)}{(v', c')}$.
+\end{theorem}
+
+\begin{proof}
+  By induction on the derivation of $\smallstep{(v, c)}{(v', c')}$.
+\end{proof}
+
+\begin{lemma}
+  If $\smallstepo{(v, c)}{(v', c')}$, then $\smallstep{(v, c)}{(v', c')}$.
+\end{lemma}
+
+\begin{proof}
+  By cases on the derivation of $\smallstepo{(v, c)}{(v', c')}$.
+\end{proof}
+
+\begin{lemma}
+  If $\smallstepo{(v, c)}{(v', c')}$, then $\smallstep{(v, C[c])}{(v', C[c'])}$.
+\end{lemma}
+
+\begin{proof}
+  By induction on the structure of evaluation context $C$, appealing to the last lemma.
+\end{proof}
+
+\begin{theorem}
+  If $\smallstepc{(v, c)}{(v', c')}$, then $\smallstep{(v, c)}{(v', c')}$.
+\end{theorem}
+
+\begin{proof}
+  By inversion on the derivation of $\smallstepc{(v, c)}{(v', c')}$, followed by an appeal to the last lemma.
+\end{proof}
+
+\subsection{Evaluation Contexts Pay Off: Adding Concurrency}
+
+To showcase the convenience of contextual semantics, let's extend our example language with a simple construct for running two commands in parallel\index{parallel composition of threads}, implicitly extending the definition of plugging accordingly.
+
+$$\begin{array}{rrcl}
+  \textrm{Commands} & c &::=& \ldots \mid c || c
+\end{array}$$
+
+To capture that idea that \emph{either} command in a parallel construct is allowed to step next, we extend evaluation contexts like so:
+\encoding
+$$\begin{array}{rrcl}
+  \textrm{Evaluation contexts} & C &::=& \ldots \mid C || c \mid c || C
+\end{array}$$
+
+We need one more basic step rule, to ``garbage-collect'' threads that have finished.
+$$\infer{\smallstepo{(v, \skipe || c)}{(v, c)}}{}$$
+
+And that's it!
+The new system faithfully captures our usual idea of threads executing in parallel.
+All of the theorems proved previously about contextual steps continue to hold.
+In fact, in the accompanying Coq code, literally the same proof scripts establish the new versions of the theorems, with no new human proof effort.
+It's not often that concurrency comes for free in a rigorous proof!
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

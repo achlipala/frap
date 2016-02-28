@@ -1322,6 +1322,7 @@ $$\begin{array}{rrcl}
 For our example relation, we will define a relation written $\bigstep{(v, c)}{v'}$, for ``command $c$, run with variable valuation $v$, terminates, modifying the valuation to $v'$.''
 
 This relation is fairly straightforward to define with inference rules.
+\encoding
 $$\infer{\bigstep{(v, \skipe)}{v}}{}
 \quad \infer{\bigstep{(v, \assign{x}{e})}{\mupd{v}{x}{\denote{e}v}}}{}
 \quad \infer{\bigstep{(v, c_1; c_2)}{v_2}}{
@@ -1387,6 +1388,135 @@ We can even prove that $\mathtt{factorial}$ behaves correctly on all inputs, by 
 Most of our program proofs in this book establish \emph{safety properties}\index{safety properties}, or invariants of transition systems.
 However, these last two examples with big-step semantics also establish program termination, taking us a few steps into the world of \emph{liveness properties}\index{liveness properties}.
 
+
+\section{Small-Step Semantics}
+
+Often it is convenient to break a system's execution into small sequential steps, rather than executing a whole program in one go.
+Perhaps the most compelling example comes from concurrency, where it is difficult to give a big-step semantics directly.
+Nonterminating programs are the other standard example.
+We want to be able to establish invariants for those programs, all the same, and we need a semantics to help us state what it means to be an invariant.
+
+\newcommand{\smallstep}[2]{#1 \to #2}
+
+The canonical solution is \emph{small-step operational semantics}\index{small-step operational semantics}, probably the most common approach to formal program semantics in contemporary research.
+Now we define a single-step relation $\smallstep{(v, c)}{(v', c')}$, meaning that one execution step transforms the first state into the second state.
+Each state is a valuation $v$ and a current command $c$.
+
+These inference rules give the details.
+\encoding
+$$\infer{\smallstep{(v, \assign{x}{e})}{(\mupd{v}{x}{\denote{e}v}, \skipe)}}{}
+\quad \infer{\smallstep{(v, c_1; c_2)}{(v', c'_1; c_2)}}{
+    \smallstep{(v, c_1)}{(v', c'_1)}
+}
+\quad \infer{\smallstep{(v, \skipe; c_2)}{(v, c_2)}}{}$$
+$$\infer{\smallstep{(v, \ifte{e}{c_1}{c_2})}{(v, c_1)}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstep{(v, \ifte{e}{c_1}{c_2})}{(v, c_2)}}{
+  \denote{e}v = 0
+}$$
+$$\infer{\smallstep{(v, \while{e}{c_1})}{(v, c_1; \while{e}{c_1})}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstep{(v, \while{e}{c_1})}{(v, \skipe)}}{
+  \denote{e}v = 0
+}$$
+
+The intuition behind the rules may come best from working out an example.
+
+\newcommand{\smallsteps}[2]{#1 \to^* #2}
+
+\begin{theorem}
+  There exists valuation $v$ such that $\smallsteps{(\mupd{\mempty}{\mathtt{input}}{2}, \mathtt{factorial})}{(v, \skipe)}$ and $\msel{v}{\mathtt{output}} = 2$.
+\end{theorem}
+
+\begin{proof}
+  Here is a step-by-step (literally!) derivation that finds $v$.
+  $$\begin{array}{cl}
+    & (\mupd{\mempty}{\mathtt{input}}{2}, \assign{\mathtt{output}}{1}; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{1}, (\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, (\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{2}}{\mathtt{output}}{2}, \assign{\mathtt{input}}{\mathtt{input} - 1}; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \skipe; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, (\assign{\mathtt{output}}{\mathtt{output} \times \mathtt{input}}; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, (\skipe; \assign{\mathtt{input}}{\mathtt{input} - 1}); \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{1}}{\mathtt{output}}{2}, \assign{\mathtt{input}}{\mathtt{input} - 1}; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{0}}{\mathtt{output}}{2}, \skipe; \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{0}}{\mathtt{output}}{2}, \mathtt{factorial\_loop}) \\
+    \to & (\mupd{\mupd{\mempty}{\mathtt{input}}{0}}{\mathtt{output}}{2}, \skipe)
+  \end{array}$$
+
+  Clearly the final valuation assigns $\mathtt{output}$ to 2.
+\end{proof}
+
+\subsection{Equivalence of Big-Step and Small-Step}
+
+Different theorems are easier to prove with different semantics, so it is helpful to establish formally the intuitive connection between big and small steps.
+
+\begin{lemma}
+  If $\smallsteps{(v, c_1)}{(v', c'_1)}$, then $\smallsteps{(v, c_1; c_2)}{(v', c'_1; c_2)}$,
+\end{lemma}
+
+\begin{proof}
+  By induction on the derivation of $\smallsteps{(v, c_1)}{(v', c'_1)}$.
+\end{proof}
+
+\begin{theorem}
+  If $\bigstep{(v, c)}{v'}$, then $\smallsteps{(v, c)}{(v', \skipe)}$.
+\end{theorem}
+
+\begin{proof}
+  By induction on the derivation of $\bigstep{(v, c)}{v'}$, appealing to the last lemma at two points.
+\end{proof}
+
+\begin{lemma}
+  If $\smallstep{(v, c)}{(v', c')}$ and $\bigstep{(v', c')}{v''}$, then $\bigstep{(v, c)}{v''}$.  In other words, we can add a small step to the beginning of any big-step derivation.
+\end{lemma}
+
+\begin{proof}
+  By induction on the derivation of $\smallstep{(v, c)}{(v', c')}$.
+\end{proof}
+
+\begin{lemma}
+  If $\smallsteps{(v, c)}{(v', c')}$ and $\bigstep{(v', c')}{v''}$, then $\bigstep{(v, c)}{v''}$.  In other words, we can add any number of small steps to the beginning of any big-step derivation.
+\end{lemma}
+
+\begin{proof}
+  By induction on the derivation of $\smallsteps{(v, c)}{(v', c')}$, appealing to the last lemma.
+\end{proof}
+
+\begin{theorem}
+  If $\smallsteps{(v, c)}{(v', \skipe)}$, then $\bigstep{(v, c)}{v'}$.
+\end{theorem}
+
+\begin{proof}
+  Largely by appeal to the last lemma, considering that $\bigstep{(v', \skipe)}{v'}$.
+\end{proof}
+
+\subsection{Transition Systems from Small-Step Semantics}
+
+The small-step semantics is a natural fit with our working definition of transition systems.
+We can define a transition system from any valuation and command, where $\mathbb V$ is the set of valuations and $\mathbb C$ the set of commands, by $\mathbb T(v, c) = \angled{\mathbb V \times \mathbb C, {(v, c)}, \to}$.
+Now we bring to bear all of our machinery about invariants and their proof methods.
+
+For instance, consider program $P = \while{\mathtt{n}}{\assign{\mathtt{a}}{\mathtt{a} + \mathtt{n}}; \assign{\mathtt{n}}{\mathtt{n} - 2}}$.
+
+\invariants
+\begin{theorem}
+  For $\mathbb T(\mupd{\mupd{\mempty}{\mathtt{n}}{0}}{\mathtt{a}}{0}, P)$, it is an invariant that the valuation maps variable $\mathtt{a}$ to an even number.
+\end{theorem}
+
+\begin{proof}
+  First, we strengthen the invariant.
+  We compute the set $\overline{P}$ of all commands that can be reached from $P$ by stepping the small-step semantics.
+  This set is finite, even though the set of \emph{reachable valuations} is infinite.
+  Our strengthened invariant is $I(v, c) = c \in \overline{P} \land (\exists n. \; \msel{v}{\mathtt{n}} = n \land \textrm{even}(n)) \land (\exists a. \; \msel{v}{\mathtt{a}} = a \land \textrm{even}(a))$.
+  In other words, we strengthen by adding the constraints that (1) we do not stray from the expected set of reachable commands and (2) variable \texttt{n} also remains even.
+
+  The strengthened invariant is straightforward to prove by invariant induction, using repeated inversion on $\to$ facts.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

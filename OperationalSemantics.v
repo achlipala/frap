@@ -37,7 +37,7 @@ Infix "*" := Times : arith_scope.
 Delimit Scope arith_scope with arith.
 Notation "x <- e" := (Assign x e%arith) (at level 75).
 Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
-Notation "'when' e 'loop' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
+Notation "'when' e 'then' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
 Notation "'while' e 'loop' body 'done'" := (While e%arith body) (at level 75).
 
 (* Here's an adaptation of our factorial example from Chapter 3. *)
@@ -974,7 +974,7 @@ Module Concurrent.
 
   Notation "x <- e" := (Assign x e%arith) (at level 75).
   Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
-  Notation "'when' e 'loop' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
+  Notation "'when' e 'then' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
   Notation "'while' e 'loop' body 'done'" := (While e%arith body) (at level 75).
   Infix "||" := Parallel.
 

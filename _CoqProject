@@ -14,4 +14,5 @@ TransitionSystems_template.v
 TransitionSystems.v
 ModelChecking_template.v
 ModelChecking.v
+OperationalSemantics_template.v
 OperationalSemantics.v

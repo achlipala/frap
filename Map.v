@@ -9,6 +9,7 @@ Module Type S.
   Parameter add : forall A B, fmap A B -> A -> B -> fmap A B.
   Parameter remove : forall A B, fmap A B -> A -> fmap A B.
   Parameter join : forall A B, fmap A B -> fmap A B -> fmap A B.
+  Parameter merge : forall A B, (option B -> option B -> option B) -> fmap A B -> fmap A B -> fmap A B.
   Parameter lookup : forall A B, fmap A B -> A -> option B.
   Parameter includes : forall A B, fmap A B -> fmap A B -> Prop.
 
@@ -67,6 +68,9 @@ Module Type S.
   Axiom join_assoc : forall A B (m1 m2 m3 : fmap A B),
     (m1 $++ m2) $++ m3 = m1 $++ (m2 $++ m3).
 
+  Axiom lookup_merge : forall A B f (m1 m2 : fmap A B) k,
+    merge f m1 m2 $? k = f (m1 $? k) (m2 $? k).
+
   Axiom empty_includes : forall A B (m : fmap A B), empty A B $<= m.
 
   Axiom dom_empty : forall A B, dom (empty A B) = {}.
@@ -81,7 +85,7 @@ Module Type S.
 
   Hint Resolve includes_lookup includes_add empty_includes.
 
-  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne using congruence.
+  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne lookup_merge using congruence.
 
   Ltac maps_equal :=
     apply fmap_ext; intros;
@@ -121,6 +125,8 @@ Module M : S.
                | None => m2 k
                | x => x
              end.
+  Definition merge A B f (m1 m2 : fmap A B) : fmap A B :=
+    fun k => f (m1 k) (m2 k).
   Definition lookup A B (m : fmap A B) (k : A) := m k.
   Definition includes A B (m1 m2 : fmap A B) :=
     forall k v, m1 k = Some v -> m2 k = Some v.
@@ -223,6 +229,12 @@ Module M : S.
   Proof.
     intros; apply fmap_ext; unfold join, lookup; intros.
     destruct (m1 k); auto.
+  Qed.
+
+  Theorem lookup_merge : forall A B f (m1 m2 : fmap A B) k,
+      lookup (merge f m1 m2) k = f (m1 k) (m2 k).
+  Proof.
+    auto.
   Qed.
 
   Theorem empty_includes : forall A B (m : fmap A B), includes (empty (A := A) B) m.

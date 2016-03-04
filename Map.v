@@ -71,6 +71,47 @@ Module Type S.
   Axiom lookup_merge : forall A B f (m1 m2 : fmap A B) k,
     merge f m1 m2 $? k = f (m1 $? k) (m2 $? k).
 
+  Axiom merge_empty1 : forall A B f (m : fmap A B),
+    (forall x, f None x = x)
+    -> merge f (@empty _ _) m = m.
+
+  Axiom merge_empty2 : forall A B f (m : fmap A B),
+    (forall x, f x None = x)
+    -> merge f m (@empty _ _) = m.
+
+  Axiom merge_empty1_alt : forall A B f (m : fmap A B),
+    (forall x, f None x = None)
+    -> merge f (@empty _ _) m = @empty _ _.
+
+  Axiom merge_empty2_alt : forall A B f (m : fmap A B),
+    (forall x, f x None = None)
+    -> merge f m (@empty _ _) = @empty _ _.
+
+  Axiom merge_add1 : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f (Some x) y = None -> False)
+    -> ~k \in dom m1
+    -> merge f (add m1 k v) m2 = match f (Some v) (lookup m2 k) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+
+  Axiom merge_add2 : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f x (Some y) = None -> False)
+    -> ~k \in dom m2
+    -> merge f m1 (add m2 k v) = match f (lookup m1 k) (Some v) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+
+  Axiom merge_add1_alt : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f (Some x) (Some y) = None -> False)
+    -> ~k \in dom m1
+    -> k \in dom m2
+    -> merge f (add m1 k v) m2 = match f (Some v) (lookup m2 k) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+
   Axiom empty_includes : forall A B (m : fmap A B), empty A B $<= m.
 
   Axiom dom_empty : forall A B, dom (empty A B) = {}.
@@ -86,6 +127,8 @@ Module Type S.
   Hint Resolve includes_lookup includes_add empty_includes.
 
   Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne lookup_merge using congruence.
+
+  Hint Rewrite dom_empty dom_add.
 
   Ltac maps_equal :=
     apply fmap_ext; intros;
@@ -234,6 +277,95 @@ Module M : S.
   Theorem lookup_merge : forall A B f (m1 m2 : fmap A B) k,
       lookup (merge f m1 m2) k = f (m1 k) (m2 k).
   Proof.
+    auto.
+  Qed.
+
+  Theorem merge_empty1 : forall A B f (m : fmap A B),
+    (forall x, f None x = x)
+    -> merge f (@empty _ _) m = m.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge; auto.
+  Qed.
+
+  Theorem merge_empty2 : forall A B f (m : fmap A B),
+    (forall x, f x None = x)
+    -> merge f m (@empty _ _) = m.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge; auto.
+  Qed.
+
+  Theorem merge_empty1_alt : forall A B f (m : fmap A B),
+    (forall x, f None x = None)
+    -> merge f (@empty _ _) m = @empty _ _.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge; auto.
+  Qed.
+
+  Theorem merge_empty2_alt : forall A B f (m : fmap A B),
+    (forall x, f x None = None)
+    -> merge f m (@empty _ _) = @empty _ _.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge; auto.
+  Qed.
+
+  Theorem merge_add1 : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f (Some x) y = None -> False)
+    -> ~k \in dom m1
+    -> merge f (add m1 k v) m2 = match f (Some v) (lookup m2 k) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge, add; intros.
+    destruct (decide (k0 = k)); auto; subst.
+    case_eq (f (Some v) (m2 k)); intros.
+    case_eq (decide (k = k)); congruence.
+    exfalso; eauto.
+
+    case_eq (f (Some v) (m2 k)); intros.
+    destruct (decide (k0 = k)); congruence.
+    auto.
+  Qed.
+
+  Theorem merge_add2 : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f x (Some y) = None -> False)
+    -> ~k \in dom m2
+    -> merge f m1 (add m2 k v) = match f (lookup m1 k) (Some v) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge, add; intros.
+    destruct (decide (k0 = k)); auto; subst.
+    case_eq (f (m1 k) (Some v)); intros.
+    case_eq (decide (k = k)); congruence.
+    exfalso; eauto.
+
+    case_eq (f (m1 k) (Some v)); intros.
+    destruct (decide (k0 = k)); congruence.
+    auto.
+  Qed.
+
+  Theorem merge_add1_alt : forall A B f (m1 m2 : fmap A B) k v,
+    (forall x y, f (Some x) (Some y) = None -> False)
+    -> ~k \in dom m1
+    -> k \in dom m2
+    -> merge f (add m1 k v) m2 = match f (Some v) (lookup m2 k) with
+                                 | None => merge f m1 m2
+                                 | Some v => add (merge f m1 m2) k v
+                                 end.
+  Proof.
+    intros; apply fmap_ext; unfold lookup, merge, add; intros.
+    destruct (decide (k0 = k)); auto; subst.
+    case_eq (f (Some v) (m2 k)); intros.
+    case_eq (decide (k = k)); congruence.
+    case_eq (m2 k); intros.
+    rewrite H3 in H2.
+    exfalso; eauto.
+    congruence.
+
+    case_eq (f (Some v) (m2 k)); intros.
+    destruct (decide (k0 = k)); congruence.
     auto.
   Qed.
 

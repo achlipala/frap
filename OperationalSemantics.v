@@ -827,7 +827,7 @@ Lemma step0_step : forall v c v' c',
   step0 (v, c) (v', c')
   -> step (v, c) (v', c').
 Proof.
-  induct 1; constructor; assumption.
+  invert 1; constructor; assumption.
 Qed.
 
 Lemma cstep_step' : forall C c0 c,
@@ -853,7 +853,7 @@ Theorem cstep_step : forall v c v' c',
   cstep (v, c) (v', c')
   -> step (v, c) (v', c').
 Proof.
-  induct 1.
+  invert 1.
   eapply cstep_step'.
   eassumption.
   eassumption.
@@ -880,7 +880,7 @@ Lemma step0_step_snazzy : forall v c v' c',
   step0 (v, c) (v', c')
   -> step (v, c) (v', c').
 Proof.
-  induct 1; eauto.
+  invert 1; eauto.
 Qed.
 
 Hint Resolve step0_step_snazzy.
@@ -902,7 +902,7 @@ Theorem cstep_step_snazzy : forall v c v' c',
   cstep (v, c) (v', c')
   -> step (v, c) (v', c').
 Proof.
-  induct 1; eauto.
+  invert 1; eauto.
 Qed.
 
 
@@ -1166,7 +1166,7 @@ Module Concurrent.
     step0 (v, c) (v', c')
     -> step (v, c) (v', c').
   Proof.
-    induct 1; eauto.
+    invert 1; eauto.
   Qed.
 
   Hint Resolve step0_step.
@@ -1188,6 +1188,6 @@ Module Concurrent.
     cstep (v, c) (v', c')
     -> step (v, c) (v', c').
   Proof.
-    induct 1; eauto.
+    invert 1; eauto.
   Qed.
 End Concurrent.

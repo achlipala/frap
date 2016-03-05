@@ -139,6 +139,10 @@ Module Type S.
         end).
 
   Hint Extern 3 (_ = _) => maps_equal.
+
+  Axiom lookup_split : forall A B (m : fmap A B) k v k' v',
+    (m $+ (k, v)) $? k' = Some v'
+    -> (k' <> k /\ m $? k' = Some v') \/ (k' = k /\ v' = v).
 End S.
 
 Module M : S.
@@ -388,6 +392,14 @@ Module M : S.
                                  | [ _ : context[if ?E then _ else _] |- _ ] => destruct E
                                end; intuition congruence).
   Qed.
+
+  Lemma lookup_split : forall A B (m : fmap A B) k v k' v',
+    lookup (add m k v) k' = Some v'
+    -> (k' <> k /\ lookup m k' = Some v') \/ (k' = k /\ v' = v).
+  Proof.
+    unfold lookup, add; simpl; intros.
+    destruct (decide (k' = k)); intuition congruence.
+  Qed.    
 End M.
 
 Export M.

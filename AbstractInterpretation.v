@@ -250,16 +250,6 @@ Module SimpleAbstractInterpreter.
                                       | Some ss'' => merge_astates ss'' ss'
                                       end).
 
-  Inductive interpret a : astates a -> astates a -> Prop :=
-  | InterpretDone : forall ss,
-    oneStepClosure ss ss
-    -> interpret ss ss
-
-  | InterpretStep : forall ss ss' ss'',
-    oneStepClosure ss ss'
-    -> interpret (merge_astates ss ss') ss''
-    -> interpret ss ss''.
-
   Definition subsumed a (s1 s2 : astate a) :=
     forall x, match s1 $? x with
               | None => s2 $? x = None
@@ -290,6 +280,17 @@ Module SimpleAbstractInterpreter.
   Qed.
 
   Hint Resolve subsumeds_refl.
+
+  Inductive interpret a : astates a -> astates a -> astates a -> Prop :=
+  | InterpretDone : forall ss1 any ss2,
+    oneStepClosure ss1 ss2
+    -> subsumeds ss2 ss1
+    -> interpret ss1 any ss1
+
+  | InterpretStep : forall ss worklist ss' ss'',
+    oneStepClosure worklist ss'
+    -> interpret (merge_astates ss ss') ss' ss''
+    -> interpret ss worklist ss''.
 
   Lemma oneStepClosure_sound : forall a, absint_sound a
     -> forall ss ss' : astates a, oneStepClosure ss ss'
@@ -474,25 +475,25 @@ Module SimpleAbstractInterpreter.
   Qed.
 
   Lemma interpret_sound' : forall c a, absint_sound a
-    -> forall ss ss' : astates a, interpret ss ss'
+    -> forall ss worklist ss' : astates a, interpret ss worklist ss'
       -> ss $? c = Some $0
       -> invariantFor (absint_trsys a c) (fun p => exists s, ss' $? snd p = Some s
                                                              /\ subsumed (fst p) s).
   Proof.
-    induct 2; simplify.
+    induct 2; simplify; subst.
 
     apply invariant_induction; simplify; propositional; subst; simplify; eauto.
 
-    invert H2; propositional.
+    invert H3; propositional.
     cases s.
     cases s'.
     simplify.
-    eapply abs_step_monotone in H3; eauto.
-    invert H3; propositional.
-    eapply oneStepClosure_sound in H3; eauto.
-    invert H3; propositional.
-    eexists; propositional.
-    eassumption.
+    eapply abs_step_monotone in H4; eauto.
+    invert H4; propositional.
+    eapply oneStepClosure_sound in H4; eauto.
+    invert H4; propositional.
+    eapply H1 in H4.
+    invert H4; propositional.
     eauto using subsumed_trans.
 
     apply IHinterpret.
@@ -506,7 +507,7 @@ Module SimpleAbstractInterpreter.
 
   Theorem interpret_sound : forall c a (ss : astates a),
     absint_sound a
-    -> interpret ($0 $+ (c, $0)) ss
+    -> interpret ($0 $+ (c, $0)) ($0 $+ (c, $0)) ss
     -> invariantFor (absint_trsys a c) (fun p => exists s, ss $? snd p = Some s
                                                            /\ subsumed (fst p) s).
   Proof.
@@ -781,9 +782,9 @@ Module SimpleAbstractInterpreter.
 
   Ltac simplify_map :=
     match goal with
-    | [ |- context[?m $+ (?k, ?v)] ] =>
+    | [ |- context[@add ?A ?B ?m ?k ?v] ] =>
       simplify_map' (m $+ (k, v)) tt ltac:(fun m' =>
-                                             replace (m $+ (k, v)) with m' by maps_equal)
+                                             replace (@add A B m k v) with m' by maps_equal)
     end.
 
   Definition easy :=
@@ -792,9 +793,59 @@ Module SimpleAbstractInterpreter.
       "n" <- "n" - 2
     done.
 
+  Ltac interpret1 := eapply InterpretStep; [ repeat (apply OscNil || apply OscCons)
+                                           | unfold merge_astates, merge_astate;
+                                             simplify; repeat simplify_map ].
+
+  Lemma subsumeds_empty : forall a (ss : astates a),
+    subsumeds $0 ss.
+  Proof.
+    unfold subsumeds; simplify.
+    equality.
+  Qed.
+
+  Lemma subsumeds_add_left : forall a (ss1 ss2 : astates a) c s,
+    ss2 $? c = Some s
+    -> subsumeds ss1 ss2
+    -> subsumeds (ss1 $+ (c, s)) ss2.
+  Proof.
+    unfold subsumeds; simplify.
+    cases (command_equal c c0); subst; simplify; eauto.
+    invert H1; eauto.
+  Qed.
+
+  Ltac interpret_done := eapply InterpretDone; [
+    repeat (apply OscNil || apply OscCons)
+    | unfold merge_astates, merge_astate; simplify; repeat simplify_map;
+      repeat (apply subsumeds_add_left || apply subsumeds_empty); (simplify; equality) ].
+
+  Lemma final_even : forall (s s' : astate parity_absint) v x,
+    compatible1 s v
+    -> subsumed s s'
+    -> s' $? x = Some Even
+    -> exists n, v $? x = Some n /\ isEven n.
+  Proof.
+    unfold compatible1, subsumed; simplify.
+    specialize (H x); specialize (H0 x).
+    cases (s $? x); simplify.
+
+    rewrite Heq in *.
+    assert (Some t = Some t) by equality.
+    apply H in H2.
+    first_order.
+    eapply H0 in H1.
+    invert H1.
+    eauto.
+    assumption.
+
+    rewrite Heq in *.
+    equality.
+  Qed.
+
   Theorem easy_even : forall v n,
     isEven n
-    -> invariantFor (trsys_of v easy) (fun p => exists n, fst p $? "n" = Some n /\ isEven n).
+    -> invariantFor (trsys_of v easy) (fun p => snd p = Skip
+                                                -> exists n, fst p $? "n" = Some n /\ isEven n).
   Proof.
     simplify.
     eapply invariant_weaken.
@@ -807,52 +858,18 @@ Module SimpleAbstractInterpreter.
     apply interpret_sound.
     apply parity_sound.
 
-    Ltac interpret1 := eapply InterpretStep; [ repeat (apply OscNil || apply OscCons)
-                                             | unfold merge_astates, merge_astate;
-                                               simplify; repeat simplify_map ].
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret_done.
 
-    interpret1.
-    interpret1.
-    interpret1.
+    invert 1.
+    first_order.
+    invert H1; simplify.
+    invert H2.
+    eapply final_even; eauto; simplify; equality.
+  Qed.
 
-    eapply InterpretStep.
-    repeat (apply OscNil || apply OscCons).
-    simplify.
-    unfold merge_astates, merge_astate.
-    simplify.
-
-    interpret1.
-
-    simplify.
-
-    simplify_map.
-
-    Ltac interpret1 :=
-      eapply InterpretStep; [ (repeat (apply OscNil || eapply OscCons);
-                                invert 1; repeat (match goal with
-                                                  | [ H : step _ _ |- _ ] => invert H
-                                                  | [ _ : match ?E with
-                                                          | Some n => n
-                                                          | None => 0
-                                                          end = 0 |- _ ] => cases E; try linear_arithmetic
-                                                  end; simplify); simplify;
-                                try solve [ eapply compatible_skip; eassumption
-                                          | eapply compatible_skip2; eassumption || congruence
-                                          | eapply compatible_const; eassumption ]) | ];
-      repeat match goal with
-             | [ |- context[@add ?A ?B ?m _ _] ] =>
-               match m with
-               | @empty _ _ => fail 1
-               | _ => unify m (@empty A B)
-               end
-             end.
-
-    interpret1.
-    unfold merge_astates, merge_astate; simplify.
-    interpret1.
-    unfold merge_astates, merge_astate; simplify.
-    simplify_map.
-    interpret1.
-    unfold merge_astates, merge_astate; simplify.
-    simplify_map.
-    interpret1.
+End SimpleAbstractInterpreter.

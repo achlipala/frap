@@ -178,3 +178,40 @@ Proof.
 Qed.
 
 Ltac total_ordering N M := destruct (totally_ordered N M).
+
+Ltac inList x xs :=
+  match xs with
+  | (x, _) => constr:true
+  | (_, ?xs') => inList x xs'
+  | _ => constr:false
+  end.
+
+Ltac maybe_simplify_map m found kont :=
+  match m with
+  | @empty ?A ?B => kont (@empty A B)
+  | ?m' $+ (?k, ?v) =>
+    let iL := inList k found in
+    match iL with
+    | true => maybe_simplify_map m' found kont
+    | false =>
+      maybe_simplify_map m' (k, found) ltac:(fun m' => kont (m' $+ (k, v)))
+    end
+  end.
+
+Ltac simplify_map' m found kont :=
+  match m with
+  | ?m' $+ (?k, ?v) =>
+    let iL := inList k found in
+      match iL with
+      | true => maybe_simplify_map m' found kont
+      | false =>
+        simplify_map' m' (k, found) ltac:(fun m' => kont (m' $+ (k, v)))
+      end
+  end.
+
+Ltac simplify_map :=
+  match goal with
+  | [ |- context[@add ?A ?B ?m ?k ?v] ] =>
+    simplify_map' (m $+ (k, v)) tt ltac:(fun m' =>
+                                           replace (@add A B m k v) with m' by maps_equal)
+  end.

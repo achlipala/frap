@@ -500,9 +500,7 @@ Module SimpleAbstractInterpreter.
     unfold merge_astates; simplify.
     rewrite H2.
     cases (ss' $? c); trivial.
-    unfold merge_astate; simplify.
-    f_equal.
-    maps_equal.
+    unfold merge_astate; simplify; equality.
   Qed.
 
   Theorem interpret_sound : forall c a (ss : astates a),
@@ -727,9 +725,6 @@ Module SimpleAbstractInterpreter.
       "n" <- "n" - 2
     done.
 
-  Hint Rewrite merge_empty1 merge_empty2 using solve [ eauto 1 ].
-  Hint Rewrite merge_empty1_alt merge_empty2_alt using congruence.
-
   Lemma merge_astates_fok : forall x : option (astate parity_absint),
     match x with Some x' => Some x' | None => None end = x.
   Proof.
@@ -747,55 +742,11 @@ Module SimpleAbstractInterpreter.
 
   Hint Resolve merge_astates_fok merge_astates_fok2.
 
-  Hint Rewrite merge_add1 using solve [ eauto | unfold Sets.In; simplify; equality ].
-  Hint Rewrite merge_add1_alt using solve [ congruence | unfold Sets.In; simplify; equality ].
-
-  Ltac inList x xs :=
-    match xs with
-    | (x, _) => constr:true
-    | (_, ?xs') => inList x xs'
-    | _ => constr:false
-    end.
-
-  Ltac maybe_simplify_map m found kont :=
-    match m with
-    | @empty ?A ?B => kont (@empty A B)
-    | ?m' $+ (?k, ?v) =>
-      let iL := inList k found in
-      match iL with
-      | true => maybe_simplify_map m' found kont
-      | false =>
-        maybe_simplify_map m' (k, found) ltac:(fun m' => kont (m' $+ (k, v)))
-      end
-    end.
-
-  Ltac simplify_map' m found kont :=
-    match m with
-    | ?m' $+ (?k, ?v) =>
-      let iL := inList k found in
-        match iL with
-        | true => maybe_simplify_map m' found kont
-        | false =>
-          simplify_map' m' (k, found) ltac:(fun m' => kont (m' $+ (k, v)))
-        end
-    end.
-
-  Ltac simplify_map :=
-    match goal with
-    | [ |- context[@add ?A ?B ?m ?k ?v] ] =>
-      simplify_map' (m $+ (k, v)) tt ltac:(fun m' =>
-                                             replace (@add A B m k v) with m' by maps_equal)
-    end.
-
   Definition easy :=
     "n" <- 10;;
     while "n" loop
       "n" <- "n" - 2
     done.
-
-  Ltac interpret1 := eapply InterpretStep; [ repeat (apply OscNil || apply OscCons)
-                                           | unfold merge_astates, merge_astate;
-                                             simplify; repeat simplify_map ].
 
   Lemma subsumeds_empty : forall a (ss : astates a),
     subsumeds $0 ss.
@@ -813,6 +764,10 @@ Module SimpleAbstractInterpreter.
     cases (command_equal c c0); subst; simplify; eauto.
     invert H1; eauto.
   Qed.
+
+  Ltac interpret1 := eapply InterpretStep; [ repeat (apply OscNil || apply OscCons)
+                                           | unfold merge_astates, merge_astate;
+                                             simplify; repeat simplify_map ].
 
   Ltac interpret_done := eapply InterpretDone; [
     repeat (apply OscNil || apply OscCons)
@@ -842,10 +797,9 @@ Module SimpleAbstractInterpreter.
     equality.
   Qed.
 
-  Theorem easy_even : forall v n,
-    isEven n
-    -> invariantFor (trsys_of v easy) (fun p => snd p = Skip
-                                                -> exists n, fst p $? "n" = Some n /\ isEven n).
+  Theorem easy_even : forall v,
+    invariantFor (trsys_of v easy) (fun p => snd p = Skip
+                                             -> exists n, fst p $? "n" = Some n /\ isEven n).
   Proof.
     simplify.
     eapply invariant_weaken.
@@ -861,14 +815,12 @@ Module SimpleAbstractInterpreter.
     interpret1.
     interpret1.
     interpret1.
-    interpret1.
-    interpret1.
     interpret_done.
 
     invert 1.
     first_order.
-    invert H1; simplify.
-    invert H2.
+    invert H0; simplify.
+    invert H1.
     eapply final_even; eauto; simplify; equality.
   Qed.
 

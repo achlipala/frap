@@ -143,6 +143,12 @@ Module Type S.
   Axiom lookup_split : forall A B (m : fmap A B) k v k' v',
     (m $+ (k, v)) $? k' = Some v'
     -> (k' <> k /\ m $? k' = Some v') \/ (k' = k /\ v' = v).
+
+  Hint Rewrite merge_empty1 merge_empty2 using solve [ eauto 1 ].
+  Hint Rewrite merge_empty1_alt merge_empty2_alt using congruence.
+
+  Hint Rewrite merge_add1 using solve [ eauto | unfold Sets.In; autorewrite with core in *; simpl in *; intuition congruence ].
+  Hint Rewrite merge_add1_alt using solve [ congruence | unfold Sets.In; autorewrite with core in *; simpl in *; intuition congruence ].
 End S.
 
 Module M : S.

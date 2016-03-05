@@ -93,19 +93,19 @@ Module SimpleAbstractInterpreter.
     | While e body => Some ($0 $+ (wrap Skip, s) $+ (wrap (Sequence body (While e body)), s))
     end.
 
-  Definition compatible1 a (s : astate a) (v : valuation) : Prop :=
+  Definition compatible a (s : astate a) (v : valuation) : Prop :=
     forall x xa, s $? x = Some xa
                  -> exists n, v $? x = Some n
                               /\ a.(Represents) n xa.
 
   Theorem absint_interp_ok : forall a, absint_sound a
     -> forall (s : astate a) v e,
-      compatible1 s v
+      compatible s v
       -> a.(Represents) (interp e v) (absint_interp e s).
   Proof.
     induct e; simplify; eauto.
     cases (s $? x); auto.
-    unfold compatible1 in H0.
+    unfold compatible in H0.
     apply H0 in Heq.
     invert Heq.
     propositional.
@@ -113,17 +113,17 @@ Module SimpleAbstractInterpreter.
     assumption.
   Qed.
 
-  Lemma compatible1_add : forall a (s : astate a) v x na n,
-    compatible1 s v
+  Lemma compatible_add : forall a (s : astate a) v x na n,
+    compatible s v
     -> a.(Represents) n na
-    -> compatible1 (s $+ (x, na)) (v $+ (x, n)).
+    -> compatible (s $+ (x, na)) (v $+ (x, n)).
   Proof.
-    unfold compatible1; simplify.
+    unfold compatible; simplify.
     cases (x ==v x0); simplify; eauto.
     invert H1; eauto.
   Qed.
 
-  Hint Resolve compatible1_add absint_interp_ok.
+  Hint Resolve compatible_add absint_interp_ok.
 
   Lemma command_equal : forall c1 c2 : cmd, sumbool (c1 = c2) (c1 <> c2).
   Proof.
@@ -131,11 +131,11 @@ Module SimpleAbstractInterpreter.
   Qed.
 
   Theorem absint_step_ok : forall a, absint_sound a
-    -> forall (s : astate a) v, compatible1 s v
+    -> forall (s : astate a) v, compatible s v
     -> forall c v' c', step (v, c) (v', c')
                        -> forall wrap, exists ss s', absint_step s c wrap = Some ss
                                                      /\ ss $? wrap c' = Some s'
-                                                     /\ compatible1 s' v'.
+                                                     /\ compatible s' v'.
   Proof.
     induct 2; simplify.
 
@@ -190,7 +190,7 @@ Module SimpleAbstractInterpreter.
 
   Inductive Rabsint a : valuation * cmd -> astate a * cmd -> Prop :=
   | RAbsint : forall v s c,
-    compatible1 s v
+    compatible s v
     -> Rabsint (v, c) (s, c).
 
   Hint Constructors abs_step Rabsint.
@@ -205,7 +205,7 @@ Module SimpleAbstractInterpreter.
     exists ($0, c); propositional.
     subst.
     constructor.
-    unfold compatible1.
+    unfold compatible.
     simplify.
     equality.
 
@@ -735,12 +735,6 @@ Module SimpleAbstractInterpreter.
 
   Hint Resolve merge_astates_fok merge_astates_fok2.
 
-  Definition easy :=
-    "n" <- 10;;
-    while "n" loop
-      "n" <- "n" - 2
-    done.
-
   Lemma subsumeds_empty : forall a (ss : astates a),
     subsumeds $0 ss.
   Proof.
@@ -771,12 +765,12 @@ Module SimpleAbstractInterpreter.
     | repeat (apply subsumeds_add_left || apply subsumeds_empty); (simplify; equality) ].
 
   Lemma final_even : forall (s s' : astate parity_absint) v x,
-    compatible1 s v
+    compatible s v
     -> subsumed s s'
     -> s' $? x = Some Even
     -> exists n, v $? x = Some n /\ isEven n.
   Proof.
-    unfold compatible1, subsumed; simplify.
+    unfold compatible, subsumed; simplify.
     specialize (H x); specialize (H0 x).
     cases (s $? x); simplify.
 
@@ -792,6 +786,85 @@ Module SimpleAbstractInterpreter.
     rewrite Heq in *.
     equality.
   Qed.
+
+  Definition simple :=
+    "a" <- 7;;
+    "b" <- 8;;
+    "a" <- "a" + "b";;
+    "b" <- "a" * "b".
+
+  Theorem simple_even : forall v,
+    invariantFor (trsys_of v simple) (fun p => snd p = Skip
+                                               -> exists n, fst p $? "b" = Some n /\ isEven n).
+  Proof.
+    simplify.
+    eapply invariant_weaken.
+
+    unfold simple.
+    eapply invariant_simulates.
+    apply absint_simulates with (a := parity_absint).
+    apply parity_sound.
+
+    apply interpret_sound.
+    apply parity_sound.
+
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret_done.
+
+    invert 1.
+    first_order.
+    invert H0; simplify.
+    invert H1.
+    eapply final_even; eauto; simplify; equality.
+  Qed.
+
+  Definition branchy :=
+    "a" <- 8;;
+    when "c" then
+      "b" <- "a" + 4
+    else
+      "b" <- 7
+    done.
+
+  Theorem branchy_even : forall v,
+    invariantFor (trsys_of v branchy) (fun p => snd p = Skip
+                                                -> exists n, fst p $? "a" = Some n /\ isEven n).
+  Proof.
+    simplify.
+    eapply invariant_weaken.
+
+    unfold branchy.
+    eapply invariant_simulates.
+    apply absint_simulates with (a := parity_absint).
+    apply parity_sound.
+
+    apply interpret_sound.
+    apply parity_sound.
+
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret_done.
+
+    invert 1.
+    first_order.
+    invert H0; simplify.
+    invert H1.
+    eapply final_even; eauto; simplify; equality.
+  Qed.
+
+  Definition easy :=
+    "n" <- 10;;
+    while "n" loop
+      "n" <- "n" - 2
+    done.
 
   Theorem easy_even : forall v,
     invariantFor (trsys_of v easy) (fun p => snd p = Skip

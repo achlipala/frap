@@ -243,12 +243,13 @@ Module SimpleAbstractInterpreter.
   Inductive oneStepClosure a : astates a -> astates a -> Prop :=
   | OscNil :
     oneStepClosure $0 $0
-  | OscCons : forall ss c s ss',
+  | OscCons : forall ss c s ss' ss'',
     oneStepClosure ss ss'
-    -> oneStepClosure (ss $+ (c, s)) (match absint_step s c (fun x => x) with
-                                      | None => ss'
-                                      | Some ss'' => merge_astates ss'' ss'
-                                      end).
+    -> match absint_step s c (fun x => x) with
+       | None => ss'
+       | Some ss'' => merge_astates ss'' ss'
+       end = ss''
+    -> oneStepClosure (ss $+ (c, s)) ss''.
 
   Definition subsumed a (s1 s2 : astate a) :=
     forall x, match s1 $? x with
@@ -305,8 +306,8 @@ Module SimpleAbstractInterpreter.
 
     cases (command_equal c c0); subst; simplify.
 
-    invert H1.
     invert H2.
+    invert H3.
     rewrite H5.
     unfold merge_astates; simplify.
     rewrite H7.
@@ -319,11 +320,11 @@ Module SimpleAbstractInterpreter.
     invert H1; eauto.
     eauto.
 
-    apply IHoneStepClosure in H2; auto.
-    invert H2; propositional.
+    apply IHoneStepClosure in H3; auto.
+    invert H3; propositional.
     cases (absint_step s c (fun x => x)); eauto.
     unfold merge_astates; simplify.
-    rewrite H2.
+    rewrite H3.
     cases (a0 $? c'); eauto.
     eexists; propositional.
     unfold subsumed; simplify.
@@ -717,14 +718,6 @@ Module SimpleAbstractInterpreter.
     exists x0; ring.
   Qed.
 
-  Definition loopy :=
-    "n" <- 100;;
-    "a" <- 0;;
-    while "n" loop
-      "a" <- "a" + "n";;
-      "n" <- "n" - 2
-    done.
-
   Lemma merge_astates_fok : forall x : option (astate parity_absint),
     match x with Some x' => Some x' | None => None end = x.
   Proof.
@@ -765,14 +758,17 @@ Module SimpleAbstractInterpreter.
     invert H1; eauto.
   Qed.
 
-  Ltac interpret1 := eapply InterpretStep; [ repeat (apply OscNil || apply OscCons)
-                                           | unfold merge_astates, merge_astate;
-                                             simplify; repeat simplify_map ].
+  Ltac interpret_simpl := unfold merge_astates, merge_astate;
+                         simplify; repeat simplify_map.
 
-  Ltac interpret_done := eapply InterpretDone; [
-    repeat (apply OscNil || apply OscCons)
-    | unfold merge_astates, merge_astate; simplify; repeat simplify_map;
-      repeat (apply subsumeds_add_left || apply subsumeds_empty); (simplify; equality) ].
+  Ltac oneStepClosure := apply OscNil
+                         || (eapply OscCons; [ oneStepClosure
+                                             | interpret_simpl; reflexivity ]).
+
+  Ltac interpret1 := eapply InterpretStep; [ oneStepClosure | interpret_simpl ].
+
+  Ltac interpret_done := eapply InterpretDone; [ oneStepClosure
+    | repeat (apply subsumeds_add_left || apply subsumeds_empty); (simplify; equality) ].
 
   Lemma final_even : forall (s s' : astate parity_absint) v x,
     compatible1 s v
@@ -812,6 +808,45 @@ Module SimpleAbstractInterpreter.
     apply interpret_sound.
     apply parity_sound.
 
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret_done.
+
+    invert 1.
+    first_order.
+    invert H0; simplify.
+    invert H1.
+    eapply final_even; eauto; simplify; equality.
+  Qed.
+
+  Definition loopy :=
+    "n" <- 100;;
+    "a" <- 0;;
+    while "n" loop
+      "a" <- "a" + "n";;
+      "n" <- "n" - 2
+    done.
+
+  Theorem loopy_even : forall v,
+    invariantFor (trsys_of v loopy) (fun p => snd p = Skip
+                                              -> exists n, fst p $? "n" = Some n /\ isEven n).
+  Proof.
+    simplify.
+    eapply invariant_weaken.
+
+    unfold loopy.
+    eapply invariant_simulates.
+    apply absint_simulates with (a := parity_absint).
+    apply parity_sound.
+
+    apply interpret_sound.
+    apply parity_sound.
+
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
     interpret1.
     interpret1.
     interpret1.

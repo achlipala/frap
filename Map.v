@@ -126,7 +126,8 @@ Module Type S.
 
   Hint Resolve includes_lookup includes_add empty_includes.
 
-  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne lookup_merge using congruence.
+  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
+       lookup_merge using congruence.
 
   Hint Rewrite dom_empty dom_add.
 

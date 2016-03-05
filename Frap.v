@@ -215,3 +215,5 @@ Ltac simplify_map :=
     simplify_map' (m $+ (k, v)) tt ltac:(fun m' =>
                                            replace (@add A B m k v) with m' by maps_equal)
   end.
+
+Ltac sets := Sets.sets ltac:(simpl in *; intuition (subst; auto)).

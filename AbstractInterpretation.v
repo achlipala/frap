@@ -58,12 +58,14 @@ Module SimpleAbstractInterpreter.
     JoinSoundLeft : forall x y n, a.(Represents) n x
                                   -> a.(Represents) n (a.(Join) x y);
     JoinSoundRight : forall x y n, a.(Represents) n y
-                                   -> a.(Represents) n (a.(Join) x y);
-    JoinComplete : forall x y z n, a.(Represents) n (a.(Join) x y)
-                                   -> (forall n, a.(Represents) n x -> a.(Represents) n z)
-                                   -> (forall n, a.(Represents) n y -> a.(Represents) n z)
-                                   -> a.(Represents) n z
+                                   -> a.(Represents) n (a.(Join) x y)
   }.
+
+  Definition absint_complete (a : absint) :=
+    forall x y z n, a.(Represents) n (a.(Join) x y)
+                    -> (forall n, a.(Represents) n x -> a.(Represents) n z)
+                    -> (forall n, a.(Represents) n y -> a.(Represents) n z)
+                    -> a.(Represents) n z.
 
   Hint Resolve TopSound ConstSound AddSound SubtractSound MultiplySound
        AddMonotone SubtractMonotone MultiplyMonotone
@@ -290,6 +292,17 @@ Module SimpleAbstractInterpreter.
     exists x; ring.
     exists x0; ring.
     exists x0; ring.
+  Qed.
+
+  Theorem parity_complete : absint_complete parity_absint.
+  Proof.
+    unfold absint_complete; simplify; eauto;
+    repeat match goal with
+           | [ H : parity_rep _ _ |- _ ] => invert H
+           | [ H : ~isEven _ |- _ ] => apply notEven_odd in H; invert H
+           | [ H : isEven _ |- _ ] => invert H
+           | [ p : parity |- _ ] => cases p; simplify; try equality
+           end; try solve [ exfalso; eauto ]; try (constructor; try apply odd_notEven).
     exists x0; ring.
     exists x0; ring.
   Qed.
@@ -362,7 +375,7 @@ Module SimpleAbstractInterpreter.
     Step := flow_insensitive_step (a := a) c
   |}.
 
-  Definition compatible a (s : astate a) (v : valuation) : Prop :=
+  Definition insensitive_compatible a (s : astate a) (v : valuation) : Prop :=
     forall x xa, s $? x = Some xa
                  -> (exists n, v $? x = Some n
                                /\ a.(Represents) n xa)
@@ -370,30 +383,30 @@ Module SimpleAbstractInterpreter.
 
   Inductive Rinsensitive a (c : cmd) : valuation * cmd -> astate a -> Prop :=
   | RInsensitive : forall v s c',
-    compatible s v
+    insensitive_compatible s v
     -> assignmentsOf c' \subseteq assignmentsOf c
     -> Rinsensitive c (v, c') s.
 
   Hint Constructors Rinsensitive.
 
-  Lemma compatible_add : forall a (s : astate a) v x na n,
-    compatible s v
+  Lemma insensitive_compatible_add : forall a (s : astate a) v x na n,
+    insensitive_compatible s v
     -> a.(Represents) n na
-    -> compatible (s $+ (x, na)) (v $+ (x, n)).
+    -> insensitive_compatible (s $+ (x, na)) (v $+ (x, n)).
   Proof.
-    unfold compatible; simplify.
+    unfold insensitive_compatible; simplify.
     cases (x ==v x0); simplify; eauto.
     invert H1; eauto.
   Qed.
 
   Theorem absint_interp_ok : forall a, absint_sound a
     -> forall (s : astate a) v e,
-      compatible s v
+      insensitive_compatible s v
       -> a.(Represents) (interp e v) (absint_interp e s).
   Proof.
     induct e; simplify; eauto.
     cases (s $? x); auto.
-    unfold compatible in H0.
+    unfold insensitive_compatible in H0.
     apply H0 in Heq.
     invert Heq.
     invert H1.
@@ -403,11 +416,11 @@ Module SimpleAbstractInterpreter.
     eauto.
   Qed.
 
-  Hint Resolve compatible_add absint_interp_ok.
+  Hint Resolve insensitive_compatible_add absint_interp_ok.
 
   Theorem insensitive_simulates : forall a (s : astate a) v c,
     absint_sound a
-    -> compatible s v
+    -> insensitive_compatible s v
     -> simulates (Rinsensitive (a := a) c) (trsys_of v c) (flow_insensitive_trsys s c).
   Proof.
     simplify.
@@ -433,7 +446,7 @@ Module SimpleAbstractInterpreter.
     exists (merge_astate st2 (st2 $+ (x, absint_interp x0 st2))).
     propositional; eauto.
     econstructor; eauto.
-    unfold compatible in *; simplify.
+    unfold insensitive_compatible in *; simplify.
     unfold merge_astate in *; simplify.
     cases (st2 $? x1); simplify; try equality.
     cases (x ==v x1); simplify; try equality.
@@ -585,18 +598,19 @@ Module SimpleAbstractInterpreter.
   Qed.
 
   Lemma subsumed_merge_both : forall a, absint_sound a
+    -> absint_complete a
     -> forall s1 s2 s : astate a,
       subsumed s1 s
       -> subsumed s2 s
       -> subsumed (merge_astate s1 s2) s.
   Proof.
     unfold subsumed, merge_astate; simplify.
-    specialize (H0 x).
     specialize (H1 x).
+    specialize (H2 x).
     cases (s1 $? x); auto.
     cases (s2 $? x); auto.
     simplify.
-    eauto using JoinComplete.
+    unfold absint_complete in *; eauto.
   Qed.
 
   Lemma subsumed_add : forall a, absint_sound a
@@ -614,28 +628,30 @@ Module SimpleAbstractInterpreter.
   Hint Resolve subsumed_add.
 
   Lemma iterate_ok' : forall a, absint_sound a
+    -> absint_complete a
     -> forall c (s0 s s' : astate a),
       iterate c s s'
       -> subsumed s0 s
       -> invariantFor (flow_insensitive_trsys s0 c) (fun s'' => subsumed s'' s').
   Proof.
-    induct 2; simplify.
+    induct 3; simplify.
 
     apply invariant_induction; simplify; propositional; subst; auto.
 
-    invert H3; auto.
-    eapply runAllAssignments_ok in H4; eauto.
+    invert H4; auto.
+    eapply runAllAssignments_ok in H5; eauto.
     apply subsumed_merge_both; auto.
     unfold subsumed, merge_astate; simplify.
     assert (subsumed s1 s) by assumption.
-    specialize (H3 x0).
     specialize (H4 x0).
+    specialize (H5 x0).
     cases (x ==v x0); subst; simplify; eauto.
 
     eauto using subsumed_trans.
   Qed.
 
   Theorem iterate_ok : forall a, absint_sound a
+    -> absint_complete a
     -> forall c (s0 s : astate a),
       iterate c s0 s
       -> invariantFor (flow_insensitive_trsys s0 c) (fun s' => subsumed s' s).
@@ -654,12 +670,12 @@ Module SimpleAbstractInterpreter.
     "a" <- "a" + "b".
 
   Lemma final_even : forall (s s' : astate parity_absint) v x,
-    compatible s v
+    insensitive_compatible s v
     -> subsumed s s'
     -> s' $? x = Some Even
     -> exists n, v $? x = Some n /\ isEven n.
   Proof.
-    unfold compatible, subsumed; simplify.
+    unfold insensitive_compatible, subsumed; simplify.
     specialize (H x); specialize (H0 x).
     cases (s $? x); simplify.
 
@@ -693,7 +709,7 @@ Module SimpleAbstractInterpreter.
     apply insensitive_simulates with (s := $0 $+ ("a", Even) $+ ("b", Even))
                                      (a := parity_absint).
     apply parity_sound.
-    unfold compatible; simplify.
+    unfold insensitive_compatible; simplify.
     cases (x ==v "b"); simplify.
     invert H; eauto.
     cases (x ==v "a"); simplify.
@@ -702,6 +718,7 @@ Module SimpleAbstractInterpreter.
 
     apply iterate_ok.
     apply parity_sound.
+    apply parity_complete.
 
     iterate1.
     iterate_done.
@@ -732,7 +749,7 @@ Module SimpleAbstractInterpreter.
     apply insensitive_simulates with (s := $0 $+ ("a", Even) $+ ("b", Even))
                                      (a := parity_absint).
     apply parity_sound.
-    unfold compatible; simplify.
+    unfold insensitive_compatible; simplify.
     cases (x ==v "b"); simplify.
     invert H; eauto.
     cases (x ==v "a"); simplify.
@@ -741,6 +758,7 @@ Module SimpleAbstractInterpreter.
 
     apply iterate_ok.
     apply parity_sound.
+    apply parity_complete.
 
     iterate1.
     iterate_done.
@@ -771,7 +789,7 @@ Module SimpleAbstractInterpreter.
     apply insensitive_simulates with (s := $0 $+ ("n", Even) $+ ("a", Even))
                                      (a := parity_absint).
     apply parity_sound.
-    unfold compatible; simplify.
+    unfold insensitive_compatible; simplify.
     cases (x ==v "a"); simplify.
     invert H; eauto.
     cases (x ==v "n"); simplify.
@@ -780,6 +798,7 @@ Module SimpleAbstractInterpreter.
 
     apply iterate_ok.
     apply parity_sound.
+    apply parity_complete.
 
     iterate_done.
 
@@ -790,6 +809,40 @@ Module SimpleAbstractInterpreter.
 
 
   (** * Flow-sensitive analysis *)
+
+  Definition compatible a (s : astate a) (v : valuation) : Prop :=
+    forall x xa, s $? x = Some xa
+                 -> exists n, v $? x = Some n
+                              /\ a.(Represents) n xa.
+
+  Lemma compatible_add : forall a (s : astate a) v x na n,
+    compatible s v
+    -> a.(Represents) n na
+    -> compatible (s $+ (x, na)) (v $+ (x, n)).
+  Proof.
+    unfold compatible; simplify.
+    cases (x ==v x0); simplify; eauto.
+    invert H1; eauto.
+  Qed.
+
+  Hint Resolve compatible_add.
+
+  Theorem absint_interp_ok2 : forall a, absint_sound a
+    -> forall (s : astate a) v e,
+      compatible s v
+      -> a.(Represents) (interp e v) (absint_interp e s).
+  Proof.
+    induct e; simplify; eauto.
+    cases (s $? x); auto.
+    unfold compatible in H0.
+    apply H0 in Heq.
+    invert Heq.
+    propositional.
+    rewrite H2.
+    assumption.
+  Qed.
+
+  Hint Resolve absint_interp_ok2.
 
   Definition astates (a : absint) := fmap cmd (astate a).
 
@@ -1154,6 +1207,30 @@ Module SimpleAbstractInterpreter.
     "a" <- "a" + "b";;
     "b" <- "a" * "b".
 
+  Lemma final_even2 : forall (s s' : astate parity_absint) v x,
+    compatible s v
+    -> subsumed s s'
+    -> s' $? x = Some Even
+    -> exists n, v $? x = Some n /\ isEven n.
+  Proof.
+    unfold insensitive_compatible, subsumed; simplify.
+    specialize (H x); specialize (H0 x).
+    cases (s $? x); simplify.
+
+    rewrite Heq in *.
+    assert (Some t = Some t) by equality.
+    apply H in H2.
+    first_order.
+
+    eapply H0 in H1.
+    invert H1.
+    eauto.
+    assumption.
+
+    rewrite Heq in *.
+    equality.
+  Qed.
+
   Theorem simple_even : forall v,
     invariantFor (trsys_of v simple) (fun p => snd p = Skip
                                                -> exists n, fst p $? "b" = Some n /\ isEven n).
@@ -1182,7 +1259,7 @@ Module SimpleAbstractInterpreter.
     first_order.
     invert H0; simplify.
     invert H1.
-    eapply final_even; eauto; simplify; equality.
+    eapply final_even2; eauto; simplify; try equality.
   Qed.
 
   Definition branchy :=
@@ -1218,7 +1295,7 @@ Module SimpleAbstractInterpreter.
     first_order.
     invert H0; simplify.
     invert H1.
-    eapply final_even; eauto; simplify; equality.
+    eapply final_even2; eauto; simplify; equality.
   Qed.
 
   Definition easy :=
@@ -1251,7 +1328,7 @@ Module SimpleAbstractInterpreter.
     first_order.
     invert H0; simplify.
     invert H1.
-    eapply final_even; eauto; simplify; equality.
+    eapply final_even2; eauto; simplify; equality.
   Qed.
 
   Theorem loopy_even_again : forall v,
@@ -1282,7 +1359,7 @@ Module SimpleAbstractInterpreter.
     first_order.
     invert H0; simplify.
     invert H1.
-    eapply final_even; eauto; simplify; equality.
+    eapply final_even2; eauto; simplify; equality.
   Qed.
 
 
@@ -1621,11 +1698,6 @@ Module SimpleAbstractInterpreter.
     apply H in H2.
     first_order.
 
-    specialize (H2 (S u)).
-    eapply H0 in H2; eauto.
-    invert H2; simplify.
-    exfalso; linear_arithmetic.
-
     rewrite Heq in *.
     equality.
   Qed.
@@ -1673,12 +1745,175 @@ Module SimpleAbstractInterpreter.
     eapply final_upper; eauto; simplify; equality.
   Qed.
 
-  (*Definition ge7 :=
-    "n" <- 100;;
+
+  (** * Let's redo that definition for better termination behavior. *)
+
+  Definition interval_widen (x y : interval) :=
+    if impossible x then y
+    else if impossible y then x
+         else {| Lower := if x.(Lower) <=? y.(Lower) then x.(Lower) else 0;
+                 Upper := match x.(Upper) with
+                          | None => None
+                          | Some x2 =>
+                            match y.(Upper) with
+                            | None => None
+                            | Some y2 => if y2 <=? x2 then Some x2 else None
+                            end
+                          end |}.
+
+  Lemma interval_widen_impossible1 : forall x y,
+    impossible x = true
+    -> interval_widen x y = y.
+  Proof.
+    unfold interval_widen; simplify.
+    rewrite H; equality.
+  Qed.
+
+  Lemma interval_widen_impossible2 : forall x y,
+    impossible x = false
+    -> impossible y = true
+    -> interval_widen x y = x.
+  Proof.
+    unfold interval_widen; simplify.
+    rewrite H, H0; equality.
+  Qed.
+
+  Lemma interval_widen_possible : forall x y,
+    impossible x = false
+    -> impossible y = false
+    -> interval_widen x y = {| Lower := if x.(Lower) <=? y.(Lower) then x.(Lower) else 0;
+                               Upper := match x.(Upper) with
+                                        | None => None
+                                        | Some x2 =>
+                                          match y.(Upper) with
+                                          | None => None
+                                          | Some y2 => if y2 <=? x2 then Some x2 else None
+                                          end
+                                        end |}.
+  Proof.
+    unfold interval_widen; simplify.
+    rewrite H, H0; equality.
+  Qed.
+
+  Hint Rewrite interval_widen_impossible1 interval_widen_impossible2 interval_widen_possible
+       using assumption.
+
+  Definition interval_absint_widening := {|
+    Top := {| Lower := 0; Upper := None |};
+    Constant := fun n => {| Lower := n;
+                            Upper := Some n |};
+    Add := interval_combine plus;
+    Subtract := interval_subtract;
+    Multiply := interval_combine mult;
+    Join := interval_widen;
+    Represents := interval_rep
+  |}.
+
+  Theorem interval_widening_sound : absint_sound interval_absint_widening.
+  Proof.
+    constructor; simplify; eauto;
+    repeat match goal with
+           | [ x : interval |- _ ] => cases x
+           end; simplify;
+    (repeat match goal with
+            | [ _ : interval_rep _ (interval_widen ?x ?y) |- _ ] =>
+              cases (impossible x); simplify; eauto;
+              cases (impossible y); simplify; eauto
+            | [ H : interval_rep _ ?x |- _ ] =>
+              cases (impossible x); [ exfalso; solve [ eauto using impossible_sound ] | invert H ]
+            | [ H : impossible _ = _ |- _ ] => apply interval_combine_possible_bwd in H; propositional; simplify
+            | [ H : impossible _ = _ |- _ ] => apply interval_subtract_possible_bwd in H; propositional; simplify
+            | [ H : forall x, _ |- _ ] => apply interval_imply in H; auto
+            | [ |- context[interval_widen ?x _] ] =>
+              match goal with
+              | [ _ : impossible x = _ |- _ ] => fail 1
+              | _ => cases (impossible x); simplify
+              end
+            | [ |- context[interval_widen _ ?x] ] =>
+              match goal with
+              | [ _ : impossible x = _ |- _ ] => fail 1
+              | _ => cases (impossible x); simplify
+              end
+            end; propositional; constructor; simplify;
+     repeat match goal with
+            | [ H : Some _ = Some _ |- _] => invert H
+            | [ _ : context[match ?X with _ => _ end] |- _ ] => cases X
+            | [ |- context[match ?X with _ => _ end] ] => cases X
+            end; eauto; try equality; linear_arithmetic).
+  Qed.
+
+  Lemma merge_astates_fok_interval_widening : forall x : option (astate interval_absint_widening),
+    match x with Some x' => Some x' | None => None end = x.
+  Proof.
+    simplify; cases x; equality.
+  Qed.
+
+  Lemma merge_astates_fok2_interval_widening : forall x (y : option (astate interval_absint_widening)),
+      match y with
+      | Some y' => Some (merge_astate x y')
+      | None => Some x
+      end = None -> False.
+  Proof.
+    simplify; cases y; equality.
+  Qed.
+
+  Hint Resolve merge_astates_fok_interval_widening merge_astates_fok2_interval_widening.
+
+  Definition ge7 :=
     "a" <- 7;;
-    while "n" loop
-      "a" <- "a" + "n";;
-      "n" <- "n" - 1
-    done.*)
+    while "a" loop
+      "a" <- "a" + 3
+    done.
+
+  Lemma final_lower_widening : forall (s s' : astate interval_absint_widening) v x l,
+    compatible s v
+    -> subsumed s s'
+    -> s' $? x = Some {| Lower := l; Upper := None |}
+    -> exists n, v $? x = Some n /\ n >= l.
+  Proof.
+    unfold compatible, subsumed; simplify.
+    specialize (H x); specialize (H0 x).
+    cases (s $? x); simplify.
+
+    rewrite Heq in *.
+    assert (Some t = Some t) by equality.
+    apply H in H2.
+    first_order.
+
+    rewrite Heq in *.
+    equality.
+  Qed.
+
+  Theorem ge7_ok : forall v,
+    invariantFor (trsys_of v ge7)
+                 (fun p => snd p = Skip
+                           -> exists n, fst p $? "a" = Some n /\ n >= 7).
+  Proof.
+    simplify.
+    eapply invariant_weaken.
+
+    unfold ge7.
+    eapply invariant_simulates.
+    apply absint_simulates with (a := interval_absint_widening).
+    apply interval_widening_sound.
+
+    apply interpret_sound.
+    apply interval_widening_sound.
+
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    unfold interval_combine, interval_widen; simplify.
+    interpret_done.
+
+    invert 1.
+    first_order.
+    invert H0; simplify.
+    invert H1.
+    eapply final_lower_widening; eauto; simplify; equality.
+  Qed.
 
 End SimpleAbstractInterpreter.

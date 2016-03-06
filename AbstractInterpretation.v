@@ -1102,13 +1102,13 @@ Module SimpleAbstractInterpreter.
 
 
 
-  Lemma merge_astates_fok : forall x : option (astate parity_absint),
+  Lemma merge_astates_fok_parity : forall x : option (astate parity_absint),
     match x with Some x' => Some x' | None => None end = x.
   Proof.
     simplify; cases x; equality.
   Qed.
 
-  Lemma merge_astates_fok2 : forall x (y : option (astate parity_absint)),
+  Lemma merge_astates_fok2_parity : forall x (y : option (astate parity_absint)),
       match y with
       | Some y' => Some (merge_astate x y')
       | None => Some x
@@ -1117,7 +1117,7 @@ Module SimpleAbstractInterpreter.
     simplify; cases y; equality.
   Qed.
 
-  Hint Resolve merge_astates_fok merge_astates_fok2.
+  Hint Resolve merge_astates_fok_parity merge_astates_fok2_parity.
 
   Lemma subsumeds_empty : forall a (ss : astates a),
     subsumeds $0 ss.
@@ -1350,32 +1350,6 @@ Module SimpleAbstractInterpreter.
 
   Hint Rewrite interval_join_impossible1 interval_join_impossible2 interval_join_possible
        using assumption.
-
-  (*Lemma interval_join_possible_bwd : forall x y,
-    impossible (interval_join x y) = false
-    -> impossible x = false /\ impossible y = false.
-  Proof.
-    unfold impossible, interval_join; simplify.
-    repeat match goal with
-           | [ H : Some _ = Some _ |- _ ] => invert H
-           | [ _ : context[match ?E with _ => _ end] |- _ ] => cases E; simplify
-           | [ |- context[match ?E with _ => _ end] ] => cases E; simplify
-           end; propositional.
-    
-
-    exfalso; linear_arithmetic.
-    invert Heq.
-
-    cases (Upper x); simplify.
-    cases (Upper y); simplify.
-    cases (min (Lower x) (Lower y) <=? max n n0).
-    cases (Lower x <=? n).
-    cases (Lower x <=? n).
-
-    cases (impossible x); simplify.
-    unfold impossible in H; simplify; equality.
-    cases (impossible y); simplify; equality.
-  Qed.*)
 
   Definition interval_combine (f : nat -> nat -> nat) (x y : interval) :=
     if impossible x || impossible y then
@@ -1614,5 +1588,97 @@ Module SimpleAbstractInterpreter.
             | [ |- context[match ?X with _ => _ end] ] => cases X
             end; eauto; try equality; linear_arithmetic).
   Qed.
+
+  Lemma merge_astates_fok_interval : forall x : option (astate interval_absint),
+    match x with Some x' => Some x' | None => None end = x.
+  Proof.
+    simplify; cases x; equality.
+  Qed.
+
+  Lemma merge_astates_fok2_interval : forall x (y : option (astate interval_absint)),
+      match y with
+      | Some y' => Some (merge_astate x y')
+      | None => Some x
+      end = None -> False.
+  Proof.
+    simplify; cases y; equality.
+  Qed.
+
+  Hint Resolve merge_astates_fok_interval merge_astates_fok2_interval.
+
+  Lemma final_upper : forall (s s' : astate interval_absint) v x l u,
+    compatible s v
+    -> subsumed s s'
+    -> s' $? x = Some {| Lower := l; Upper := Some u |}
+    -> exists n, v $? x = Some n /\ n <= u.
+  Proof.
+    unfold compatible, subsumed; simplify.
+    specialize (H x); specialize (H0 x).
+    cases (s $? x); simplify.
+
+    rewrite Heq in *.
+    assert (Some t = Some t) by equality.
+    apply H in H2.
+    first_order.
+
+    specialize (H2 (S u)).
+    eapply H0 in H2; eauto.
+    invert H2; simplify.
+    exfalso; linear_arithmetic.
+
+    rewrite Heq in *.
+    equality.
+  Qed.
+
+  Hint Rewrite Nat.min_l Nat.min_r Nat.max_l Nat.max_r using linear_arithmetic.
+
+  Definition interval_test :=
+    "a" <- 6;;
+    "b" <- 7;;
+    when "c" then
+      "a" <- "a" + "b"
+    else
+      "b" <- "a" * "b"
+    done.
+
+  Theorem interval_test_ok : forall v,
+    invariantFor (trsys_of v interval_test)
+                 (fun p => snd p = Skip
+                           -> exists n, fst p $? "b" = Some n /\ n <= 42).
+  Proof.
+    simplify.
+    eapply invariant_weaken.
+
+    unfold interval_test.
+    eapply invariant_simulates.
+    apply absint_simulates with (a := interval_absint).
+    apply interval_sound.
+
+    apply interpret_sound.
+    apply interval_sound.
+
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    interpret1.
+    unfold interval_join, interval_combine; simplify.
+    interpret_done.
+
+    invert 1.
+    first_order.
+    invert H0; simplify.
+    invert H1.
+    eapply final_upper; eauto; simplify; equality.
+  Qed.
+
+  (*Definition ge7 :=
+    "n" <- 100;;
+    "a" <- 7;;
+    while "n" loop
+      "a" <- "a" + "n";;
+      "n" <- "n" - 1
+    done.*)
 
 End SimpleAbstractInterpreter.

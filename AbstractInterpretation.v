@@ -59,8 +59,10 @@ Module SimpleAbstractInterpreter.
                                   -> a.(Represents) n (a.(Join) x y);
     JoinSoundRight : forall x y n, a.(Represents) n y
                                    -> a.(Represents) n (a.(Join) x y);
-    JoinComplete : forall x y n, a.(Represents) n (a.(Join) x y)
-                                 -> a.(Represents) n x \/ a.(Represents) n y
+    JoinComplete : forall x y z n, a.(Represents) n (a.(Join) x y)
+                                   -> (forall n, a.(Represents) n x -> a.(Represents) n z)
+                                   -> (forall n, a.(Represents) n y -> a.(Represents) n z)
+                                   -> a.(Represents) n z
   }.
 
   Hint Resolve TopSound ConstSound AddSound SubtractSound MultiplySound
@@ -288,6 +290,8 @@ Module SimpleAbstractInterpreter.
     exists x; ring.
     exists x0; ring.
     exists x0; ring.
+    exists x0; ring.
+    exists x0; ring.
   Qed.
 
 
@@ -433,7 +437,7 @@ Module SimpleAbstractInterpreter.
     unfold merge_astate in *; simplify.
     cases (st2 $? x1); simplify; try equality.
     cases (x ==v x1); simplify; try equality.
-    invert H5; eauto 10.
+    invert H5; eauto 6.
     rewrite Heq in H5.
     invert H5; eauto.
     apply H3 in Heq; propositional; eauto.
@@ -592,7 +596,7 @@ Module SimpleAbstractInterpreter.
     cases (s1 $? x); auto.
     cases (s2 $? x); auto.
     simplify.
-    apply JoinComplete in H3; propositional; eauto.
+    eauto using JoinComplete.
   Qed.
 
   Lemma subsumed_add : forall a, absint_sound a
@@ -1279,6 +1283,336 @@ Module SimpleAbstractInterpreter.
     invert H0; simplify.
     invert H1.
     eapply final_even; eauto; simplify; equality.
+  Qed.
+
+
+  (** * Another abstract interpretation: intervals *)
+
+  Record interval := {
+    Lower : nat;
+    Upper : option nat
+  }.
+
+  Infix "<=?" := le_lt_dec.
+
+  Definition impossible (x : interval) :=
+    match x.(Upper) with
+    | None => false
+    | Some u => if x.(Lower) <=? u then false else true
+    end.
+
+  Definition interval_join (x y : interval) :=
+    if impossible x then y
+    else if impossible y then x
+         else {| Lower := min x.(Lower) y.(Lower);
+                 Upper := match x.(Upper) with
+                          | None => None
+                          | Some x2 =>
+                            match y.(Upper) with
+                            | None => None
+                            | Some y2 => Some (max x2 y2)
+                            end
+                          end |}.
+
+  Lemma interval_join_impossible1 : forall x y,
+    impossible x = true
+    -> interval_join x y = y.
+  Proof.
+    unfold interval_join; simplify.
+    rewrite H; equality.
+  Qed.
+
+  Lemma interval_join_impossible2 : forall x y,
+    impossible x = false
+    -> impossible y = true
+    -> interval_join x y = x.
+  Proof.
+    unfold interval_join; simplify.
+    rewrite H, H0; equality.
+  Qed.
+
+  Lemma interval_join_possible : forall x y,
+    impossible x = false
+    -> impossible y = false
+    -> interval_join x y = {| Lower := min x.(Lower) y.(Lower);
+                              Upper := match x.(Upper) with
+                                       | None => None
+                                       | Some x2 =>
+                                         match y.(Upper) with
+                                         | None => None
+                                         | Some y2 => Some (max x2 y2)
+                                         end
+                                       end |}.
+  Proof.
+    unfold interval_join; simplify.
+    rewrite H, H0; equality.
+  Qed.
+
+  Hint Rewrite interval_join_impossible1 interval_join_impossible2 interval_join_possible
+       using assumption.
+
+  (*Lemma interval_join_possible_bwd : forall x y,
+    impossible (interval_join x y) = false
+    -> impossible x = false /\ impossible y = false.
+  Proof.
+    unfold impossible, interval_join; simplify.
+    repeat match goal with
+           | [ H : Some _ = Some _ |- _ ] => invert H
+           | [ _ : context[match ?E with _ => _ end] |- _ ] => cases E; simplify
+           | [ |- context[match ?E with _ => _ end] ] => cases E; simplify
+           end; propositional.
+    
+
+    exfalso; linear_arithmetic.
+    invert Heq.
+
+    cases (Upper x); simplify.
+    cases (Upper y); simplify.
+    cases (min (Lower x) (Lower y) <=? max n n0).
+    cases (Lower x <=? n).
+    cases (Lower x <=? n).
+
+    cases (impossible x); simplify.
+    unfold impossible in H; simplify; equality.
+    cases (impossible y); simplify; equality.
+  Qed.*)
+
+  Definition interval_combine (f : nat -> nat -> nat) (x y : interval) :=
+    if impossible x || impossible y then
+      {| Lower := 1; Upper := Some 0 |}
+    else {| Lower := f x.(Lower) y.(Lower);
+            Upper := match x.(Upper) with
+                     | None => None
+                     | Some x2 =>
+                       match y.(Upper) with
+                       | None => None
+                       | Some y2 => Some (f x2 y2)
+                       end
+                     end |}.
+
+  Lemma interval_combine_possible_fwd : forall f x y,
+    impossible x = false
+    -> impossible y = false
+    -> interval_combine f x y
+       = {| Lower := f x.(Lower) y.(Lower);
+            Upper := match x.(Upper) with
+                     | None => None
+                     | Some x2 =>
+                       match y.(Upper) with
+                       | None => None
+                       | Some y2 => Some (f x2 y2)
+                       end
+                     end |}.
+  Proof.
+    unfold interval_combine; simplify.
+    rewrite H, H0; simplify; equality.
+  Qed.
+
+  Lemma interval_combine_possible_bwd : forall f x y,
+    impossible (interval_combine f x y) = false
+    -> impossible x = false /\ impossible y = false.
+  Proof.
+    unfold interval_combine; simplify.
+    cases (impossible x); simplify.
+    unfold impossible in H; simplify; equality.
+    cases (impossible y); simplify; equality.
+  Qed.
+
+  Hint Rewrite interval_combine_possible_fwd using assumption.
+
+  Definition interval_subtract (x y : interval) :=
+    if impossible x || impossible y then
+      {| Lower := 1; Upper := Some 0 |}
+    else
+      {| Lower := match y.(Upper) with
+                  | None => 0
+                  | Some y2 => x.(Lower) - y2
+                  end;
+         Upper := match x.(Upper) with
+                  | None => None
+                  | Some x2 => Some (x2 - y.(Lower))
+                  end |}.
+
+  Lemma interval_subtract_possible_fwd : forall x y,
+    impossible x = false
+    -> impossible y = false
+    -> interval_subtract x y
+       = {| Lower := match y.(Upper) with
+                     | None => 0
+                     | Some y2 => x.(Lower) - y2
+                     end;
+            Upper := match x.(Upper) with
+                     | None => None
+                     | Some x2 => Some (x2 - y.(Lower))
+                     end |}.
+  Proof.
+    unfold interval_subtract; simplify.
+    rewrite H, H0; simplify; equality.
+  Qed.
+
+  Lemma interval_subtract_possible_bwd : forall x y,
+    impossible (interval_subtract x y) = false
+    -> impossible x = false /\ impossible y = false.
+  Proof.
+    unfold interval_subtract; simplify.
+    cases (impossible x); simplify.
+    unfold impossible in H; simplify; equality.
+    cases (impossible y); simplify; equality.
+  Qed.
+
+  Hint Rewrite interval_subtract_possible_fwd using assumption.
+
+  Record interval_rep (n : nat) (i : interval) : Prop := {
+    BoundedBelow : i.(Lower) <= n;
+    BoundedAbove : match i.(Upper) with
+                   | None => True
+                   | Some n2 => n <= n2
+                   end
+  }.
+
+  Hint Constructors interval_rep.
+
+  Definition interval_absint := {|
+    Top := {| Lower := 0; Upper := None |};
+    Constant := fun n => {| Lower := n;
+                            Upper := Some n |};
+    Add := interval_combine plus;
+    Subtract := interval_subtract;
+    Multiply := interval_combine mult;
+    Join := interval_join;
+    Represents := interval_rep
+  |}.
+
+  Hint Resolve mult_le_compat.
+
+  Lemma interval_imply : forall k1 k2 u1 u2,
+      impossible {| Lower := k1; Upper := u1 |} = false
+      -> (forall n,
+             interval_rep n {| Lower := k1; Upper := u1 |}
+             -> interval_rep n {| Lower := k2; Upper := u2 |})
+      -> k1 >= k2
+         /\ match u2 with
+            | None => True
+            | Some u2' => match u1 with
+                          | None => False
+                          | Some u1' => u1' <= u2'
+                          end
+            end
+         /\ impossible {| Lower := k2; Upper := u2 |} = false.
+  Proof.
+    simplify.
+    assert (k1 >= k2 \/ k1 < k2) by linear_arithmetic.
+    invert H1.
+    propositional.
+
+    cases u2; auto.
+    cases u1.
+    assert (n >= n0 \/ n < n0) by linear_arithmetic.
+    propositional.
+    exfalso.
+    assert (interval_rep n0 {| Lower := k2; Upper := Some n |}).
+    apply H0.
+    constructor; simplify; auto.
+    unfold impossible in H; simplify.
+    cases (k1 <=? n0); equality.
+    invert H1; simplify; auto.
+    linear_arithmetic.
+    assert (interval_rep (S (max k1 n)) {| Lower := k2; Upper := Some n |}).
+    apply H0.
+    constructor; simplify; auto.
+    linear_arithmetic.
+    invert H1; simplify; linear_arithmetic.
+
+    unfold impossible; simplify.
+    cases u2; try equality.
+    cases (k2 <=? n); try equality; try linear_arithmetic.
+    exfalso.
+    assert (interval_rep k1 {| Lower := k2; Upper := Some n |}).
+    apply H0.
+    unfold impossible in H; simplify.
+    cases u1.
+    cases (k1 <=? n0); try equality.
+    constructor; simplify; linear_arithmetic.
+    constructor; simplify; auto; linear_arithmetic.
+    invert H1; simplify.
+    linear_arithmetic.
+
+    exfalso.
+    assert (interval_rep k1 {| Lower := k2; Upper := u2 |}).
+    apply H0.
+    unfold impossible in H; simplify.
+    cases u1.
+    cases (k1 <=? n); try equality.
+    constructor; simplify; linear_arithmetic.
+    constructor; simplify; auto; linear_arithmetic.
+    invert H1; simplify; try linear_arithmetic.
+  Qed.
+
+  Lemma impossible_sound : forall n x,
+    interval_rep n x
+    -> impossible x = true
+    -> False.
+  Proof.
+    invert 1.
+    unfold impossible.
+    cases (Upper x); simplify; try equality.
+    cases (Lower x <=? n0); try equality.
+    linear_arithmetic.
+  Qed.
+
+  Lemma mult_bound1 : forall a b n a' b',
+    a' * b' <= n
+    -> a <= a'
+    -> b <= b'
+    -> a * b <= n.
+  Proof.
+    simplify.
+    transitivity (a' * b'); eauto.
+  Qed.
+
+  Lemma mult_bound2 : forall a b n a' b',
+    n <= a' * b'
+    -> a' <= a
+    -> b' <= b
+    -> n <= a * b.
+  Proof.
+    simplify.
+    transitivity (a' * b'); eauto.
+  Qed.
+
+  Hint Immediate mult_bound1 mult_bound2.
+
+  Theorem interval_sound : absint_sound interval_absint.
+  Proof.
+    constructor; simplify; eauto;
+    repeat match goal with
+           | [ x : interval |- _ ] => cases x
+           end; simplify;
+    (repeat match goal with
+            | [ _ : interval_rep _ (interval_join ?x ?y) |- _ ] =>
+              cases (impossible x); simplify; eauto;
+              cases (impossible y); simplify; eauto
+            | [ H : interval_rep _ ?x |- _ ] =>
+              cases (impossible x); [ exfalso; solve [ eauto using impossible_sound ] | invert H ]
+            | [ H : impossible _ = _ |- _ ] => apply interval_combine_possible_bwd in H; propositional; simplify
+            | [ H : impossible _ = _ |- _ ] => apply interval_subtract_possible_bwd in H; propositional; simplify
+            | [ H : forall x, _ |- _ ] => apply interval_imply in H; auto
+            | [ |- context[interval_join ?x _] ] =>
+              match goal with
+              | [ _ : impossible x = _ |- _ ] => fail 1
+              | _ => cases (impossible x); simplify
+              end
+            | [ |- context[interval_join _ ?x] ] =>
+              match goal with
+              | [ _ : impossible x = _ |- _ ] => fail 1
+              | _ => cases (impossible x); simplify
+              end
+            end; propositional; constructor; simplify;
+     repeat match goal with
+            | [ H : Some _ = Some _ |- _] => invert H
+            | [ _ : context[match ?X with _ => _ end] |- _ ] => cases X
+            | [ |- context[match ?X with _ => _ end] ] => cases X
+            end; eauto; try equality; linear_arithmetic).
   Qed.
 
 End SimpleAbstractInterpreter.

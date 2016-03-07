@@ -1698,6 +1698,130 @@ Almost every new proof technique is phrased as an approach to establishing invar
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Abstract Interpretation and Dataflow Analysis}
+
+The last two chapters showed us both how to build a transition system from a program automatically and how to find an invariant for a transition system automatically.
+Let's now combine these ideas to find invariants for programs automatically, in a particular way associated with the technique of \emph{dataflow analysis}\index{dataflow analysis} used to drive many compiler optimizations.
+Throughout, we'll stick with the example of the small imperative language whose semantics we studied in the last chapter.
+We'll confine our attention to its basic small-step semantics via the $\to$ relation.
+
+Model checking builds up increasingly larger finite sets of reachable states in a system.
+A state $(v, c)$ of our imperative language combines \emph{control state}\index{control state} $c$ (the next command to execute) with \emph{data state} $v$ (the values of the variables), and so model checking will find invariants that restrict both components.
+We say that model checking is \emph{path-sensitive}\index{path-sensitive analysis} because its invariants can distinguish between the different data states that can be associated with the same control state, reached along different paths in the program's executions.
+Path-sensitive analyses tend to be much more computationally expensive than \emph{path-insensitive}\index{path-insensitive analysis} analyses, whose invariants collapse together all ways of reaching the same control state.
+Dataflow analysis is one such path-insensitive approach, and its underlying theory is \emph{abstract interpretation}\index{abstract interpretation}.
+
+
+\section{Definition of an Abstract Interpretation}
+
+An abstract interpretation is a particular sort of abstraction, of the kind we met in studying model checking.
+In that more general setting, we can represent concrete states with any sorts of abstract states.
+In abstract interpretation, we most commonly associate each variable with an independent abstract description.
+One example, which we'll formalize in more detail shortly, would be to label each variable as ``even,'' ``odd,'' or ``either.''
+
+\newcommand{\join}[0]{\sqcup}
+
+\begin{definition}
+  An \emph{abstract interpretation} (for our example imperative language) is a tuple $\angled{\mathbb D, \top, \mathcal C, \hat{+}, \hat{-}, \hat{\times}, \join, \mathcal R}$, where $\mathbb D$ is a set (the domain of the analysis); $\top \in \mathbb D$; $\mathcal C : \mathbb N \to \mathbb D$; $\hat{+}, \hat{-}, \hat{\times}, \join : \mathbb D \times \mathbb D \to \mathbb D$; and $\mathcal R \subseteq \mathbb N \times \mathbb D$.
+  The idea is that:
+  \begin{itemize}
+  \item Abstract versions of numbers are $\mathbb D$ values.
+  \item $\top$ (``top'')\index{top element of an abstract interpretation} is the least specific abstract value, representing any concrete value.
+  \item $\mathcal C$ maps any constant to its most precise abstraction.
+  \item $\hat{+}$, $\hat{-}$, and $\hat{\times}$ push abstraction through arithmetic operators, calculating their most precise abstractions.
+  \item $\join$ (``join'')\index{join operation of an abstract interpretation} computes the \emph{least upper bound}\index{least upper bound} of two abstract values: the most specific value that represents any value associated with either input.
+  \item $\mathcal R$ formalizes the idea of which concrete values are covered by which abstract values.
+  \end{itemize}
+
+  For $a, b \in \mathbb D$, define $a \sqsubseteq b$ to mean $\forall n \in \mathbb N. \; (n \; \mathcal R \; a) \Rightarrow (n \; \mathcal R \; b)$.  That is, $b$ is at least as general as $a$.
+  An abstract interpretation must satsify the following algebraic laws:
+  \begin{itemize}
+  \item $\forall a \in \mathbb D. \; a \sqsubseteq \top$
+  \item $\forall n \in \mathbb N. \; n \; \mathcal R \; \mathcal C(n)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n + m) \; \mathcal R \; (a \hat{+} b)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n - m) \; \mathcal R \; (a \hat{-} b)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n \times m) \; \mathcal R \; (a \hat{\times} b)$
+  \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{+} b) \sqsubseteq (a' \hat{+} b')$
+  \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{-} b) \sqsubseteq (a' \hat{-} b')$
+  \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{\times} b) \sqsubseteq (a' \hat{\times} b')$
+  \item $\forall a, b \in \mathbb D. \; a \sqsubseteq (a \join b)$
+  \item $\forall a, b \in \mathbb D. \; b \sqsubseteq (a \join b)$
+  \end{itemize}
+\end{definition}
+
+As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise to the reader.
+
+\newcommand{\E}[0]{\mathsf{E}}
+\renewcommand{\O}[0]{\mathsf{O}}
+\begin{eqnarray*}
+  \mathbb D &=& \{\E, \O, \top\} \\
+  \mathcal C(n) &=& \textrm{$\E$ or $\O$, depending on parity of $n$} \\
+  \E \; \hat{+} \; \E &=& \E \\
+  \E \; \hat{+} \; \O &=& \O \\
+  \O \; \hat{+} \; \E &=& \O \\
+  \O \; \hat{+} \; \O &=& \E \\
+  \_ \; \hat{+} \; \_ &=& \top \\
+  \E \; \hat{-} \; \E &=& \E \\
+  \_ \; \hat{-} \; \_ &=& \top \\
+  \E \; \hat{\times} \; \_ &=& \E \\
+  \_ \; \hat{\times} \; \E &=& \E \\
+  \O \; \hat{\times} \; \O &=& \O \\
+  \top \; \hat{\times} \; \top &=& \top \\
+  \E \join \E &=& \E \\
+  \O \join \O &=& \O \\
+  \_ \join \_ &=& \top \\
+  n \; \mathcal R \; \E &=& \textrm{$n$ is even} \\
+  n \; \mathcal R \; \O &=& \textrm{$n$ is odd} \\
+  n \; \mathcal R \; \top &=& \textrm{always}
+\end{eqnarray*}
+
+We generally think of an abstract interpretation as forming a \emph{lattice}\index{lattice}, which is roughly the algebraic structure characterized by operations like $\join$, when $\join$ truly returns the \emph{most specific} or \emph{least} upper bound of its two arguments.  We visualize the even-odd lattice like so.
+
+\begin{center}\begin{tikzpicture}[node distance=1.5cm]
+\node(top)                      {$\top$};
+\node(E)   [below left of=top]  {$\E$};
+\node(O)   [below right of=top] {$\O$};
+
+\draw(top) -- (E);
+\draw(top) -- (O);
+\end{tikzpicture}\end{center}
+
+The idea is that taking the join of two elements moves us \emph{up} the lattice to their lowest common ancestor.
+
+An edge going up from $a$ to $b$ indicates that $a \sqsubseteq b$.
+As another example, consider a lattice tracking prime factors of numbers, up to 5.
+Then the picture version might go like so:
+
+\begin{center}\begin{tikzpicture}[node distance=1.5cm]
+\node(top)                             {$\{2, 3, 5\}$};
+\node(twothree)   [below left of=top]  {$\{2, 3\}$};
+\node(twofive)    [below of=top]       {$\{2, 5\}$};
+\node(threefive)  [below right of=top] {$\{3, 5\}$};
+\node(two)        [below of=twothree]  {$\{2\}$};
+\node(three)      [below of=twofive]   {$\{3\}$};
+\node(five)       [below of=threefive] {$\{5\}$};
+\node(emp)        [below of=three]     {$\{\}$};
+
+\draw(top)       -- (twothree);
+\draw(top)       -- (twofive);
+\draw(top)       -- (threefive);
+\draw(twothree)  -- (two);
+\draw(twothree)  -- (three);
+\draw(twofive)   -- (two);
+\draw(twofive)   -- (five);
+\draw(threefive) -- (three);
+\draw(threefive) -- (five);
+\draw(two)       -- (emp);
+\draw(three)     -- (emp);
+\draw(five)      -- (emp);
+\end{tikzpicture}\end{center}
+
+Since $\sqsubseteq$ is clearly transitive, upward-moving paths across multiple nodes also imply $\sqsubseteq$ relationships between their endpoints.
+It's worth verifying quickly that any two nodes in this graph have a unique lowest common ancestor, which is the proper result of the $\join$ operation on those nodes.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

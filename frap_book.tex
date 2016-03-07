@@ -1722,7 +1722,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
 \newcommand{\join}[0]{\sqcup}
 
 \begin{definition}
-  An \emph{abstract interpretation} (for our example imperative language) is a tuple $\angled{\mathbb D, \top, \mathcal C, \hat{+}, \hat{-}, \hat{\times}, \join, \sim}$, where $\mathbb D$ is a set (the domain of the analysis); $\top \in \mathbb D$; $\mathcal C : \mathbb N \to \mathbb D$; $\hat{+}, \hat{-}, \hat{\times}, \join : \mathbb D \times \mathbb D \to \mathbb D$; and $\sim \subseteq \mathbb N \times \mathbb D$.
+  An \emph{abstract interpretation} (for our example imperative language) is a tuple $\angled{\mathbb D, \top, \mathcal C, \hat{+}, \hat{-}, \hat{\times}, \join, \sim}$, where $\mathbb D$ is a set (the domain of the analysis); $\top \in \mathbb D$; $\mathcal C : \mathbb N \to \mathbb D$; $\hat{+}, \hat{-}, \hat{\times}, \join : \mathbb D \times \mathbb D \to \mathbb D$; and $\sim \; \subseteq \mathbb N \times \mathbb D$.
   The idea is that:
   \begin{itemize}
   \item Abstract versions of numbers are $\mathbb D$ values.
@@ -1749,7 +1749,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
   \end{itemize}
 \end{definition}
 
-As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise to the reader.
+As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise for the reader.
 
 \newcommand{\E}[0]{\mathsf{E}}
 \renewcommand{\O}[0]{\mathsf{O}}
@@ -1907,7 +1907,7 @@ The solution can be to go to \emph{flow-sensitive}\index{flow-sensitive analysis
 \newcommand{\absstep}[3]{\mathcal S(#1, #2, #3)}
 \newcommand{\absstepo}[2]{\mathcal S(#1, #2)}
 
-We define a function $\absstep{s}{c}{f}$ to compute all of the states of the form $(s', c')$ reachable in a single step from $(s, f(c))$.
+We define a function $\absstep{s}{c}{f}$ to compute all of the states of the form $(s', c')$ reachable in a single step from $(s, c)$.
 Actually, for each $(s', c')$ covered by that informal description, this function returns a map from keys $f(c')$ to values $s'$.
 The idea is that function $f$ wraps the step in any additional command context that isn't participating directly in this step.
 See how $f$ is modified in the sequencing case below, for something of an intuition for its purpose.
@@ -1963,6 +1963,61 @@ Again, every step in this outline is computable, for the same reason as in the p
 
 Again, the last two theorems together give us a recipe for computing an invariant automatically, when the loop terminates.
 The flow-sensitive procedure is guaranteed to give an invariant at least as strong as what the flow-insensitive procedure would come up with, and often it's much stronger.
+
+
+\section{Widening}
+
+Consider an abstract interpretation of \emph{intervals}\index{interval analysis}, where each elements of the domain is either $[a, b]$ or $[a, \infty)$, for $a, b \in \mathbb N$.
+Restricting our attention to $a$ and $b$ values between 0 and 1 for illustration purposes, we have this diagram of the domain, where the bottom element represents an empty set.
+
+\begin{center}\begin{tikzpicture}[node distance=1.5cm]
+\node(top)                             {$[0, \infty)$};
+\node(zeroone)    [below left of=top]  {$[0, 1]$};
+\node(oneinf)     [below right of=top] {$[1, \infty)$};
+\node(zero)       [below of=zeroone]   {$[0, 0]$};
+\node(one)        [below of=oneinf]    {$[1, 1]$};
+\node(emp)        [below right of=zero]{$[1, 0]$};
+
+\draw(top)       -- (zeroone);
+\draw(top)       -- (oneinf);
+\draw(zeroone)   -- (zero);
+\draw(zeroone)   -- (one);
+\draw(oneinf)    -- (one);
+\draw(zero)      -- (emp);
+\draw(one)       -- (emp);
+\end{tikzpicture}\end{center}
+
+The abstract operators have intuitive and simple definitions, like, flattening the different kinds of intervals into a common notation, defining $(a_1, b_1) \join (a_2, b_2) = (\min(a_1, a_2), \max(b_1, b_2))$ and $(a_1, b_1) \hat{+} (a_2, b_2) = (a_1 + a_2, b_1 + b_2)$, with usual conventions about what it means to do arithmetic with $\infty$.
+
+Again, the lattice diagram above was simplified to cover only 0 and 1 as legal constant values.
+We can define the interval lattice to draw from the full, infinite set of natural numbers.
+In that case, we can quickly run into trouble with abstract interpretation.
+For instance, consider this infinite-looping program:
+$$\assign{\mathsf{a}}{7}; \while{\mathsf{a}}{\assign{\mathsf{a}}{\mathsf{a} + 3}}$$
+
+One (flow-insensitive) invariant is that $\mathsf{a} \geq 7$, represented as the abstract state $\mupd{\mempty}{\mathsf{a}}{[7, \infty)}$.
+However, even the flow-sensitive analysis will keep growing the range of $\mathsf{a}$, as it traverses the loop over and over!
+We see $\mathsf{a}$ initialized to $[7, 7]$, then grown to $[7, 10]$ after one loop iteration, then to $[7, 13]$ after another, and so on indefinitely.
+
+Notice that we wrote before that termination is guaranteed when the lattice has finite height, which we have just demonstrated is not true for general intervals, as our example program generates an infinite ascending chain of distinct intervals.
+
+\newcommand{\widen}[0]{\triangledown}
+
+The canonical solution to this problem is to employ a \emph{widening}\index{widening} operator $\widen$.
+This operator has the same soundness requirements as $\join$, but we do not require that it gives the \emph{least} upper bound of its two operands.
+It merely needs to give some upper bound.
+In fact, we don't want it to give least upper bounds; we want it to \emph{skip ahead} in that ordering as necessary to promote termination.
+In general, we don't want to replace all uses of $\join$ with $\widen$, though it is sound to do so.
+We might apply $\widen$ in place of $\join$ only for commands that are the beginnings of loops, for instance, to guarantee that there is no infinite path in the program that never encounters a use of $\widen$ to tame infinite ascending chains.
+
+For intervals, when we are working with programs that we fear will keep increasing variables indefinitely through loops, a simple form of widening is defined as follows.
+Set $(a_1, b_1) \widen (a_2, b_2) = (a_1, b_1) \join (a_2, b_2)$ when $b_2 \leq b_1$, that is, when the upper bound of the interval hasn't increased since the last iteration.
+Otherwise, set $(a_1, b_1) \widen (a_2, b_2) = (\min(a_1, a_2), \infty)$.
+In other words, when an interval expands to include higher values, fast-forward its upper bound to $\infty$.
+
+With this modification, analysis of our tricky example successfully finds the invariant $\mathsf{a} \geq 7$.
+In fact, flow-insensitive and flow-sensitive interval analysis with this widening operator applied at loop starts are guaranteed to terminate, for any input programs.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

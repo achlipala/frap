@@ -11,3 +11,4 @@ Just run `make` here to build everything, including the book `frap.pdf` and the 
 * Chapter 4: `TransitionSystems.v`
 * Chapter 5: `ModelChecking.v`
 * Chapter 6: `OperationalSemantics.v`
+* Chapter 7: `AbstractInterpretation.v`

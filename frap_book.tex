@@ -1722,7 +1722,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
 \newcommand{\join}[0]{\sqcup}
 
 \begin{definition}
-  An \emph{abstract interpretation} (for our example imperative language) is a tuple $\angled{\mathbb D, \top, \mathcal C, \hat{+}, \hat{-}, \hat{\times}, \join, \mathcal R}$, where $\mathbb D$ is a set (the domain of the analysis); $\top \in \mathbb D$; $\mathcal C : \mathbb N \to \mathbb D$; $\hat{+}, \hat{-}, \hat{\times}, \join : \mathbb D \times \mathbb D \to \mathbb D$; and $\mathcal R \subseteq \mathbb N \times \mathbb D$.
+  An \emph{abstract interpretation} (for our example imperative language) is a tuple $\angled{\mathbb D, \top, \mathcal C, \hat{+}, \hat{-}, \hat{\times}, \join, \sim}$, where $\mathbb D$ is a set (the domain of the analysis); $\top \in \mathbb D$; $\mathcal C : \mathbb N \to \mathbb D$; $\hat{+}, \hat{-}, \hat{\times}, \join : \mathbb D \times \mathbb D \to \mathbb D$; and $\sim \subseteq \mathbb N \times \mathbb D$.
   The idea is that:
   \begin{itemize}
   \item Abstract versions of numbers are $\mathbb D$ values.
@@ -1730,17 +1730,17 @@ One example, which we'll formalize in more detail shortly, would be to label eac
   \item $\mathcal C$ maps any constant to its most precise abstraction.
   \item $\hat{+}$, $\hat{-}$, and $\hat{\times}$ push abstraction through arithmetic operators, calculating their most precise abstractions.
   \item $\join$ (``join'')\index{join operation of an abstract interpretation} computes the \emph{least upper bound}\index{least upper bound} of two abstract values: the most specific value that represents any value associated with either input.
-  \item $\mathcal R$ formalizes the idea of which concrete values are covered by which abstract values.
+  \item $\sim$ formalizes the idea of which concrete values are covered by which abstract values.
   \end{itemize}
 
-  For $a, b \in \mathbb D$, define $a \sqsubseteq b$ to mean $\forall n \in \mathbb N. \; (n \; \mathcal R \; a) \Rightarrow (n \; \mathcal R \; b)$.  That is, $b$ is at least as general as $a$.
+  For $a, b \in \mathbb D$, define $a \sqsubseteq b$ to mean $\forall n \in \mathbb N. \; (n \sim a) \Rightarrow (n \sim b)$.  That is, $b$ is at least as general as $a$.
   An abstract interpretation must satsify the following algebraic laws:
   \begin{itemize}
   \item $\forall a \in \mathbb D. \; a \sqsubseteq \top$
-  \item $\forall n \in \mathbb N. \; n \; \mathcal R \; \mathcal C(n)$
-  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n + m) \; \mathcal R \; (a \hat{+} b)$
-  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n - m) \; \mathcal R \; (a \hat{-} b)$
-  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \; \mathcal R \; a \land m \; \mathcal R \; b \Rightarrow (n \times m) \; \mathcal R \; (a \hat{\times} b)$
+  \item $\forall n \in \mathbb N. \; n \sim \mathcal C(n)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \sim a \land m \sim b \Rightarrow (n + m) \sim (a \hat{+} b)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \sim a \land m \sim b \Rightarrow (n - m) \sim (a \hat{-} b)$
+  \item $\forall n, m \in \mathbb N. \; \forall a, b \in \mathbb D. \; n \sim a \land m \sim b \Rightarrow (n \times m) \sim (a \hat{\times} b)$
   \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{+} b) \sqsubseteq (a' \hat{+} b')$
   \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{-} b) \sqsubseteq (a' \hat{-} b')$
   \item $\forall a, b, a', b' \in \mathbb D. \; a \sqsubseteq a' \land b \sqsubseteq b' \Rightarrow (a \hat{\times} b) \sqsubseteq (a' \hat{\times} b')$
@@ -1770,9 +1770,9 @@ As an example, consider this formalization of even-odd analysis, whose proof of 
   \E \join \E &=& \E \\
   \O \join \O &=& \O \\
   \_ \join \_ &=& \top \\
-  n \; \mathcal R \; \E &=& \textrm{$n$ is even} \\
-  n \; \mathcal R \; \O &=& \textrm{$n$ is odd} \\
-  n \; \mathcal R \; \top &=& \textrm{always}
+  n \sim \E &=& \textrm{$n$ is even} \\
+  n \sim \O &=& \textrm{$n$ is odd} \\
+  n \sim \top &=& \textrm{always}
 \end{eqnarray*}
 
 We generally think of an abstract interpretation as forming a \emph{lattice}\index{lattice}, which is roughly the algebraic structure characterized by operations like $\join$, when $\join$ truly returns the \emph{most specific} or \emph{least} upper bound of its two arguments.  We visualize the even-odd lattice like so.
@@ -1818,6 +1818,82 @@ Then the picture version might go like so:
 
 Since $\sqsubseteq$ is clearly transitive, upward-moving paths across multiple nodes also imply $\sqsubseteq$ relationships between their endpoints.
 It's worth verifying quickly that any two nodes in this graph have a unique lowest common ancestor, which is the proper result of the $\join$ operation on those nodes.
+
+Another worthwhile exercise for the reader is to work out the proper definitions of $\hat{+}$, $\hat{-}$, and $\hat{\times}$ for this domain.
+
+
+\section{Flow-Insensitive Analysis}
+
+We now give our first recipe for building a program abstraction from an abstract interpretation.
+We apply a \emph{flow-insensitive} abstraction, which means we find an invariant that doesn't depend at all on the control part $c$ of a full state $(v, c)$.
+Alternatively, the invariant depends only on the data part $v$.
+Concretely, with $\mathbb V$ the set of variables, we work with states $s \in \mathbb V \to \mathbb D$, taking the domain $\mathbb D$ of our chosen abstract interpretation.
+An abstract state $s$ for a concrete valuation $v$ assigns to each $x$ an abstract value $s(x)$ such that $v(x) \sim s(x)$.
+We overload the operator $\sim$ to denote this compatibility via $v \sim s$.
+
+\newcommand{\absexp}[1]{[#1]}
+
+As a preliminary, we define the abstract interpretation of an expression like so:
+\begin{eqnarray*}
+  \absexp{n}s &=& \mathcal C(n) \\
+  \absexp{x}s &=& s(x) \\
+  \absexp{e_1 + e_2}s &=& \absexp{e_1}s \hat{+} \absexp{e_2}s \\
+  \absexp{e_1 - e_2}s &=& \absexp{e_1}s \hat{-} \absexp{e_2}s \\
+  \absexp{e_1 \times e_2}s &=& \absexp{e_1}s \hat{\times} \absexp{e_2}s
+\end{eqnarray*}
+
+\begin{theorem}
+  If $v \sim s$, then $\denote{e}v \sim \absexp{e}s$.
+\end{theorem}
+
+\newcommand{\asgns}[1]{\mathcal A(#1)}
+
+Next, we define the assignments-of function $\mathcal A$ for commands.
+\begin{eqnarray*}
+  \asgns{\skipe} &=& \{\} \\
+  \asgns{\assign{x}{e}} &=& \{(x, e)\} \\
+  \asgns{c_1; c_2} &=& \asgns{c_1} \cup \asgns{c_2} \\
+  \asgns{\ifte{e}{c_1}{c_2}} &=& \asgns{c_1} \cup \asgns{c_2} \\
+  \asgns{\while{e}{c_1}} &=& \asgns{c_1}
+\end{eqnarray*}
+
+As a final preliminary ingredient, for abstract states $s_1$ and $s_2$, define $s_1 \join s_2$ by $(s_1 \join s_2)(x) = s_1(x) \join s_2(x)$.
+
+Now we define the flow-insensitive step relation, over abstract states alone, as:
+$$\infer{s \to^c_\mathsf{FI} s}{}
+\quad \infer{s \to^c_\mathsf{FI} s \cup \mupd{s}{x}{\absexp{e}s}}{
+  (x, e) \in \asgns{c}
+}$$
+
+We can establish formally how forgetting about the order of assignments is a valid abstraction technique.
+
+\begin{theorem}\label{flow_insensitive_abstraction}
+  Given command $c$, initial valuation $v$, and initial abstract state $s$ such that $v \sim s$.  The transition system with initial state $s$ and step relation $\to^c_\mathsf{FI}$ simulates the system with initial state $(v, c)$ and step relation $\to$, according to a simulation relation enforcing $\sim$ between the valuation and abstract state.
+\end{theorem}
+
+Now a simple procedure can find an invariant for the abstracted system.
+In particular:
+
+\begin{enumerate}
+\item Initialize $s$ with the abstract state from the theorem statement.
+\item \label{flow_insensitive_loop}Compute $s' = s \join \bigsqcup_{(x, e) \in \asgns{c}} \mupd{s}{x}{\absexp{e}s}$.
+\item If $s' \sqsubseteq s$, then we're done; $s$ is the invariant.
+\item Otherwise, assign $s = s'$ and return to \ref{flow_insensitive_loop}.
+\end{enumerate}
+
+Every step in this outline is computable, since the abstract states will, in practice, be finite maps, where all variables not in their domains are assumed to map to $\top$.
+
+\begin{theorem}\label{flow_insensitive_iteration}
+  If the outline above terminates, then it is an invariant of the flow-insensitive abstracted system that $s$ (its final value from the loop above) is an upper bound for every reachable state.  That is, for every reachable $s'$, $s' \sqsubseteq s$.
+\end{theorem}
+
+To check a concrete program, we first abstract it to a flow-insensitive version with Theorem \ref{flow_insensitive_abstraction}, then we find a guaranteed invariant with Theorem \ref{flow_insensitive_iteration}.
+One wrinkle here is that it is not obvious that our informal loop above always terminates.
+However, it always terminates if our abstract domain has \emph{finite height}\index{finite height of abstract domain}, meaning that there is no infinite ascending chain of distinct elements $a_i$ such that $a_i \sqsubseteq a_{i+1}$ for all $i$.
+Our even-odd example trivially has that property, since it contains only finitely many distinct elements.
+
+It is worth emphasizing that, when those conditions are met, our invariant-finding procedure is guaranteed to terminate, even though the underlying language is Turing-complete, so that most interesting analysis problems are uncomputable!
+The catch is that it is always possible that the invariant found is a trivial one, where the abstract state maps every variable to $\top$.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

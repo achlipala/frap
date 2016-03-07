@@ -1793,27 +1793,27 @@ As another example, consider a lattice tracking prime factors of numbers, up to 
 Then the picture version might go like so:
 
 \begin{center}\begin{tikzpicture}[node distance=1.5cm]
-\node(top)                             {$\{2, 3, 5\}$};
-\node(twothree)   [below left of=top]  {$\{2, 3\}$};
-\node(twofive)    [below of=top]       {$\{2, 5\}$};
-\node(threefive)  [below right of=top] {$\{3, 5\}$};
-\node(two)        [below of=twothree]  {$\{2\}$};
-\node(three)      [below of=twofive]   {$\{3\}$};
-\node(five)       [below of=threefive] {$\{5\}$};
-\node(emp)        [below of=three]     {$\{\}$};
+\node(top)                              {$\{\}$};
+\node(two)        [below left of=top]   {$\{2\}$};
+\node(three)      [below of=top]        {$\{3\}$};
+\node(five)       [below right of=top]  {$\{5\}$};
+\node(twothree)   [below left of=two]   {$\{2, 3\}$};
+\node(twofive)    [below of=three]      {$\{2, 5\}$};
+\node(threefive)  [below right of=five] {$\{3, 5\}$};
+\node(bot)        [below of=twofive]    {$\{2, 3, 5\}$};
 
-\draw(top)       -- (twothree);
-\draw(top)       -- (twofive);
-\draw(top)       -- (threefive);
-\draw(twothree)  -- (two);
-\draw(twothree)  -- (three);
-\draw(twofive)   -- (two);
-\draw(twofive)   -- (five);
-\draw(threefive) -- (three);
-\draw(threefive) -- (five);
-\draw(two)       -- (emp);
-\draw(three)     -- (emp);
-\draw(five)      -- (emp);
+\draw(top)       -- (two);
+\draw(top)       -- (three);
+\draw(top)       -- (five);
+\draw(two)       -- (twothree);
+\draw(two)       -- (twofive);
+\draw(three)     -- (twothree);
+\draw(three)     -- (threefive);
+\draw(five)      -- (twofive);
+\draw(five)      -- (threefive);
+\draw(twothree)  -- (bot);
+\draw(twofive)   -- (bot);
+\draw(threefive) -- (bot);
 \end{tikzpicture}\end{center}
 
 Since $\sqsubseteq$ is clearly transitive, upward-moving paths across multiple nodes also imply $\sqsubseteq$ relationships between their endpoints.

@@ -1885,12 +1885,12 @@ Proof.
             | [ _ : impossible x = _ |- _ ] => fail 1
             | _ => cases (impossible x); simplify
             end
-          end; propositional; constructor; simplify;
+          end; propositional; try constructor; simplify;
    repeat match goal with
           | [ H : Some _ = Some _ |- _] => invert H
           | [ _ : context[match ?X with _ => _ end] |- _ ] => cases X
           | [ |- context[match ?X with _ => _ end] ] => cases X
-          end; eauto; try equality; linear_arithmetic).
+          end; eauto; try equality; try linear_arithmetic).
 Qed.
 
 (* As before, two helpful lemmas to feed the book library's automation about
@@ -2083,7 +2083,7 @@ Proof.
             | [ _ : impossible x = _ |- _ ] => fail 1
             | _ => cases (impossible x); simplify
             end
-          end; propositional; constructor; simplify;
+          end; propositional; try constructor; simplify;
    repeat match goal with
           | [ H : Some _ = Some _ |- _] => invert H
           | [ _ : context[match ?X with _ => _ end] |- _ ] => cases X

@@ -13,7 +13,7 @@ coq: Makefile.coq
 	$(MAKE) -f Makefile.coq
 
 lib: Makefile.coq
-	$(MAKE) -f Makefile.coq Frap.vo
+	$(MAKE) -f Makefile.coq Frap.vo AbstractInterpret.vo
 
 Makefile.coq: Makefile _CoqProject *.v
 	coq_makefile -f _CoqProject -o Makefile.coq

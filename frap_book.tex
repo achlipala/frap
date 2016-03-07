@@ -1868,6 +1868,7 @@ $$\infer{s \to^c_\mathsf{FI} s}{}
 We can establish formally how forgetting about the order of assignments is a valid abstraction technique.
 
 \begin{theorem}\label{flow_insensitive_abstraction}
+  \abstraction
   Given command $c$, initial valuation $v$, and initial abstract state $s$ such that $v \sim s$.  The transition system with initial state $s$ and step relation $\to^c_\mathsf{FI}$ simulates the system with initial state $(v, c)$ and step relation $\to$, according to a simulation relation enforcing $\sim$ between the valuation and abstract state.
 \end{theorem}
 
@@ -1884,6 +1885,7 @@ In particular:
 Every step in this outline is computable, since the abstract states will, in practice, be finite maps, where all variables not in their domains are assumed to map to $\top$.
 
 \begin{theorem}\label{flow_insensitive_iteration}
+  \invariants
   If the outline above terminates, then it is an invariant of the flow-insensitive abstracted system that $s$ (its final value from the loop above) is an upper bound for every reachable state.  That is, for every reachable $s'$, $s' \sqsubseteq s$.
 \end{theorem}
 
@@ -1894,6 +1896,73 @@ Our even-odd example trivially has that property, since it contains only finitel
 
 It is worth emphasizing that, when those conditions are met, our invariant-finding procedure is guaranteed to terminate, even though the underlying language is Turing-complete, so that most interesting analysis problems are uncomputable!
 The catch is that it is always possible that the invariant found is a trivial one, where the abstract state maps every variable to $\top$.
+
+
+\section{Flow-Sensitive Analysis}
+
+We can only go so far with flow-insensitive invariants, which don't let us record different facts about the variables for different lines of the program code.
+Such an analysis will get tripped up even by straightline code where parities of variables change as we go.
+The solution can be to go to \emph{flow-sensitive}\index{flow-sensitive analysis} analysis, where an abstract state $S$ is a finite map from commands to the abstract states of the previous section.
+
+\newcommand{\absstep}[3]{\mathcal S(#1, #2, #3)}
+\newcommand{\absstepo}[2]{\mathcal S(#1, #2)}
+
+We define a function $\absstep{s}{c}{f}$ to compute all of the states of the form $(s', c')$ reachable in a single step from $(s, f(c))$.
+Actually, for each $(s', c')$ covered by that informal description, this function returns a map from keys $f(c')$ to values $s'$.
+The idea is that function $f$ wraps the step in any additional command context that isn't participating directly in this step.
+See how $f$ is modified in the sequencing case below, for something of an intuition for its purpose.
+\begin{eqnarray*}
+  \absstep{s}{\skipe}{f} &=& \mempty \\
+  \absstep{s}{\assign{x}{e}}{f} &=& \mupd{\mempty}{f(\skipe)}{\mupd{s}{x}{\absexp{e}s}} \\
+  \absstep{s}{\skipe; c_2}{f} &=& \mupd{\mempty}{f(c_2)}{s} \\
+  \absstep{s}{c_1; c_2}{f} &=& \absstep{s}{c_1}{\lambda c. \; f(c; c_2)} \\
+  \absstep{s}{\ifte{e}{c_1}{c_2}}{f} &=& \mupd{\mupd{\mempty}{f(c_1)}{s}}{f(c_2)}{s} \\
+  \absstep{s}{\while{e}{c_1}}{f} &=& \mupd{\mupd{\mempty}{f(\skipe)}{s}}{f(c_1; \while{e}{c_1})}{s}
+\end{eqnarray*}
+
+Note that the last two cases, for conditional control flow, ignore the test expression entirely, which is certainly sound, though it may lead to imprecision in the analysis.
+Define $\absstepo{s}{c}$ as shorthand for $\absstep{s}{c}{\lambda c_1. \; c_1}$.
+
+Now we can define a new abstract step relation.
+$$\infer{(s, c) \to_\mathsf{FS} (s', c')}{
+  \absstepo{s}{c}(c') = s'
+}$$
+
+That is, we step from $(s, c)$ to $(s', c')$ precisely when, if we look up $c'$ in the result of running $c$ abstractly in $s$, we find $s'$.
+
+Now we can follow an analogous path to the one we did in the last section.
+
+\begin{theorem}\label{flow_sensitive_abstraction}
+  \abstraction
+  Given command $c$ and initial valuation $v$.  The transition system with initial state $(s, c)$ and step relation $\to_\mathsf{FS}$ simulates the system with initial state $(v, c)$ and step relation $\to$, according to a simulation relation enforcing equality of the commands, as well as $\sim$ between the valuation and abstract state.
+\end{theorem}
+
+Now another simple procedure can find an invariant for the abstracted system.
+We write $S \join S'$ for joining of two flow-sensitive abstract states.
+When $c$ is in the domain of exactly one of $S$ or $S'$, $S \join S'$ agrees with the corresponding mapping.
+When $c$ is in neither domain, it isn't in the domain of $S \join S'$ either.
+Finally, when $c$ is in both domains, we have $(S \join S')(c) = S(c) \join S'(c)$.
+
+Also define $S \sqsubseteq S'$ to mean that, whenever $S(c) = s$, there exists $s'$ such that $S'(c) = s'$ and $s \sqsubseteq s'$.
+
+Now our procedure works as follows.
+
+\begin{enumerate}
+\item Initialize $S = \mupd{\mempty}{c}{\lambda x. \; \top}$.
+\item \label{flow_sensitive_loop}Compute $S' = S \join \bigsqcup_{S(c) = s} \absstepo{s}{c}$.
+\item If $S' \sqsubseteq S$, then we're done; $S$ is the invariant.
+\item Otherwise, assign $S = S'$ and return to \ref{flow_sensitive_loop}.
+\end{enumerate}
+
+Again, every step in this outline is computable, for the same reason as in the prior section.
+
+\begin{theorem}\label{flow_sensitive_iteration}
+  \invariants
+  If the outline above terminates, then it is an invariant of the flow-sensitive abstracted system that, for reachable $(s, c)$, we have $S(c) = s'$ for some $s'$ with $s \sqsubseteq s'$.
+\end{theorem}
+
+Again, the last two theorems together give us a recipe for computing an invariant automatically, when the loop terminates.
+The flow-sensitive procedure is guaranteed to give an invariant at least as strong as what the flow-insensitive procedure would come up with, and often it's much stronger.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

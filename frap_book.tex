@@ -1775,7 +1775,7 @@ As an example, consider this formalization of even-odd analysis, whose proof of 
   n \sim \top &=& \textrm{always}
 \end{eqnarray*}
 
-We generally think of an abstract interpretation as forming a \emph{lattice}\index{lattice}, which is roughly the algebraic structure characterized by operations like $\join$, when $\join$ truly returns the \emph{most specific} or \emph{least} upper bound of its two arguments.  We visualize the even-odd lattice like so.
+We generally think of an abstract interpretation as forming a \emph{lattice}\index{lattice} (actually a semilattice\index{semilattice}), which is roughly the algebraic structure characterized by operations like $\join$, when $\join$ truly returns the \emph{most specific} or \emph{least} upper bound of its two arguments.  We visualize the even-odd lattice like so.
 
 \begin{center}\begin{tikzpicture}[node distance=1.5cm]
 \node(top)                      {$\top$};
@@ -1852,8 +1852,8 @@ Next, we define the assignments-of function $\mathcal A$ for commands.
 \begin{eqnarray*}
   \asgns{\skipe} &=& \{\} \\
   \asgns{\assign{x}{e}} &=& \{(x, e)\} \\
-  \asgns{c_1; c_2} &=& \asgns{c_1} \cup \asgns{c_2} \\
-  \asgns{\ifte{e}{c_1}{c_2}} &=& \asgns{c_1} \cup \asgns{c_2} \\
+  \asgns{c_1; c_2} &=& \asgns{c_1} \join \asgns{c_2} \\
+  \asgns{\ifte{e}{c_1}{c_2}} &=& \asgns{c_1} \join \asgns{c_2} \\
   \asgns{\while{e}{c_1}} &=& \asgns{c_1}
 \end{eqnarray*}
 
@@ -1861,7 +1861,7 @@ As a final preliminary ingredient, for abstract states $s_1$ and $s_2$, define $
 
 Now we define the flow-insensitive step relation, over abstract states alone, as:
 $$\infer{s \to^c_\mathsf{FI} s}{}
-\quad \infer{s \to^c_\mathsf{FI} s \cup \mupd{s}{x}{\absexp{e}s}}{
+\quad \infer{s \to^c_\mathsf{FI} s \join \mupd{s}{x}{\absexp{e}s}}{
   (x, e) \in \asgns{c}
 }$$
 
@@ -1963,6 +1963,7 @@ Again, every step in this outline is computable, for the same reason as in the p
 
 Again, the last two theorems together give us a recipe for computing an invariant automatically, when the loop terminates.
 The flow-sensitive procedure is guaranteed to give an invariant at least as strong as what the flow-insensitive procedure would come up with, and often it's much stronger.
+However, flow-sensitive analysis is often much more computationally expensive (in time and memory), so there is a trade-off.
 
 
 \section{Widening}
@@ -2008,7 +2009,7 @@ This operator has the same soundness requirements as $\join$, but we do not requ
 It merely needs to give some upper bound.
 In fact, we don't want it to give least upper bounds; we want it to \emph{skip ahead} in that ordering as necessary to promote termination.
 In general, we don't want to replace all uses of $\join$ with $\widen$, though it is sound to do so.
-We might apply $\widen$ in place of $\join$ only for commands that are the beginnings of loops, for instance, to guarantee that there is no infinite path in the program that never encounters a use of $\widen$ to tame infinite ascending chains.
+We might apply $\widen$ in place of $\join$ only for commands that are the beginnings of loops, for instance, to guarantee that no infinite path in the program avoids infinitely many encounters with $\widen$ to tame infinite ascending chains.
 
 For intervals, when we are working with programs that we fear will keep increasing variables indefinitely through loops, a simple form of widening is defined as follows.
 Set $(a_1, b_1) \widen (a_2, b_2) = (a_1, b_1) \join (a_2, b_2)$ when $b_2 \leq b_1$, that is, when the upper bound of the interval hasn't increased since the last iteration.

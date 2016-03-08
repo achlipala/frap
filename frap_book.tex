@@ -595,7 +595,7 @@ Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ fo
 \encoding
 \begin{eqnarray*}
   \compile{n} &=& \mathsf{PushConst}(n) \\
-  \compile{x} &=& \mathsf{PushVar}(n) \\
+  \compile{x} &=& \mathsf{PushVar}(x) \\
   \compile{e_1 + e_2} &=& \concat{\compile{e_1}}{\concat{\compile{e_2}}{\mathsf{Add}}} \\
   \compile{e_1 \times e_2} &=& \concat{\compile{e_1}}{\concat{\compile{e_2}}{\mathsf{Multiply}}}
 \end{eqnarray*}

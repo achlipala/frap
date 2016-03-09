@@ -873,7 +873,7 @@ Another important property of invariants formalizes the connection with weakenin
 \end{theorem}
 
 Note that the larger $I'$ above may not be suitable to use in an inductive proof by Theorem \ref{invariant_induction}!
-For instance, for factorial, we might define $I' = \mathcal \{\mathsf{AnswerIs}(n_0)\} \cup \{\mathsf{WithAccumulator}(n, a) \mid n, a \in \mathbb N\}$, clearly a superset of $I$.
+For instance, for factorial, we might define $I' = \mathcal \{\mathsf{AnswerIs}(n_0!)\} \cup \{\mathsf{WithAccumulator}(n, a) \mid n, a \in \mathbb N\}$, clearly a superset of $I$.
 However, by forgetting everything that we know about intermediate $\mathsf{WithAccumulator}$ states, we will get stuck on the inductive step of the proof.
 Thus, what we call invariants here needn't also be \emph{inductive invariants}\index{inductive invariants}, and there may be slight terminology mismatches with other sources.
 

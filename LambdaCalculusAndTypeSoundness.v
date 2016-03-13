@@ -107,7 +107,320 @@ Inductive hasty : fmap var type -> exp -> type -> Prop :=
 
 Hint Constructors value plug step0 step hasty.
 
-(* Some automation *)
+
+(** * Let's prove type soundness first without much automation. *)
+
+(* Now we're ready for the first of the two key properties, to show that "has
+ * type t in the empty typing context" is an invariant. *)
+Lemma progress : forall e t,
+  hasty $0 e t
+  -> value e
+  \/ (exists e' : exp, step e e').
+Proof.
+  induct 1; simplify; try equality.
+
+  left.
+  constructor.
+
+  propositional.
+
+  right.
+  invert H1; invert H.
+  invert H2; invert H0.
+  exists (Const (n + n0)).
+  eapply StepRule with (C := Hole).
+  eauto.
+  eauto.
+  constructor.
+
+  invert H2.
+  right.
+  invert H3.
+  exists (Plus e1 x).
+  eapply StepRule with (C := Plus2 e1 C).
+  eauto.
+  eauto.
+  assumption.
+
+  invert H1.
+  invert H3.
+  right.
+  exists (Plus x e2).
+  eapply StepRule with (C := Plus1 C e2).
+  eauto.
+  eauto.
+  assumption.
+
+  invert H1.
+  invert H3.
+  right.
+  exists (Plus x e2).
+  eapply StepRule with (C := Plus1 C e2).
+  eauto.
+  eauto.
+  assumption.
+
+  left.
+  constructor.
+
+  propositional.
+  
+  right.
+  invert H1; invert H.
+  exists (subst e2 x e0).
+  eapply StepRule with (C := Hole).
+  eauto.
+  eauto.
+  constructor.
+  assumption.
+
+  invert H2.
+  right.
+  invert H3.
+  exists (App e1 x).
+  eapply StepRule with (C := App2 e1 C).
+  eauto.
+  eauto.
+  assumption.
+
+  invert H1.
+  invert H3.
+  right.
+  exists (App x e2).
+  eapply StepRule with (C := App1 C e2).
+  eauto.
+  eauto.
+  assumption.
+
+  invert H1.
+  invert H3.
+  right.
+  exists (App x e2).
+  eapply StepRule with (C := App1 C e2).
+  eauto.
+  eauto.
+  assumption.
+Qed.
+
+(* Inclusion between typing contexts is preserved by adding the same new mapping
+ * to both. *)
+Lemma weakening_override : forall (G G' : fmap var type) x t,
+  (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
+  -> (forall x' t', G $+ (x, t) $? x' = Some t'
+                    -> G' $+ (x, t) $? x' = Some t').
+Proof.
+  simplify.
+  cases (x ==v x'); simplify; eauto.
+Qed.
+
+(** Raising a typing derivation to a larger typing context *)
+Lemma weakening : forall G e t,
+  hasty G e t
+  -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+    -> hasty G' e t.
+Proof.
+  induct 1; simplify.
+
+  constructor.
+  apply H0.
+  assumption.
+
+  constructor.
+
+  constructor.
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
+
+  constructor.
+  apply IHhasty.
+  apply weakening_override.
+  assumption.
+
+  econstructor.
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
+Qed.
+
+(* Replacing a variable with a properly typed term preserves typing. *)
+Lemma substitution : forall G x t' e t e',
+  hasty (G $+ (x, t')) e t
+  -> hasty $0 e' t'
+  -> hasty G (subst e' x e) t.
+Proof.
+  induct 1; simplify.
+
+  cases (x0 ==v x).
+
+  simplify.
+  invert H.
+  eapply weakening.
+  eassumption.
+  simplify.
+  equality.
+
+  simplify.
+  constructor.
+  assumption.
+
+  constructor.
+
+  constructor.
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
+
+  cases (x0 ==v x).
+
+  constructor.
+  eapply weakening.
+  eassumption.
+  simplify.
+  cases (x0 ==v x1).
+
+  simplify.
+  assumption.
+
+  simplify.
+  assumption.
+
+  constructor.
+  eapply IHhasty.
+  maps_equal.
+  assumption.
+
+  econstructor.
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
+Qed.
+
+(* We're almost ready for the main preservation property.  Let's prove it first
+ * for the more basic [step0] relation. *)
+Lemma preservation0 : forall e1 e2,
+  step0 e1 e2
+  -> forall t, hasty $0 e1 t
+    -> hasty $0 e2 t.
+Proof.
+  invert 1; simplify.
+
+  invert H.
+  invert H4.
+  eapply substitution.
+  eassumption.
+  assumption.
+  
+  invert H.
+  constructor.
+Qed.
+
+(* We also need this key property, essentially saying that, if [e1] and [e2] are
+ * "type-equivalent," then they remain "type-equivalent" after wrapping the same
+ * context around both. *)
+Lemma generalize_plug : forall e1 C e1',
+  plug C e1 e1'
+  -> forall e2 e2', plug C e2 e2'
+    -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
+    -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
+Proof.
+  induct 1; simplify.
+
+  invert H.
+  apply H0.
+  assumption.
+
+  invert H0.
+  invert H2.
+  constructor.
+  eapply IHplug.
+  eassumption.
+  assumption.
+  assumption.
+  assumption.
+
+  invert H1.
+  invert H3.
+  constructor.
+  assumption.
+  eapply IHplug.
+  eassumption.
+  assumption.
+  assumption.
+
+  invert H0.
+  invert H2.
+  econstructor.
+  eapply IHplug.
+  eassumption.
+  assumption.
+  eassumption.
+  assumption.
+
+  invert H1.
+  invert H3.
+  econstructor.
+  eassumption.
+  eapply IHplug.
+  eassumption.
+  assumption.
+  eassumption.
+Qed.
+
+(* OK, now we're almost done. *)
+Lemma preservation : forall e1 e2,
+  step e1 e2
+  -> forall t, hasty $0 e1 t
+    -> hasty $0 e2 t.
+Proof.
+  invert 1; simplify.
+
+  eapply generalize_plug with (e1' := e1).
+  eassumption.
+  eassumption.
+  simplify.
+  eapply preservation0.
+  eassumption.
+  assumption.
+  assumption.
+Qed.
+
+(* Now watch this!  Though the syntactic approach to type soundness is usually
+ * presented from scratch as a proof technique, it turns out that the two key
+ * properties, progress and preservation, are just instances of the same methods
+ * we've been applying all along with invariants of transition systems! *)
+Theorem safety : forall e t, hasty $0 e t
+  -> invariantFor (trsys_of e)
+                  (fun e' => value e'
+                             \/ exists e'', step e' e'').
+Proof.
+  simplify.
+
+  (* Step 1: strengthen the invariant.  In particular, the typing relation is
+   * exactly the right stronger invariant!  Our progress theorem proves the
+   * required invariant inclusion. *)
+  apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t).
+
+  (* Step 2: apply invariant induction, whose induction step turns out to match
+   * our preservation theorem exactly! *)
+  apply invariant_induction; simplify.
+  equality.
+
+  eapply preservation.
+  eassumption.
+  assumption.
+
+  simplify.
+  eapply progress.
+  eassumption.
+Qed.
+
+
+(** * Let's do that again with more automation. *)
 
 Ltac t0 := match goal with
            | [ H : ex _ |- _ ] => destruct H
@@ -124,9 +437,7 @@ Ltac t0 := match goal with
 
 Ltac t := simplify; propositional; repeat (t0; simplify); try congruence; eauto 6.
 
-(* Now we're ready for the first of the two key properties, to show that "has
- * type t in the empty typing context" is an invariant. *)
-Lemma progress : forall e t,
+Lemma progress_snazzy : forall e t,
   hasty $0 e t
   -> value e
   \/ (exists e' : exp, step e e').
@@ -134,21 +445,9 @@ Proof.
   induct 1; t.
 Qed.
 
-(* Inclusion between typing contexts is preserved by adding the same new mapping
- * to both. *)
-Lemma weakening_override : forall (G G' : fmap var type) x t,
-  (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
-  -> (forall x' t', G $+ (x, t) $? x' = Some t'
-                    -> G' $+ (x, t) $? x' = Some t').
-Proof.
-  simplify.
-  cases (x ==v x'); simplify; eauto.
-Qed.
-
 Hint Resolve weakening_override.
 
-(** Raising a typing derivation to a larger typing context *)
-Lemma weakening : forall G e t,
+Lemma weakening_snazzy : forall G e t,
   hasty G e t
   -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
     -> hasty G' e t.
@@ -156,7 +455,7 @@ Proof.
   induct 1; t.
 Qed.
 
-Hint Resolve weakening.
+Hint Resolve weakening_snazzy.
 
 (* Replacing a typing context with an equal one has no effect (useful to guide
  * proof search). *)
@@ -170,8 +469,7 @@ Qed.
 
 Hint Resolve hasty_change.
 
-(* Replacing a variable with a properly typed term preserves typing. *)
-Lemma substitution : forall G x t' e t e',
+Lemma substitution_snazzy : forall G x t' e t e',
   hasty (G $+ (x, t')) e t
   -> hasty $0 e' t'
   -> hasty G (subst e' x e) t.
@@ -179,11 +477,9 @@ Proof.
   induct 1; t.
 Qed.
 
-Hint Resolve substitution.
+Hint Resolve substitution_snazzy.
 
-(* We're almost ready for the main preservation property.  Let's prove it first
- * for the more basic [step0] relation. *)
-Lemma preservation0 : forall e1 e2,
+Lemma preservation0_snazzy : forall e1 e2,
   step0 e1 e2
   -> forall t, hasty $0 e1 t
     -> hasty $0 e2 t.
@@ -191,12 +487,9 @@ Proof.
   invert 1; t.
 Qed.
 
-Hint Resolve preservation0.
+Hint Resolve preservation0_snazzy.
 
-(* We also need this key property, essentially saying that, if [e1] and [e2] are
- * "type-equivalent," then they remain "type-equivalent" after wrapping the same
- * context around both. *)
-Lemma generalize_plug : forall e1 C e1',
+Lemma generalize_plug_snazzy : forall e1 C e1',
   plug C e1 e1'
   -> forall e2 e2', plug C e2 e2'
     -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
@@ -205,10 +498,9 @@ Proof.
   induct 1; t.
 Qed.
 
-Hint Resolve generalize_plug.
+Hint Resolve generalize_plug_snazzy.
 
-(* OK, now we're out of the woods. *)
-Lemma preservation : forall e1 e2,
+Lemma preservation_snazzy : forall e1 e2,
   step e1 e2
   -> forall t, hasty $0 e1 t
     -> hasty $0 e2 t.
@@ -216,27 +508,14 @@ Proof.
   invert 1; t.
 Qed.
 
-Hint Resolve progress preservation.
+Hint Resolve progress_snazzy preservation_snazzy.
 
-(* Now watch this!  Though the syntactic approach to type soundness is usually
- * presented from scratch as a proof technique, it turns out that the two key
- * properties, progress and preservation, are just instances of the same methods
- * we've been applying all along with invariants of transition systems! *)
-Theorem safety : forall e t, hasty $0 e t
+Theorem safety_snazzy : forall e t, hasty $0 e t
   -> invariantFor (trsys_of e)
                   (fun e' => value e'
                              \/ exists e'', step e' e'').
 Proof.
   simplify.
-
-  (* Step 1: strengthen the invariant.  In particular, the typing relation is
-   * exactly the right stronger invariant!  Our progress theorem proves the
-   * required invariant inclusion. *)
   apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t); eauto.
-
-  (* Step 2: apply invariant induction, whose induction step turns out to match
-   * our preservation theorem exactly! *)
-  apply invariant_induction; simplify.
-  equality.
-  eauto. (* We use preservation here. *)
+  apply invariant_induction; simplify; eauto; equality.
 Qed.

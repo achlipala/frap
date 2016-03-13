@@ -2095,6 +2095,17 @@ Substitute the argument value in the body of the abstraction, evaluate the resul
 Note that we only ever need to evaluate \emph{closed} terms\index{closed terms}, meaning terms that are not open, so we obey the restriction on substitution sketched above.
 
 It may be surprising that these two rules are enough to define the full semantics of a Turing-complete language!
+Indeed, $\lambda$-calculus is Turing-complete, and we must be able to find nonterminating programs.
+Here is one example.
+\begin{eqnarray*}
+  \Omega &=& (\lambda x. \; x \; x) \; (\lambda x. \; x \; x) \\
+\end{eqnarray*}
+\begin{theorem}
+  $\Omega$ does not evaluate to anything.  In other words, $\bigstep{\Omega}{v}$ implies a contradiction.
+\end{theorem}
+\begin{proof}
+  By induction on the derivation of $\bigstep{\Omega}{v}$.
+\end{proof}
 
 
 \section{A Quick Case Study in Program Verification: Church Numerals}

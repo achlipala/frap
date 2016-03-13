@@ -81,6 +81,21 @@ Module Ulc.
   Notation "\ x , e" := (Abs x e) (at level 50).
   Infix "@" := App (at level 49, left associativity).
 
+  (* Believe it or not, this is a Turing-complete language!  Here's an example
+   * nonterminating program. *)
+  Example omega := (\"x", "x" @ "x") @ (\"x", "x" @ "x").
+
+  Theorem omega_no_eval : forall v, eval omega v -> False.
+  Proof.
+    induct 1.
+
+    invert H.
+    invert H0.
+    simplify.
+    apply IHeval3.
+    trivial.
+  Qed.
+
 
   (** * Church Numerals, everyone's favorite example of lambda terms in
       * action *)

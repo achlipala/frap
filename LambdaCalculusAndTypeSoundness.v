@@ -5,13 +5,27 @@
 
 Require Import Frap.
 
-Module Ulc.
-  Inductive exp : Set :=
-  | Var : var -> exp
-  | Abs : var -> exp -> exp
-  | App : exp -> exp -> exp.
+(* The last few chapters have focused on small programming languages that are
+ * representative of the essence of the imperative languages.  We now turn to
+ * lambda-calculus, the usual representative of functional languages. *)
 
-  Fixpoint subst (rep : exp) (x : string) (e : exp) : exp :=
+Module Ulc.
+  (* Programs are expressions, which we evaluate algebraically, rather than
+   * executing for side effects. *)
+  Inductive exp : Set :=
+  | Var (x : var)
+  | Abs (x : var) (body : exp)
+    (* A function that binds its argument to the given variable, evaluating the
+     * body expression *)
+  | App (e1 e2 : exp).
+    (* Applying a function to an argument *)
+
+  (* Key operation: within [e], changing every occurrence of variable [x] into
+   * [rep].  IMPORTANT: we will only apply this operation in contexts where
+   * [rep] is *closed*, meaning every [Var] refers to some enclosing [Abs], so
+   * as to avoid *variable capture*.  See the book proper for a little more
+   * discussion. *)
+  Fixpoint subst (rep : exp) (x : var) (e : exp) : exp :=
     match e with
     | Var y => if string_dec y x then rep else Var y
     | Abs y e1 => Abs y (if y ==v x then e1 else subst rep x e1)
@@ -21,8 +35,8 @@ Module Ulc.
 
   (** * Big-step semantics *)
 
-  (** This is the most straightforward way to give semantics to lambda terms:
-    * We evaluate any closed term into a value (that is, an [Abs]). *)
+  (* This is the most straightforward way to give semantics to lambda terms:
+   * We evaluate any closed term into a value (that is, an [Abs]). *)
   Inductive eval : exp -> exp -> Prop :=
   | BigAbs : forall x e,
     eval (Abs x e) (Abs x e)
@@ -32,7 +46,8 @@ Module Ulc.
     -> eval (subst v2 x e1') v
     -> eval (App e1 e2) v.
 
-  (** Note that we omit a [Var] case, since variable terms can't be *closed*. *)
+  (* Note that we omit a [Var] case, since variable terms can't be *closed*,
+   * and therefore they aren't meaningful as top-level programs. *)
 
   (** Which terms are values, that is, final results of execution? *)
   Inductive value : exp -> Prop :=
@@ -41,6 +56,7 @@ Module Ulc.
 
   Hint Constructors eval value.
 
+  (* Every value executes to itself. *)
   Theorem value_eval : forall v,
     value v
     -> eval v v.
@@ -50,7 +66,7 @@ Module Ulc.
 
   Hint Resolve value_eval.
 
-  (** Actually, let's prove that [eval] only produces values. *)
+  (** Conversely, let's prove that [eval] only produces values. *)
   Theorem eval_value : forall e v,
     eval e v
     -> value v.
@@ -60,24 +76,39 @@ Module Ulc.
 
   Hint Resolve eval_value.
 
+  (* Some notations, to let us write more normal-looking lambda terms *)
   Coercion Var : var >-> exp.
   Notation "\ x , e" := (Abs x e) (at level 50).
   Infix "@" := App (at level 49, left associativity).
 
+
+  (** * Church Numerals, everyone's favorite example of lambda terms in
+      * action *)
+
+  (* Here are two curious definitions. *)
   Definition zero := \"f", \"x", "x".
   Definition plus1 := \"n", \"f", \"x", "f" @ ("n" @ "f" @ "x").
 
+  (* We can build up any natural number [n] as [plus1^n @ zero].  Let's prove
+   * that, in fact, these definitions constitute a workable embedding of the
+   * natural numbers in lambda-calculus. *)
+
+  (* A term [plus^n @ zero] evaluates to something very close to what this
+   * function returns. *)
   Fixpoint canonical' (n : nat) : exp :=
     match n with
     | O => "x"
     | S n' => "f" @ ((\"f", \"x", canonical' n') @ "f" @ "x")
     end.
 
+  (* This missing piece is this wrapper. *)
   Definition canonical n := \"f", \"x", canonical' n.
 
+  (* Let's formalize our definition of what it means to represent a number. *)
   Definition represents (e : exp) (n : nat) :=
     eval e (canonical n).
 
+  (* Zero passes the test. *)
   Theorem zero_ok : represents zero 0.
   Proof.
     unfold zero, represents, canonical.
@@ -85,6 +116,7 @@ Module Ulc.
     econstructor.
   Qed.
 
+  (* So does our successor operation. *)
   Theorem plus1_ok : forall e n, represents e n
                                  -> represents (plus1 @ e) (S n).
   Proof.
@@ -96,8 +128,15 @@ Module Ulc.
     econstructor.
   Qed.
 
+  (* What's basically going on here?  The representation of number [n] is [N]
+   * such that, for any function [f]:
+   *   N(f) = f^n
+   * That is, we represent a number as its repeated-composition operator.
+   * So, given a number, we can use it to repeat any operation.  In particular,
+   * to implement addition, we can just repeat [plus1]! *)
   Definition add := \"n", \"m", "n" @ plus1 @ "m".
 
+  (* Our addition works properly on this test case. *)
   Example add_1_2 : exists v,
       eval (add @ (plus1 @ zero) @ (plus1 @ (plus1 @ zero))) v
       /\ eval (plus1 @ (plus1 @ (plus1 @ zero))) v.
@@ -107,12 +146,16 @@ Module Ulc.
     repeat econstructor.
   Qed.
 
+  (* By the way: since [canonical'] doesn't mention variable "m", substituting
+   * for "m" has no effect.  This fact will come in handy shortly. *)
   Lemma subst_m_canonical' : forall m n,
     subst m "m" (canonical' n) = canonical' n.
   Proof.
     induct n; simplify; equality.
   Qed.
 
+  (* This inductive proof is the workhorse for the next result, so let's skip
+   * ahead there. *)
   Lemma add_ok' : forall m n,
       eval
         (subst (\ "f", (\ "x", canonical' m)) "x"
@@ -139,6 +182,7 @@ Module Ulc.
     econstructor.
   Qed.
 
+  (* [add] properly encodes the usual addition. *)
   Theorem add_ok : forall n ne m me,
       represents ne n
       -> represents me m
@@ -164,6 +208,8 @@ Module Ulc.
     rewrite subst_m_canonical'.
     apply add_ok'.
   Qed.
+
+  (* Let's repeat the same exercise for multiplication. *)
 
   Definition mult := \"n", \"m", "n" @ (add @ "m") @ zero.
 
@@ -210,7 +256,7 @@ Module Ulc.
     econstructor.
     econstructor.
     rewrite subst_m_canonical'.
-    apply add_ok'.
+    apply add_ok'. (* Note the recursive appeal to correctness of [add]. *)
   Qed.
 
   Theorem mult_ok : forall n ne m me,
@@ -247,6 +293,9 @@ Module Ulc.
 
   (** * Small-step semantics with evaluation contexts *)
 
+  (* We can also port to this setting our small-step semantics style based on
+   * evaluation contexts. *)
+
   Inductive context : Set :=
   | Hole : context
   | App1 : context -> exp -> context
@@ -269,6 +318,9 @@ Module Ulc.
    * *call-by-value* instead of other evaluation strategies.  Details are
    * largely beyond our scope here. *)
 
+  (* Compared to the small-step contextual semantics from two chapters back, we
+   * skip a [step0] relation, since function application (called "beta
+   * reduction") is the only option here. *)
   Inductive step : exp -> exp -> Prop :=
   | ContextBeta : forall c x e v e1 e2,
     value v
@@ -278,7 +330,8 @@ Module Ulc.
 
   Hint Constructors plug step.
 
-  (** We can move directly to establishing inclusion from basic small steps to contextual small steps. *)
+  (* Here we now go through a proof of equivalence between big- and small-step
+   * semantics, though we won't spend any further commentary on it. *)
 
   Lemma step_eval'' : forall v c x e e1 e2 v0,
     value v
@@ -396,8 +449,12 @@ Module Ulc.
   Qed.
 End Ulc.
 
+
+(** * Now we turn to a variant of lambda calculus with static type-checking.
+    * This variant is called *simply typed* lambda calculus, and *simple* has a
+    * technical meaning, which we will explore relaxing in a problem set. *)
 Module Stlc.
-  (* Expression syntax *)
+  (* We add expression forms for numeric constants and addition. *)
   Inductive exp : Set :=
   | Var (x : var)
   | Const (n : nat)
@@ -421,7 +478,7 @@ Module Stlc.
       | App e2' e2'' => App (subst e1 x e2') (subst e1 x e2'')
     end.
 
-  (* Evaluation contexts *)
+  (* Evaluation contexts; note that we added cases for [Plus]. *)
   Inductive context : Set :=
   | Hole : context
   | Plus1 : context -> exp -> context
@@ -472,13 +529,16 @@ Module Stlc.
   |}.
 
 
-  (* Syntax of types *)
+  (* That language is suitable to describe with a static *type system*.  Here's
+   * our modest, but countably infinite, set of types. *)
   Inductive type : Set :=
-  | Nat
-  | Fun (dom ran : type).
+  | Nat                  (* Numbers *)
+  | Fun (dom ran : type) (* Functions *).
 
-  (* Our typing judgment uses *typing contexts* (not to be confused with
-   * evaluation contexts) to map free variables to their types. *)
+  (* Our typing relation (also often called a "judgment") uses *typing contexts*
+   * (not to be confused with evaluation contexts) to map free variables to
+   * their types.  Free variables are those that don't refer to enclosing [Abs]
+   * binders. *)
   Inductive hasty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
@@ -499,12 +559,15 @@ Module Stlc.
 
   Hint Constructors value plug step0 step hasty.
 
+  (* Some notation to make it more pleasant to write programs *)
   Infix "-->" := Fun (at level 60, right associativity).
   Coercion Const : nat >-> exp.
   Infix "^+^" := Plus (at level 50).
   Coercion Var : var >-> exp.
   Notation "\ x , e" := (Abs x e) (at level 51).
   Infix "@" := App (at level 49, left associativity).
+
+  (* Some examples of typed programs *)
 
   Example one_plus_one : hasty $0 (1 ^+^ 1) Nat.
   Proof.
@@ -527,19 +590,24 @@ Module Stlc.
   Qed.
 
 
-  (** * Some examples of typed programs *)
-
-
   (** * Let's prove type soundness first without much automation. *)
 
-  (* Now we're ready for the first of the two key properties, to show that "has
-   * type t in the empty typing context" is an invariant. *)
+  (* What useful invariants could we prove about programs in this language?  How
+   * about that, at every point, either they're finished executing or they can
+   * take further steps?  For instance, a program that tried to add a function
+   * to a number would not satisfy that condition, and we call it *stuck*.  We
+   * want to prove that typed programs can never become stuck.  Here's a good
+   * invariant to strive for. *)
+  Definition unstuck e := value e
+    \/ (exists e' : exp, step e e').
+
+  (* Now we're ready for the first of the two key properties to establish that
+   * invariant: well-typed programs are never stuck. *)
   Lemma progress : forall e t,
     hasty $0 e t
-    -> value e
-    \/ (exists e' : exp, step e e').
+    -> unstuck e.
   Proof.
-    induct 1; simplify; try equality.
+    unfold unstuck; induct 1; simplify; try equality.
 
     left.
     constructor.
@@ -635,7 +703,8 @@ Module Stlc.
     cases (x ==v x'); simplify; eauto.
   Qed.
 
-  (** Raising a typing derivation to a larger typing context *)
+  (* This lemma lets us transplant a typing derivation into a new context that
+   * includes the old one. *)
   Lemma weakening : forall G e t,
     hasty G e t
     -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
@@ -722,8 +791,8 @@ Module Stlc.
     assumption.
   Qed.
 
-  (* We're almost ready for the main preservation property.  Let's prove it first
-   * for the more basic [step0] relation. *)
+  (* We're almost ready for the other main property.  Let's prove it first
+   * for the more basic [step0] relation: steps preserve typing. *)
   Lemma preservation0 : forall e1 e2,
     step0 e1 e2
     -> forall t, hasty $0 e1 t
@@ -793,7 +862,7 @@ Module Stlc.
     eassumption.
   Qed.
 
-  (* OK, now we're almost done. *)
+  (* OK, now we're almost done.  Full steps really do preserve typing! *)
   Lemma preservation : forall e1 e2,
     step e1 e2
     -> forall t, hasty $0 e1 t
@@ -811,14 +880,12 @@ Module Stlc.
     assumption.
   Qed.
 
-  (* Now watch this!  Though the syntactic approach to type soundness is usually
+  (* Now watch this!  Though this syntactic approach to type soundness is usually
    * presented from scratch as a proof technique, it turns out that the two key
    * properties, progress and preservation, are just instances of the same methods
    * we've been applying all along with invariants of transition systems! *)
   Theorem safety : forall e t, hasty $0 e t
-    -> invariantFor (trsys_of e)
-                    (fun e' => value e'
-                               \/ exists e'', step e' e'').
+    -> invariantFor (trsys_of e) unstuck.
   Proof.
     simplify.
 
@@ -842,7 +909,8 @@ Module Stlc.
   Qed.
 
 
-  (** * Let's do that again with more automation. *)
+  (** * Let's do that again with more automation, whose details are beyond the
+      * scope of the book. *)
 
   Ltac t0 := match goal with
              | [ H : ex _ |- _ ] => destruct H
@@ -880,7 +948,7 @@ Module Stlc.
   Hint Resolve weakening_snazzy.
 
   (* Replacing a typing context with an equal one has no effect (useful to guide
-   * proof search). *)
+   * proof search as a hint). *)
   Lemma hasty_change : forall G e t,
     hasty G e t
     -> forall G', G' = G

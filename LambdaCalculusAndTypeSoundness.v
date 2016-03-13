@@ -14,7 +14,7 @@ Module Ulc.
   Fixpoint subst (rep : exp) (x : string) (e : exp) : exp :=
     match e with
     | Var y => if string_dec y x then rep else Var y
-    | Abs y e1 => Abs y (if string_dec y x then e1 else subst rep x e1)
+    | Abs y e1 => Abs y (if y ==v x then e1 else subst rep x e1)
     | App e1 e2 => App (subst rep x e1) (subst rep x e2)
     end.
 
@@ -34,7 +34,6 @@ Module Ulc.
 
   (** Note that we omit a [Var] case, since variable terms can't be *closed*. *)
 
-
   (** Which terms are values, that is, final results of execution? *)
   Inductive value : exp -> Prop :=
   | Value : forall x e, value (Abs x e).
@@ -42,12 +41,207 @@ Module Ulc.
 
   Hint Constructors eval value.
 
+  Theorem value_eval : forall v,
+    value v
+    -> eval v v.
+  Proof.
+    invert 1; eauto.
+  Qed.
+
+  Hint Resolve value_eval.
+
   (** Actually, let's prove that [eval] only produces values. *)
   Theorem eval_value : forall e v,
     eval e v
     -> value v.
   Proof.
     induct 1; eauto.
+  Qed.
+
+  Hint Resolve eval_value.
+
+  Coercion Var : var >-> exp.
+  Notation "\ x , e" := (Abs x e) (at level 50).
+  Infix "@" := App (at level 49, left associativity).
+
+  Definition zero := \"f", \"x", "x".
+  Definition plus1 := \"n", \"f", \"x", "f" @ ("n" @ "f" @ "x").
+
+  Fixpoint canonical' (n : nat) : exp :=
+    match n with
+    | O => "x"
+    | S n' => "f" @ ((\"f", \"x", canonical' n') @ "f" @ "x")
+    end.
+
+  Definition canonical n := \"f", \"x", canonical' n.
+
+  Definition represents (e : exp) (n : nat) :=
+    eval e (canonical n).
+
+  Theorem zero_ok : represents zero 0.
+  Proof.
+    unfold zero, represents, canonical.
+    simplify.
+    econstructor.
+  Qed.
+
+  Theorem plus1_ok : forall e n, represents e n
+                                 -> represents (plus1 @ e) (S n).
+  Proof.
+    unfold plus1, represents, canonical; simplify.
+    econstructor.
+    econstructor.
+    eassumption.
+    simplify.
+    econstructor.
+  Qed.
+
+  Definition add := \"n", \"m", "n" @ plus1 @ "m".
+
+  Example add_1_2 : exists v,
+      eval (add @ (plus1 @ zero) @ (plus1 @ (plus1 @ zero))) v
+      /\ eval (plus1 @ (plus1 @ (plus1 @ zero))) v.
+  Proof.
+    eexists; propositional.
+    repeat (econstructor; simplify).
+    repeat econstructor.
+  Qed.
+
+  Lemma subst_m_canonical' : forall m n,
+    subst m "m" (canonical' n) = canonical' n.
+  Proof.
+    induct n; simplify; equality.
+  Qed.
+
+  Lemma add_ok' : forall m n,
+      eval
+        (subst (\ "f", (\ "x", canonical' m)) "x"
+               (subst (\ "n", (\ "f", (\ "x", "f" @ (("n" @ "f") @ "x")))) "f"
+                      (canonical' n))) (canonical (n + m)).
+  Proof.
+    induct n; simplify.
+
+    econstructor.
+
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    econstructor.
+    simplify.
+    eassumption.
+
+    simplify.
+    econstructor.
+  Qed.
+
+  Theorem add_ok : forall n ne m me,
+      represents ne n
+      -> represents me m
+      -> represents (add @ ne @ me) (n + m).
+  Proof.
+    unfold represents; simplify.
+
+    econstructor.
+    econstructor.
+    econstructor.
+    eassumption.
+    simplify.
+    econstructor.
+    eassumption.
+    simplify.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    econstructor.
+    rewrite subst_m_canonical'.
+    apply add_ok'.
+  Qed.
+
+  Definition mult := \"n", \"m", "n" @ (add @ "m") @ zero.
+
+  Example mult_1_2 : exists v,
+      eval (mult @ (plus1 @ zero) @ (plus1 @ (plus1 @ zero))) v
+      /\ eval (plus1 @ (plus1 @ zero)) v.
+  Proof.
+    eexists; propositional.
+    repeat (econstructor; simplify).
+    repeat econstructor.
+  Qed.
+
+  Lemma mult_ok' : forall m n,
+      eval
+        (subst (\ "f", (\ "x", "x")) "x"
+               (subst
+                  (\ "m",
+                   ((\ "f", (\ "x", canonical' m)) @
+                                                   (\ "n", (\ "f", (\ "x", "f" @ (("n" @ "f") @ "x"))))) @ "m")
+                  "f" (canonical' n))) (canonical (n * m)).
+  Proof.
+    induct n; simplify.
+
+    econstructor.
+
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    econstructor.
+    simplify.
+    eassumption.
+
+    simplify.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    econstructor.
+    rewrite subst_m_canonical'.
+    apply add_ok'.
+  Qed.
+
+  Theorem mult_ok : forall n ne m me,
+      represents ne n
+      -> represents me m
+      -> represents (mult @ ne @ me) (n * m).
+  Proof.
+    unfold represents; simplify.
+
+    econstructor.
+    econstructor.
+    econstructor.
+    eassumption.
+    simplify.
+    econstructor.
+    eassumption.
+    simplify.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    simplify.
+    econstructor.
+    econstructor.
+    simplify.
+    rewrite subst_m_canonical'.
+    apply mult_ok'.
   Qed.
 
 
@@ -85,15 +279,6 @@ Module Ulc.
   Hint Constructors plug step.
 
   (** We can move directly to establishing inclusion from basic small steps to contextual small steps. *)
-
-  Theorem value_eval : forall v,
-    value v
-    -> eval v v.
-  Proof.
-    invert 1; eauto.
-  Qed.
-
-  Hint Resolve value_eval.
 
   Lemma step_eval'' : forall v c x e e1 e2 v0,
     value v
@@ -313,6 +498,36 @@ Module Stlc.
     -> hasty G (App e1 e2) t2.
 
   Hint Constructors value plug step0 step hasty.
+
+  Infix "-->" := Fun (at level 60, right associativity).
+  Coercion Const : nat >-> exp.
+  Infix "^+^" := Plus (at level 50).
+  Coercion Var : var >-> exp.
+  Notation "\ x , e" := (Abs x e) (at level 51).
+  Infix "@" := App (at level 49, left associativity).
+
+  Example one_plus_one : hasty $0 (1 ^+^ 1) Nat.
+  Proof.
+    repeat (econstructor; simplify).
+  Qed.
+
+  Example add : hasty $0 (\"n", \"m", "n" ^+^ "m") (Nat --> Nat --> Nat).
+  Proof.
+    repeat (econstructor; simplify).
+  Qed.
+
+  Example eleven : hasty $0 ((\"n", \"m", "n" ^+^ "m") @ 7 @ 4) Nat.
+  Proof.
+    repeat (econstructor; simplify).
+  Qed.
+
+  Example seven_the_long_way : hasty $0 ((\"x", "x") @ (\"x", "x") @ 7) Nat.
+  Proof.
+    repeat (econstructor; simplify).
+  Qed.
+
+
+  (** * Some examples of typed programs *)
 
 
   (** * Let's prove type soundness first without much automation. *)

@@ -2022,14 +2022,14 @@ In fact, flow-insensitive and flow-sensitive interval analysis with this widenin
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Lambda-Calculus and Simple Type Safety}
+\chapter{Lambda Calculus and Simple Type Safety}
 
 We'll now take a break from the imperative language we've been studying for the last two chapters, instead looking at a classic sort of small language that distills the essence of \emph{functional} programming\index{functional programming}.
 That's the language paradigm that we've been using throughout this book, as we coded executable versions of algorithms.
 Its distinctive characteristics are first, a computation style based on simplifying terms instead of running step-by-step instructions that modify state; and second, use of functions as first-class values.
 Functional programming went mainstream in the early 21st century, influencing widely adopted languages from JavaScript\index{JavaScript}, where first-class functions are routinely used as callbacks in asynchronous event processing; to Scala\index{Scala}, a hybrid language that melds functional-programming ideas with object-oriented programming for the Java platform; to Haskell\index{Haskell}, a purely functional language that has become popular with programming hobbyists and is seeing increasing adoption in industry.
 
-The heart of functional programming persists even in \emph{$\lambda$-calculus}\index{$\lambda$-calculus} (or lambda-calculus\index{lambda-calculus}), the simplest version of which contains just three syntactic forms, but which provides probably the simplest of the widely known Turing-complete languages that is (nearly!) pleasant to program in directly.
+The heart of functional programming persists even in \emph{$\lambda$-calculus}\index{$\lambda$-calculus} (or lambda calculus\index{lambda calculus}), the simplest version of which contains just three syntactic forms, but which provides probably the simplest of the widely known Turing-complete languages that is (nearly!) pleasant to program in directly.
 
 
 \section{Untyped Lambda Calculus}
@@ -2095,6 +2095,80 @@ Substitute the argument value in the body of the abstraction, evaluate the resul
 Note that we only ever need to evaluate \emph{closed} terms\index{closed terms}, meaning terms that are not open, so we obey the restriction on substitution sketched above.
 
 It may be surprising that these two rules are enough to define the full semantics of a Turing-complete language!
+
+
+\section{A Quick Case Study in Program Verification: Church Numerals}
+
+\newcommand{\church}[1]{\underline{#1}}
+
+Since $\lambda$-calculus is Turing-complete, it must be able to represent numbers and all the usual arithmetic operations.
+The classic representation is \emph{Church numerals}\index{Church numerals}, where every natural number $n$ is represented as a particular $\lambda$-term $\church{n}$ that, when passed a function $f$ as input, returns $f^n$, the $n$-way self-composition of $f$.
+In some sense, repeating a process is the fundamental use of a natural number, and it turns out that we can recover all of the usual operations atop this primitive.
+
+\newcommand{\lc}[1]{\mathsf{#1}}
+
+Two $\lambda$-calculus functions are sufficient to build up all the naturals as Church numerals.
+\begin{eqnarray*}
+  \lc{zero} &=& \lambda f. \; \lambda x. \; x \\
+  \lc{plus1} &=& \lambda n. \; \lambda f. \; \lambda x. \; f \; (n \; f \; x)
+\end{eqnarray*}
+Our representation of 0 returns an identity function, no matter which $f$ it is passed.
+Our successor operation takes in a number $n$ and returns a new one that first runs $n$ and then applies $f$ one extra time.
+Now we have $\church{0} = \lc{zero}$, $\church{1} = \lc{plus1} \; \lc{zero}$, $\church{2} = \lc{plus1} \; (\lc{plus1} \; \lc{zero})$, and so on.
+
+\newcommand{\prechurch}[1]{\left \lfloor #1 \right \rfloor}
+
+These Church numerals are not values yet.
+Let us formalize which values they evaluate to and tweak the encoding to use the values instead.
+We write $\prechurch{n}$ for the body of a $\lambda$-abstraction that we are building to represent $n$, where variables $f$ and $x$ are in scope.
+\begin{eqnarray*}
+  \prechurch{0} &=& x \\
+  \prechurch{n+1} &=& f \; ((\lambda f. \; \lambda x. \; \prechurch{n}) \; f \; x)
+\end{eqnarray*}
+The $n+1$ case may seem wastefully large, but, in fact, this is the precise form of the values produced by evaluating repeated applications of $\lc{plus1}$ to $\lc{zero}$, as the reader can verify using the big-step semantics.
+We define $\church{n} = \lambda f. \; \lambda x. \; \prechurch{n}$, giving a canonical encoding for each number.
+
+Now we notate correctness of an encoding $e$ for number $n$ by $e \sim n$, defining it as $\bigstep{e}{\church{n}}$, meaning that $e$ evaluates to the Church encoding of $n$.
+Two first easy results show that our primitive constructors are correct.
+
+\begin{theorem}
+  $\lc{zero} \sim 0$.
+\end{theorem}
+
+\begin{theorem}
+  If $e_n \sim n$, then $\lc{plus1} \; e_n \sim n+1$.
+\end{theorem}
+
+Things get more interesting as we start to code up the arithmetic operations.
+\begin{eqnarray*}
+  \lc{add} &=& \lambda n. \; \lambda m. \; n \; \lc{plus1} \; m
+\end{eqnarray*}
+
+That is, addition of $n$ to $m$ is calculated by applying $n$ $\lc{plus1}$ operations to $m$.
+
+\begin{theorem}\label{church_add}
+  If $e_n \sim n$ and $e_m \sim m$, then $\lc{add} \; e_n \; e_m \sim n + m$.
+\end{theorem}
+\begin{proof}
+  After a few steps applying the big-step rules directly, we finish by induction on $n$.
+  A silly-seeming but necessary lemma proves that $\subst{\prechurch{n}}{m}{e} = \prechurch{n}$, since $\prechurch{n}$ does not contain free occurrences of $m$.
+\end{proof}
+
+Multiplication proceeds in much the same way.
+\begin{eqnarray*}
+  \lc{mult} &=& \lambda n. \; \lambda m. \; n \; (\lc{add} \; m) \; \lc{zero}
+\end{eqnarray*}
+
+\begin{theorem}
+  If $e_n \sim n$ and $e_m \sim m$, then $\lc{mult} \; e_n \; e_m \sim n \times m$.
+\end{theorem}
+\begin{proof}
+  After a few steps applying the big-step rules directly, we finish by induction on $n$, within which we appeal to Theorem \ref{church_add}.
+\end{proof}
+
+An enjoyable (though not entirely trivial) exercise for the reader is to generalize the methods of Church encoding to encoding of other inductive datatypes, including the syntax of $\lambda$-calculus itself.
+A hallmark of a Turing-complete language is that it can host an interpreter for itself, and $\lambda$-calculus is no exception!
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

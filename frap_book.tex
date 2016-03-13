@@ -2020,6 +2020,82 @@ With this modification, analysis of our tricky example successfully finds the in
 In fact, flow-insensitive and flow-sensitive interval analysis with this widening operator applied at loop starts are guaranteed to terminate, for any input programs.
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Lambda-Calculus and Simple Type Safety}
+
+We'll now take a break from the imperative language we've been studying for the last two chapters, instead looking at a classic sort of small language that distills the essence of \emph{functional} programming\index{functional programming}.
+That's the language paradigm that we've been using throughout this book, as we coded executable versions of algorithms.
+Its distinctive characteristics are first, a computation style based on simplifying terms instead of running step-by-step instructions that modify state; and second, use of functions as first-class values.
+Functional programming went mainstream in the early 21st century, influencing widely adopted languages from JavaScript\index{JavaScript}, where first-class functions are routinely used as callbacks in asynchronous event processing; to Scala\index{Scala}, a hybrid language that melds functional-programming ideas with object-oriented programming for the Java platform; to Haskell\index{Haskell}, a purely functional language that has become popular with programming hobbyists and is seeing increasing adoption in industry.
+
+The heart of functional programming persists even in \emph{$\lambda$-calculus}\index{$\lambda$-calculus} (or lambda-calculus\index{lambda-calculus}), the simplest version of which contains just three syntactic forms, but which provides probably the simplest of the widely known Turing-complete languages that is (nearly!) pleasant to program in directly.
+
+
+\section{Untyped Lambda Calculus}
+
+Here is the syntax of the original $\lambda$-calculus.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e &::=& x \mid \lambda x. \; e \mid e \; e
+\end{array}$$
+
+An expression $\lambda x. \; e$\index{$\lambda$ expression} is a first-class, anonymous function, also called a \emph{function abstraction}\index{function abstraction}.
+When called, it replaces its formal-argument variable $x$ with the actual argument within $e$ and continues evaluating.
+The third syntactic form $e \; e$ uses \emph{juxtaposition}\index{juxtaposition}, or writing one term after another, for function application.
+
+A simple example of an expression is $\lambda x. \; x$, for an identity function.
+When we apply it to itself, like $(\lambda x. \; x) \; (\lambda x. \; x)$, it reduces again to itself.
+
+\newcommand{\fv}[1]{\textsf{FV}(#1)}
+
+We can give a simple big-step operational semantics to $\lambda$-terms.
+The key auxiliary operation is \emph{substitution}\index{substitution}, where we write $\subst{e}{x}{e'}$ for replacing all \emph{free} occurrences of $x$ in $e$ with $e'$.
+Here we refer to a notion of \emph{free variables}\index{free variables}, which we should define first, as a recursive function.
+\begin{eqnarray*}
+  \fv{x} &=& \{x\} \\
+  \fv{\lambda x. \; e} &=& \fv{e} - \{x\} \\
+  \fv{e_1 \; e_2} &=& \fv{e_1} \cup \fv{e_2}
+\end{eqnarray*}
+Intuitively, a variable is free in an expression iff it doesn't occur inside the scope of a $\lambda$ binding the same variable.
+
+Next we define substitution.
+\begin{eqnarray*}
+  \subst{x}{x}{e'} &=& e' \\
+  \subst{y}{x}{e'} &=& y\textrm{, if $y \neq x$} \\
+  \subst{\lambda x. \; e}{x}{e'} &=& \lambda x. \; e \\
+  \subst{\lambda y. \; e}{x}{e'} &=& \lambda y. \; \subst{e}{x}{e'}\textrm{, if $y \neq x$} \\
+  \subst{e_1 \; e_2}{x}{e'} &=& \subst{e_1}{x}{e'} \; \subst{e_2}{x}{e'}
+\end{eqnarray*}
+
+Notice a peculiar property of this definition when we work with \emph{open} terms\index{open terms}, whose free-variable sets are nonempty.
+According to the definition $\subst{\lambda x. \; y}{y}{x} = \lambda x. \; x$.
+In this example, we say that $\lambda$-bound variable $x$ has been \emph{captured}\index{variable capture} unintentionally, where substitution created a reference to that $\lambda$ where none existed before.
+Such a problem can only arise when replacing a variable with an open term.
+In this case, that term is $y$, where $\fv{y} = \{y\} \neq \emptyset$.
+
+More general investigations into $\lambda$-calculus will define a more involved notion of \emph{capture-avoiding} substitution\index{capture-avoiding substitution}.
+Instead, in this book, we carefully steer clear of the $\lambda$-calculus applications that require substituting open terms for variables, letting us stick with the simpler definiton.
+When it comes to formal encoding of this style of syntax in proof assistants, surprisingly many complications arise, leading to what is still an active research area in encodings of language syntax with local variable binding\index{variable binding}.
+Since we aim more for broad than deep coverage of the field of formal program reasoning, we are happy to avoid those complexities.
+
+With substitution in hand, a big-step semantics\index{big-step semantics} is easy to define.
+We use the syntactic shorthand $v$ for a \emph{value}\index{value}, or term that needs no further evaluation, which in this case includes just the $\lambda$-abstractions.
+$$\infer{\bigstep{\lambda x. \; x}{\lambda x. \; x}}{}
+\quad \infer{\bigstep{e_1 \; e_2}{v'}}{
+  \bigstep{e_1}{\lambda x. \; e}
+  & \bigstep{e_2}{v}
+  & \bigstep{\subst{e}{x}{v}}{v'}
+}$$
+
+A value evaluates to itself.
+To evaluate an application, evaluate both the function and the argument.
+The function value must be some $\lambda$-abstraction.
+Substitute the argument value in the body of the abstraction, evaluate the result, and return that value as the overall value.
+Note that we only ever need to evaluate \emph{closed} terms\index{closed terms}, meaning terms that are not open, so we obey the restriction on substitution sketched above.
+
+It may be surprising that these two rules are enough to define the full semantics of a Turing-complete language!
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

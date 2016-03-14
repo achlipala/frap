@@ -19,4 +19,5 @@ ModelChecking.v
 OperationalSemantics_template.v
 OperationalSemantics.v
 AbstractInterpretation.v
+LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v

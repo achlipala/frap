@@ -2072,7 +2072,7 @@ Notice a peculiar property of this definition when we work with \emph{open} term
 According to the definition $\subst{\lambda x. \; y}{y}{x} = \lambda x. \; x$.
 In this example, we say that $\lambda$-bound variable $x$ has been \emph{captured}\index{variable capture} unintentionally, where substitution created a reference to that $\lambda$ where none existed before.
 Such a problem can only arise when replacing a variable with an open term.
-In this case, that term is $y$, where $\fv{y} = \{y\} \neq \emptyset$.
+In this case, that term is $x$, where $\fv{x} = \{x\} \neq \emptyset$.
 
 More general investigations into $\lambda$-calculus will define a more involved notion of \emph{capture-avoiding} substitution\index{capture-avoiding substitution}.
 Instead, in this book, we carefully steer clear of the $\lambda$-calculus applications that require substituting open terms for variables, letting us stick with the simpler definiton.

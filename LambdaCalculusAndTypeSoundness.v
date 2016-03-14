@@ -546,7 +546,7 @@ Module Stlc.
 
   (* That language is suitable to describe with a static *type system*.  Here's
    * our modest, but countably infinite, set of types. *)
-  Inductive type : Set :=
+  Inductive type :=
   | Nat                  (* Numbers *)
   | Fun (dom ran : type) (* Functions *).
 

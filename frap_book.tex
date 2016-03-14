@@ -2040,7 +2040,7 @@ $$\begin{array}{rrcl}
   \textrm{Expressions} & e &::=& x \mid \lambda x. \; e \mid e \; e
 \end{array}$$
 
-An expression $\lambda x. \; e$\index{$\lambda$ expression} is a first-class, anonymous function, also called a \emph{function abstraction}\index{function abstraction}.
+An expression $\lambda x. \; e$\index{$\lambda$ expression} is a first-class, anonymous function, also called a \emph{function abstraction}\index{function abstraction} or \emph{$\lambda$-abstraction}\index{$\lambda$-abstraction}.
 When called, it replaces its formal-argument variable $x$ with the actual argument within $e$ and continues evaluating.
 The third syntactic form $e \; e$ uses \emph{juxtaposition}\index{juxtaposition}, or writing one term after another, for function application.
 
@@ -2214,6 +2214,141 @@ There are a few proof subtleties beyond what we encountered before, and the Coq 
 Again as before, we have a natural way to build a transition system from any $\lambda$-term $e$, where $\mathcal L$ is the set of $\lambda$-terms.
 We define $\mathbb T(e) = \angled{\mathcal L, \{e\}, \to}$.
 The next section gives probably the most celebrated $\lambda$-calculus result based on the transition-system perspective.
+
+
+\section{Simple Types and Their Soundness}
+
+Let's spruce up the language with some more constructs.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Expressions} & e &::=& n \mid e + e \mid x \mid \lambda x. \; e \mid e \; e \\
+  \textrm{Values} & v &::=& n \mid \lambda x. \; e
+\end{array}$$
+We've added natural numbers as a primitive feature, supported via constants and addition.
+Numbers may be intermixed with functions, and we may, for instance, write first-class functions that take numbers as input or return numbers.
+
+Our language of evaluation contexts expands a bit.
+$$\begin{array}{rrcl}
+  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C \mid C + e \mid v + C
+\end{array}$$
+
+Now we want to define two kinds of basic small steps, so it is worth defining a separate relation for them.
+Here we face a classic nuisance in writing rules that combine explicit syntax with standard mathematical operators, and we write $+$ for the syntactic construct and $\textbf{+}$ for the mathematical addition operator.
+$$\infer{\smallstepo{(\lambda x. \; e) \; v}{\subst{e}{x}{v}}}{}
+\quad \infer{\smallstepo{n + m}{n \textbf{+} m}}{}$$
+
+Here is the overall step rule.
+$$\infer{\smallstep{\plug{C}{e}}{\plug{C}{e'}}}{
+  \smallstepo{e}{e'}
+}$$
+
+What would be a useful property to prove about our new expressions?
+For one thing, we don't want them to ``crash,'' as in the expression $(\lambda x. \; x) + 7$ that tries to add a function and a number.
+No rule of the semantics knows what to do with that case, but it also isn't a value, so we shouldn't consider it as finished with evaluation.
+Define an expression as \emph{stuck}\index{stuck term} when it is not a value and it cannot take a small step.
+For ``reasonable'' expressions $e$, we should be able to prove that it is an invariant of $\mathbb T(e)$ that no expression is ever stuck.
+
+To define ``reasonable,'' we formalize the popular idea of a static type system.
+Every expression will be assigned a type, capturing which sorts of contexts it may legally be dropped into.
+Our language of types is simple.
+\abstraction
+$$\begin{array}{rrcl}
+  \textrm{Types} & \tau &::=& \mathbb N \mid \tau \to \tau
+\end{array}$$
+We have trees of function-space constructors, where all the leaves are instances of the natural-number type $\mathbb N$.
+Note that, with type assignment, we have yet another case of \emph{abstraction}, approximating a potentially complex expression with a type that only records enough information to rule out crashes.
+
+\newcommand{\hasty}[3]{#1 \vdash #2 : #3}
+
+To assign types to closed terms, we must recursively define what it means for an open term to have a type.
+To that end, we use \emph{typing contexts}\index{typing context} $\Gamma$, finite maps from variables to types.
+To mimic standard notation, we write $\Gamma, x : \tau$ as shorthand for $\mupd{\Gamma}{x}{\tau}$, overriding of key $x$ with value $\tau$ in $\Gamma$.
+Now we define typing as a three-place relation, written $\hasty{\Gamma}{e}{\tau}$, to indicate that, assuming $\Gamma$ as an assignment of types to $e$'s free variables, we conclude that $e$ has type $\tau$.
+
+We define the relation inductively, with one case per syntactic construct.
+\modularity
+$$\infer{\hasty{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\hasty{\Gamma}{n}{\mathbb N}}{}
+\quad \infer{\hasty{\Gamma}{e_1 + e_2}{\mathbb N}}{
+    \hasty{\Gamma}{e_1}{\mathbb N}
+    & \hasty{\Gamma}{e_2}{\mathbb N}
+}$$
+$$\infer{\hasty{\Gamma}{\lambda x. \; e}{\tau_1 \to \tau_2}}{
+  \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\tau_2}}{
+  \hasty{\Gamma}{e_1}{\tau_1 \to \tau_2}
+  & \hasty{\Gamma}{e_2}{\tau_1}
+}$$
+
+We write $\hasty{}{e}{\tau}$ as shorthand for $\hasty{\mempty}{e}{\tau}$, meaning that closed term $e$ has type $\tau$, with no typing context required.
+Note that this style of typing rules provides another instance of \emph{modularity}, since we can separately type-check different subexpressions of a large expression, using just their types to coordinate expectations among subexpressions.
+
+It should be an invariant of $\mathbb T(e)$ that every reachable expression has the same type as the original, so long as the original was well-typed.
+This observation is the key to proving that it is also an invariant that no reachable expression is stuck, using a proof technique called \emph{the syntactic approach to type soundness}\index{syntactic approach to type soundness}, which turns out to be just another instance of our general toolbox for invariant proofs.
+
+We work our way through a suite of standard lemmas to support that invariant proof.
+
+\begin{lemma}[Progress]\label{progress}
+  If $\hasty{}{e}{\tau}$, then $e$ isn't stuck.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hasty{}{e}{\tau}$.
+\end{proof}
+
+\begin{lemma}[Weakening]\label{weakening}
+  If $\hasty{\Gamma}{e}{\tau}$ and every mapping in $\Gamma$ is also included in $\Gamma'$, then $\hasty{\Gamma'}{e}{\tau}$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hasty{\Gamma}{e}{\tau}$.
+\end{proof}
+
+\begin{lemma}[Substitution]\label{substitution}
+  If $\hasty{\Gamma, x : \tau'}{e}{\tau}$ and $\hasty{}{e'}{\tau'}$, then $\hasty{\Gamma}{\subst{e}{x}{e'}}{\tau}$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hasty{\Gamma, x: \tau'}{e}{\tau}$, with appeal to Lemma \ref{weakening}.
+\end{proof}
+
+\begin{lemma}\label{preservation0}
+  If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
+\end{lemma}
+\begin{proof}
+  By inversion on the derivation of $\smallstepo{e}{e'}$, with appeal to Lemma \ref{substitution}.
+\end{proof}
+
+\begin{lemma}\label{generalize_plug}
+  If any type of $e_1$ is also a type of $e_2$, then any type of $\plug{C}{e_1}$ is also a type of $\plug{C}{e_2}$.
+\end{lemma}
+\begin{proof}
+  By induction on the structure of $C$.
+\end{proof}
+
+\begin{lemma}[Preservation]\label{preservation}
+  If $\smallstep{e_1}{e_2}$ and $\hasty{}{e_1}{\tau}$, then $\hasty{}{e_2}{\tau}$.
+\end{lemma}
+\begin{proof}
+  By inversion on the derivation of $\smallstep{e_1}{e_2}$, with appeal to Lemmas \ref{preservation0} and \ref{generalize_plug}.
+\end{proof}
+
+\invariants
+\begin{theorem}[Type Soundness]
+  If $\hasty{}{e}{\tau}$, then $\neg \textrm{stuck}$ is an invariant of $\mathbb T(e)$.
+\end{theorem}
+\begin{proof}
+  First, we strengthen the invariant to $I(e) = \; \hasty{}{e}{\tau}$, justifying the implication by Lemma \ref{progress}, Progress.
+  Then we apply invariant induction, where the base case is trivial.
+  The induction step is a direct match for Lemma \ref{preservation}, Preservation.
+\end{proof}
+
+The syntactic approach to type soundness is often presented as a proof technique in isolation, but what we see here is that it follows very directly from our general invariant proof technique.
+Usually syntactic type soundness is presented as fundamentally about proving Progress and Preservation conditions.
+The Progress condition maps to invariant strengthening, and the Preservation condition maps to invariant induction, which we have used in almost every invariant proof so far.
+Since the basic proof structure matches our standard one, the main insight is the usual one: a good choice of a strengthened invariant.
+In this case, invariant $I(e) = \; \hasty{}{e}{\tau}$ is that crucial insight, including the original design of the set of types and the typing relation.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

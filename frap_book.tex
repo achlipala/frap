@@ -1292,7 +1292,7 @@ Define an exponentially growing system of threads ${\mathbb S}^n$ by:
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Operational Semantics}
+\chapter{\label{operational_semantics}Operational Semantics}
 
 It gets tedious to define a relation from first principles, to explain the behaviors of any concrete program.
 We do more things with programs than just reason about them.
@@ -1638,7 +1638,7 @@ This new semantics formulation is equivalent to the other two, as we establish n
   By inversion on the derivation of $\smallstepc{(v, c)}{(v', c')}$, followed by an appeal to the last lemma.
 \end{proof}
 
-\subsection{Evaluation Contexts Pay Off: Adding Concurrency}
+\subsection{\label{eval_contexts}Evaluation Contexts Pay Off: Adding Concurrency}
 
 To showcase the convenience of contextual semantics, let's extend our example language with a simple construct for running two commands in parallel\index{parallel composition of threads}, implicitly extending the definition of plugging accordingly.
 $$\begin{array}{rrcl}
@@ -2081,6 +2081,7 @@ Since we aim more for broad than deep coverage of the field of formal program re
 
 With substitution in hand, a big-step semantics\index{big-step semantics} is easy to define.
 We use the syntactic shorthand $v$ for a \emph{value}\index{value}, or term that needs no further evaluation, which in this case includes just the $\lambda$-abstractions.
+\encoding
 $$\infer{\bigstep{\lambda x. \; x}{\lambda x. \; x}}{}
 \quad \infer{\bigstep{e_1 \; e_2}{v'}}{
   \bigstep{e_1}{\lambda x. \; e}
@@ -2180,6 +2181,39 @@ Multiplication proceeds in much the same way.
 An enjoyable (though not entirely trivial) exercise for the reader is to generalize the methods of Church encoding to encoding of other inductive datatypes, including the syntax of $\lambda$-calculus itself.
 A hallmark of a Turing-complete language is that it can host an interpreter for itself, and $\lambda$-calculus is no exception!
 
+
+\section{Small-Step Semantics}
+
+$\lambda$-calculus is also straightforward to formalize with a small-step semantics\index{small-step operational semantics} and evaluation contexts\index{evaluation contexts}, following the method of Section \ref{eval_contexts}.
+One might argue that the technique is even simpler for $\lambda$-calculus, since we must deal only with expressions, not also imperative variable valuations.
+
+$$\begin{array}{rrcl}
+  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C
+\end{array}$$
+Note the one subtlety: the last form of evaluation context requires the term in a function position to be a \emph{value}.
+This innocuous-looking restriction enforces \emph{call-by-value evaluation order}\index{call-by-value}, where, upon encountering a function application, we must first evaluate the function, then evaluate the argument, and only then call the function.
+Tweaks to the definition of $C$ produce other evaluation orders, like \emph{call-by-name}\index{call-by-name}, but we will say no more about those alternatives.
+
+We assume a standard definition of what it means to plug an expression into the hole in a context, and now we can give the sole small-step evaluation rule for basic $\lambda$-calculus, conventionally called the \emph{$\beta$-reduction} rule\index{$\beta$-reduction}.
+\encoding
+$$\infer{\smallstep{\plug{C}{(\lambda x. \; e) \; v}}{\plug{C}{\subst{e}{x}{v}}}}{}$$
+That is, we find a suitable position within the expression where a $\lambda$-expression is applied to a value, and we replace that position with the appropriate substitution result.
+
+Following a very similar outline to what we used in Chapter \ref{operational_semantics}, we establish equivalence between the two semantics for $\lambda$-calculus.
+
+\begin{theorem}
+  If $\smallsteps{e}{v}$, then $\bigstep{e}{v}$.
+\end{theorem}
+
+\begin{theorem}
+  If $\bigstep{e}{v}$, then $\smallsteps{e}{v}$.
+\end{theorem}
+
+There are a few proof subtleties beyond what we encountered before, and the Coq formalization may be worth reading, to see those details.
+
+Again as before, we have a natural way to build a transition system from any $\lambda$-term $e$, where $\mathcal L$ is the set of $\lambda$-terms.
+We define $\mathbb T(e) = \angled{\mathcal L, \{e\}, \to}$.
+The next section gives probably the most celebrated $\lambda$-calculus result based on the transition-system perspective.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

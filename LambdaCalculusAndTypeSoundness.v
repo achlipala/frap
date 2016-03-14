@@ -928,9 +928,9 @@ Module Stlc.
       * scope of the book. *)
 
   Ltac t0 := match goal with
-             | [ H : ex _ |- _ ] => destruct H
-             | [ H : _ /\ _ |- _ ] => destruct H
-             | [ |- context[?x ==v ?y] ] => destruct (x ==v y)
+             | [ H : ex _ |- _ ] => invert H
+             | [ H : _ /\ _ |- _ ] => invert H
+             | [ |- context[?x ==v ?y] ] => cases (x ==v y)
              | [ H : Some _ = Some _ |- _ ] => invert H
 
              | [ H : step _ _ |- _ ] => invert H
@@ -940,7 +940,7 @@ Module Stlc.
              | [ H : plug _ _ _ |- _ ] => invert1 H
              end; subst.
 
-  Ltac t := simplify; propositional; repeat (t0; simplify); try congruence; eauto 6.
+  Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 6.
 
   Lemma progress_snazzy : forall e t,
     hasty $0 e t

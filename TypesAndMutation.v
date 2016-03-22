@@ -181,9 +181,6 @@ Module Rlc.
              | [ H : hasty _ _ ?e _, H' : value ?e |- _ ] => (invert H'; invert H); []
              | [ H : hasty _ _ _ _ |- _ ] => invert1 H
              | [ H : plug _ _ _ |- _ ] => invert1 H
-
-             | [ H : forall l t, ?h $? l = Some t -> _,
-                 H' : ?h $? _ = Some _ |- _ ] => apply H in H'
              end; subst.
 
   Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 7.
@@ -197,6 +194,8 @@ Module Rlc.
          \/ exists he', step (h, e) he'.
   Proof.
     induct 2; t.
+    apply H2 in H8; t.
+    apply H1 in H8; t.
   Qed.
 
   Lemma weakening_override : forall (G G' : fmap var type) x t,
@@ -288,7 +287,9 @@ Module Rlc.
     -> forall H1 t, hasty H1 $0 e1 t
                     -> heapty H1 h1
                     -> exists H2, hasty H2 $0 e2 t
-                                  /\ heapty H2 h2.
+                                  /\ heapty H2 h2
+                                  /\ (forall l t, H1 $? l = Some t
+                                                  -> H2 $? l = Some t).
   Proof.
     invert 1; t.
 
@@ -297,31 +298,51 @@ Module Rlc.
     econstructor.
     simplify.
     auto.
-    eauto.
+    eauto 6.
 
+    apply H3 in H9; t.
     rewrite H1 in H2.
     invert H2.
     eauto.
 
-    rewrite H1 in H2.
-    invert H2.
-    exists H0; propositional.
-  Admitted.
+    assert (H0 $? l = Some t) by assumption.
+    apply H3 in H8.
+    invert H8; propositional.
+    rewrite H1 in H5.
+    invert H5.
+    eexists; propositional.
+    eauto.
+    exists bound; propositional.
+    cases (l ==n l0); simplify; eauto.
+    subst.
+    rewrite H in H2; invert H2.
+    eauto.
+    apply H4 in H2.
+    cases (l ==n l0); simplify; equality.
+    assumption.
+  Qed.
 
   Hint Resolve preservation0.
 
-  Lemma generalize_plug : forall e1 C e1',
+  Lemma generalize_plug : forall H e1 C e1',
     plug C e1 e1'
-    -> forall e2 e2', plug C e2 e2'
-      -> (forall H t, hasty H $0 e1 t -> hasty H $0 e2 t)
-      -> (forall H t, hasty H $0 e1' t -> hasty H $0 e2' t).
+    -> forall t, hasty H $0 e1' t
+    -> exists t0, hasty H $0 e1 t0
+                  /\ (forall e2 e2' H',
+                         hasty H' $0 e2 t0
+                         -> plug C e2 e2'
+                         -> (forall l t, H $? l = Some t -> H' $? l = Some t)
+                         -> hasty H' $0 e2' t).
   Proof.
-    induct 1; t.
+    Ltac applyIn := match goal with
+                    | [ H : forall x, _, H' : _ |- _ ] =>
+                      apply H in H'; clear H; invert H'; propositional
+                    end.
+
+    induct 1; t; (try applyIn; eexists; t).
   Qed.
 
-  Hint Resolve generalize_plug.
-
-  Lemma preservation : forall h1 e1 h2 e2,
+ Lemma preservation : forall h1 e1 h2 e2,
     step (h1, e1) (h2, e2)
     -> forall H1 t, hasty H1 $0 e1 t
                    -> heapty H1 h1
@@ -329,11 +350,12 @@ Module Rlc.
                                  /\ heapty H2 h2.
   Proof.
     invert 1; simplify.
-    eapply preservation0 in H6.
+    eapply generalize_plug in H; eauto.
+    invert H; propositional.
+    eapply preservation0 in H6; eauto.
     invert H6; propositional.
-    exists x; propositional.
-    3: eauto.
-  Admitted.
+    eauto.
+  Qed.
 
   Hint Resolve progress preservation.
 

@@ -208,6 +208,69 @@ Module References.
   Hint Constructors value plug step0 step hasty heapty.
 
 
+  (* Perhaps surprisingly, this language admits well-typed, nonterminating
+   * programs!  Here's an example. *)
+  Definition let_ (x : var) (e1 e2 : exp) :=
+    App (Abs x e2) e1.
+  Example loopy :=
+    let_ "r" (New (Abs "x" (Var "x")))
+         (let_ "_" (Write (Var "r") (Abs "x" (App (Read (Var "r")) (Var "x"))))
+               (App (Read (Var "r")) (Const 0))).
+
+  Theorem loopy_hasty : hasty $0 $0 loopy Nat.
+  Proof.
+    repeat (econstructor; simplify).
+  Qed.
+
+  Hint Resolve lookup_add_eq.
+
+  Ltac loopy := propositional; subst; simplify;
+    repeat match goal with
+           | [ x : _ * _ |- _ ] => cases x; simplify
+           end;
+    propositional; subst;
+    repeat match goal with
+           | [ H : ex _ |- _ ] => invert H; propositional; subst
+           end;
+    try match goal with
+        | [ H : step _ _ |- _ ] => invert H
+        end;
+    repeat match goal with
+           | [ H : plug _ _ _ |- _ ] => invert H
+           | [ H : step0 _ _ |- _ ] => invert1 H
+           | [ H : value _ |- _ ] => invert1 H
+           | [ H : ?X = Some _, H' : ?X = Some _ |- _ ] => rewrite H in H'; invert H'
+           end; eauto 7.
+
+  Theorem loopy_diverge : invariantFor (trsys_of loopy) (fun he => ~value (snd he)).
+  Proof.
+    (* We prove divergence (unreachability of a value) by strengthening to an
+     * invariant that enumerates all reachable expressions.  It isn't quite a
+     * finite set.  We need to quantify existentially over the location chosen
+     * for "r". *)
+    apply invariant_weaken with (invariant1 := fun he =>
+      snd he = loopy
+      \/ exists l,
+        (fst he $? l = Some (Abs "x" (Var "x")))
+        /\ (snd he = let_ "r" (Loc l)
+                          (let_ "_" (Write (Var "r") (Abs "x" (App (Read (Var "r")) (Var "x"))))
+                                (App (Read (Var "r")) (Const 0)))
+            \/ snd he = let_ "_" (Write (Loc l) (Abs "x" (App (Read (Loc l)) (Var "x"))))
+                             (App (Read (Loc l)) (Const 0)))
+        \/ (fst he $? l = Some (Abs "x" (App (Read (Loc l)) (Var "x")))
+            /\ (snd he = let_ "_" (Abs "x" (App (Read (Loc l)) (Var "x")))
+                               (App (Read (Loc l)) (Const 0))
+                \/ snd he = App (Read (Loc l)) (Const 0)
+                \/ snd he = App (Abs "x" (App (Read (Loc l)) (Var "x"))) (Const 0)))).
+
+    apply invariant_induction; simplify.
+
+    loopy.
+    loopy.
+    loopy.
+  Qed.
+
+
   (** * Type soundness *)
 
   Definition unstuck (he : heap * exp) := value (snd he)

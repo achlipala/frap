@@ -6,11 +6,13 @@ Module Type S.
   Parameter fmap : Type -> Type -> Type.
 
   Parameter empty : forall A B, fmap A B.
+  Parameter lookup : forall A B, fmap A B -> A -> option B.
   Parameter add : forall A B, fmap A B -> A -> B -> fmap A B.
+
   Parameter remove : forall A B, fmap A B -> A -> fmap A B.
   Parameter join : forall A B, fmap A B -> fmap A B -> fmap A B.
   Parameter merge : forall A B, (option B -> option B -> option B) -> fmap A B -> fmap A B -> fmap A B.
-  Parameter lookup : forall A B, fmap A B -> A -> option B.
+  Parameter restrict : forall A B, (A -> bool) -> fmap A B -> fmap A B.
   Parameter includes : forall A B, fmap A B -> fmap A B -> Prop.
 
   Notation "$0" := (empty _ _).
@@ -119,6 +121,9 @@ Module Type S.
   Axiom dom_add : forall A B (m : fmap A B) (k : A) (v : B),
     dom (add m k v) = {k} \cup dom m.
 
+  Axiom lookup_restrict : forall A B (f : A -> bool) (m : fmap A B) k,
+    lookup (restrict f m) k = if f k then lookup m k else None.
+
   Hint Extern 1 => match goal with
                      | [ H : lookup (empty _ _) _ = Some _ |- _ ] =>
                        rewrite lookup_empty in H; discriminate
@@ -127,7 +132,7 @@ Module Type S.
   Hint Resolve includes_lookup includes_add empty_includes.
 
   Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
-       lookup_merge using congruence.
+       lookup_merge lookup_restrict using congruence.
 
   Hint Rewrite dom_empty dom_add.
 
@@ -182,6 +187,8 @@ Module M : S.
   Definition merge A B f (m1 m2 : fmap A B) : fmap A B :=
     fun k => f (m1 k) (m2 k).
   Definition lookup A B (m : fmap A B) (k : A) := m k.
+  Definition restrict A B (f : A -> bool) (m : fmap A B) : fmap A B :=
+    fun k => if f k then m k else None.
   Definition includes A B (m1 m2 : fmap A B) :=
     forall k v, m1 k = Some v -> m2 k = Some v.
 
@@ -405,7 +412,13 @@ Module M : S.
   Proof.
     unfold lookup, add; simpl; intros.
     destruct (decide (k' = k)); intuition congruence.
-  Qed.    
+  Qed.
+
+  Theorem lookup_restrict : forall A B (f : A -> bool) (m : fmap A B) k,
+    lookup (restrict f m) k = if f k then lookup m k else None.
+  Proof.
+    auto.
+  Qed.
 End M.
 
 Export M.

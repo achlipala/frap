@@ -12,7 +12,7 @@ Module Type S.
   Parameter remove : forall A B, fmap A B -> A -> fmap A B.
   Parameter join : forall A B, fmap A B -> fmap A B -> fmap A B.
   Parameter merge : forall A B, (option B -> option B -> option B) -> fmap A B -> fmap A B -> fmap A B.
-  Parameter restrict : forall A B, (A -> bool) -> fmap A B -> fmap A B.
+  Parameter restrict : forall A B, (A -> Prop) -> fmap A B -> fmap A B.
   Parameter includes : forall A B, fmap A B -> fmap A B -> Prop.
 
   Notation "$0" := (empty _ _).
@@ -121,8 +121,17 @@ Module Type S.
   Axiom dom_add : forall A B (m : fmap A B) (k : A) (v : B),
     dom (add m k v) = {k} \cup dom m.
 
-  Axiom lookup_restrict : forall A B (f : A -> bool) (m : fmap A B) k,
-    lookup (restrict f m) k = if f k then lookup m k else None.
+  Axiom lookup_restrict_true : forall A B (P : A -> Prop) (m : fmap A B) k,
+    P k
+    -> lookup (restrict P m) k = lookup m k.
+
+  Axiom lookup_restrict_false : forall A B (P : A -> Prop) (m : fmap A B) k,
+    ~P k
+    -> lookup (restrict P m) k = None.
+
+  Axiom lookup_restrict_true_fwd : forall A B (P : A -> Prop) (m : fmap A B) k v,
+    lookup (restrict P m) k = Some v
+    -> P k.
 
   Hint Extern 1 => match goal with
                      | [ H : lookup (empty _ _) _ = Some _ |- _ ] =>
@@ -132,7 +141,7 @@ Module Type S.
   Hint Resolve includes_lookup includes_add empty_includes.
 
   Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
-       lookup_merge lookup_restrict using congruence.
+       lookup_merge lookup_restrict_true lookup_restrict_false using congruence.
 
   Hint Rewrite dom_empty dom_add.
 
@@ -187,8 +196,8 @@ Module M : S.
   Definition merge A B f (m1 m2 : fmap A B) : fmap A B :=
     fun k => f (m1 k) (m2 k).
   Definition lookup A B (m : fmap A B) (k : A) := m k.
-  Definition restrict A B (f : A -> bool) (m : fmap A B) : fmap A B :=
-    fun k => if f k then m k else None.
+  Definition restrict A B (P : A -> Prop) (m : fmap A B) : fmap A B :=
+    fun k => if decide (P k) then m k else None.
   Definition includes A B (m1 m2 : fmap A B) :=
     forall k v, m1 k = Some v -> m2 k = Some v.
 
@@ -414,10 +423,28 @@ Module M : S.
     destruct (decide (k' = k)); intuition congruence.
   Qed.
 
-  Theorem lookup_restrict : forall A B (f : A -> bool) (m : fmap A B) k,
-    lookup (restrict f m) k = if f k then lookup m k else None.
+  Theorem lookup_restrict_true : forall A B (P : A -> Prop) (m : fmap A B) k,
+    P k
+    -> lookup (restrict P m) k = lookup m k.
   Proof.
-    auto.
+    unfold lookup, restrict; intros.
+    destruct (decide (P k)); tauto.
+  Qed.
+
+  Theorem lookup_restrict_false : forall A B (P : A -> Prop) (m : fmap A B) k,
+    ~P k
+    -> lookup (restrict P m) k = None.
+  Proof.
+    unfold lookup, restrict; intros.
+    destruct (decide (P k)); tauto.
+  Qed.
+
+  Theorem lookup_restrict_true_fwd : forall A B (P : A -> Prop) (m : fmap A B) k v,
+    lookup (restrict P m) k = Some v
+    -> P k.
+  Proof.
+    unfold lookup, restrict; intros.
+    destruct (decide (P k)); intuition congruence.
   Qed.
 End M.
 

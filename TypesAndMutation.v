@@ -5,7 +5,7 @@
 
 Require Import Frap.
 
-Module Rlc.
+Module References.
   Notation loc := nat.
 
   Inductive exp : Set :=
@@ -342,7 +342,7 @@ Module Rlc.
     induct 1; t; (try applyIn; eexists; t).
   Qed.
 
- Lemma preservation : forall h1 e1 h2 e2,
+  Lemma preservation : forall h1 e1 h2 e2,
     step (h1, e1) (h2, e2)
     -> forall H1 t, hasty H1 $0 e1 t
                    -> heapty H1 h1
@@ -389,4 +389,202 @@ Module Rlc.
     cases s.
     eauto.
   Qed.
-End Rlc.
+End References.
+
+Module GarbageCollection.
+  Import References.
+
+  Fixpoint freeLocs (e : exp) : set loc :=
+    match e with
+    | Var _ => {}
+    | Const _ => {}
+    | Plus e1 e2 => freeLocs e1 \cup freeLocs e2
+    | Abs _ e1 => freeLocs e1
+    | App e1 e2 => freeLocs e1 \cup freeLocs e2
+    | New e1 => freeLocs e1
+    | Read e1 => freeLocs e1
+    | Write e1 e2 => freeLocs e1 \cup freeLocs e2
+    | Loc l => {l}
+    end.
+
+  Inductive reachableLoc (h : heap) : loc -> loc -> Prop :=
+  | ReachSelf : forall l, reachableLoc h l l
+  | ReachLookup : forall l e l' l'',
+      h $? l = Some e
+      -> l' \in freeLocs e
+      -> reachableLoc h l' l''
+      -> reachableLoc h l l''.
+
+  Inductive reachableLocFromExp (h : heap) : exp -> loc -> Prop :=
+  | ReachFromExp : forall l e l',
+      l \in freeLocs e
+      -> reachableLoc h l l'
+      -> reachableLocFromExp h e l'.
+
+  Inductive step : heap * exp -> heap * exp -> Prop :=
+  | StepRule : forall C e1 e2 e1' e2' h h',
+    plug C e1 e1'
+    -> plug C e2 e2'
+    -> step0 (h, e1) (h', e2)
+    -> step (h, e1') (h', e2')
+  | StepGc : forall h h' e lDefinitelyGone,
+    (forall l e',
+        reachableLocFromExp h e l
+        -> h $? l = Some e'
+        -> h' $? l = Some e')
+    -> (forall l e',
+           h' $? l = Some e'
+           -> h $? l = Some e')
+    -> h $? lDefinitelyGone <> None
+    -> h' $? lDefinitelyGone = None
+    -> step (h, e) (h', e).
+
+  Hint Constructors step.
+
+  Definition trsys_of (e : exp) := {|
+    Initial := {($0, e)};
+    Step := step
+  |}.
+
+
+  (** * Type soundness *)
+
+  Definition unstuck (he : heap * exp) := value (snd he)
+    \/ (exists he', step he he').
+
+  Lemma progress : forall ht h, heapty ht h
+    -> forall e t,
+      hasty ht $0 e t
+      -> value e
+         \/ exists he', step (h, e) he'.
+  Proof.
+    intros.
+    eapply References.progress in H0; t.
+  Qed.
+
+  Lemma reachableLocFromExp_trans : forall h e1 l e2,
+      reachableLocFromExp h e1 l
+      -> freeLocs e1 \subseteq freeLocs e2
+      -> reachableLocFromExp h e2 l.
+  Proof.
+    invert 1; simplify.
+    econstructor.
+    sets; eauto.
+    assumption.
+  Qed.
+
+  Hint Resolve reachableLocFromExp_trans.
+  Hint Extern 1 (_ \in _) => simplify; solve [ sets ].
+  Hint Extern 1 (_ \subseteq _) => simplify; solve [ sets ].
+  Hint Constructors reachableLoc reachableLocFromExp.
+
+  Lemma hasty_restrict : forall H h H' G e t,
+      heapty H h
+      -> hasty H G e t
+      -> (forall l t, reachableLocFromExp h e l
+                      -> H $? l = Some t
+                      -> H' $? l = Some t)
+      -> hasty H' G e t.
+  Proof.
+    induct 2; simplify; econstructor; eauto.
+  Qed.
+
+  Lemma reachableLoc_sandwich : forall h l l' e l'',
+    reachableLoc h l l'
+    -> h $? l' = Some e
+    -> reachableLocFromExp h e l''
+    -> reachableLoc h l l''.
+  Proof.
+    induct 1; simplify; eauto.
+    invert H0; eauto.
+  Qed.
+
+  Lemma reachableLocFromExp_sandwich : forall h e l e' l',
+    reachableLocFromExp h e l
+    -> h $? l = Some e'
+    -> reachableLocFromExp h e' l'
+    -> reachableLocFromExp h e l'.
+  Proof.
+    invert 1; simplify.
+    econstructor; eauto.
+    eapply reachableLoc_sandwich; eauto.
+  Qed.
+
+  Lemma preservation : forall h1 e1 h2 e2,
+    step (h1, e1) (h2, e2)
+    -> forall H1 t, hasty H1 $0 e1 t
+                   -> heapty H1 h1
+                   -> exists H2, hasty H2 $0 e2 t
+                                 /\ heapty H2 h2.
+  Proof.
+    invert 1; simplify.
+
+    eapply generalize_plug in H; eauto.
+    invert H; propositional.
+    eapply preservation0 in H6; eauto.
+    invert H6; propositional.
+    eauto.
+
+    exists (restrict (reachableLocFromExp h1 e2) H1).
+    propositional.
+
+    eapply hasty_restrict; eauto.
+    simplify.
+    invert H0.
+    assert (H1 $? l = Some t0) by assumption.
+    apply H8 in H0.
+    invert H0; propositional.
+
+    assert (heapty H1 h1) by assumption.
+    invert H2.
+    exists bound; simplify; propositional.
+    assert (reachableLocFromExp h1 e2 l) by (eapply lookup_restrict_true_fwd; eassumption).
+    simplify.
+    apply H3 in H2.
+    invert H2; propositional.
+    apply H4 in H2; auto.
+    eexists; propositional.
+    eauto.
+    eapply hasty_restrict.
+    eauto.
+    eauto.
+    simplify.
+    assert (H1 $? l0 = Some t1) by assumption.
+    apply H3 in H13.
+    invert H13; propositional.
+    simplify.
+    rewrite lookup_restrict_true; auto.
+    eapply reachableLocFromExp_sandwich; eauto.
+
+    cases (h2 $? l); eauto.
+    apply H8 in H2.
+    apply H5 in Heq.
+    equality.
+  Qed.
+
+  Hint Resolve progress preservation.
+
+  Theorem safety : forall e t, hasty $0 $0 e t
+    -> invariantFor (trsys_of e)
+                    (fun he' => value (snd he')
+                                \/ exists he'', step he' he'').
+  Proof.
+    simplify.
+    apply invariant_weaken with (invariant1 := fun he' => exists H,
+                                                   hasty H $0 (snd he') t
+                                                   /\ heapty H (fst he')); eauto.
+    apply invariant_induction; simplify; eauto.
+    propositional.
+    subst; simplify.
+    eauto.
+    invert H0.
+    propositional.
+    cases s; cases s'; simplify.
+    eauto.
+
+    invert 1.
+    propositional.
+    cases s.
+    eauto.
+  Qed.
+End GarbageCollection.

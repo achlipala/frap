@@ -5,8 +5,16 @@
 
 Require Import Frap.
 
+(* Our approach to type soundness works beyond purely functional programs, too.
+ * Let's see how it applies to a classic ML feature: mutable references.
+ * We'll complete the full exercise for one semantics first, then go back and
+ * extend the result to cover a semantics with another crucial real-world
+ * feature. *)
+
 Module References.
   Notation loc := nat.
+  (* Locations are the values allowed for references.  Think of them as memory
+   * addresses. *)
 
   Inductive exp : Set :=
   | Var (x : var)
@@ -16,15 +24,24 @@ Module References.
   | App (e1 e2 : exp)
 
   | New (e1 : exp)
+  (* Allocate a fresh reference, initialized with this value. *)
+
   | Read (e1 : exp)
+  (* Return the value stored at this address. *)
+
   | Write (e1 e2 : exp)
+  (* Overwrite the value at address [e1] with new value [e2]. *)
+
   | Loc (l : loc).
+  (* A twist: though source programs may not mention locations directly,
+   * intermediate execution states will need to include location constants. *)
 
   Inductive value : exp -> Prop :=
   | VConst : forall n, value (Const n)
   | VAbs : forall x e1, value (Abs x e1)
 
   | VLoc : forall l, value (Loc l).
+  (* Locations are values, too. *)
 
   Fixpoint subst (e1 : exp) (x : string) (e2 : exp) : exp :=
     match e2 with
@@ -39,6 +56,9 @@ Module References.
       | Write e2' e2'' => Write (subst e1 x e2') (subst e1 x e2'')
       | Loc l => Loc l
     end.
+
+  (* We extend evaluation contexts in the natural way, though we won't dwell on
+   * the details. *)
 
   Inductive context : Set :=
   | Hole : context
@@ -83,6 +103,7 @@ Module References.
     -> plug (Write2 v1 C) e (Write v1 e').
 
   Definition heap := fmap loc exp.
+  (* A heap assigns a value to each allocated location. *)
 
   Inductive step0 : heap * exp -> heap * exp -> Prop :=
   | Beta : forall h x e v,
@@ -90,17 +111,28 @@ Module References.
     -> step0 (h, App (Abs x e) v) (h, subst v x e)
   | Add : forall h n1 n2,
     step0 (h, Plus (Const n1) (Const n2)) (h, Const (n1 + n2))
+
+  (* To run a [New], pick a location [l] that isn't used yet and stash the
+   * requested value at that spot before returning it. *)
   | Allocate : forall h v l,
     value v
     -> h $? l = None
     -> step0 (h, New v) (h $+ (l, v), Loc l)
+
+  (* To run a [Read], just look up in the heap. *)
   | Lookup : forall h v l,
     h $? l = Some v
     -> step0 (h, Read (Loc l)) (h, v)
+
+  (* To run a [Write], just replace in the heap, *after* verifying that the
+   * location is really present in the heap.  If not, this is another
+   * opportunity to get stuck, which we will prove never occurs! *)
   | Overwrite : forall h v l v',
-    h $? l = Some v
+    value v'
+    -> h $? l = Some v
     -> step0 (h, Write (Loc l) v') (h $+ (l, v'), v').
 
+  (* The overall relation is much like before, with a heap added. *)
   Inductive step : heap * exp -> heap * exp -> Prop :=
   | StepRule : forall C e1 e2 e1' e2' h h',
     plug C e1 e1'
@@ -118,7 +150,10 @@ Module References.
   | Nat
   | Fun (dom ran : type)
   | Ref (t : type).
+  (* Crucial type addition: reference types *)
 
+  (* New first parameter to typing relation: a *heap typing*, partial map from
+   * locations to types *)
   Inductive hasty : fmap loc type -> fmap var type -> exp -> type -> Prop :=
   | HtVar : forall H G x t,
     G $? x = Some t
@@ -150,15 +185,24 @@ Module References.
   | HtLoc : forall H G l t,
      H $? l = Some t
      -> hasty H G (Loc l) (Ref t).
+  (* Notice that the heap typing is only used here, for locations! *)
 
+  (* When are a heap and a heap typing compatible? *)
   Inductive heapty (ht : fmap loc type) (h : fmap loc exp) : Prop :=
   | Heapty : forall bound,
+      (* Condition 1: when the heap typing assigns a type to a location, the
+       * heap assigns a value of that type to that location. *)
       (forall l t,
           ht $? l = Some t
           -> exists e, h $? l = Some e
                        /\ hasty ht $0 e t)
+
+      (* Condition 2: all addresses above some bound are unallocated in the
+       * heap.  Without this condition, we could get stuck proving that progress
+       * can be made from a [New] expression, if the heap could be infinite! *)
       -> (forall l, l >= bound
                     -> h $? l = None)
+
       -> heapty ht h.
                  
   Hint Constructors value plug step0 step hasty heapty.
@@ -187,6 +231,7 @@ Module References.
 
   Hint Extern 2 (exists _ : _ * _, _) => eexists (_ $+ (_, _), _).
 
+  (* Progress is quite straightforward. *)
   Lemma progress : forall ht h, heapty ht h
     -> forall e t,
       hasty ht $0 e t
@@ -197,6 +242,9 @@ Module References.
     apply H2 in H8; t.
     apply H1 in H8; t.
   Qed.
+
+  (* Now, a series of lemmas essentially copied from original type-soundness
+   * proof. *)
 
   Lemma weakening_override : forall (G G' : fmap var type) x t,
     (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
@@ -239,6 +287,7 @@ Module References.
 
   Hint Resolve substitution.
 
+  (* A new property: expanding the heap typing preserves typing. *)
   Lemma heap_weakening : forall H G e t,
     hasty H G e t
     -> forall H', (forall x t, H $? x = Some t -> H' $? x = Some t)
@@ -249,6 +298,7 @@ Module References.
 
   Hint Resolve heap_weakening.
 
+  (* A property about extending heap typings *)
   Lemma heap_override : forall H h k t t0 l,
     H $? k = Some t
     -> heapty H h
@@ -262,6 +312,7 @@ Module References.
 
   Hint Resolve heap_override.
 
+  (* A higher-level property, stated via [heapty] *)
   Lemma heapty_extend : forall H h l t v,
       heapty H h
       -> hasty H $0 v t
@@ -282,6 +333,10 @@ Module References.
 
   Hint Resolve heapty_extend.
 
+  (* The old cases of preservation proceed as before, and we need to fiddle with
+   * the heap in the new cases.  Note a crucial change to the theorem statement:
+   * now we say that *for all* original heap typings, *there exists* a new heap
+   * typing that has not *dropped* any locations. *)
   Lemma preservation0 : forall h1 e1 h2 e2,
     step0 (h1, e1) (h2, e2)
     -> forall H1 t, hasty H1 $0 e1 t
@@ -305,25 +360,26 @@ Module References.
     invert H2.
     eauto.
 
-    assert (H0 $? l = Some t) by assumption.
-    apply H3 in H8.
-    invert H8; propositional.
-    rewrite H1 in H5.
-    invert H5.
+    assert (H1 $? l = Some t) by assumption.
+    apply H2 in H9.
+    invert H9; propositional.
+    rewrite H5 in H6.
+    invert H6.
     eexists; propositional.
     eauto.
     exists bound; propositional.
     cases (l ==n l0); simplify; eauto.
     subst.
-    rewrite H in H2; invert H2.
+    rewrite H0 in H; invert H.
     eauto.
-    apply H4 in H2.
+    apply H4 in H0.
     cases (l ==n l0); simplify; equality.
     assumption.
   Qed.
 
   Hint Resolve preservation0.
 
+  (* This lemma gets more complicated, too, to accommodate heap typings. *)
   Lemma generalize_plug : forall H e1 C e1',
     plug C e1 e1'
     -> forall t, hasty H $0 e1' t
@@ -342,6 +398,7 @@ Module References.
     induct 1; t; (try applyIn; eexists; t).
   Qed.
 
+  (* For overall preservation, most of the action was in the last few lemmas. *)
   Lemma preservation : forall h1 e1 h2 e2,
     step (h1, e1) (h2, e2)
     -> forall H1 t, hasty H1 $0 e1 t
@@ -359,6 +416,7 @@ Module References.
 
   Hint Resolve progress preservation.
 
+  (* We'll need this fact for the base case of invariant induction. *)
   Lemma heapty_empty : heapty $0 $0.
   Proof.
     exists 0; t.
@@ -366,6 +424,9 @@ Module References.
 
   Hint Resolve heapty_empty.
 
+  (* Now there isn't much more to the proof of type safety.  The crucial overall
+   * insight is a strengthened invariant that quantifies existentially over a
+   * heap typing. *)
   Theorem safety : forall e t, hasty $0 $0 e t
     -> invariantFor (trsys_of e)
                     (fun he' => value (snd he')
@@ -391,9 +452,17 @@ Module References.
   Qed.
 End References.
 
+(* That last operational semantics lets references pile up in the heap.  Their
+ * storage space is never reclaimed, even if the program will never use them
+ * again.  It turns out, however, that our type system remains safe, even when
+ * we extend the operational semantics with explicit *garbage collection*! *)
+
 Module GarbageCollection.
   Import References.
+  (* We'll start from the definitions we just made, only adding a few new ones
+   * and revising a few. *)
 
+  (* First key ingredient: which location constants appear in an expression? *)
   Fixpoint freeLocs (e : exp) : set loc :=
     match e with
     | Var _ => {}
@@ -407,6 +476,8 @@ Module GarbageCollection.
     | Loc l => {l}
     end.
 
+  (* When is there a path from one location to another through the heap, via
+   * following free locations in the values associated to addresses? *)
   Inductive reachableLoc (h : heap) : loc -> loc -> Prop :=
   | ReachSelf : forall l, reachableLoc h l l
   | ReachLookup : forall l e l' l'',
@@ -415,6 +486,7 @@ Module GarbageCollection.
       -> reachableLoc h l' l''
       -> reachableLoc h l l''.
 
+  (* When is there a path from an expression to a location? *)
   Inductive reachableLocFromExp (h : heap) : exp -> loc -> Prop :=
   | ReachFromExp : forall l e l',
       l \in freeLocs e
@@ -427,16 +499,30 @@ Module GarbageCollection.
     -> plug C e2 e2'
     -> step0 (h, e1) (h', e2)
     -> step (h, e1') (h', e2')
+
+  (* New rule for the operational semantics!  Pick heap [h'] that is the result
+   * of garbage collecting [h]. *)
   | StepGc : forall h h' e lDefinitelyGone,
+
+    (* Fundamental condition: any *reachable* location in [h] has been preserved
+     * precisely in [h']. *)
     (forall l e',
         reachableLocFromExp h e l
         -> h $? l = Some e'
         -> h' $? l = Some e')
+
+    (* However, [h'] has not sprouted any new locations.  It only keeps some
+     * subset of [h]'s locations. *)
     -> (forall l e',
            h' $? l = Some e'
            -> h $? l = Some e')
+
+    (* Finally, we require that [h'] has dropped at least one location from [h].
+     * Why?  If not, type safety follows trivially, because, from any starting
+     * expression, we can run an infinite loop of no-op "garbage collection"! *)
     -> h $? lDefinitelyGone <> None
     -> h' $? lDefinitelyGone = None
+
     -> step (h, e) (h', e).
 
   Hint Constructors step.
@@ -452,6 +538,8 @@ Module GarbageCollection.
   Definition unstuck (he : heap * exp) := value (snd he)
     \/ (exists he', step he he').
 
+  (* Progress is easy; we essentially reuse the old proof, since the original
+   * [step] case is enough to cover all expressions. *)
   Lemma progress : forall ht h, heapty ht h
     -> forall e t,
       hasty ht $0 e t
@@ -462,6 +550,9 @@ Module GarbageCollection.
     eapply References.progress in H0; t.
   Qed.
 
+  (* For preservation, we'll need a few more lemmas.  First, reachability is
+   * preserved by moving to a "larger" expression that contains "at least as
+   * many" free locations. *)
   Lemma reachableLocFromExp_trans : forall h e1 l e2,
       reachableLocFromExp h e1 l
       -> freeLocs e1 \subseteq freeLocs e2
@@ -478,6 +569,8 @@ Module GarbageCollection.
   Hint Extern 1 (_ \subseteq _) => simplify; solve [ sets ].
   Hint Constructors reachableLoc reachableLocFromExp.
 
+  (* Typing is preserved by moving to a heap typing that only needs to preserve
+   * the mappings for *reachable* locations. *)
   Lemma hasty_restrict : forall H h H' G e t,
       heapty H h
       -> hasty H G e t
@@ -489,6 +582,8 @@ Module GarbageCollection.
     induct 2; simplify; econstructor; eauto.
   Qed.
 
+  (* The sandwich properties, for adding a new reachability step through the
+   * heap, between two other chains of arbitrary length *)
   Lemma reachableLoc_sandwich : forall h l l' e l'',
     reachableLoc h l l'
     -> h $? l' = Some e
@@ -510,6 +605,7 @@ Module GarbageCollection.
     eapply reachableLoc_sandwich; eauto.
   Qed.
 
+  (* Finally, we are ready for preservation. *)
   Lemma preservation : forall h1 e1 h2 e2,
     step (h1, e1) (h2, e2)
     -> forall H1 t, hasty H1 $0 e1 t
@@ -519,12 +615,17 @@ Module GarbageCollection.
   Proof.
     invert 1; simplify.
 
+    (* The case for the original [step] rule proceeds exactly the same way as
+     * before. *)
     eapply generalize_plug in H; eauto.
     invert H; propositional.
     eapply preservation0 in H6; eauto.
     invert H6; propositional.
     eauto.
 
+    (* The key insight for the garbage-collection rule: as the new heap typing
+     * after collection, choose the *restriction* of the original heap typing to
+     * just the *reachable* locations. *)
     exists (restrict (reachableLocFromExp h1 e2) H1).
     propositional.
 
@@ -564,6 +665,7 @@ Module GarbageCollection.
 
   Hint Resolve progress preservation.
 
+  (* The safety proof itself is anticlimactic, looking the same as before. *)
   Theorem safety : forall e t, hasty $0 $0 e t
     -> invariantFor (trsys_of e)
                     (fun he' => value (snd he')

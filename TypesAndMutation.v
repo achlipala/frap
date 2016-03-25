@@ -226,7 +226,7 @@ Module References.
 
   Ltac loopy := propositional; subst; simplify;
     repeat match goal with
-           | [ x : _ * _ |- _ ] => cases x; simplify
+           | [ x : (_ * _)%type |- _ ] => cases x; simplify
            end;
     propositional; subst;
     repeat match goal with

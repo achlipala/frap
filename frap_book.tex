@@ -2356,7 +2356,7 @@ In this case, invariant $I(e) = \; \hasty{}{e}{\tau}$ is that crucial insight, i
 \chapter{Types and Mutation}
 
 The syntactic approach to type soundness continues to apply to \emph{impure} functional languages, which combine imperative side effects with first-class functions.
-We'll study the general domain through its most common exemplar: lambda calculus with \emph{mutable references}\index{mutable references}\index{references}.
+We'll study the general domain through its most common exemplar: $\lambda$-calculus with \emph{mutable references}\index{mutable references}\index{references}.
 
 \section{Simply Typed Lambda Calculus with Mutable References}
 
@@ -2373,13 +2373,13 @@ $$\begin{array}{rrcl}
 
 \newcommand{\elet}[3]{\mathsf{let} \; #1 = #2 \; \mathsf{in} \; #3}
 
-The three new expression forms deal with \emph{references}, which act like, for instance, Java objects that only have single public fields.
+The three new expression forms deal with \emph{references}, which act like, for instance, Java\index{Java} objects that only have single public fields.
 We write $\newref{e}$ to allocate a new reference initialized with value $e$, we write $\readref{e}$ for reading the value stored in reference $e$, and we write $\writeref{e_1}{e_2}$ for overwriting the value of reference $e_1$ with $e_2$.
 An example is worth a thousand words, so let's consider a concrete program.
 We'll use two notational shorthands:
 \begin{eqnarray*}
   \elet{x}{e_1}{e_2} &\triangleq& (\lambda x. \; e_2) \; e_1 \\
-  e_1; e_2 &\triangleq& \elet{\_}{e_1}{e_2} \textrm{(for $\_$ a variable not used anywhere else)}
+  e_1; e_2 &\triangleq& \elet{\_}{e_1}{e_2} \textrm{ (for $\_$ a variable not used anywhere else)}
 \end{eqnarray*}
 
 Here is a simple program that uses references.
@@ -2395,7 +2395,7 @@ $$\begin{array}{rrcl}
 \end{array}$$
 
 Next we define the basic reduction steps of the language.
-In contrast to last chapter's semantics for pure lambda calculus, here we work with states that include not just expressions but also \emph{heaps}\index{heaps} $h$, partial functions from references to their current stored values.
+In contrast to last chapter's semantics for pure $\lambda$-calculus, here we work with states that include not just expressions but also \emph{heaps}\index{heaps} $h$, partial functions from references to their current stored values.
 We begin by copying over the two basic-step rules from last chapter, threading through the heap $h$ unchanged.
 $$\infer{\smallstepo{(h, (\lambda x. \; e) \; v)}{(h, \subst{e}{x}{v})}}{}
 \quad \infer{\smallstepo{(h, n + m)}{(h, n \textbf{+} m)}}{}$$
@@ -2432,6 +2432,8 @@ $$\infer{\smallstep{(h, \plug{C}{e})}{(h', \plug{C}{e'})}}{
 As a small exercise for the reader, it may be worth using this judgment to derive that our example program from before always returns 1.
 Even fixing the empty heap in the starting state, there is some nondeterminism in which final heap it returns: the possibilities are all the single-location heaps, mapping their single locations to value 1.
 It is natural to allow this nondeterminism in allocation, since typical memory allocators in real systems don't give promises about predictability in the addresses that they return.
+However, we will be able to prove that, for instance, any program returning a number \emph{gives the same answer, independently of nondeterministic choices made by the allocator}.
+That property is not true in programming languages like C\index{C programming language} that are not \emph{memory safe}\index{memory safety}, as they allow arithmetic and comparisons on pointers\index{pointers}, the closest C equivalent of our references.
 
 
 \section{Type Soundness}
@@ -2491,8 +2493,8 @@ $$\infer{\rhasty{\Sigma}{\Gamma}{\ell}{\tau}}{
   \msel{\Sigma}{\ell} = \tau
 }$$
 
-We must also extend every typing rule we gave before, adding an extra ``$\Sigma;$'' prefix threaded mindlessly through everything.
-We never extend $\Sigma$ as we recurse into subexpressions, and we only examine it in leaves of derivations corresponding to $\ell$ expressions.
+We must also extend every typing rule we gave before, adding an extra ``$\Sigma;$'' prefix, threaded mindlessly through everything.
+We never extend $\Sigma$ as we recurse into subexpressions, and we only examine it in leaves of derivation trees, corresponding to $\ell$ expressions.
 
 We have made some progress toward stating an inductive invariant for the type-soundness theorem.
 The essential idea of the proof is found in the invariant choice $I(h, e) = \exists \Sigma. \; \rhasty{\Sigma}{\mempty}{e}{\tau}$.
@@ -2576,12 +2578,12 @@ $$\infer{\ell \in \reach{h}{\ell}}{}
   \msel{h}{\ell} = v
   & \ell' \in \reach{h}{v}
 }
-\quad \infer{\ell' \in \reach{h}{v}}{
-  \ell \in \freeloc{v}
+\quad \infer{\ell' \in \reach{h}{e}}{
+  \ell \in \freeloc{e}
   & \ell' \in \reach{h}{\ell}
 }$$
 
-In order, the rules say: any location reaches itself; any location reaches anywhere reachable from the value assigned to it by $h$; and any value reaches anywhere reachable from any of its free locations.
+In order, the rules say: any location reaches itself; any location reaches anywhere reachable from the value assigned to it by $h$; and any expression reaches anywhere reachable from any of its free locations.
 
 Now we add one new top-level rule to the operational semantics, saying \emph{unreachable locations may be removed at any time}.
 $$\infer{\smallstep{(h, e)}{(h', e)}}{
@@ -2597,7 +2599,7 @@ The first premise says that, going from the old heap $h$ to the new heap $h'$, \
 The second premise says that \emph{the new heap is a subheap of the original, not spontaneously adding any new mappings}.
 The final premise says that we have actually done some useful work: the new heap isn't just the same as the old one.
 
-It may not be clear why we include the last premise.
+It may not be clear why we must include the last premise.
 The reason has to do with our formulation of type safety, by saying that programs never get \emph{stuck}.
 We defined that $e$ is \emph{stuck} if it is not a value, but it also can't take a step.
 If we omitted from the garbage-collection rule the premise $h' \neq h$, then this rule would \emph{always} apply, for any term, simply by setting $h' = h$.

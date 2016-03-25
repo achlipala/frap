@@ -2434,6 +2434,118 @@ Even fixing the empty heap in the starting state, there is some nondeterminism i
 It is natural to allow this nondeterminism in allocation, since typical memory allocators in real systems don't give promises about predictability in the addresses that they return.
 
 
+\section{Type Soundness}
+
+\newcommand{\reft}[1]{#1 \; \mathsf{ref}}
+
+For $\lambda$-calculus with references, we can prove a similar type-soundness theorem to what we proved last chapter, though the proof has a twist or two.
+To start with, we should define our extended type system, with one new case for references.
+$$\begin{array}{rrcl}
+  \textrm{Types} & \tau &::=& \mathbb N \mid \tau \to \tau \mid \underline{\reft{\tau}}
+\end{array}$$
+
+Here are the rules from last chapter's basic $\lambda$-calculus, which we can keep unchanged.
+$$\infer{\hasty{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\hasty{\Gamma}{n}{\mathbb N}}{}
+\quad \infer{\hasty{\Gamma}{e_1 + e_2}{\mathbb N}}{
+    \hasty{\Gamma}{e_1}{\mathbb N}
+    & \hasty{\Gamma}{e_2}{\mathbb N}
+}$$
+$$\infer{\hasty{\Gamma}{\lambda x. \; e}{\tau_1 \to \tau_2}}{
+  \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\tau_2}}{
+  \hasty{\Gamma}{e_1}{\tau_1 \to \tau_2}
+  & \hasty{\Gamma}{e_2}{\tau_1}
+}$$
+
+We also need a rule for each of the reference primitives.
+$$\infer{\hasty{\Gamma}{\newref{e}}{\reft{\tau}}}{
+  \hasty{\Gamma}{e}{\tau}
+}
+\quad \infer{\hasty{\Gamma}{\; \readref{e}}{\tau}}{
+    \hasty{\Gamma}{e}{\reft{\tau}}
+}
+\quad \infer{\hasty{\Gamma}{\writeref{e_1}{e_2}}{\tau}}{
+  \hasty{\Gamma}{e_1}{\reft{\tau}}
+  & \hasty{\Gamma}{e_2}{\tau}
+}$$
+
+That's enough notation to let us state type soundness, which is indeed provable.
+
+\begin{theorem}[Type Soundness]
+  If $\hasty{}{e}{\tau}$, then $\neg \textrm{stuck}$ is an invariant of $\mathbb T(e)$.
+\end{theorem}
+
+However, we will need to develop some more machinery to let us state the strengthened invariant that makes the proof go through.
+
+\newcommand{\rhasty}[4]{#1; #2 \vdash #3 : #4}
+
+The trouble with our typing rules is that they disallow location constants, but those constants \emph{will} arise in intermediate states of program execution.
+To prepare for them, we introduce \emph{heap typings}\index{heap typings} $\Sigma$, partial functions from locations to types.
+The idea is that a heap typing $\Sigma$ models a heap $h$ by giving the intended type for each of its locations.
+We define an expanded typing judgment of the form $\rhasty{\Sigma}{\Gamma}{e}{\tau}$, with a new parameter included solely to enable the following rule.
+$$\infer{\rhasty{\Sigma}{\Gamma}{\ell}{\tau}}{
+  \msel{\Sigma}{\ell} = \tau
+}$$
+
+We must also extend every typing rule we gave before, adding an extra ``$\Sigma;$'' prefix threaded mindlessly through everything.
+We never extend $\Sigma$ as we recurse into subexpressions, and we only examine it in leaves of derivations corresponding to $\ell$ expressions.
+
+We have made some progress toward stating an inductive invariant for the type-soundness theorem.
+The essential idea of the proof is found in the invariant choice $I(h, e) = \exists \Sigma. \; \rhasty{\Sigma}{\mempty}{e}{\tau}$.
+However, we can tell that something is suspicious with this invariant, since it does not mention $h$.
+We should also somehow characterize the relationship between $\Sigma$ and $h$.
+
+\newcommand{\heapty}[2]{#1 \vdash #2}
+
+Here is a first cut at defining a relation $\heapty{\Sigma}{h}$.
+$$\infer{\heapty{\Sigma}{h}}{
+  \forall \ell, \tau. \; \msel{\Sigma}{\ell} = \tau \Rightarrow \exists v. \; \msel{h}{\ell} = v \land \rhasty{\Sigma}{\mempty}{v}{\tau}
+}$$
+
+In other words, whenever $\Sigma$ announces the existence of location $\ell$ meant to store values of type $\tau$, the heap $h$ actually stores some value $v$ for $\ell$, and that value has the right type.
+Note the tricky recursion inherent in typing $v$ with respect to the very same $\Sigma$.
+
+This rule as stated is not \emph{quite} sufficient to make the invariant inductive.
+We could get stuck on a $\newref{e}$ expression if the heap $h$ becomes \emph{infinite}, with no free addresses left to allocate.
+Of course, we know that finite executions, started in the empty heap, only produce finite intermediate heaps.
+Let's remember that fact with another condition in the $\heapty{\Sigma}{h}$ relation.
+$$\infer{\heapty{\Sigma}{h}}{
+  (\forall \ell, \tau. \; \msel{\Sigma}{\ell} = \tau \Rightarrow \exists v. \; \msel{h}{\ell} = v \land \rhasty{\Sigma}{\mempty}{v}{\tau})
+  & (\exists \; \mathsf{bound}. \; \forall \ell \geq \mathsf{bound}. \; \ell \notin \dom{h})
+}$$
+
+The rule requires the existence of some upper bound $\mathsf{bound}$ on the already-allocated locations.
+By construction, whenever we need to allocate a fresh location, we may choose $\mathsf{bound}$, or indeed any location greater than it.
+
+We now have the right machinery to define an inductive invariant, namely:
+$$I(h, e) = \exists \Sigma. \; \rhasty{\Sigma}{\mempty}{e}{\tau} \land \heapty{\Sigma}{h}$$
+
+We prove variants of all of the lemmas behind last chapter's type-safety proof, with a few new ones and twists on the originals.
+Here we give some highlights.
+
+\begin{lemma}[Heap Weakening]
+  If $\rhasty{\Sigma}{\Gamma}{e}{\tau}$ and every mapping in $\Sigma$ is also included in $\Sigma'$, then $\rhasty{\Sigma'}{\Gamma}{e}{\tau}$.
+\end{lemma}
+
+\begin{lemma}\label{preservation0}
+  If $\smallstepo{(h, e)}{(h', e')}$, $\rhasty{\Sigma}{\mempty}{e}{\tau}$, and $\heapty{\Sigma}{h}$, then there exists $\Sigma'$ such that $\rhasty{\Sigma'}{\mempty}{e'}{\tau}$, $\heapty{\Sigma'}{h'}$, and $\Sigma'$ preserves all mappings from $\Sigma$.
+\end{lemma}
+
+\begin{lemma}\label{generalize_plug}
+  If $\rhasty{\Sigma}{\mempty}{\plug{C}{e_1}}{\tau}$, then there exists $\tau_0$ such that $\rhasty{\Sigma}{\mempty}{e_1}{\tau_0}$ and, for all $e_2$ and $\Sigma'$, if $\rhasty{\Sigma'}{\mempty}{e_2}{\tau_0}$ and $\Sigma'$ preserves mappings from $\Sigma$, then $\rhasty{\Sigma'}{\mempty}{\plug{C}{e_2}}{\tau}$.
+\end{lemma}
+
+\begin{lemma}[Preservation]\label{preservation}
+  If $\smallstep{(h, e)}{(h', e')}$, $\rhasty{\Sigma}{\mempty}{e}{\tau}$, and $\heapty{\Sigma}{h}$, then there exists $\Sigma'$ such that $\rhasty{\Sigma'}{\mempty}{e'}{\tau}$ and $\heapty{\Sigma'}{h'}$.
+\end{lemma}
+
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \appendix

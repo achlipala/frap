@@ -2522,6 +2522,7 @@ The rule requires the existence of some upper bound $\mathsf{bound}$ on the alre
 By construction, whenever we need to allocate a fresh location, we may choose $\mathsf{bound}$, or indeed any location greater than it.
 
 We now have the right machinery to define an inductive invariant, namely:
+\invariants
 $$I(h, e) = \exists \Sigma. \; \rhasty{\Sigma}{\mempty}{e}{\tau} \land \heapty{\Sigma}{h}$$
 
 We prove variants of all of the lemmas behind last chapter's type-safety proof, with a few new ones and twists on the originals.
@@ -2543,6 +2544,94 @@ Here we give some highlights.
   If $\smallstep{(h, e)}{(h', e')}$, $\rhasty{\Sigma}{\mempty}{e}{\tau}$, and $\heapty{\Sigma}{h}$, then there exists $\Sigma'$ such that $\rhasty{\Sigma'}{\mempty}{e'}{\tau}$ and $\heapty{\Sigma'}{h'}$.
 \end{lemma}
 
+
+\section{Garbage Collection}
+
+Functional languages like ML\index{ML} and Haskell\index{Haskell} include features very similar to the mutable references that we study in this chapter.
+However, their execution models depart in an important way from the operational semantics we just defined: they use \emph{garbage collection}\index{garbage collection} to deallocate unused references, whereas our last semantics allows references to accumulate forever in the heap, even if it is clear that some of them will never be needed again.
+Worry not!
+We can model garbage collection with one new rule of the operational semantics, and then our type-safety proof adapts and shows that we still avoid stuckness, when the garbage collector can snatch \emph{unreachable} locations away from us at any moment.
+
+\newcommand{\freeloc}[1]{\mathsf{freeloc}(#1)}
+
+To define \emph{unreachable}, we start with a way to compute the \emph{free locations} of an expression.
+\begin{eqnarray*}
+  \freeloc{x} &=& \emptyset \\
+  \freeloc{n} &=& \emptyset \\
+  \freeloc{e_1 + e_2} &=& \freeloc{e_1} \cup \freeloc{e_2} \\
+  \freeloc{\lambda x. \; e_1} &=& \freeloc{e_1} \\
+  \freeloc{e_1 \; e_2} &=& \freeloc{e_1} \cup \freeloc{e_2} \\
+  \freeloc{\newref{e_1}} &=& \freeloc{e_1} \\
+  \freeloc{\readref{e_1}} &=& \freeloc{e_1} \\
+  \freeloc{\writeref{e_1}{e_2}} &=& \freeloc{e_1} \cup \freeloc{e_2} \\
+  \freeloc{\ell} &=& \{\ell\}
+\end{eqnarray*}
+
+\newcommand{\reach}[2]{\mathcal R_{#1}(#2)}
+
+Next, we define a relation to capture \emph{which locations are reachable from some starting expression, relative to a particular heap?}
+For each expression $e$ and heap $e$, we define $\reach{h}{e}$ as the set of locations reachable from $e$ via $h$.
+$$\infer{\ell \in \reach{h}{\ell}}{}
+\quad \infer{\ell' \in \reach{h}{\ell}}{
+  \msel{h}{\ell} = v
+  & \ell' \in \reach{h}{v}
+}
+\quad \infer{\ell' \in \reach{h}{v}}{
+  \ell \in \freeloc{v}
+  & \ell' \in \reach{h}{\ell}
+}$$
+
+In order, the rules say: any location reaches itself; any location reaches anywhere reachable from the value assigned to it by $h$; and any value reaches anywhere reachable from any of its free locations.
+
+Now we add one new top-level rule to the operational semantics, saying \emph{unreachable locations may be removed at any time}.
+$$\infer{\smallstep{(h, e)}{(h', e)}}{
+  \begin{array}{c}
+    \forall \ell, v. \; \ell \in \reach{h}{e} \land \msel{h}{\ell} = v \Rightarrow \msel{h'}{\ell} = v \\
+    \forall \ell, v. \; \msel{h'}{\ell} = v \Rightarrow \msel{h}{\ell} = v \\
+    h' \neq h
+  \end{array}
+}$$
+
+Let us explain each premise in more detail.
+The first premise says that, going from the old heap $h$ to the new heap $h'$, \emph{the value of every reachable reference is preserved}.
+The second premise says that \emph{the new heap is a subheap of the original, not spontaneously adding any new mappings}.
+The final premise says that we have actually done some useful work: the new heap isn't just the same as the old one.
+
+It may not be clear why we include the last premise.
+The reason has to do with our formulation of type safety, by saying that programs never get \emph{stuck}.
+We defined that $e$ is \emph{stuck} if it is not a value, but it also can't take a step.
+If we omitted from the garbage-collection rule the premise $h' \neq h$, then this rule would \emph{always} apply, for any term, simply by setting $h' = h$.
+That is, \emph{no} term would ever be stuck, and type safety would be meaningless!
+Since the rule also requires that $h'$ be \emph{no larger than} $h$ (with the second premise), additionally requiring $h' \neq h$ forces $h'$ to \emph{shrink}, garbage-collecting at least one location.
+Thus, in any execution state, we can ``kill time'' by running garbage collection only finitely many times before we need to find some ``real'' step to run.
+More precisely, the limit on how many times we can run garbage collection in a row, starting from heap $h$, is $|\dom{h}|$, the number of locations in $h$.
+
+The type-safety proof is fairly straightforward to update.
+We prove progress by \emph{ignoring} the garbage-collection rule, since the existing rule was already enough to find a step for every nonvalue.
+A bit more work is needed to update the proof of preservation; its case for the existing rule follows the same way as before, while we must prove a few lemmas on the way to handling the new rule.
+
+\begin{lemma}[Transitivity for reachability]
+  If $\freeloc{e_1} \subseteq \freeloc{e_2}$, then $\reach{h}{e_1} \subseteq \reach{h}{e_2}$.
+\end{lemma}
+
+\begin{lemma}[Irrelevance of unreachable locations for typing]
+  If $\heapty{\Sigma}{h}$, $\rhasty{\Sigma}{\Gamma}{e}{\tau}$, then $\rhasty{\Sigma'}{\Gamma}{e}{\tau}$, if we also know that, for all $\ell$ and $\tau'$, when $\ell \in \reach{h}{e}$ and $\msel{\Sigma}{\ell} = \tau'$, it follows that $\msel{\Sigma'}{\ell} = \tau'$.
+\end{lemma}
+
+\begin{lemma}[Reachability sandwich]
+  If $\ell \in \reach{h}{e}$, $\msel{h}{\ell} = v$, and $\ell' \in \reach{h}{v}$, then $\ell' \in \reach{h}{e}$.
+\end{lemma}
+
+To extend the proof of preservation, we need to show that the strengthened invariant still holds after garbage collection.
+A key element is choosing the new heap typing.
+We pick \emph{the restriction of the old heap typing $\Sigma$ to the domain of the new heap $h'$}.
+That is, we drop from the heap typing all locations that have been garbage collected, preserving the types of the survivors.
+Some work is required to show that this strategy is sound, given the definition of reachability, but the lemmas above work out the details, leaving just a bit of bookkeeping in the preservation proof.
+The final safety proof then proceeds in exactly the same way as before.
+
+Our proof here hasn't quite covered all the varieties of garbage collectors that exist.
+In particular, \emph{copying collectors}\index{copying garbage collectors} may \emph{move references to different locations}, while we only allow collectors to delete some references.
+It may be an edifying exercise for the reader to extend our proof in a way that also supports reference relocation.
 
 
 

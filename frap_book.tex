@@ -2353,6 +2353,89 @@ In this case, invariant $I(e) = \; \hasty{}{e}{\tau}$ is that crucial insight, i
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Types and Mutation}
+
+The syntactic approach to type soundness continues to apply to \emph{impure} functional languages, which combine imperative side effects with first-class functions.
+We'll study the general domain through its most common exemplar: lambda calculus with \emph{mutable references}\index{mutable references}\index{references}.
+
+\section{Simply Typed Lambda Calculus with Mutable References}
+
+\newcommand{\newref}[1]{\mathsf{new}(#1)}
+\newcommand{\readref}[1]{!#1}
+\newcommand{\writeref}[2]{#1 := #2}
+
+Here is an extension of the lambda-calculus syntax from last chapter, with additions underlined.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Expressions} & e &::=& n \mid e + e \mid x \mid \lambda x. \; e \mid e \; e \mid \underline{\newref{e} \mid \; \readref{e} \mid \writeref{e}{e}}
+\end{array}$$
+
+\newcommand{\elet}[3]{\mathsf{let} \; #1 = #2 \; \mathsf{in} \; #3}
+
+The three new expression forms deal with \emph{references}, which act like, for instance, Java objects that only have single public fields.
+We write $\newref{e}$ to allocate a new reference initialized with value $e$, we write $\readref{e}$ for reading the value stored in reference $e$, and we write $\writeref{e_1}{e_2}$ for overwriting the value of reference $e_1$ with $e_2$.
+An example is worth a thousand words, so let's consider a concrete program.
+We'll use two notational shorthands:
+\begin{eqnarray*}
+  \elet{x}{e_1}{e_2} &\triangleq& (\lambda x. \; e_2) \; e_1 \\
+  e_1; e_2 &\triangleq& \elet{\_}{e_1}{e_2} \textrm{(for $\_$ a variable not used anywhere else)}
+\end{eqnarray*}
+
+Here is a simple program that uses references.
+$$\elet{r}{\newref{0}}{\writeref{r}{\; \readref{r} + 1}; \readref{r}}$$
+
+This program (1) allocates a new reference $r$ storing the value 0; (2) increments $r$'s value by 1; and (3) returns the new $r$ value, which is 1.
+
+To be more formal about the meanings of all programs, we extend the operational semantics from last chapter.
+First, we add some new kinds of evaluation contexts.
+$$\begin{array}{rrcl}
+  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C \mid C + e \mid v + C \\
+  &&& \mid \; \underline{\newref{C} \mid \; \readref{C} \mid \writeref{C}{e} \mid \writeref{v}{C}}
+\end{array}$$
+
+Next we define the basic reduction steps of the language.
+In contrast to last chapter's semantics for pure lambda calculus, here we work with states that include not just expressions but also \emph{heaps}\index{heaps} $h$, partial functions from references to their current stored values.
+We begin by copying over the two basic-step rules from last chapter, threading through the heap $h$ unchanged.
+$$\infer{\smallstepo{(h, (\lambda x. \; e) \; v)}{(h, \subst{e}{x}{v})}}{}
+\quad \infer{\smallstepo{(h, n + m)}{(h, n \textbf{+} m)}}{}$$
+
+To write out the rules that are specific to references, it's helpful to extend our language syntax with a form that will never appear in original programs, but which does show up at intermediate execution steps.
+In particular, let's add an expression form for \emph{locations}\index{locations}, the runtime values of references, and let's say that locations also count as values.
+$$\begin{array}{rrcl}
+  \textrm{Locations} & \ell &\in& \mathbb N \\
+  \textrm{Expressions} & e &::=& n \mid e + e \mid x \mid \lambda x. \; e \mid e \; e \mid \newref{e} \mid \; \readref{e} \mid \writeref{e}{e} \mid \underline{\ell} \\
+  \textrm{Values} & v &::=& n \mid \lambda x. \; e \mid \underline{\ell}
+\end{array}$$
+
+\newcommand{\dom}[1]{\mathsf{dom}(#1)}
+Now we can write the rules for the three reference primitives.
+$$\infer{\smallstep{(h, \newref{v})}{(\mupd{h}{\ell}{v}, \ell)}}{
+  \ell \notin \dom{h}
+}
+\quad \infer{\smallstep{(h, \readref{\ell})}{(h, v)}}{
+  \msel{h}{\ell} = v
+}
+\quad \infer{\smallstep{(h, \writeref{\ell}{v'})}{(\mupd{h}{\ell}{v'}, v')}}{
+  \msel{h}{\ell} = v
+}$$
+
+To evaluate a reference allocation $\newref{e}$, we nondeterministically\index{nondeterminism} pick some unused location $\ell$ and initialize it with the requested value.
+To read from a reference in $\readref{e}$, we just look up the location in the heap; the program will be \emph{stuck} if the location is not already included in $h$.
+Finally, to write to a reference with $\writeref{e_1}{e_2}$, we check that the requested location is already in the heap (we're stuck if not), then we overwrite its value with the new one.
+
+Here is the overall step rule, which looks just like the one for basic $\lambda$-calculus, with a heap wrapped around everything.
+$$\infer{\smallstep{(h, \plug{C}{e})}{(h', \plug{C}{e'})}}{
+  \smallstepo{(h, e)}{(h', e')}
+}$$
+
+As a small exercise for the reader, it may be worth using this judgment to derive that our example program from before always returns 1.
+Even fixing the empty heap in the starting state, there is some nondeterminism in which final heap it returns: the possibilities are all the single-location heaps, mapping their single locations to value 1.
+It is natural to allow this nondeterminism in allocation, since typical memory allocators in real systems don't give promises about predictability in the addresses that they return.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

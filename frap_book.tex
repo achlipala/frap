@@ -2636,6 +2636,82 @@ In particular, \emph{copying collectors}\index{copying garbage collectors} may \
 It may be an edifying exercise for the reader to extend our proof in a way that also supports reference relocation.
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Hoare Logic: Verifying Imperative Programs}
+
+We now take a step away from the last chapters in two dimensions: we switch back from functional to imperative programs, and we return to proofs of deep correctness properties, rather than mere absence of type-related crashes.
+Nontheless, the essential proof structure winds up being the same, as we once again prove invariants of transition systems!
+
+
+\section{An Imperative Language with Memory}
+
+\newcommand{\assert}[1]{\mathsf{assert}(#1)}
+\newcommand{\readfrom}[1]{*[#1]}
+\newcommand{\writeto}[2]{\readfrom{#1} \leftarrow #2}
+
+To provide us with an interesting enough playground for program verification, let's begin by defining an imperative language with an infinite mutable heap.
+For reasons that will become clear shortly, we do a strange bit of mixing of syntax and semantics.
+In certain parts of the syntax, we include \emph{assertions}\index{assertions} $a$, which are arbitrary mathematical predicates over program state, split between heaps $h$ and variable valuations $v$.
+
+$$\begin{array}{rrcl}
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e &::=& n \mid x \mid e + e \mid e - e \mid e \times e \mid \readfrom{e} \\
+  \textrm{Boolean expressions} & b &::=& e = e \mid e < e \\
+  \textrm{Commands} & c &::=& \skipe \mid \assign{x}{e} \mid \writeto{e}{e} \mid c; c \\
+  &&& \mid \ifte{b}{c}{c} \mid \{a\}\while{b}{c} \mid \assert{a}
+\end{array}$$
+
+Beside assertions, we also have memory-read operations $\readfrom{e}$ and memory-write operations $\writeto{e_1}{e_2}$, which are written suggestively, as if the memory were a global array named $*$.
+Loops have sprouted an extra assertion in their syntax, which we will actually ignore in the language semantics, but which becomes important as part of the proof technique we will learn, especially in automating it.
+
+Expressions have a standard recursive semantics.
+\begin{eqnarray*}
+  \denote{n}(h, v) &=& n \\
+  \denote{x}(h, v) &=& \msel{v}{x} \\
+  \denote{e_1 + e_2}(h, v) &=& \denote{e_1}(h, v) + \denote{e_2}(h, v) \\
+  \denote{e_1 - e_2}(h, v) &=& \denote{e_1}(h, v) - \denote{e_2}(h, v) \\
+  \denote{e_1 \times e_2}(h, v) &=& \denote{e_1}(h, v) \times \denote{e_2}(h, v) \\
+  \denote{\readfrom{e}}(h, v) &=& \msel{h}{\denote{e}(h, v)} \\
+  \denote{e_1 = e_2}(h, v) &=& \denote{e_1}(h, v) = \denote{e_2}(h, v) \\
+  \denote{e_1 < e_2}(h, v) &=& \denote{e_1}(h, v) < \denote{e_2}(h, v)
+\end{eqnarray*}
+
+We finish up with a big-step semantics in the style of those we've seen before, with the added complication of threading a heap through.
+$$\infer{\bigstep{(h, v, \skipe)}{(h, v)}}{}
+\quad \infer{\bigstep{(h, v, \assign{x}{e})}{(h, \mupd{v}{x}{\denote{e}(h, v)})}}{}$$
+
+$$\infer{\bigstep{(h, v, \writeto{e_1}{e_2})}{(\mupd{h}{\denote{e_1}(h, v)}{\denote{e_2}(h, v)}, v)}}{}$$
+
+$$\infer{\bigstep{(h, v, c_1; c_2)}{(h_2, v_2)}}{
+  \bigstep{(h, v, c_1)}{(h_1, v_1)}
+  & \bigstep{(h_1, v_1, c_2)}{(h_2, v_2)}
+}$$
+
+$$\infer{\bigstep{(h, v, \ifte{b}{c_1}{c_2})}{(h', v')}}{
+  \denote{b}(h, v)
+  & \bigstep{(h, v, c_1)}{(h', v')}
+}
+\quad \infer{\bigstep{(h, v, \ifte{b}{c_1}{c_2})}{(h', v')}}{
+  \neg \denote{b}(h, v)
+  & \bigstep{(h, v, c_2)}{(h', v')}
+}$$
+
+$$\infer{\bigstep{(h, v, \while{b}{c})}{(h', v')}}{
+  \denote{b}(h, v)
+  & \bigstep{(h, v, c; \while{b}{c})}{(h', v')}
+}
+\quad \infer{\bigstep{(h, v, \while{b}{c})}{(h, v)}}{
+  \neg \denote{b}(h, v)
+}$$
+
+$$\infer{\bigstep{(h, v, \assert{a})}{(h, v)}}{
+  a(h, v)
+}$$
+
+Reasoning directly about operational semantics can get tedious, so let's develop some machinery for proving program correctness automatically.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

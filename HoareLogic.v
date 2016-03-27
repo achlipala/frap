@@ -9,7 +9,7 @@ Require Import Frap.
 (** * Syntax and semantics of a simple imperative language *)
 
 (* Here's some appropriate syntax for expressions (side-effect-free) of a simple
- * imperatve language with a mutable memory. *)
+ * imperative language with a mutable memory. *)
 Inductive exp :=
 | Const (n : nat)
 | Var (x : string)
@@ -43,10 +43,11 @@ Inductive cmd :=
  * simply: *)
 | Assert (a : assertion).
 
+(* Shorthand notation for looking up in a finite map, returning zero if the key
+ * is not found *)
 Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 
-(* Start of expression semantics: meaning of expressions, as a function of
- * state *)
+(* Start of expression semantics: meaning of expressions *)
 Fixpoint eval (e : exp) (h : heap) (v : valuation) : nat :=
   match e with
   | Const n => n
@@ -93,13 +94,19 @@ Inductive exec : heap -> valuation -> cmd -> heap -> valuation -> Prop :=
   -> exec h2 v2 (While_ I b c) h3 v3
   -> exec h1 v1 (While_ I b c) h3 v3
 
-(* Assertions execute only when they are true. *)
+(* Assertions execute only when they are true.  They provide a way to embed
+ * proof obligations within programs. *)
 | ExAssert : forall h v (a : assertion),
   a h v
   -> exec h v (Assert a) h v.
 
 
 (** * Hoare logic *)
+
+(* Here's an inductive predicate capturing a class of *proved* specifications
+ * for commands.  The intuition is that, when [hoare_triple P c Q], we know
+ * that, when we start [c] in a state satisfying [P], if [c] finishes, its final
+ * state satisfies [Q]. *)
 
 Inductive hoare_triple : assertion -> cmd -> assertion -> Prop :=
 | HtSkip : forall P, hoare_triple P Skip P
@@ -128,21 +135,23 @@ Inductive hoare_triple : assertion -> cmd -> assertion -> Prop :=
   -> (forall h v, Q h v -> Q' h v)
   -> hoare_triple P' c Q'.
 
-Lemma hoare_triple_big_step_while: forall I b c,
-  (forall h v h' v', I h v /\ beval b h v = true
-                     -> exec h v c h' v'
+(* Let's prove that the intuitive description given above really applies to this
+ * predicate.  First, a lemma, which is difficult to summarize intuitively!
+ * More or less precisely this obligation shows up in the main proof below. *)
+Lemma hoare_triple_big_step_while: forall (I : assertion) b c,
+  (forall h v h' v', exec h v c h' v'
+                     -> I h v
+                     -> beval b h v = true
                      -> I h' v')
-  -> (forall h v h' v', exec h v c h' v'
-                        -> I h v
-                        -> beval b h v = true
-                        -> I h' v')
   -> forall h v h' v', exec h v (While_ I b c) h' v'
                        -> I h v
                        -> I h' v' /\ beval b h' v' = false.
 Proof.
-  induct 3; eauto.
+  induct 2; eauto.
 Qed.
 
+(* That main theorem statement literally translates our intuitive description of
+ * [hoare_triple] from above. *)
 Theorem hoare_triple_big_step : forall pre c post,
     hoare_triple pre c post
     -> forall h v h' v', exec h v c h' v'
@@ -191,31 +200,67 @@ Open Scope reset_scope.
  * lambdas for writing assertions. *)
 Notation "h & v ~> e" := (fun h v => e%reset) (at level 85, v at level 0).
 
+(* And here's the classic notation for Hoare triples. *)
 Notation "{{ P }} c {{ Q }}" := (hoare_triple P c%cmd Q) (at level 90, c at next level).
 
+(* Special case of consequence: keeping the precondition; only changing the
+ * postcondition. *)
+Lemma HtStrengthenPost : forall (P Q Q' : assertion) c,
+  hoare_triple P c Q
+  -> (forall h v, Q h v -> Q' h v)
+  -> hoare_triple P c Q'.
+Proof.
+  simplify; eapply HtConsequence; eauto.
+Qed.
+
+(* Finally, three tactic definitions that we won't explain.  The overall tactic
+ * [ht] tries to prove Hoare triples, essentially by rote application of the
+ * rules.  Some other obligations are generated, generally of implications
+ * between assertions, and [ht] also makes a best effort to solve those. *)
+
+Ltac ht1 := apply HtSkip || apply HtAssign || apply HtWrite || eapply HtSeq
+            || eapply HtIf || eapply HtWhile || eapply HtAssert
+            || eapply HtStrengthenPost.
+
+Ltac t := cbv beta; propositional; subst;
+          repeat match goal with
+                 | [ H : ex _ |- _ ] => invert H; propositional; subst
+                 end;
+          simplify;
+          repeat match goal with
+                 | [ _ : context[?a <=? ?b] |- _ ] => destruct (a <=? b); try discriminate
+                 | [ H : ?E = ?E |- _ ] => clear H
+                 end; simplify; propositional; auto; try equality; try linear_arithmetic.
+
+Ltac ht := simplify; repeat ht1; t.
 
 
 (** * Some examples of verified programs *)
 
 (** ** Swapping the values in two variables *)
 
-Ltac ht1 := apply HtSkip || apply HtAssign || apply HtWrite || eapply HtSeq
-            || eapply HtIf || eapply HtWhile || eapply HtAssert
-            || match goal with
-               | [ |- hoare_triple ?pre _ _ ] => eapply HtConsequence with (P := pre); [ | tauto | ]
-               end.
-
-Ltac ht := simplify; repeat ht1; cbv beta; propositional; subst;
-           repeat match goal with
-                  | [ H : ex _ |- _ ] => invert H; propositional; subst
-                  end;
-           simplify;
-           repeat match goal with
-                  | [ _ : context[?a <=? ?b] |- _ ] => destruct (a <=? b); try discriminate
-                  | [ H : ?E = ?E |- _ ] => clear H
-                  end; simplify; propositional; auto; try equality; try linear_arithmetic.
-
+(* First, let's prove it with more manual applications of the Hoare-logic
+ * rules. *)
 Theorem swap_ok : forall a b,
+  {{_&v ~> v $! "x" = a /\ v $! "y" = b}}
+    "tmp" <- "x";;
+    "x" <- "y";;
+    "y" <- "tmp"
+  {{_&v ~> v $! "x" = b /\ v $! "y" = a}}.
+Proof.
+  simplify.
+  eapply HtSeq.
+  apply HtAssign.
+  eapply HtSeq.
+  apply HtAssign.
+  eapply HtStrengthenPost.
+  apply HtAssign.
+  simplify.
+  t.
+Qed.
+
+(* We can also automate the proof easily. *)
+Theorem swap_ok_snazzy : forall a b,
   {{_&v ~> v $! "x" = a /\ v $! "y" = b}}
     "tmp" <- "x";;
     "x" <- "y";;
@@ -228,6 +273,24 @@ Qed.
 (** ** Computing the maximum of two variables *)
 
 Theorem max_ok : forall a b,
+  {{_&v ~> v $! "x" = a /\ v $! "y" = b}}
+    when "x" < "y" then
+      "m" <- "y"
+    else
+      "m" <- "x"
+    done
+  {{_&v ~> v $! "m" = max a b}}.
+Proof.
+  simplify.
+  eapply HtStrengthenPost.
+  apply HtIf.
+  apply HtAssign.
+  apply HtAssign.
+  simplify.
+  t.
+Qed.
+
+Theorem max_ok_snazzy : forall a b,
   {{_&v ~> v $! "x" = a /\ v $! "y" = b}}
     when "x" < "y" then
       "m" <- "y"
@@ -273,9 +336,37 @@ Theorem fact_ok : forall n,
     done
   {{_&v ~> v $! "acc" = fact n}}.
 Proof.
+  simplify.
+  eapply HtSeq.
+  apply HtAssign.
+  eapply HtStrengthenPost.
+  eapply HtWhile.
+  simplify.
+  t.
+  eapply HtSeq.
+  apply HtAssign.
+  eapply HtStrengthenPost.
+  apply HtAssign.
+  simplify.
+  t.
+  ring [H0].
+  (* This variant of [ring] suggests a hypothesis to use in the proof. *)
+  simplify.
+  t.
+Qed.
+
+Theorem fact_ok_snazzy : forall n,
+  {{_&v ~> v $! "n" = n}}
+    "acc" <- 1;;
+    {{_&v ~> v $! "acc" * fact (v $! "n") = fact n}}
+    while 0 < "n" loop
+      "acc" <- "acc" * "n";;
+      "n" <- "n" - 1
+    done
+  {{_&v ~> v $! "acc" = fact n}}.
+Proof.
   ht.
-  ring [H0]. (* This variant of [ring] suggests a hypothesis to use in the
-              * proof. *)
+  ring [H0].
 Qed.
 
 (** ** Selection sort *)
@@ -283,7 +374,7 @@ Qed.
 (* This is our one example of a program reading/writing memory, which holds the
  * representation of an array that we want to sort in-place. *)
 
-(** One simple lemma turns out to be helpful to guide [auto] properly. *)
+(* One simple lemma turns out to be helpful to guide [eauto] properly. *)
 Lemma leq_f : forall A (m : fmap A nat) x y,
   x = y
   -> m $! x <= m $! y.
@@ -295,7 +386,7 @@ Hint Resolve leq_f.
 Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
 Hint Extern 1 (_ < _) => linear_arithmetic.
 Hint Extern 1 (_ <= _) => linear_arithmetic.
-(* We also register [linear-arithmetic] as a step to try during proof search. *)
+(* We also register [linear_arithmetic] as a step to try during proof search. *)
 
 (* These invariants are fairly hairy, but probably the best way to understand
  * them is just to spend a while reading them.  They generally talk about
@@ -347,6 +438,11 @@ Qed.
 
 (** * An alternative correctness theorem for Hoare logic, with small-step semantics *)
 
+(* In case you were worried that this chapter is too far removed from the
+ * pattern of program reasoning we've seen recur again and again, help is here!
+ * We can also characterize Hoare triples in terms of invariants of transition
+ * systems.  To start with, here's a small-step semantics for our running
+ * language. *)
 Inductive step : heap * valuation * cmd -> heap * valuation * cmd -> Prop :=
 | StAssign : forall h v x e,
   step (h, v, Assign x e) (h, v $+ (x, eval e h v), Skip)
@@ -380,10 +476,19 @@ Definition trsys_of (st : heap * valuation * cmd) := {|
   Step := step
 |}.
 
+(* We'll characterize *unstuckness* in roughly the same way as we did for
+ * lambda-calculus type soundness: the program is done (reached [Skip]) or can
+ * take a step. *)
 Definition unstuck (st : heap * valuation * cmd) :=
   snd st = Skip
   \/ exists st', step st st'.
 
+(* A convenient property of Hoare triples: they rule out stuckness, regardless
+ * of the specs we choose, so long as the precondition accurately describes the
+ * real execution state!  Note that the only real possibility for stuckness in
+ * the semantics is via [Assert], which is why we included it.  We reduce
+ * arbitrary correctness checks, on intermediate program states, to stuckness or
+ * lack thereof in program execution. *)
 Lemma hoare_triple_unstuck : forall P c Q,
   {{P}} c {{Q}}
   -> forall h v, P h v
@@ -406,6 +511,8 @@ Proof.
   unfold unstuck in H2; simplify; first_order.
 Qed.
 
+(* Another basic property: [Skip] has no effect on program state, and the set of
+ * derivable specs for [Skip] reflects that fact. *)
 Lemma hoare_triple_Skip : forall P Q,
   {{P}} Skip {{Q}}
   -> forall h v, P h v -> Q h v.
@@ -413,6 +520,10 @@ Proof.
   induct 1; auto.
 Qed.
 
+(* Finally, our main inductive proof: small steps preserve the existence of
+ * Hoare triples.  We even give the concrete specification for the new command
+ * [c'] that was stepped to.  It keeps the old postcondition, and we give it a
+ * very specific precondition saying "the state is exactly this." *)
 Lemma hoare_triple_step : forall P c Q,
   {{P}} c {{Q}}
   -> forall h v h' v' c',
@@ -463,6 +574,9 @@ Proof.
   auto.
 Qed.
 
+(* Oh, what a coincidence! ;-)  As with type-safety proofs, we find that the
+ * reasonably intuitive properties we just proved are precisely the hard parts
+ * of a standard proof by invariant strengthening and invariant induction. *)
 Theorem hoare_triple_invariant : forall P c Q h v,
   {{P}} c {{Q}}
   -> P h v
@@ -496,7 +610,7 @@ Proof.
   simplify; auto.
 Qed.
 
-(* A very simple example, just to show all this in action. *)
+(* A very simple example, just to show all this in action *)
 Definition forever := (
   "i" <- 1;;
   "n" <- 1;;

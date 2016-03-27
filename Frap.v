@@ -71,11 +71,18 @@ Ltac removeDups :=
                  || (apply RdDup; [ simpl; intuition congruence | ]))
   end.
 
+Ltac simpl_maps :=
+  repeat match goal with
+         | [ |- context[add ?m ?k1 ?v $? ?k2] ] =>
+           (rewrite (@lookup_add_ne _ _ m k1 k2 v) by (congruence || omega))
+           || (rewrite (@lookup_add_eq _ _ m k1 k2 v) by (congruence || omega))
+         end.
+
 Ltac simplify := repeat (unifyTails; pose proof I);
                 repeat match goal with
                        | [ H : True |- _ ] => clear H
                        end;
-                repeat progress (simpl in *; intros; try autorewrite with core in *);
+                repeat progress (simpl in *; intros; try autorewrite with core in *; simpl_maps);
                                  repeat (removeDups || doSubtract).
 Ltac propositional := intuition idtac.
 

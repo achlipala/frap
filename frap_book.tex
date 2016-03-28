@@ -2749,6 +2749,7 @@ $$\infer{\hoare{P}{\ifte{b}{c_1}{c_2}}{\lambda s. \; Q_1(s) \lor Q_2(s)}}{
 }$$
 
 Coming to loops, we at least have a purpose for the assertion annotated on each one.
+\invariants
 We call those assertions \emph{loop invariants}\index{loop invariants}; one of these is meant to be true every time a loop iteration begins.
 We will try to avoid confusion with the more fundamental concept of invariant for transition systems, though in fact the two are closely related formally, which we will see in the last section of this chapter.
 Essentially, the loop invariant gives the \emph{induction hypothesis} that makes the program correctness proof go through.
@@ -2859,6 +2860,52 @@ $$\infer{\smallstep{(h, v, \{I\} \while{b}{c})}{(h, v, c; \{I\} \while{b}{c})}}{
 $$\infer{\smallstep{(h, v, \assert{a})}{(h, v, \skipe)}}{
   a(h, v)
 }$$
+
+
+\section{Transition-System Invariants from Hoare Triples}
+
+Even an infinite-looping program must satisfy its $\mathsf{assert}$ commands, every time it passes one of them.
+For that reason, it's interesting to consider how to show that a command never gets stuck on a false assertion.
+We work up to that result with a few intermediate ones.
+First, we define \emph{stuck} much the same way as in the last two chapters: a state $(h, v, c)$ is stuck if $c$ is not $\skipe$, but there is also nowhere to step to from this state.
+An example of a stuck state would be one beginning with an $\mathsf{assert}$ of an assertion that does not hold on $h$ and $v$.
+In fact, we can prove that any other state is unstuck, though we won't bother here.
+
+\begin{lemma}[Progress]\label{hoare_progress}
+  If $\hoare{P}{c}{Q}$ and $P(h, v)$, then $(h, v, c)$ is unstuck.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c}{Q}$.
+\end{proof}
+
+\begin{lemma}\label{hoare_skip}
+  If $\hoare{P}{\skipe}{Q}$, then $\forall s. \; P(s) \Rightarrow Q(s)$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{\skipe}{Q}$.
+\end{proof}
+
+\begin{lemma}[Preservation]\label{hoare_preservation}
+  If $\hoare{P}{c}{Q}$, $\smallstep{(h, v, c)}{(h', v', c')}$, and $P(h, v)$, then $\hoare{\lambda s. \; s = (h', v')}{c'}{Q}$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c}{Q}$, appealing to Lemma \ref{hoare_skip} in one case.  Note how we conclude a very specific precondition, forcing exact state equality with the one we have stepped to.
+\end{proof}
+
+\invariants
+\begin{lemma}[Invariant Safety]
+  If $\hoare{P}{c}{Q}$ and $P(h, v)$, then unstuckness is an invariant for the small-step transition system starting at $(h, v, c)$.
+\end{lemma}
+\begin{proof}
+  First we weaken the invariant to $I(h, v, c) = \hoare{\lambda s. \; s = (h, v)}{c}{\lambda \_. \; \top}$.
+  That is, we focus in on the most specific applicable precondition, and we forget everything that the postcondition was recording for us.
+  Note that postconditions are still an essential part of Hoare triples for this proof, but we have already done our detailed analysis of them in the earlier lemmas.
+  Lemma \ref{hoare_progress} gives the needed implication from the new invariant to the old.
+  
+  Next, we apply invariant induction, whose base case follows trivially.
+  The induction step follows by Lemma \ref{hoare_preservation}.
+\end{proof}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

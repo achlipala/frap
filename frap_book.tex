@@ -2679,6 +2679,7 @@ Expressions have a standard recursive semantics.
 \end{eqnarray*}
 
 We finish up with a big-step semantics in the style of those we've seen before, with the added complication of threading a heap through.
+\encoding
 $$\infer{\bigstep{(h, v, \skipe)}{(h, v)}}{}
 \quad \infer{\bigstep{(h, v, \assign{x}{e})}{(h, \mupd{v}{x}{\denote{e}(h, v)})}}{}$$
 
@@ -2711,6 +2712,113 @@ $$\infer{\bigstep{(h, v, \assert{a})}{(h, v)}}{
 }$$
 
 Reasoning directly about operational semantics can get tedious, so let's develop some machinery for proving program correctness automatically.
+
+
+\section{Hoare Triples}
+
+\newcommand{\hoare}[3]{\{#1\} #2 \{#3\}}
+
+Much as we did with type systems, we define a syntactic predicate and prove it sound once and for all.
+Afterward, we can automatically show that particular programs and their specifications inhabit the predicate.
+This time, predicate instances will be written like $\hoare{P}{c}{Q}$, with $c$ the command being verified, $P$ its \emph{precondition}\index{precondition} (assumption about the program state before we start running $c$), and $Q$ its \emph{postcondition} (obligation about the program state after $c$ finishes).
+We call any such fact a \emph{Hoare triple}\index{Hoare triple}, and the overall predicate is an instance of \emph{Hoare logic}\index{Hoare logic}.
+
+\encoding
+A first rule for $\skipe$ is easy: anything that was true before is also true after.
+
+$$\infer{\hoare{P}{\skipe}{P}}{}$$
+
+A rule for assignment is slightly more involved: to state what we know is true after, we recall that there existed a prestate satisfying the precondition, which then evolved into the poststate in the expected way.
+$$\infer{\hoare{P}{\assign{x}{e}}{\lambda (h, v). \; \exists v'. \; P(h, v') \land v = \mupd{v'}{x}{\denote{e}(h, v')}}}{}$$
+
+The memory-write command is treated symmetrically.
+$$\infer{\hoare{P}{\writeto{e_1}{e_2}}{\lambda (h, v). \; \exists h'. \; P(h', v) \land h = \mupd{h'}{\denote{e_1}(h', v)}{\denote{e_2}(h', v)}}}{}$$
+
+To model sequencing, we thread predicates through in an intuitive way.
+$$\infer{\hoare{P}{c_1; c_2}{R}}{
+  \hoare{P}{c_1}{Q}
+  & \hoare{Q}{c_2}{R}
+}$$
+
+For conditional statements, we start from the basic approach of sequencing, adding two twists.
+First, since the two subcommands run after different outcomes of the test expression, we extend their preconditions.
+Second, since we may reach the end of the command after running either subcommand, we take the disjunction of their postconditions.
+$$\infer{\hoare{P}{\ifte{b}{c_1}{c_2}}{\lambda s. \; Q_1(s) \lor Q_2(s)}}{
+  \hoare{\lambda s. \; P(s) \land \denote{b}(s)}{c_1}{Q_1}
+  & \hoare{\lambda s. \; P(s) \land \neg \denote{b}(s)}{c_2}{Q_2}
+}$$
+
+Coming to loops, we at least have a purpose for the assertion annotated on each one.
+We call those assertions \emph{loop invariants}\index{loop invariants}; one of these is meant to be true every time a loop iteration begins.
+We will try to avoid confusion with the more fundamental concept of invariant for transition systems, though in fact the two are closely related formally, which we will see in the last section of this chapter.
+Essentially, the loop invariant gives the \emph{induction hypothesis} that makes the program correctness proof go through.
+We encapsulate the induction reasoning once and for all, in the proof of soundness for Hoare triples.
+To verify an individual program, it is only necessary to prove the premises of the rule, which we give now.
+$$\infer{\hoare{P}{\{I\} \while{b}{c}}{\lambda s. \; I(s) \land \neg \denote{b}(s)}}{
+  (\forall s. \; P(s) \Rightarrow I(s))
+  & \hoare{\lambda s. \; I(s) \land \denote{b}(s)}{c}{I}
+}$$
+In words: the loop invariant is true when we begin the loop, and every iteration preserves the invariant, given the extra knowledge that the loop test succeeded.
+If the loop finishes, we know that the invariant is still true, but now the test is false.
+
+The final command-specific rule, for assertions, is a bit anticlimactic.
+The precondition is carried over as postcondition, if it is strong enough to prove the assertion.
+$$\infer{\hoare{P}{\assert{I}}{P}}{
+  \forall s. \; P(s) \Rightarrow I(s)
+}$$
+
+One more essential rule remains, this time not specific to any command form.
+The rules we've given deduce specific kinds of precondition-postcondition pairs.
+For instance, the $\skipe$ rule forces the precondition and postcondition to match.
+However, we expect to be able to prove $\hoare{\lambda (h, v). \; \msel{v}{x} > 0}{\skipe}{\lambda (h, v). \; \msel{v}{x} \geq 0}$, because the postcondition is \emph{weaker}\index{weaker predicate} than the precondition, meaning the precondition implies the postcondition.
+Alternatively, the precondition is \emph{stronger}\index{stronger predicate} than the postcondition, because the precondition keeps all restrictions from the postcondition while adding new ones.
+Hoare Logic's \emph{rule of consequence}\index{rule of consequence} allows us to build a new Hoare triple from an old one by \emph{strengthening the precondition}\index{strengthening the precondition} and \emph{weakening the postcondition}\index{weakening the postcondition}.
+$$\infer{\hoare{P'}{c}{Q'}}{
+  \hoare{P}{c}{Q}
+  & (\forall s. \; P'(s) \Rightarrow P(s))
+  & (\forall s. \; Q(s) \Rightarrow Q'(s))
+}$$
+
+These rules together are \emph{complete}\index{completeness of Hoare logic}, in the sense that any intuitively correct precondition-postcondition pair for a command is provable.
+Here we only go into detail on a proof of the dual property, \emph{soundness}\index{soundness of Hoare logic}.
+
+\begin{lemma}\label{hoare_while}
+  Assume the following fact: Together, $\bigstep{(h, v, c)}{(h', v')}$, $I(h, v)$, and $\denote{b}(h, s)$ imply $I(h', v')$.
+  Then, given $\bigstep{(h, v, \{I\} \while{b}{c})}{(h', v')}$, it follows that $I(h', v')$ and $\neg \denote{b}(h', v')$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\bigstep{(h, v, \{I\} \while{b}{c})}{(h', v')}$.
+\end{proof}
+
+That lemma encapsulates once and for all the use of induction in reasoning about the many iterations of loops.
+
+\begin{theorem}[Soundness of Hoare logic]
+  If $\hoare{P}{c}{Q}$, $\bigstep{(h, v, c)}{(h', v')}$, and $P(h, v)$, then $Q(h', v')$.
+\end{theorem}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c}{Q}$ and inversion on the derivation of $\bigstep{(h, v, c)}{(h', v')}$, appealing to Lemma \ref{hoare_while} in the appropriate case.
+\end{proof}
+
+We leave concrete example derivations to the accompanying Coq code, as that level of fiddly detail deserves to be machine-checked.
+Note that there is a rather effective automated proof procedure lurking behind the rules introduced in this section:
+To prove a Hoare triple, first try applying the rule associated with its top-level syntax-tree constructor (e.g., assignment or loop rule).
+If the conclusion of that rule does unify with the goal, apply the rule and proceed recursively on its premises.
+Otherwise, apply the rule of consequence to replace the postcondition with one matching that from the matching rule; note that all rules accept arbitrarily shaped preconditions, so we don't actually need to do work to massage the precondition.
+After a step like this one, it is guaranteed that the ``fundamental'' rule now applies.
+
+This process creates a pile of side conditions to be proved by other means, corresponding to the assertion implications generated by the rules for loops, assertions, and consequence.
+Many real-world tools based on Hoare logic discharge such goals using solvers for satisfiability modulo theories\index{satisfiability modulo theories}, otherwise known as SMT solvers\index{SMT solvers}.
+The accompanying Coq code just uses a modest Coq automation tactic definition building on the proof steps we have been using all along.
+It is not complete by any means, but it does surprisingly well in the examples we step through, of low to moderate complexity.
+
+Before closing our discussion of the basics of Hoare logic, let's consider how it brings to bear some more of the general principles that we have met before.
+\abstraction
+A command's precondition and postcondition serve as an \emph{abstraction} of the command: it is safe to model a command with its specification, if it has been proved using a Hoare triple.
+\modularity
+Furthermore, the Hoare rules themselves take advantage of \emph{modularity} to analyze subcommands separately, mediating between them using only the specifications.
+The implementation details of a subcommand don't matter for any other subcommands in the program, so long as that subcommand has been connected to a specification that preserves enough information about its behavior.
+It is an art to choose the right specification for each piece of a program.
+Detailed specifications minimize the chance that some other part of the program winds up unprovable, despite its correctness, but more detailed specifications also tend to be harder to prove in the first place.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

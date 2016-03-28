@@ -2699,9 +2699,9 @@ $$\infer{\bigstep{(h, v, \ifte{b}{c_1}{c_2})}{(h', v')}}{
   & \bigstep{(h, v, c_2)}{(h', v')}
 }$$
 
-$$\infer{\bigstep{(h, v, \while{b}{c})}{(h', v')}}{
+$$\infer{\bigstep{(h, v, \{I\} \while{b}{c})}{(h', v')}}{
   \denote{b}(h, v)
-  & \bigstep{(h, v, c; \while{b}{c})}{(h', v')}
+  & \bigstep{(h, v, c; \{I\} \while{b}{c})}{(h', v')}
 }
 \quad \infer{\bigstep{(h, v, \while{b}{c})}{(h, v)}}{
   \neg \denote{b}(h, v)
@@ -2819,6 +2819,46 @@ Furthermore, the Hoare rules themselves take advantage of \emph{modularity} to a
 The implementation details of a subcommand don't matter for any other subcommands in the program, so long as that subcommand has been connected to a specification that preserves enough information about its behavior.
 It is an art to choose the right specification for each piece of a program.
 Detailed specifications minimize the chance that some other part of the program winds up unprovable, despite its correctness, but more detailed specifications also tend to be harder to prove in the first place.
+
+
+\section{Small-Step Semantics}
+
+Last section's soundness theorem only lets us draw conclusions about programs that terminate.
+We call such guarantees \emph{partial correctness}\index{partial correctness}.
+Other forms of Hoare triples guarantee \emph{total correctness}\index{total correctness}, which includes termination.
+However, sometimes programs aren't meant to terminate, yet we still want to gain confidence about their behavior.
+To that end, we first give a small-step semantics for the same programming language.
+Then we prove a different soundness theorem for the same Hoare-triple predicate, showing that it also implies a useful invariant for programs as transition systems.
+
+The small-step relation is quite similar to the one from last chapter, though now our states are triples $(h, v, c)$, of heap $h$, variable valuation $v$, and command $c$.
+
+\encoding
+$$\infer{\smallstep{(h, v, \assign{x}{e})}{(h, \mupd{v}{x}{\denote{e}(h, v)}, \skipe)}}{}$$
+
+$$\infer{\smallstep{(h, v, \writeto{e_1}{e_2})}{(\mupd{h}{\denote{e_1}(h, v)}{\denote{e_2}(h, v)}, v, \skipe)}}{}$$
+
+$$\infer{\smallstep{(h, v, \skipe; c_2)}{(h, v, c_2)}}{}
+\quad \infer{\smallstep{(h, v, c_1; c_2)}{(h', v', c'_1; c_2)}}{
+  \smallstep{(h, v, c_1)}{(h', v', c'_1)}
+}$$
+
+$$\infer{\smallstep{(h, v, \ifte{b}{c_1}{c_2})}{(h, v, c_1)}}{
+  \denote{b}(h, v)
+}
+\quad \infer{\smallstep{(h, v, \ifte{b}{c_1}{c_2})}{(h, v, c_2)}}{
+  \neg \denote{b}(h, v)
+}$$
+
+$$\infer{\smallstep{(h, v, \{I\} \while{b}{c})}{(h, v, c; \{I\} \while{b}{c})}}{
+  \denote{b}(h, v)
+}
+\quad \infer{\smallstep{(h, v, \{I\} \while{b}{c})}{(h, v, \skipe)}}{
+  \neg \denote{b}(h, v)
+}$$
+
+$$\infer{\smallstep{(h, v, \assert{a})}{(h, v, \skipe)}}{
+  a(h, v)
+}$$
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

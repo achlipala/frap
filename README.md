@@ -13,3 +13,4 @@ Just run `make` here to build everything, including the book `frap.pdf` and the 
 * Chapter 6: `OperationalSemantics.v`
 * Chapter 7: `AbstractInterpretation.v`
 * Chapter 8: `LambdaCalculusAndTypeSoundness.v`
+* Chapter 9: `TypesAndMutation.v`

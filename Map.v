@@ -163,6 +163,18 @@ Module Type S.
 
   Hint Rewrite merge_add1 using solve [ eauto | unfold Sets.In; autorewrite with core in *; simpl in *; intuition congruence ].
   Hint Rewrite merge_add1_alt using solve [ congruence | unfold Sets.In; autorewrite with core in *; simpl in *; intuition congruence ].
+
+  Axiom includes_intro : forall K V (m1 m2 : fmap K V),
+      (forall k v, m1 $? k = Some v -> m2 $? k = Some v)
+      -> m1 $<= m2.
+  
+  Axiom lookup_Some_dom : forall K V (m : fmap K V) k v,
+      m $? k = Some v
+      -> k \in dom m.
+
+  Axiom lookup_None_dom : forall K V (m : fmap K V) k,
+      m $? k = None
+      -> ~ k \in dom m.
 End S.
 
 Module M : S.
@@ -445,6 +457,27 @@ Module M : S.
   Proof.
     unfold lookup, restrict; intros.
     destruct (decide (P k)); intuition congruence.
+  Qed.
+
+  Lemma includes_intro : forall K V (m1 m2 : fmap K V),
+      (forall k v, lookup m1 k = Some v -> lookup m2 k = Some v)
+      -> includes m1 m2.
+  Proof.
+    auto.
+  Qed.
+  
+  Lemma lookup_Some_dom : forall K V (m : fmap K V) k v,
+      lookup m k = Some v
+      -> k \in dom m.
+  Proof.
+    unfold lookup, dom, In; congruence.
+  Qed.
+
+  Lemma lookup_None_dom : forall K V (m : fmap K V) k,
+      lookup m k = None
+      -> ~ k \in dom m.
+  Proof.
+    unfold lookup, dom, In; congruence.
   Qed.
 End M.
 

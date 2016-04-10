@@ -17,3 +17,4 @@ frap.tgz
 .coq-native
 Deep.ml*
 Deeper.ml*
+DeeperWithFail.ml*

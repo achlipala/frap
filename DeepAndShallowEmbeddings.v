@@ -20,6 +20,11 @@ Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 
 Hint Rewrite max_l max_r using linear_arithmetic.
 
+Ltac simp := repeat (simplify; subst; propositional;
+                    try match goal with
+                        | [ H : ex _ |- _ ] => invert H
+                        end); try linear_arithmetic.
+
 
 (** * Shallow embedding of a language very similar to the one we used last chapter *)
 
@@ -224,6 +229,13 @@ Module Deep.
     eapply HtConsequence; eauto.
   Qed.
 
+  Ltac basic := apply HtReturn || eapply HtRead || eapply HtWrite.
+  Ltac step0 := basic || eapply HtBind || (eapply HtStrengthen; [ basic | ]).
+  Ltac step := step0; simp.
+  Ltac ht := simp; repeat step; eauto.
+  Ltac conseq := simplify; eapply HtConsequence.
+  Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+  
   Notation "{{ h ~> P }} c {{ r & h' ~> Q }}" :=
     (hoare_triple (fun h => P) c (fun r h' => Q)) (at level 90, c at next level).
 
@@ -232,27 +244,11 @@ Module Deep.
       array_max i acc
     {{ r&h ~> forall j, j < len -> h $! j <= r }}.
   Proof.
-    induct i; simplify.
-
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional.
-    subst.
-    auto.
-
-    econstructor.
-    constructor.
-    simplify.
-    eapply HtConsequence.
-    apply IHi.
-    simplify; propositional.
-    subst.
-    cases (j ==n i); subst; auto.
+    induct i; ht.
+    use_IH IHi.
+    cases (j ==n i); simp.
     assert (h $! j <= acc) by auto.
     linear_arithmetic.
-
-    simplify; auto.
   Qed.
 
   Theorem array_max_ok : forall len,
@@ -260,13 +256,10 @@ Module Deep.
       array_max len 0
     {{ r&h ~> forall i, i < len -> h $! i <= r }}.
   Proof.
-    simplify.
-    eapply HtConsequence.
+    conseq.
     apply array_max_ok' with (len := len).
-
-    simplify.
-    linear_arithmetic.
-
+    simp.
+    simp.
     auto.
   Qed.
 
@@ -276,32 +269,11 @@ Module Deep.
       increment_all i
     {{ _&h ~> forall j, j < len -> h $! j = S (h0 $! j) }}.
   Proof.
-    induct i; simplify; propositional.
-
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional.
+    induct i; ht.
+    use_IH IHi.
+    cases (j ==n i); simp.
     auto.
-
-    econstructor.
-    econstructor.
-    simplify.
-    econstructor.
-    econstructor.
-    simplify.
-    eapply HtConsequence.
-    apply IHi.
-    simplify.
-    invert H; propositional; subst.
-    simplify.
     auto.
-
-    cases (j ==n i); subst; auto.
-    simplify; auto.
-    simplify; auto.
-
-    simplify; auto.
   Qed.
 
   Theorem increment_all_ok : forall len h0,
@@ -309,14 +281,10 @@ Module Deep.
       increment_all len
     {{ _&h ~> forall j, j < len -> h $! j = S (h0 $! j) }}.
   Proof.
-    simplify.
-    eapply HtConsequence.
+    conseq.
     apply increment_all_ok' with (len := len).
-
-    simplify; subst; propositional.
-    linear_arithmetic.
-
-    simplify.
+    simp.
+    simp.
     auto.
   Qed.
 
@@ -447,6 +415,14 @@ Module Deeper.
     eapply HtConsequence; eauto.
   Qed.
 
+  Ltac basic := apply HtReturn || eapply HtRead || eapply HtWrite.
+  Ltac step0 := basic || eapply HtBind || (eapply HtStrengthen; [ basic | ]).
+  Ltac step := step0; simp.
+  Ltac ht := simp; repeat step; eauto.
+  Ltac conseq := simplify; eapply HtConsequence.
+  Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+  Ltac loop_inv Inv := eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]; ht.
+
   Theorem index_of_ok : forall hinit needle,
     {{ h ~> h = hinit }}
       index_of needle
@@ -454,40 +430,16 @@ Module Deeper.
          /\ hinit $! r = needle
          /\ forall i, i < r -> hinit $! i <> needle }}.
   Proof.
-    unfold index_of.
     simplify.
-    eapply HtConsequence.
-    apply HtLoop with (I := fun r h => h = hinit
-                                       /\ match r with
-                                          | Done r' => hinit $! r' = needle
-                                                       /\ forall i, i < r' -> hinit $! i <> needle
+    loop_inv (fun r h => h = hinit
+                         /\ match r with
+                            | Done r' => hinit $! r' = needle
+                                         /\ forall i, i < r' -> hinit $! i <> needle
                                           | Again r' => forall i, i < r' -> hinit $! i <> needle
-                                          end); simplify.
-
-    econstructor.
-    econstructor.
-
-    simplify.
-    cases (r ==n needle); subst.
-    eapply HtStrengthen.
-    econstructor.
-    simplify; propositional; subst.
-    auto.
-
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional; subst.
-    simplify.
-    cases (i ==n acc); subst; auto.
+                            end).
+    cases (r ==n needle); ht.
+    cases (i ==n acc); simp.
     apply H3 with (i0 := i); auto.
-
-    simplify.
-    propositional.
-    linear_arithmetic.
-
-    simplify.
-    propositional.
   Qed.
 
   Definition trsys_of {result} (c : cmd result) (h : heap) := {|
@@ -772,51 +724,29 @@ Module DeeperWithFail.
     eapply HtConsequence; eauto.
   Qed.
 
+  Ltac basic := apply HtReturn || eapply HtRead || eapply HtWrite.
+  Ltac step0 := basic || eapply HtBind || (eapply HtStrengthen; [ basic | ])
+                || (eapply HtConsequence; [ apply HtFail | .. ]).
+  Ltac step := step0; simp.
+  Ltac ht := simp; repeat step.
+  Ltac conseq := simplify; eapply HtConsequence.
+  Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+  Ltac use_lemma H := eapply HtWeaken; [ apply H | .. ]; ht.
+  Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
+                        || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
+  Ltac loop_inv Inv := loop_inv0 Inv; ht.
+
   Theorem forever_ok :
     {{ _ ~> True }}
       forever
     {{ _&_ ~> False }}.
   Proof.
-    unfold forever.
-    econstructor.
-    econstructor.
-    simplify.
-    eapply HtConsequence.
-    apply HtLoop with (I := fun r h => h $! 0 > 0 /\ match r with
-                                                     | Done _ => False
-                                                     | _ => True
-                                                     end); simplify.
-
-    econstructor.
-    econstructor.
-    simplify.
-    econstructor.
-    econstructor.
-    simplify.
-    cases r1.
-    eapply HtConsequence.
-    apply HtFail.
-    simplify.
-    linear_arithmetic.
-    simplify.
-    linear_arithmetic.
-    econstructor.
-    econstructor.
-    simplify.
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional; subst.
-    invert H0; propositional; subst.
-    simplify.
-    linear_arithmetic.
-    invert H0; propositional; subst.
-    simplify.
-    invert H; propositional; subst.
-    simplify.
-    linear_arithmetic.
-    simplify.
-    propositional.
+    ht.
+    loop_inv (fun (r : loop_outcome nat) h => h $! 0 > 0 /\ match r with
+                                                            | Done _ => False
+                                                            | _ => True
+                                                            end).
+    cases r1; ht.
   Qed.
 
   Definition trsys_of {result} (c : cmd result) (h : heap) := {|
@@ -1047,51 +977,23 @@ Module DeeperWithFail.
        {{r&h ~> (forall i, i < length ls -> h $! i = nth_default 0 ls i)
            /\ r = fold_left f ls init}}.
   Proof.
-    unfold heapfold.
-    simplify.
-    econstructor.
-    eapply HtWeaken.
-    apply HtLoop with (I := fun r h => (forall i, i < length ls -> h $! i = nth_default 0 ls i)
-                                       /\ match r with
-                                          | Done (_, acc) => acc = fold_left f ls init
-                                          | Again (i, acc) => acc = fold_left f (firstn i ls) init
-                                          end).
-    simplify.
-    cases acc; simplify.
-    cases (length ls <=? n); simplify.
-
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional; subst.
-    reflexivity.
-
-    econstructor.
-    econstructor.
-    simplify.
-    econstructor.
-    eapply HtWeaken.
-    apply H with (P := fun h => (forall i, i < Datatypes.length ls -> h $! i = nth_default 0 ls i)
-                                /\ a = fold_left f (firstn n ls) init
-                                /\ r = h $! n).
-    simplify; propositional; subst; auto.
-    simplify.
-    eapply HtStrengthen.
-    econstructor.
-    simplify; propositional; subst.
+    ht.
+    loop_inv (fun r h => (forall i, i < length ls -> h $! i = nth_default 0 ls i)
+                         /\ match r with
+                            | Done (_, acc) => acc = fold_left f ls init
+                            | Again (i, acc) => acc = fold_left f (firstn i ls) init
+                            end).
+    cases (length ls <=? a); ht.
+    use_lemma (H (fun h => (forall i, i < Datatypes.length ls -> h $! i = nth_default 0 ls i)
+                           /\ b = fold_left f (firstn a ls) init
+                           /\ r = h $! a)).
+    simp; auto.
+    simp.
     rewrite H1 by assumption.
     simplify.
     reflexivity.
-
-    simplify; propositional.
-
-    simplify.
-    eapply HtStrengthen.
-    econstructor.
-    simplify.
-    propositional; subst.
-    cases r; simplify.
-    assumption.
+    simp; auto.
+    simp.
   Qed.
 
   Definition array_max (len : nat) : cmd nat :=
@@ -1126,17 +1028,10 @@ Module DeeperWithFail.
       array_max (length ls)
     {{ r&h ~> forall i, i < length ls -> h $! i <= r }}.
   Proof.
-    simplify.
-    eapply HtConsequence.
-    apply heapfold_ok with (f := max).
-    simplify.
-    eapply HtStrengthen.
-    econstructor.
-    simplify; propositional.
-    simplify; auto.
-    simplify.
-    subst.
-    propositional; subst.
+    conseq.
+    apply heapfold_ok with (f := max); ht.
+    simp; auto.
+    simp.
     rewrite H1 by assumption.
     auto.
   Qed.

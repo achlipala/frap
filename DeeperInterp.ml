@@ -19,5 +19,9 @@ let interp c =
                    Hashtbl.find h a
         with Not_found -> O)
     | Write (a, v) -> Obj.magic (Hashtbl.replace h a v)
+    | Loop (i, b) ->
+      match Obj.magic (interp' (Obj.magic (b i))) with
+      | Done r -> r
+      | Again r -> interp' (Loop (r, b))
 
   in h, interp' c

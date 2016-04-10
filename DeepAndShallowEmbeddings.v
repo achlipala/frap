@@ -725,6 +725,8 @@ Module DeeperWithFail.
               end
     end.
 
+  Extraction "DeeperWithFail.ml" forever.
+
   Inductive hoare_triple : assertion -> forall {result}, cmd result -> (result -> assertion) -> Prop :=
   | HtReturn : forall P {result : Set} (v : result),
       hoare_triple P (Return v) (fun r h => P h /\ r = v)
@@ -989,5 +991,153 @@ Module DeeperWithFail.
     cases (step (fst s) (snd s)); equality.
   Qed.
 
-  Extraction "DeeperWithFail.ml" forever.
+
+  (** ** Showcasing the opportunity to create new programming abstractions,
+       * without modifying the language definition *)
+
+  Definition heapfold {A : Set} (init : A) (combine : A -> nat -> cmd A) (len : nat) : cmd A :=
+    p <- for p := (0, init) loop
+           if len <=? fst p then
+             Return (Done p)
+           else
+             h_i <- Read (fst p);
+             acc <- combine (snd p) h_i;
+             Return (Again (S (fst p), acc))
+         done;
+    Return (snd p).
+
+  Lemma firstn_nochange : forall A (ls : list A) n,
+      length ls <= n
+      -> firstn n ls = ls.
+  Proof.
+    induct ls; simplify.
+
+    cases n; simplify; auto.
+
+    cases n; simplify.
+    linear_arithmetic.
+    rewrite IHls; auto.
+  Qed.
+
+  Lemma fold_left_firstn : forall A B (f : A -> B -> A) (d : B) (ls : list B) (init : A) n,
+      n < length ls
+      -> f (fold_left f (firstn n ls) init) (nth_default d ls n)
+         = fold_left f (firstn (S n) ls) init.
+  Proof.
+    induct ls; simplify.
+    linear_arithmetic.
+    cases n; simplify.
+    unfold nth_default; simplify.
+    reflexivity.
+    rewrite <- IHls by linear_arithmetic.
+    unfold nth_default; simplify.
+    reflexivity.
+  Qed.
+
+  Hint Rewrite firstn_nochange fold_left_firstn using linear_arithmetic.
+
+  Theorem heapfold_ok : forall {A : Set} (init : A) combine
+                               (ls : list nat) (f : A -> nat -> A),
+    (forall P v acc,
+      {{h ~> P h}}
+        combine acc v
+      {{r&h ~> r = f acc v /\ P h}})
+    -> {{h ~> forall i, i < length ls -> h $! i = nth_default 0 ls i}}
+         heapfold init combine (length ls)
+       {{r&h ~> (forall i, i < length ls -> h $! i = nth_default 0 ls i)
+           /\ r = fold_left f ls init}}.
+  Proof.
+    unfold heapfold.
+    simplify.
+    econstructor.
+    eapply HtWeaken.
+    apply HtLoop with (I := fun r h => (forall i, i < length ls -> h $! i = nth_default 0 ls i)
+                                       /\ match r with
+                                          | Done (_, acc) => acc = fold_left f ls init
+                                          | Again (i, acc) => acc = fold_left f (firstn i ls) init
+                                          end).
+    simplify.
+    cases acc; simplify.
+    cases (length ls <=? n); simplify.
+
+    eapply HtStrengthen.
+    econstructor.
+    simplify.
+    propositional; subst.
+    reflexivity.
+
+    econstructor.
+    econstructor.
+    simplify.
+    econstructor.
+    eapply HtWeaken.
+    apply H with (P := fun h => (forall i, i < Datatypes.length ls -> h $! i = nth_default 0 ls i)
+                                /\ a = fold_left f (firstn n ls) init
+                                /\ r = h $! n).
+    simplify; propositional; subst; auto.
+    simplify.
+    eapply HtStrengthen.
+    econstructor.
+    simplify; propositional; subst.
+    rewrite H1 by assumption.
+    simplify.
+    reflexivity.
+
+    simplify; propositional.
+
+    simplify.
+    eapply HtStrengthen.
+    econstructor.
+    simplify.
+    propositional; subst.
+    cases r; simplify.
+    assumption.
+  Qed.
+
+  Definition array_max (len : nat) : cmd nat :=
+    heapfold 0 (fun n m => Return (max n m)) len.
+
+  Lemma le_max' : forall v ls acc,
+      v <= acc
+      -> v <= fold_left max ls acc.
+  Proof.
+    induct ls; simplify; auto.
+  Qed.
+
+  Lemma le_max : forall ls i acc,
+      i < Datatypes.length ls
+      -> nth_default 0 ls i <= fold_left max ls acc.
+  Proof.
+    induct ls; simplify.
+
+    linear_arithmetic.
+
+    cases i; simplify.
+    unfold nth_default; simplify.
+    apply le_max'; linear_arithmetic.
+    unfold nth_default; simplify.
+    apply IHls; linear_arithmetic.
+  Qed.
+
+  Hint Resolve le_max.
+
+  Theorem array_max_ok : forall ls : list nat,
+    {{ h ~> forall i, i < length ls -> h $! i = nth_default 0 ls i}}
+      array_max (length ls)
+    {{ r&h ~> forall i, i < length ls -> h $! i <= r }}.
+  Proof.
+    simplify.
+    eapply HtConsequence.
+    apply heapfold_ok with (f := max).
+    simplify.
+    eapply HtStrengthen.
+    econstructor.
+    simplify; propositional.
+    simplify; auto.
+    simplify.
+    subst.
+    propositional; subst.
+    rewrite H1 by assumption.
+    auto.
+  Qed.
 End DeeperWithFail.

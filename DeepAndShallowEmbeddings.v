@@ -7,7 +7,7 @@ Require Import Frap.
 
 Set Implicit Arguments.
 
-(** * Shared notations and definitions *)
+(** * Shared notations and definitions; main material starts afterward. *)
 
 Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 Definition heap := fmap nat nat.
@@ -24,6 +24,116 @@ Ltac simp := repeat (simplify; subst; propositional;
                     try match goal with
                         | [ H : ex _ |- _ ] => invert H
                         end); try linear_arithmetic.
+
+
+(** * Basic concepts of shallow, deep, and mixed embeddings *)
+
+Module SimpleShallow.
+  Definition foo (x y : nat) : nat :=
+    let u := x + y in
+    let v := u * y in
+    u + v.
+End SimpleShallow.
+
+Module SimpleDeep.
+  Inductive exp :=
+  | Var (x : var)
+  | Plus (e1 e2 : exp)
+  | Times (e1 e2 : exp)
+  | Let (x : var) (e1 e2 : exp).
+
+  Definition foo : exp :=
+    Let "u" (Plus (Var "x") (Var "y"))
+        (Let "v" (Times (Var "u") (Var "y"))
+             (Plus (Var "u") (Var "v"))).
+
+  Fixpoint interp (e : exp) (v : fmap var nat) : nat :=
+    match e with
+    | Var x => v $! x
+    | Plus e1 e2 => interp e1 v + interp e2 v
+    | Times e1 e2 => interp e1 v * interp e2 v
+    | Let x e1 e2 => interp e2 (v $+ (x, interp e1 v))
+    end.
+End SimpleDeep.
+
+Theorem shallow_to_deep : forall x y,
+    SimpleShallow.foo x y = SimpleDeep.interp SimpleDeep.foo ($0 $+ ("x", x) $+ ("y", y)).
+Proof.
+  unfold SimpleShallow.foo.
+  simplify.
+  reflexivity.
+Qed.
+
+Module SimpleMixed.
+  Inductive exp :=
+  | Const (n : nat)
+  | Plus (e1 e2 : exp)
+  | Times (e1 e2 : exp)
+  | Let (e1 : exp) (e2 : nat -> exp).
+
+  Definition foo (x y : nat) : exp :=
+    Let (Plus (Const x) (Const y))
+        (fun u => Let (Times (Const u) (Const y))
+                      (fun v => Plus (Const u) (Const v))).
+
+  Fixpoint interp (e : exp) : nat :=
+    match e with
+    | Const n => n
+    | Plus e1 e2 => interp e1 + interp e2
+    | Times e1 e2 => interp e1 * interp e2
+    | Let e1 e2 => interp (e2 (interp e1))
+    end.
+
+  Fixpoint reduce (e : exp) : exp :=
+    match e with
+    | Const n => Const n
+    | Plus e1 e2 =>
+      let e1' := reduce e1 in
+      let e2' := reduce e2 in
+      match e1' with
+      | Const 0 => e2'
+      | _ => match e2' with
+             | Const 0 => e1'
+             | _ => Plus e1' e2'
+             end
+      end
+    | Times e1 e2 =>
+      let e1' := reduce e1 in
+      let e2' := reduce e2 in
+      match e1' with
+      | Const 1 => e2'
+      | _ => match e2' with
+             | Const 1 => e1'
+             | _ => Times e1' e2'
+             end
+      end
+    | Let e1 e2 =>
+      let e1' := reduce e1 in
+      match e1' with
+      | Const n => reduce (e2 n)
+      | _ => Let e1' (fun n => reduce (e2 n))
+      end
+    end.
+
+  Compute (fun x => reduce (Let (Plus (Const 0) (Const 1)) (fun n => Times (Const n) (Const x)))).
+
+  Theorem reduce_ok : forall e, interp (reduce e) = interp e.
+  Proof.
+    induct e; simplify;
+    repeat match goal with
+           | [ H : _ = interp _ |- _ ] => rewrite <- H
+           | [ |- context[match ?E with _ => _ end] ] => cases E; simplify; subst; try linear_arithmetic
+    end; eauto.
+  Qed.
+End SimpleMixed.
+
+Theorem shallow_to_mixed : forall x y,
+    SimpleShallow.foo x y = SimpleMixed.interp (SimpleMixed.foo x y).
+Proof.
+  unfold SimpleShallow.foo.
+  simplify.
+  reflexivity.
+Qed.
 
 
 (** * Shallow embedding of a language very similar to the one we used last chapter *)

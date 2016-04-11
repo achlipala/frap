@@ -2930,6 +2930,7 @@ Often it is convenient to do reasoning without any particular object language, a
 However, it is difficult to prove some important facts about terms encoded directly in the metalanguage.
 For instance, we can't easily do induction over the syntax of all such terms.
 To allow that kind of induction, we can define an object language inductively.
+\encoding
 \begin{eqnarray*}
   \mt{Const} &:& \mathbb N \to \mt{exp} \\
   \mt{Var} &:& \mathbb V \to \mt{exp} \\
@@ -2954,6 +2955,7 @@ Conversely, $\mt{foo'}$ uses a \emph{deep embedding}\index{deep embedding}, sinc
 These extremes are not our only options.
 In higher-order logics like Coq's, we may also choose what might be called \emph{mixed embeddings}\index{mixed embedding}, which define syntax-tree types that allow some use of general functions from the metalanguage.
 Here's an example, as an alternative definition of $\mt{exp}$.
+\encoding
 \begin{eqnarray*}
   \mt{Const} &:& \mathbb N \to \mt{exp} \\
   \mt{Var} &:& \mathbb V \to \mt{exp} \\
@@ -2965,7 +2967,7 @@ Here's an example, as an alternative definition of $\mt{exp}$.
 The one change is in the type of the $\mt{Let}$ constructor, where now no variable name is given, and instead \emph{the body of the ``let'' is represented as a Gallina function from numbers to expressions}.
 The intent is that the body is called on the number that results from evaluating the first expression.
 This style is called \emph{higher-order abstract syntax}\index{higher-order abstract syntax}.
-Though that term is often applied to a more specific instance of the technique, which is not exactly the one applied here, we will not be so picky.
+Though that term is often applied to a more specific instance of the technique, which is not exactly the one used here, we will not be so picky.
 
 As an illustration of the technique in action, here's our third encoding of the simple example program.
 \begin{eqnarray*}
@@ -2999,6 +3001,7 @@ That is, the theorem holds on all results of applying body $e_2$ to arguments.
 
 This general strategy also applies to modeling imperative languages like the one from last chapter.
 We can define a polymorphic type family $\mt{cmd}$ of commands, indexed by the type of value that a command is meant to return.
+\encoding
 \begin{eqnarray*}
   \mt{Return} &:& \forall \alpha. \; \alpha \to \mt{cmd} \; \alpha \\
   \mt{Bind} &:& \forall \alpha, \beta. \; \mt{cmd} \; \beta \to (\beta \to \mt{cmd} \; \alpha) \to \mt{cmd} \; \alpha \\
@@ -3036,7 +3039,7 @@ We can also define a syntactic Hoare-logic relation for this type, where precond
 $$\infer{\hoare{P}{\mt{Return} \; v}{\lambda r, h. \; P(h) \land r = v}}{}
 \quad \infer{\hoare{P}{\mt{Bind} \; c_1 \; c_2}{R}}{
   \hoare{P}{c_1}{Q}
-  & \forall r. \; \hoare{Q(r)}{c_1(r)}{R}
+  & \forall r. \; \hoare{Q(r)}{c_2(r)}{R}
 }$$
 $$\infer{\hoare{P}{\mt{Read} \; a}{\lambda r, h. \; P(h) \land r = \msel{h}{a}}}{}
 \quad \infer{\hoare{P}{\mt{Write} \; a \; v}{\lambda r, h. \; \exists h'. \; P(h') \land h = \mupd{h'}{a}{v}}}{}$$
@@ -3057,6 +3060,68 @@ We also have a standard soundness theorem.
 \end{theorem}
 
 
+\section{Adding More Effects}
+
+We can continue to enhance our object language with different kinds of side effects that are not supported natively by Gallina.
+First, we add \emph{nontermination}, in the form of unbounded loops.
+For a type $\alpha$, we define $\mathbb O(\alpha)$ as the type of \emph{loop-body outcomes}, either $\mt{Done}(a)$ to indicate that the loop should terminate or $\mt{Again}(a)$ to indicate that the loop should keep running.
+Our loops are functional, maintaining accumulators as they run, and the $a$ argument gives the latest accumulator value in each case.
+So we add this constructor:
+\begin{eqnarray*}
+  \mt{Loop} &:& \forall \alpha. \; \alpha \to (\alpha \to \mt{cmd} \; (\mathbb O(\alpha))) \to \mt{cmd} \; \alpha
+\end{eqnarray*}
+
+Here's an example of looping in action, in a program that returns the address of the first occurrence of a value in memory, or loops forever if that value is not found in the whole infinite memory.
+\begin{eqnarray*}
+  \mt{index\_of}(n) &=& \mt{Loop} \; 0 \; (\lambda i. \; v \leftarrow \mt{Read} \; i; \mt{if} \; v = n \; \mt{then} \; \mt{Return} \; (\mt{Done}(i)) \; \mt{else} \; \mt{Return} \; (\mt{Again}(i+1)))
+\end{eqnarray*}
+
+With the addition of nontermination, it's no longer straightforward to write an interpreter for the language.
+Instead, we implement a small-step operational semantics $\to$; see the accompanying Coq code for details.
+We build an extended Hoare logic, keeping all the rules from last section and adding this new one.
+\invariants
+Like before, it is parameterized on a loop invariant, but now the loop invariant takes a loop-body outcome as parameter.
+$$\infer{\hoare{I(\mt{Again}(i))}{\mt{Loop} \; i \; c}{\lambda r. \; I(\mt{Done}(r)))}}{
+  \forall a. \; \hoare{I(\mt{Again}(a))}{c(a)}{I}
+}$$
+
+This new Hoare logic is usable to verify the example program from above and many more, and we can also prove a soundness theorem.
+The operational semantics gives us the standard way of interpreting our programs as transition systems, with states $(c, h)$.
+
+\invariants
+\begin{theorem}
+  If $\hoare{P}{c}{Q}$ and $P(h)$ for some heap $h$, then it is an invariant of $(c, h)$ that, if the command ever becomes $\mt{Return} \; r$ in a heap $h'$, then $Q(r, h')$.  That is, if the program terminates, the postcondition is satisfied.
+\end{theorem}
+
+We can add a further side effect to the language: \emph{exceptions}\index{exceptions}.
+Actually, we stick to a simple variant of this classic side effect, where there is just one exception, and it cannot be caught.
+We associate this exception with \emph{program failure}, and the Hoare logic will ensure that programs never actually fail.
+
+The extension to program syntax is easy:
+\begin{eqnarray*}
+  \mt{Loop} &:& \forall \alpha. \; \mt{cmd} \; \alpha
+\end{eqnarray*}
+That is, a failing program can be considered to return any result type, since it will never actually return normally, instead throwing an uncatchable exception.
+
+The operational semantics is also easily extended to signal failures, with a new special system state called $\mt{Failed}$.
+We also add this Hoare-logic rule.
+$$\infer{\hoare{\lambda \_. \; \bot}{\mt{Fail}}{\lambda \_, \_. \; \bot}}{}$$
+That is, failure can only be verified against an unsatisfiable precondition, so that we know that the failure is unreachable.
+
+With this extension, we can prove a soundness-theorem variant, capturing the impossibility of failure.
+
+\invariants
+\begin{theorem}
+  If $\hoare{P}{c}{Q}$ and $P(h)$ for some heap $h$, then it is an invariant of $(c, h)$ that the state never becomes $\mt{Failed}$.
+\end{theorem}
+
+Note that this version of the theorem still tells us interesting things about programs that run forever.
+It is easy to implement runtime assertion checking with code that performs some test and runs $\mt{Fail}$ if the test does not pass.
+An infinite-looping program may perform such tests infinitely often, and we learn that none of the tests ever fail.
+
+The accompanying Coq code demonstrates another advantage of this mixed-embedding style: we can extract\index{extraction} our programs to OCaml\index{OCaml} and run them efficiently.
+That is, rather than using functional programming to implement our three kinds of side effects, we implement them directly with OCaml's mutable heap, unbounded recursion, and exceptions, respectively.
+As a result, our extracted programs achieve the asymptotic performance that we would expect, thinking of them as C-like code, where interpreters in a pure functional language like Gallina would necessarily add at least an extra logarithmic factor in the modeling of unboundedly growing heaps.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

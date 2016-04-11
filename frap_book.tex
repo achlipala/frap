@@ -16,9 +16,6 @@
 \numberwithin{section}{chapter}
 \numberwithin{equation}{chapter}
 
-%    For a single index; for multiple indexes, see the manual
-%    "Instructions for preparation of papers and monographs:
-%    AMS-LaTeX" (instr-l.pdf in the AMS-LaTeX distribution).
 \makeindex
 
 \begin{document}
@@ -27,9 +24,6 @@
 
 \title{Formal Reasoning About Programs}
 
-%    Remove any unused author tags.
-
-%    author one information
 \author{Adam Chlipala}
 \address{MIT, Cambridge, MA, USA}
 \email{adamc@csail.mit.edu}
@@ -451,6 +445,7 @@ Here, unification found the assignment $e = \mathsf{Var}(x)$.
 \medskip
 
 \encoding
+\label{metalanguage}
 We close the chapter with an important note on terminology.
 A formula like $P(\size{\mathsf{Plus}(\mathsf{Var}(x), \mathsf{Const}(7))})$ combines several levels of notation.
 We consider that we are doing our mathematical reasoning in some \emph{metalanguage}\index{metalanguage}, which is often applicable to a wide variety of proof tasks.
@@ -465,7 +460,7 @@ The quoted remark could just as well be in Spanish instead of English, in which 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Semantics via Interpreters}
+\chapter{\label{interpreters}Semantics via Interpreters}
 
 That's enough about what programs \emph{look like}.
 Let's shift our attention to what programs \emph{mean}.
@@ -2905,6 +2900,102 @@ In fact, we can prove that any other state is unstuck, though we won't bother he
   Next, we apply invariant induction, whose base case follows trivially.
   The induction step follows by Lemma \ref{hoare_preservation}.
 \end{proof}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Deep Embeddings, Shallow Embeddings, and Options in Between}
+
+So far, in this book, we have followed the typographic conventions of ordinary mathematics and logic, as they would be worked out on whiteboards.
+In parallel, we have mechanized all of the definitions and proofs in Coq.
+Often little tidbits of encoding challenge show up in mechanizing the proofs.
+As formal languages get more complex, it becomes more and more important to choose the right encoding.
+For instance, in the previous chapter, we repeatedly jumped through hoops to track the local variables of programs, threading variable valuations $v$ throughout everything.
+Coq already has built into it a respectable notion of variables; can we somehow reuse that mechanism, rather than roll our own new one?
+This chapter gives a ``yes'' answer, working toward redefining last chapter's Hoare logic in a lighter-weight manner, along the way introducing some key terminology that is used to classify encoding choices.
+
+Since whiteboard math doesn't usually bother with encoding details, here we must break with our convention of using only standard notation in the book.
+Instead, we will use notation closer to literal Coq code, and, in fact, more of the technical action than usual is only found in the accompanying Coq source file.
+
+\section{The Basics}
+
+Recall some terminology introduced in Section \ref{metalanguage}: every formal proof is carried out in some \emph{metalanguage}\index{metalanguage}, which, in our case, is Coq's logic and programming language called Gallina\index{Gallina}.
+A syntactic language that we formalize is called an \emph{object language}\index{object language}.
+Often it is convenient to do reasoning without any particular object language, as in this simple arithmetic function that can be defined directly in Gallina.
+\newcommand{\mt}[1]{\mathsf{#1}}
+\begin{eqnarray*}
+  \mt{foo} &=& \lambda(x, y). \; \elet{u}{x + y}{\elet{v}{u \times y}{u + v}}
+\end{eqnarray*}
+
+However, it is difficult to prove some important facts about terms encoded directly in the metalanguage.
+For instance, we can't easily do induction over the syntax of all such terms.
+To allow that kind of induction, we can define an object language inductively.
+\begin{eqnarray*}
+  \mt{Const} &:& \mathbb N \to \mt{exp} \\
+  \mt{Var} &:& \mathbb V \to \mt{exp} \\
+  \mt{Plus} &:& \mt{exp} \to \mt{exp} \to \mt{exp} \\
+  \mt{Times} &:& \mt{exp} \to \mt{exp} \to \mt{exp} \\
+  \mt{Let} &:& \mathbb V \to \mt{exp} \to \mt{exp} \to \mt{exp}
+\end{eqnarray*}
+
+That last example program, with implicit \emph{free variables}\index{free variables} $x$ and $y$, may now be redefined in the $\mt{exp}$ type.
+\newcommand{\var}[1]{\mt{Var} \; \textrm{``#1''}}
+\begin{eqnarray*}
+  \mt{foo'} &=& \mt{Let} \; (\var{u}) \; (\mt{Plus} \; (\var{x}) \; (\var{y})) \; (\mt{Let} \; (\var{v}) \\
+  && \hspace{.1in} (\mt{Times} \; (\var{u}) \; (\var{y})) \; (\mt{Plus} \; (\var{u}) \; (\var{v})))
+\end{eqnarray*}
+
+As in Chapter \ref{interpreters}, we can define a recursive interpreter, mapping $\mt{exp}$ programs and variable valuations to numbers.
+Using that interpreter, we can prove equivalence of $\mt{foo}$ and $\mt{foo'}$.
+
+We say that $\mt{foo}$ uses a \emph{shallow embedding}\index{shallow embedding}, because it is coded directly in the metalanguage, with no extra layer of syntax.
+Conversely, $\mt{foo'}$ uses a \emph{deep embedding}\index{deep embedding}, since it goes via the inductively defined $\mt{exp}$ type.
+
+These extremes are not our only options.
+In higher-order logics like Coq's, we may also choose what might be called \emph{mixed embeddings}\index{mixed embedding}, which define syntax-tree types that allow some use of general functions from the metalanguage.
+Here's an example, as an alternative definition of $\mt{exp}$.
+\begin{eqnarray*}
+  \mt{Const} &:& \mathbb N \to \mt{exp} \\
+  \mt{Var} &:& \mathbb V \to \mt{exp} \\
+  \mt{Plus} &:& \mt{exp} \to \mt{exp} \to \mt{exp} \\
+  \mt{Times} &:& \mt{exp} \to \mt{exp} \to \mt{exp} \\
+  \mt{Let} &:& \mt{exp} \to (\mathbb N \to \mt{exp}) \to \mt{exp}
+\end{eqnarray*}
+
+The one change is in the type of the $\mt{Let}$ constructor, where now no variable name is given, and instead \emph{the body of the ``let'' is represented as a Gallina function from numbers to expressions}.
+The intent is that the body is called on the number that results from evaluating the first expression.
+This style is called \emph{higher-order abstract syntax}\index{higher-order abstract syntax}.
+Though that term is often applied to a more specific instance of the technique, which is not exactly the one applied here, we will not be so picky.
+
+As an illustration of the technique in action, here's our third encoding of the simple example program.
+\begin{eqnarray*}
+  \mt{foo''} &=& \mt{Let} \; (\mt{Plus} \; (\var{x}) \; (\var{y})) \; (\lambda u. \\
+  && \hspace{.1in} \mt{Let} \; (\mt{Times} \; (\mt{Const} \; u) \; (\var{y})) \; (\lambda v. \\
+  && \hspace{.2in} \mt{Plus} \; (\mt{Const} \; u) \; (\mt{Const} \; v)))
+\end{eqnarray*}
+
+With a bit of subtlety, we can define an interpreter for this language, too.
+\begin{eqnarray*}
+  \denote{\mt{Const} \; n}v &=& n \\
+  \denote{\mt{Var} \; x}v &=& \msel{v}{x} \\
+  \denote{\mt{Plus} \; e_1 \; e_2}v &=& \denote{e_1}v + \denote{e_2}v \\
+  \denote{\mt{Times} \; e_1 \; e_2}v &=& \denote{e_1}v \times \denote{e_2}v \\
+  \denote{\mt{Let} \; e_1 \; e_2}v &=& \denote{e_2(\denote{e_1}v)}v
+\end{eqnarray*}
+
+Note how, in the $\mt{Let}$ case, since the body $e_2$ is a function, before evaluating it, we call it on the result of evaluating $e_1$.
+This language would actually be sufficient even if we removed the $\mt{Var}$ constructor and the $v$ argument of the interpreter.
+Coq's normal variable binding is enough to let us model interesting programs and prove things about them by induction on syntax.
+
+It is important here that Coq's induction principles give us useful induction hypotheses, for constructors whose recursive arguments are functions.
+The second argument of $\mt{Let}$ above is an example.
+When we do induction on expression syntax to establish $\forall e. \; P(e)$, the case for $\mt{Let} \; e_1 \; e_2$ includes two induction hypotheses.
+The first one is standard: $P(e_1)$.
+The second one is more interesting: $\forall n : \mathbb N. \; P(e_2(n))$.
+That is, the theorem holds on all results of applying body $e_2$ to arguments.
+
+
+
 
 
 

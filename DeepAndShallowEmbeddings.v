@@ -6,6 +6,7 @@
 Require Import Frap.
 
 Set Implicit Arguments.
+Set Asymmetric Patterns.
 
 (** * Shared notations and definitions; main material starts afterward. *)
 
@@ -229,7 +230,7 @@ Module Shallow.
     induct i; unfold hoare_triple in *; simplify; propositional; auto.
 
     specialize (IHi (max (h $! i) acc) h); propositional.
-    cases (array_max i (max (h $! i) acc)); simplify; propositional; subst.
+    cases (array_max i (max (h $! i) acc) h); simplify; propositional; subst.
     apply IHi; auto.
     simplify.
     cases (j0 ==n i); subst; auto.
@@ -359,8 +360,8 @@ Module Deep.
 
   Fixpoint interp {result} (c : cmd result) (h : heap) : heap * result :=
     match c with
-    | Return r => (h, r)
-    | Bind c1 c2 =>
+    | Return _ r => (h, r)
+    | Bind _ _ c1 c2 =>
       let (h', r) := interp c1 h in
       interp (c2 r) h'
     | Read a => (h, h $! a)
@@ -551,15 +552,15 @@ Module Deeper.
 
   Fixpoint step {result} (c : cmd result) (h : heap) : stepResult result :=
     match c with
-    | Return r => Answer r
-    | Bind c1 c2 =>
+    | Return _ r => Answer r
+    | Bind _ _ c1 c2 =>
       match step c1 h with
       | Answer r => Stepped h (c2 r)
       | Stepped h' c1' => Stepped h' (Bind c1' c2)
       end
     | Read a => Answer (h $! a)
     | Write a v => Stepped (h $+ (a, v)) (Return tt)
-    | Loop init body =>
+    | Loop _ init body =>
       Stepped h (r <- body init;
                  match r with
                  | Done r' => Return r'
@@ -889,8 +890,8 @@ Module DeeperWithFail.
 
   Fixpoint step {result} (c : cmd result) (h : heap) : stepResult result :=
     match c with
-    | Return r => Answer r
-    | Bind c1 c2 =>
+    | Return _ r => Answer r
+    | Bind _ _ c1 c2 =>
       match step c1 h with
       | Answer r => Stepped h (c2 r)
       | Stepped h' c1' => Stepped h' (Bind c1' c2)
@@ -898,13 +899,13 @@ Module DeeperWithFail.
       end
     | Read a => Answer (h $! a)
     | Write a v => Stepped (h $+ (a, v)) (Return tt)
-    | Loop init body =>
+    | Loop _ init body =>
       Stepped h (r <- body init;
                  match r with
                  | Done r' => Return r'
                  | Again r' => Loop r' body
                  end)
-    | Fail => Failed
+    | Fail _ => Failed
     end.
 
   Fixpoint multiStep {result} (c : cmd result) (h : heap) (n : nat) : stepResult result :=
@@ -1236,10 +1237,7 @@ Module DeeperWithFail.
                             | Done (_, acc) => acc = fold_left f ls init
                             | Again (i, acc) => acc = fold_left f (firstn i ls) init
                             end).
-    cases (length ls <=? a); ht.
-    apply H.
-    simp; auto.
-    simp.
+    cases (length ls <=? a); ht; auto; simp; auto.
     rewrite H2 by assumption.
     simplify.
     reflexivity.

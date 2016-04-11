@@ -2995,6 +2995,66 @@ The second one is more interesting: $\forall n : \mathbb N. \; P(e_2(n))$.
 That is, the theorem holds on all results of applying body $e_2$ to arguments.
 
 
+\section{A Mixed Embedding for Hoare Logic}
+
+This general strategy also applies to modeling imperative languages like the one from last chapter.
+We can define a polymorphic type family $\mt{cmd}$ of commands, indexed by the type of value that a command is meant to return.
+\begin{eqnarray*}
+  \mt{Return} &:& \forall \alpha. \; \alpha \to \mt{cmd} \; \alpha \\
+  \mt{Bind} &:& \forall \alpha, \beta. \; \mt{cmd} \; \beta \to (\beta \to \mt{cmd} \; \alpha) \to \mt{cmd} \; \alpha \\
+  \mt{Read} &:& \mathbb N \to \mt{cmd} \; \mathbb N \\
+  \mt{Write} &:& \mathbb N \to \mathbb N \to \mt{cmd} \; \mt{unit}
+\end{eqnarray*}
+
+We use notation $x \leftarrow c_1; c_2$ as shorthand for $\mt{Bind} \; c_1 \; (\lambda x. \; c_2)$, making it possible to write some very natural-looking programs in this type.
+Here are two examples.
+\begin{eqnarray*}
+  \mt{array\_max}(0, a) &=& \mt{Return} \; a \\
+  \mt{array\_max}(i+1, a) &=& v \leftarrow \mt{Read} \; i; \mt{array\_max} \; i \; (\max(v, a)) \\
+  \\
+  \mt{increment\_all}(0) &=& \mt{Return} \; () \\
+  \mt{increment\_all}(i+1) &=& v \leftarrow \mt{Read} \; i; \_ \leftarrow \mt{Write} \; i \; (v+1); \mt{increment\_all} \; i
+\end{eqnarray*}
+
+Function $\mt{array\_max}$ computes the highest value found in the first $i$ slots of memory, using an accumulator $a$.
+Function $\mt{increment\_all}$ adds 1 to every one of the first $i$ memory slots.
+
+Note that we are not writing programs directly as syntax trees, but rather working with recursive functions that \emph{compute syntax trees}.
+We are able to do so despite the fact that we built no support for recursion into the $\mt{cmd}$ type family.
+Likewise, we didn't need to build in any support for $\max$, addition, or any of the other operations that are easy to code up in Gallina.
+
+It is straightforward to implement an interpreter for this object language, where each command's interpretation maps input heaps to pairs of output heaps and results.
+Note that we have no need for an explicit variable valuation.
+\begin{eqnarray*}
+  \denote{\mt{Return} \; v}h &=& (h, v) \\
+  \denote{\mt{Bind} \; c_1 \; c_2}h &=& \elet{(h', v)}{\denote{c_1}h}{\denote{c_2(v)}h'} \\
+  \denote{\mt{Read} \; a}h &=& (h, \msel{h}{a}) \\
+  \denote{\mt{Write} \; a \; v}h &=& (\mupd{h}{a}{v}, ())
+\end{eqnarray*}
+
+We can also define a syntactic Hoare-logic relation for this type, where preconditions are predicates over initial heaps, and postconditions are predicates over \emph{result values} and final heaps.
+$$\infer{\hoare{P}{\mt{Return} \; v}{\lambda r, h. \; P(h) \land r = v}}{}
+\quad \infer{\hoare{P}{\mt{Bind} \; c_1 \; c_2}{R}}{
+  \hoare{P}{c_1}{Q}
+  & \forall r. \; \hoare{Q(r)}{c_1(r)}{R}
+}$$
+$$\infer{\hoare{P}{\mt{Read} \; a}{\lambda r, h. \; P(h) \land r = \msel{h}{a}}}{}
+\quad \infer{\hoare{P}{\mt{Write} \; a \; v}{\lambda r, h. \; \exists h'. \; P(h') \land h = \mupd{h'}{a}{v}}}{}$$
+$$\infer{\hoare{P'}{c}{Q'}}{
+  \hoare{P}{c}{Q}
+  & (\forall h. \; P'(h) \Rightarrow P(h))
+  & (\forall r, h. \; Q(r, h) \Rightarrow Q'(r, h))
+}$$
+
+Much of the details are the same as last chapter, including in a rule of consequence at the end.
+The most interesting new wrinkle is in the rule for $\mt{Bind}$, where the premise about the body command $c_2$ starts with universal quantification over all possible results $r$ of executing $c_1$.
+That result is passed off, via function application, both to the body $c_2$ and to $Q$, which serves as the postcondition of $c_1$ and the precondition of $c_2$.
+
+This Hoare logic can be used to verify the two example programs from earlier in this section; see the accompanying Coq code for details.
+We also have a standard soundness theorem.
+\begin{theorem}
+  If $\hoare{P}{c}{Q}$ and $P(h)$ for some heap $h$, then let $(h', r) = \denote{c}h$.  It follows that $Q(r, h')$.
+\end{theorem}
 
 
 

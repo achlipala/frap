@@ -175,6 +175,101 @@ Module Type S.
   Axiom lookup_None_dom : forall K V (m : fmap K V) k,
       m $? k = None
       -> ~ k \in dom m.
+
+  (* Bits meant for separation logic *)
+  Section splitting.
+    Variables K V : Type.
+
+    Definition disjoint (h1 h2 : fmap K V) : Prop :=
+      forall a, h1 $? a <> None
+                -> h2 $? a <> None
+                -> False.
+
+    Definition split (h h1 h2 : fmap K V) : Prop :=
+      h = h1 $++ h2.
+
+    Axiom split_empty_fwd : forall h h1,
+        split h h1 $0
+        -> h = h1.
+
+    Axiom split_empty_fwd' : forall h h1,
+      split h $0 h1
+      -> h = h1.
+
+    Axiom split_empty_bwd : forall h,
+      split h h $0.
+
+    Axiom split_empty_bwd' : forall h,
+      split h $0 h.
+
+    Axiom disjoint_hemp : forall h,
+      disjoint h $0.
+
+    Axiom disjoint_hemp' : forall h,
+      disjoint $0 h.
+
+    Axiom disjoint_comm : forall h1 h2,
+      disjoint h1 h2
+      -> disjoint h2 h1.
+
+    Axiom split_comm : forall h h1 h2,
+      disjoint h1 h2
+      -> split h h1 h2
+      -> split h h2 h1.
+
+    Axiom split_assoc1 : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> split h (join h1 h2) h3.
+
+    Axiom split_assoc2' : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> split h h2 (join h3 h1).
+
+    Axiom split_assoc2 : forall h h1 h' h2 h3,
+      split h h' h1
+      -> split h' h2 h3
+      -> disjoint h' h1
+      -> disjoint h2 h3
+      -> split h h2 (join h3 h1).
+
+    Axiom disjoint_assoc1 : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> disjoint (join h1 h2) h3.
+
+    Axiom disjoint_assoc2 : forall h h1 h' h2 h3,
+      split h h' h1
+      -> split h' h2 h3
+      -> disjoint h' h1
+      -> disjoint h2 h3
+      -> disjoint h2 (join h3 h1).
+
+    Axiom split_join : forall h1 h2,
+      split (join h1 h2) h1 h2.
+
+    Axiom split_disjoint : forall h h1 h2 h' h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> disjoint h1 h2.
+
+    Axiom disjoint_assoc3 : forall h h1 h2 h3,
+      disjoint h h2
+      -> split h h1 h3
+      -> disjoint h1 h3
+      -> disjoint h3 h2.
+  End splitting.
+
+  Hint Immediate disjoint_comm split_comm.
+  Hint Immediate split_empty_bwd disjoint_hemp disjoint_hemp' split_assoc1 split_assoc2.
+  Hint Immediate disjoint_assoc1 disjoint_assoc2 split_join split_disjoint disjoint_assoc3.
 End S.
 
 Module M : S.
@@ -479,6 +574,168 @@ Module M : S.
   Proof.
     unfold lookup, dom, In; congruence.
   Qed.
+
+  Section splitting.
+    Variables K V : Type.
+
+    Notation "$0" := (@empty K V).
+    Notation "m $+ ( k , v )" := (add m k v) (at level 50, left associativity).
+    Infix "$-" := remove (at level 50, left associativity).
+    Infix "$++" := join (at level 50, left associativity).
+    Infix "$?" := lookup (at level 50, no associativity).
+    Infix "$<=" := includes (at level 90).
+
+    Definition disjoint (h1 h2 : fmap K V) : Prop :=
+      forall a, h1 $? a <> None
+                -> h2 $? a <> None
+                -> False.
+
+    Definition split (h h1 h2 : fmap K V) : Prop :=
+      h = h1 $++ h2.
+
+    Hint Extern 2 (_ <> _) => congruence.
+
+    Ltac splt := unfold disjoint, split, join, lookup in *; intros; subst;
+                 try match goal with
+                     | [ |- @eq (fmap K V) _ _ ] => let a := fresh "a" in extensionality a; simpl
+                     end;
+                 repeat match goal with
+                        | [ a : K, H : forall a : K, _ |- _ ] => specialize (H a)
+                        end;
+                 repeat match goal with
+                        | [ H : _ |- _ ] => rewrite H
+                        | [ |- context[match ?E with Some _ => _ | None => _ end] ] => destruct E
+                        | [ _ : context[match ?E with Some _ => _ | None => _ end] |- _  ] => destruct E
+                        end; eauto; try solve [ exfalso; eauto ].
+
+    Lemma split_empty_fwd : forall h h1,
+        split h h1 $0
+        -> h = h1.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_empty_fwd' : forall h h1,
+      split h $0 h1
+      -> h = h1.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_empty_bwd : forall h,
+      split h h $0.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_empty_bwd' : forall h,
+      split h $0 h.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma disjoint_hemp : forall h,
+      disjoint h $0.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma disjoint_hemp' : forall h,
+      disjoint $0 h.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma disjoint_comm : forall h1 h2,
+      disjoint h1 h2
+      -> disjoint h2 h1.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_comm : forall h h1 h2,
+      disjoint h1 h2
+      -> split h h1 h2
+      -> split h h2 h1.
+    Proof.
+      splt.
+    Qed.
+
+    Hint Immediate disjoint_comm split_comm.
+
+    Lemma split_assoc1 : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> split h (join h1 h2) h3.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_assoc2' : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> split h h2 (join h3 h1).
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_assoc2 : forall h h1 h' h2 h3,
+      split h h' h1
+      -> split h' h2 h3
+      -> disjoint h' h1
+      -> disjoint h2 h3
+      -> split h h2 (join h3 h1).
+    Proof.
+      intros; eapply split_assoc2'; eauto.
+    Qed.
+
+    Lemma disjoint_assoc1 : forall h h1 h' h2 h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> disjoint (join h1 h2) h3.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma disjoint_assoc2 : forall h h1 h' h2 h3,
+      split h h' h1
+      -> split h' h2 h3
+      -> disjoint h' h1
+      -> disjoint h2 h3
+      -> disjoint h2 (join h3 h1).
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_join : forall h1 h2,
+      split (join h1 h2) h1 h2.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma split_disjoint : forall h h1 h2 h' h3,
+      split h h1 h'
+      -> split h' h2 h3
+      -> disjoint h1 h'
+      -> disjoint h2 h3
+      -> disjoint h1 h2.
+    Proof.
+      splt.
+    Qed.
+
+    Lemma disjoint_assoc3 : forall h h1 h2 h3,
+      disjoint h h2
+      -> split h h1 h3
+      -> disjoint h1 h3
+      -> disjoint h3 h2.
+    Proof.
+      splt.
+    Qed.
+  End splitting.
 End M.
 
 Export M.

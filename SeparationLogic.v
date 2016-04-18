@@ -56,7 +56,7 @@ Fixpoint initialize (h : heap) (base numWords : nat) : heap :=
 Fixpoint deallocate (h : heap) (base numWords : nat) : heap :=
   match numWords with
   | O => h
-  | S numWords' => deallocate (h $- (base + numWords')) base numWords'
+  | S numWords' => deallocate (h $- base) (base+1) numWords'
   end.
 
 (* Let's do the semantics a bit differently this time, falling back on classic
@@ -381,10 +381,27 @@ Module Sep(Import S : SEP).
     intros; apply star_cancel; auto using himp_refl.
   Qed.
 
+  Theorem star_cancel'' : forall p q, lift True ===> q
+    -> p ===> p * q.
+  Proof.
+    intros.
+    eapply himp_trans.
+    rewrite extra_lift with (P := True); auto.
+    instantiate (1 := p * q).
+    rewrite star_comm.
+    apply star_cancel; auto.
+    reflexivity.
+    reflexivity.
+  Qed.
+
   Ltac cancel1 :=
     match goal with
-      | _ => apply himp_refl
-      | _ => apply star_cancel'
+      | [ |- _ ===> ?Q ] =>
+        match Q with
+        | _ => is_evar Q; fail 1
+        | ?Q _ => is_evar Q; fail 1
+        | _ => apply himp_refl
+        end
       | [ |- ?p ===> ?q ] =>
         forAllAtoms p ltac:(fun p0 =>
           sendToBack p0;
@@ -472,6 +489,11 @@ Module Sep(Import S : SEP).
                  repeat match goal with
                         | [ H : True |- _ ] => clear H
                         end;
+                 try match goal with
+                     | [ |- _ ===> ?p * ?q ] =>
+                       ((is_evar p; fail 1) || apply star_cancel'')
+                       || ((is_evar q; fail 1) || (rewrite (star_comm p q); apply star_cancel''))
+                     end;
                  try match goal with
                      | [ |- ?P ===> _ ] => sendToBack P;
                        match goal with
@@ -684,6 +706,14 @@ Fixpoint zeroes (n : nat) : list nat :=
   | S n' => zeroes n' ++ 0 :: nil
   end.
 
+Fixpoint allocated (a n : nat) : hprop :=
+  match n with
+  | O => emp
+  | S n' => (exists v, a |-> v) * allocated (a+1) n'
+  end%sep.
+
+Infix "|->?" := allocated (at level 30) : sep_scope.
+
 
 (** * Finally, the Hoare logic *)
 
@@ -708,7 +738,7 @@ Inductive hoare_triple : forall {result}, assertion -> cmd result -> (result -> 
 | HtAlloc : forall numWords,
     hoare_triple emp%sep (Alloc numWords) (fun r => r |--> zeroes numWords)%sep
 | HtFree : forall a numWords,
-    hoare_triple (exists vs, a |--> vs * [| length vs = numWords |])%sep (Free a numWords) (fun _ => emp)%sep
+    hoare_triple (a |->? numWords)%sep (Free a numWords) (fun _ => emp)%sep
 
 | HtConsequence : forall {result} (c : cmd result) P Q (P' : assertion) (Q' : _ -> assertion),
     hoare_triple P c Q
@@ -874,6 +904,8 @@ Proof.
   cancel.
 
   cancel.
+  rewrite <- H2.
+  cancel.
 Qed.
 
 Lemma invert_Alloc : forall numWords P Q,
@@ -973,7 +1005,7 @@ Qed.
 
 Lemma invert_Free : forall a numWords P Q,
   hoare_triple P (Free a numWords) Q
-  -> P ===> (exists vs, a |--> vs * [| length vs = numWords |]) * Q tt.
+  -> P ===> a |->? numWords * Q tt.
 Proof.
   induct 1; simp; eauto.
 
@@ -991,51 +1023,6 @@ Proof.
 
   rewrite IHhoare_triple.
   cancel; auto.
-Qed.
-
-Lemma grab_last' : forall n2 n1 a,
-    (exists vs, a |--> vs * [|length vs = n1 + n2|])
-     ===> (exists vs, a |--> vs * [| length vs = n1 |])
-    * (exists vs, (a + n1) |--> vs * [| length vs = n2 |]).
-Proof.
-  induct n1; simp.
-
-  cancel.
-  instantiate (1 := nil); simp.
-  replace (a + 0) with a by linear_arithmetic.
-  cancel; auto.
-
-  apply himp_trans with ((exists v, a |-> v)
-                         * (exists vs : list nat,
-                               (a+1) |--> vs * [|length vs = n1 + n2|]))%sep.
-  cancel.
-  instantiate (1 := tl x).
-  cases x; simp.
-  instantiate (1 := hd 0 x).
-  cases x; simp.
-  cancel.
-
-  rewrite IHn1.
-  clear IHn1.
-  replace (a + S n1) with (a + 1 + n1) by linear_arithmetic.
-  cancel.
-  instantiate (1 := x1 :: x0); simp.
-  cancel.
-Qed.  
-
-Lemma grab_last : forall n a,
-    (exists vs, a |--> vs * [|length vs = S n|])
-    ===> (exists vs, a |--> vs * [|length vs = n|])
-    * (exists v, (a + n) |-> v).
-Proof.
-  simplify.
-  replace (S n) with (n + 1) by linear_arithmetic.
-  rewrite grab_last'.
-  cancel; auto.
-  instantiate (1 := hd 0 x).
-  cases x; simp.
-  cases x; simp.
-  cancel.
 Qed.
 
 (* Temporarily transparent again! *)
@@ -1059,35 +1046,26 @@ Proof.
   simp.
 Qed.
 
-Lemma do_deallocate : forall Q a numWords h,
-    ((exists vs, a |--> vs * [|length vs = numWords|]) * Q)%sep h
+Lemma do_deallocate : forall Q numWords a h,
+    (a |->? numWords * Q)%sep h
     -> Q (deallocate h a numWords).
 Proof.
   induct numWords; simp.
 
   unfold star, exis, lift in H; simp.
-  cases x1; simp.
-  unfold emp in *; simp.
-  replace h with x0.
-  equality.
-  apply split_empty_fwd in H1; simp.
-  apply split_empty_fwd' in H0; equality.
+  apply split_empty_fwd' in H0; simp.
 
   apply IHnumWords.
   clear IHnumWords.
-  Opaque heq himp lift star exis ptsto.
-  assert ((exists vs : list nat,
-              a |--> vs * [|Datatypes.length vs = S numWords|]) * Q
-          ===> (exists vs, a |--> vs * [|length vs = numWords|])
-          * (exists v, (a + numWords) |-> v) * Q) by (rewrite grab_last; cancel; auto).
-  apply H0 in H; clear H0.
-  assert ((exists vs, a |--> vs * [|length vs = numWords|])
-          * (exists v : nat, (a + numWords) |-> v) * Q
-          ===> (exists v : nat, (a + numWords) |-> v) *
-          ((exists vs, a |--> vs * [|length vs = numWords|]) * Q)) by (cancel; auto).
-  apply H0 in H; clear H0.
+  
   apply do_deallocate'.
-  assumption.
+  Opaque heq himp lift star exis ptsto.
+  match goal with
+  | [ H : ?P h |- ?Q h ] => assert (P ===> Q) by cancel
+  end.
+  Transparent himp.
+  apply H0; auto.
+  Opaque himp.
 Qed.
 
 Lemma HtReturn' : forall P {result : Set} (v : result) Q,
@@ -1183,7 +1161,7 @@ Proof.
   assumption.
 
   apply invert_Free in H.
-  assert (((exists vs : list nat, a |--> vs * [|Datatypes.length vs = numWords|]) * Q tt)%sep h) by auto.
+  assert ((a |->? numWords * Q tt)%sep h) by auto.
   apply HtReturn'.
   unfold himp; simp.
   eapply do_deallocate.
@@ -1196,7 +1174,7 @@ Lemma deallocate_None : forall a' numWords h a,
 Proof.
   induct numWords; simp.
   rewrite IHnumWords; simp.
-  cases (a + numWords ==n a'); simp.
+  cases (a ==n a'); simp.
 Qed.
 
 Lemma preservation_finite : forall {result} (c : cmd result) h c' h' bound,
@@ -1400,10 +1378,11 @@ Proof.
   assumption.
 Qed.
 
-Ltac basic := apply HtReturn' || eapply HtRead' || eapply HtWrite || eapply HtAlloc
-              || (eapply HtRead''; solve [ cancel ]).
+Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree.
 
 Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
+              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
+              || (eapply HtRead''; solve [ cancel ])
               || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
               || (eapply HtConsequence; [ apply HtFail | .. ]).
 Ltac step := step0; simp.
@@ -1500,6 +1479,19 @@ Proof.
 Qed.
 
 Opaque init.
+
+Theorem the_circle_of_life_ok :
+  {{emp}}
+    p <- init;
+    Free p 2
+  {{_ ~> emp}}.
+Proof.
+  step.
+  use init_ok.
+  simp.
+  step.
+  cancel.
+Qed.
 
 Theorem ultra_combo_ok :
   {{emp}}

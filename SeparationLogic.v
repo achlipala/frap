@@ -207,6 +207,45 @@ Module Sep(Import S : SEP).
     apply himp_heq in H0; intuition eauto.
   Qed.
 
+  Instance exis_imp_morphism (A : Type) :
+    Proper (pointwise_relation A himp ==> himp) (@exis A).
+  Proof.
+    hnf; intros.
+    apply exis_left; intro.
+    eapply exis_right.
+    unfold pointwise_relation in H.
+    eauto.
+  Qed.
+
+  Lemma star_combine_lift1 : forall P Q, [| P |] * [| Q |] ===> [| P /\ Q |].
+  Proof.
+    intros.
+    apply lift_left; intro.
+    rewrite extra_lift with (P := True); auto.
+    apply lift_left; intro.
+    rewrite extra_lift with (P := True) (p := [| P /\ Q |]); auto.
+    apply lift_right.
+    tauto.
+    reflexivity.
+  Qed.
+
+  Lemma star_combine_lift2 : forall P Q, [| P /\ Q |] ===> [| P |] * [| Q |].
+  Proof.
+    intros.
+    rewrite extra_lift with (P := True); auto.
+    apply lift_left; intro.
+    apply lift_right; try tauto.
+    rewrite extra_lift with (P := True) (p := [| P |]); auto.
+    apply lift_right; try tauto.
+    reflexivity.
+  Qed.
+
+  Lemma star_combine_lift : forall P Q, [| P |] * [| Q |] === [| P /\ Q |].
+  Proof.
+    intros.
+    apply himp_heq; auto using star_combine_lift1, star_combine_lift2.
+  Qed.
+
   Lemma star_comm_lift : forall P q, [| P |] * q === q * [| P |].
   Proof.
     intros; apply star_comm.
@@ -262,6 +301,7 @@ Module Sep(Import S : SEP).
     setoid_rewrite exis_gulp
     || setoid_rewrite lift_combine
     || setoid_rewrite star_assoc
+    || setoid_rewrite star_combine_lift
     || setoid_rewrite star_comm_lift
     || setoid_rewrite star_assoc_lift
     || setoid_rewrite star_comm_exis.
@@ -269,7 +309,7 @@ Module Sep(Import S : SEP).
   Ltac normalizeL :=
     (apply exis_left || apply lift_left; intro; try congruence)
     || match goal with
-         | [ |- [?P] ===> _ ] =>
+         | [ |- lift ?P ===> _ ] =>
            match P with
              | True => fail 1
              | _ => apply lift1_left; intro; try congruence
@@ -277,14 +317,15 @@ Module Sep(Import S : SEP).
        end.
 
   Ltac normalizeR :=
-    eapply exis_right || apply lift_right
-    || match goal with
-         | [ |- _ ===> [?Q] ] =>
-           match Q with
-             | True => fail 1
-             | _ => apply lift1_right
-           end
-       end.
+    match goal with
+    | [ |- _ ===> exis _ ] => eapply exis_right
+    | [ |- _ ===> _ * lift _ ] => apply lift_right
+    | [ |- _ ===> lift ?Q ] =>
+      match Q with
+      | True => fail 1
+      | _ => apply lift1_right
+      end
+    end.
 
   Ltac normalize1 := normalize0 || normalizeL || normalizeR.
 
@@ -308,13 +349,13 @@ Module Sep(Import S : SEP).
              | [ H : ex _ |- _ ===> _ ] => destruct H
              | [ H : _ /\ _ |- _ ] => destruct H
              | [ H : _ = _ |- _ ] => rewrite H
-           end; subst; subst rhs.
+           end; subst rhs.
                                                       
   Ltac normalize :=
     simpl; intros; repeat normalize1; repeat normalize2;
     repeat (match goal with
               | [ H : ex _ |- _ ===> _ ] => destruct H
-            end; intuition subst); subst.
+            end; intuition idtac).
 
   Ltac forAllAtoms p k :=
     match p with
@@ -353,10 +394,121 @@ Module Sep(Import S : SEP).
       | _ => progress autorewrite with core
     end.
 
-  Ltac cancel := normalize; repeat cancel1;
+  Ltac hide_evars :=
+    repeat match goal with
+           | [ |- ?P ===> _ ] => is_evar P; set P
+           | [ |- _ ===> ?Q ] => is_evar Q; set Q
+           | [ |- context[star ?P _] ] => is_evar P; set P
+           | [ |- context[star _ ?Q] ] => is_evar Q; set Q
+           | [ |- _ ===> (exists v, _ * ?R v) ] => is_evar R; set R
+           end.
+
+  Ltac restore_evars :=
+    repeat match goal with
+           | [ x := _ |- _ ] => subst x
+           end.
+
+  Fixpoint flattenAnds (Ps : list Prop) : Prop :=
+    match Ps with
+    | nil => True
+    | [P] => P
+    | P :: Ps => P /\ flattenAnds Ps
+    end.
+
+  Ltac allPuresFrom k :=
+    match goal with
+    | [ H : ?P |- _ ] =>
+      match type of P with
+      | Prop => generalize dependent H; allPuresFrom ltac:(fun Ps => k (P :: Ps))
+      end
+    | _ => intros; k (@nil Prop)
+    end.
+
+  Ltac whichToQuantify skip foundAlready k :=
+    match goal with
+    | [ x : ?T |- _ ] =>
+      match type of T with
+      | Prop => fail 1
+      | _ =>
+        match skip with
+        | context[x] => fail 1
+        | _ =>
+          match foundAlready with
+          | context[x] => fail 1
+          | _ => (instantiate (1 := lift (x = x)); fail 2)
+                 || (instantiate (1 := fun _ => lift (x = x)); fail 2)
+                 || (whichToQuantify skip (x, foundAlready) k)
+          end
+        end
+      end
+    | _ => k foundAlready
+    end.
+
+  Ltac quantifyOverThem vars e k :=
+    match vars with
+    | tt => k e
+    | (?x, ?vars') =>
+      match e with
+      | context[x] =>
+        match eval pattern x in e with
+        | ?f _ => quantifyOverThem vars' (exis f) k
+        end
+      | _ => quantifyOverThem vars' e k
+      end
+    end.
+
+  Ltac addQuantifiers P k :=
+    whichToQuantify tt tt ltac:(fun vars =>
+        quantifyOverThem vars P k).
+
+  Ltac addQuantifiersSkipping x P k :=
+    whichToQuantify x tt ltac:(fun vars =>
+        quantifyOverThem vars P k).
+
+  Ltac basic_cancel :=
+    normalize; repeat cancel1; intuition eassumption.
+
+  Ltac cancel := hide_evars; normalize; repeat cancel1; restore_evars;
+                 repeat match goal with
+                        | [ H : True |- _ ] => clear H
+                        end;
                  try match goal with
-                       | [ |- _ ===> _ ] => intuition (try congruence)
-                     end.
+                     | [ |- ?P ===> _ ] => sendToBack P;
+                       match goal with
+                       | [ |- ?P ===> ?Q * ?P ] => is_evar Q;
+                         rewrite (star_comm Q P);
+                         allPuresFrom ltac:(fun Ps =>
+                                              match Ps with
+                                              | nil => instantiate (1 := lift True)
+                                              | _ =>
+                                                let Ps' := eval simpl in (flattenAnds Ps) in
+                                                addQuantifiers (lift Ps') ltac:(fun e => instantiate (1 := e))
+                                              end;
+                                              basic_cancel)
+                       end
+                     | [ |- ?P ===> ?Q ] => is_evar Q;
+                       allPuresFrom ltac:(fun Ps =>
+                                            match Ps with
+                                            | nil => reflexivity
+                                            | _ =>
+                                              let Ps' := eval simpl in (flattenAnds Ps) in
+                                              addQuantifiers (star P (lift Ps')) ltac:(fun e => instantiate (1 := e));
+                                              basic_cancel
+                                            end)
+                     | [ |- ?P ===> ?Q ?x ] => is_evar Q;
+                        allPuresFrom ltac:(fun Ps =>
+                                             match Ps with
+                                             | nil => reflexivity
+                                             | _ =>
+                                               let Ps' := eval simpl in (flattenAnds Ps) in
+                                               addQuantifiersSkipping x (star P (lift Ps'))
+                                                 ltac:(fun e => match eval pattern x in e with
+                                                                | ?f _ => instantiate (1 := f)
+                                                                end);
+                                               basic_cancel
+                                             end)
+                     | [ |- _ ===> _ ] => intuition (try congruence)
+                     end; intuition (try eassumption).
 End Sep.
 
 
@@ -535,24 +687,24 @@ Fixpoint zeroes (n : nat) : list nat :=
 
 (** * Finally, the Hoare logic *)
 
-Inductive hoare_triple : assertion -> forall {result}, cmd result -> (result -> assertion) -> Prop :=
+Inductive hoare_triple : forall {result}, assertion -> cmd result -> (result -> assertion) -> Prop :=
 (* First, four basic rules that look exactly the same as before *)
 | HtReturn : forall P {result : Set} (v : result),
-    hoare_triple P (Return v) (fun r h => P h /\ r = v)
+    hoare_triple P (Return v) (fun r => P * [| r = v |])%sep
 | HtBind : forall P {result' result} (c1 : cmd result') (c2 : result' -> cmd result) Q R,
     hoare_triple P c1 Q
     -> (forall r, hoare_triple (Q r) (c2 r) R)
     -> hoare_triple P (Bind c1 c2) R
 | HtLoop : forall {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) I,
     (forall acc, hoare_triple (I (Again acc)) (body acc) I)
-    -> hoare_triple (I (Again init)) (Loop init body) (fun r h => I (Done r) h)
+    -> hoare_triple (I (Again init)) (Loop init body) (fun r => I (Done r))
 | HtFail : forall {result},
     hoare_triple (fun _ => False) (Fail (result := result)) (fun _ _ => False)
 
-| HtRead : forall a v,
-    hoare_triple (a |-> v)%sep (Read a) (fun r => a |-> v * [| r = v |])%sep
-| HtWrite : forall a v',
-    hoare_triple (exists v, a |-> v)%sep (Write a v') (fun _ => a |-> v')%sep
+| HtRead : forall a R,
+    hoare_triple (exists v, a |-> v * R v)%sep (Read a) (fun r => a |-> r * R r)%sep
+| HtWrite : forall a v v',
+    hoare_triple (a |-> v)%sep (Write a v') (fun _ => a |-> v')%sep
 | HtAlloc : forall numWords,
     hoare_triple emp%sep (Alloc numWords) (fun r => r |--> zeroes numWords)%sep
 | HtFree : forall a numWords,
@@ -567,12 +719,13 @@ Inductive hoare_triple : assertion -> forall {result}, cmd result -> (result -> 
     hoare_triple P c Q
     -> hoare_triple (P * R)%sep c (fun r => Q r * R)%sep.
 
+
 Notation "{{ P }} c {{ r ~> Q }}" :=
   (hoare_triple P%sep c (fun r => Q%sep)) (at level 90, c at next level).
 
 Lemma HtStrengthen : forall {result} (c : cmd result) P Q (Q' : _ -> assertion),
     hoare_triple P c Q
-    -> (forall r h, Q r h -> Q' r h)
+    -> (forall r, Q r ===> Q' r)
     -> hoare_triple P c Q'.
 Proof.
   simplify.
@@ -582,7 +735,7 @@ Qed.
 
 Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : assertion),
     hoare_triple P c Q
-    -> (forall h, P' h -> P h)
+    -> P' ===> P
     -> hoare_triple P' c Q.
 Proof.
   simplify.
@@ -596,10 +749,15 @@ Lemma invert_Return : forall {result : Set} (r : result) P Q,
 Proof.
   induct 1; propositional; eauto.
 
+  exists h, $0; propositional; eauto.
+  unfold lift; propositional.
+
   unfold himp in *; eauto.
 
   unfold star, himp in *; simp; eauto 7.
 Qed.
+
+Hint Constructors hoare_triple.
 
 Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
   hoare_triple P (Bind c1 c2) Q
@@ -623,8 +781,6 @@ Proof.
   eapply HtFrame; eauto.
   eapply HtFrame; eauto.
 Qed.
-
-Hint Constructors hoare_triple.
 
 Lemma invert_Loop : forall {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) P Q,
     hoare_triple P (Loop init body) Q
@@ -671,12 +827,12 @@ Qed.
 
 Lemma invert_Read : forall a P Q,
   hoare_triple P (Read a) Q
-  -> exists v R, (P ===> a |-> v * R)%sep
-               /\ a |-> v * R ===> Q v.
+  -> exists R, (P ===> exists v, a |-> v * R v)%sep
+               /\ forall r, a |-> r * R r ===> Q r.
 Proof.
   induct 1; simp; eauto.
 
-  exists v, emp; simp.
+  exists R; simp.
   cancel; auto.
   cancel; auto.
 
@@ -686,9 +842,11 @@ Proof.
 
   eauto 7 using himp_trans.
 
-  exists x, (x0 * R)%sep; simp.
+  exists (fun n => x n * R)%sep; simp.
+  rewrite H1.
   cancel.
 
+  rewrite <- H2.
   cancel.
 Qed.
 
@@ -932,6 +1090,17 @@ Proof.
   assumption.
 Qed.
 
+Lemma HtReturn' : forall P {result : Set} (v : result) Q,
+    P ===> Q v
+    -> hoare_triple P (Return v) Q.
+Proof.
+  simp.
+  eapply HtStrengthen.
+  constructor.
+  simp.
+  cancel.
+Qed.
+
 (* Temporarily transparent again! *)
 Transparent heq himp lift star exis ptsto.
 
@@ -955,24 +1124,21 @@ Proof.
   assumption.
   simp.
   cases r.
+  apply HtReturn'.
+  unfold himp; simp; eauto.
   eapply HtStrengthen.
   eauto.
-  simp; eauto.
-  eapply HtStrengthen.
-  eauto.
-  simp; eauto.
+  unfold himp; simp; eauto.
 
   apply invert_Read in H0; simp.
-  eapply HtStrengthen.
-  econstructor.
-  simp.
-  assert ((a |-> x * x0)%sep h') by auto.
-  unfold star in H0; simp.
+  apply HtReturn'.
+  assert ((exists v, a |-> v * x v)%sep h') by auto.
+  unfold exis, star in H1; simp.
   unfold ptsto in H4; subst.
-  unfold split in H3; subst.
+  unfold split in H1; subst.
   unfold heap1 in H.
   rewrite lookup_join1 in H by (simp; sets).
-  simp.
+  unfold himp; simp.
   invert H.
   apply H2.
   unfold star.
@@ -981,8 +1147,7 @@ Proof.
   unfold ptsto; reflexivity.
 
   apply invert_Write in H0; simp.
-  eapply HtStrengthen.
-  econstructor.
+  apply HtReturn'.
   simp.
   assert (((exists v : nat, a |-> v) * x)%sep h) by auto.
   unfold star in H1; simp.
@@ -991,7 +1156,7 @@ Proof.
   unfold split in H3; subst.
   unfold heap1 in H.
   rewrite lookup_join1 in H by (simp; sets).
-  simp.
+  unfold himp; simp.
   invert H.
   apply H2.
   unfold star.
@@ -1011,18 +1176,16 @@ Proof.
   unfold ptsto; reflexivity.
 
   apply invert_Alloc with (r := a) in H0.
-  eapply HtStrengthen.
-  econstructor.
-  simp.
+  apply HtReturn'.
+  unfold himp; simp.
   eapply himp_trans in H0; try apply zeroes_initialize.
   auto.
   assumption.
 
   apply invert_Free in H.
   assert (((exists vs : list nat, a |--> vs * [|Datatypes.length vs = numWords|]) * Q tt)%sep h) by auto.
-  eapply HtStrengthen.
-  econstructor.
-  simp.
+  apply HtReturn'.
+  unfold himp; simp.
   eapply do_deallocate.
   eauto.
 Qed.
@@ -1071,9 +1234,16 @@ Proof.
            | [ H : forall _ h1 _, _ -> _ -> ?P h1 -> _, H' : ?P _ |- _ ] => eapply H in H'; clear H; try eassumption; simp
          end; eauto.
 
-  right; exists h, (Return v).
+  invert H1.
+  right; exists h, (Return x0).
   constructor.
   unfold split, ptsto, heap1 in *; simp.
+  unfold star in H2; simp.
+  unfold split in H; simp.
+  rewrite lookup_join1; simp.
+  rewrite lookup_join1; simp.
+  sets.
+  eapply lookup_Some_dom.
   rewrite lookup_join1; simp.
   sets.
 
@@ -1165,4 +1335,416 @@ Proof.
   assert (disjoint (fst s) $0) by auto.
   assert (exists bound, forall a, a >= bound -> fst s $? a = None) by eauto.
   cases s; simp; eauto.
+Qed.
+
+(* Fancy theorem to help us rewrite within preconditions and postconditions *)
+Instance hoare_triple_morphism : forall A,
+  Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
+Proof.
+  Transparent himp.
+  repeat (hnf; intros).
+  unfold pointwise_relation in *; intuition subst.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+Qed.
+
+
+(** * Examples *)
+
+Opaque heq himp lift star exis ptsto.
+
+Theorem use_lemma : forall result P' (c : cmd result) (Q : result -> assertion) P R,
+  hoare_triple P' c Q
+  -> P ===> P' * R
+  -> hoare_triple P c (fun r => Q r * R)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  eapply HtFrame.
+  eassumption.
+  eauto.
+Qed.
+
+Theorem HtRead' : forall a v,
+  hoare_triple (a |-> v)%sep (Read a) (fun r => a |-> v * [| r = v |])%sep.
+Proof.
+  simp.
+  apply HtWeaken with (exists r, a |-> r * [| r = v |])%sep.
+  eapply HtStrengthen.
+  apply HtRead.
+  simp.
+  cancel; auto.
+  subst; cancel.
+  cancel; auto.
+Qed.
+
+Theorem HtRead'' : forall p P R,
+  P ===> (exists v, p |-> v * R v)
+  -> hoare_triple P (Read p) (fun r => p |-> r * R r)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  apply HtRead.
+  assumption.
+Qed.
+
+Ltac basic := apply HtReturn' || eapply HtRead' || eapply HtWrite || eapply HtAlloc
+              || (eapply HtRead''; solve [ cancel ]).
+
+Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
+              || (eapply HtConsequence; [ apply HtFail | .. ]).
+Ltac step := step0; simp.
+Ltac ht := simp; repeat step.
+Ltac conseq := simplify; eapply HtConsequence.
+Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
+                      || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
+Ltac loop_inv Inv := loop_inv0 Inv; ht.
+Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel; auto ] | ]).
+
+Ltac heq := intros; apply himp_heq; split.
+
+(** ** Swapping with two pointers *)
+
+Definition swap p q :=
+  tmpp <- Read p;
+  tmpq <- Read q;
+  _ <- Write p tmpq;
+  Write q tmpp.
+
+Theorem swap_ok : forall p q a b,
+  {{p |-> a * q |-> b}}
+    swap p q
+  {{_ ~> p |-> b * q |-> a}}.
+Proof.
+  unfold swap.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  cancel.
+  subst.
+  cancel.
+Qed.
+
+Opaque swap.
+
+Definition rotate p q r :=
+  _ <- swap p q;
+  swap q r.
+
+Theorem rotate_ok : forall p q r a b c,
+  {{p |-> a * q |-> b * r |-> c}}
+    rotate p q r
+  {{_ ~> p |-> b * q |-> c * r |-> a}}.
+Proof.
+  unfold rotate.
+  simp.
+  step.
+  use swap_ok.
+  simp.
+  use swap_ok.
+  simp.
+  cancel.
+Qed.
+
+Opaque rotate.
+
+(** ** Initializing a fresh object *)
+
+Definition init :=
+  p <- Alloc 2;
+  _ <- Write p 7;
+  _ <- Write (p+1) 8;
+  Return p.
+
+Theorem init_ok :
+  {{emp}}
+    init
+  {{p ~> p |--> [7; 8]}}.
+Proof.
+  unfold init.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  cancel.
+Qed.
+
+Opaque init.
+
+Theorem ultra_combo_ok :
+  {{emp}}
+    p <- init;
+    _ <- swap p (p+1);
+    Return p
+  {{p ~> p |--> [8; 7]}}.
+Proof.
+  step.
+  use init_ok.
+  simp.
+  step.
+  use swap_ok.
+  simp.
+  step.
+  cancel.
+Qed.
+
+(** ** In-place reversal of a singly linked list *)
+
+(* Let's give a recursive definition of how a linked list should be laid out in
+ * memory. *)
+Fixpoint linkedList (p : nat) (ls : list nat) :=
+  match ls with
+    | nil => [| p = 0 |]
+      (* An empty list is associated with a null pointer and no memory
+       * contents. *)
+    | x :: ls' => [| p <> 0 |]
+                  * exists p', p |-> x * (p+1) |-> p' * linkedList p' ls'
+      (* A nonempty list is associated with a nonnull pointer and a two-cell
+       * struct, which points to a further list. *)
+  end%sep.
+
+(* The definition of [linkedList] is recursive in the list.  Let's also prove
+ * lemmas for simplifying [linkedList] invocations based on values of [p]. *)
+
+Theorem linkedList_null : forall ls,
+  linkedList 0 ls === [| ls = nil |].
+Proof.
+  heq; destruct ls; cancel.
+Qed.
+
+Theorem linkedList_nonnull : forall p ls,
+  p <> 0
+  -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |-> x * (p+1) |-> p' * linkedList p' ls'.
+Proof.
+  heq; destruct ls; cancel.
+  invert H0; cancel.
+Qed.
+
+Hint Rewrite <- rev_alt.
+Hint Rewrite rev_involutive.
+
+(* Let's hide the definition of [linkedList], so that we *only* reason about it
+ * via the two lemmas we just proved. *)
+Opaque linkedList.
+
+Definition reverse p :=
+  pr <- for pr := (p, 0) loop
+    let (p, r) := pr in
+    if p ==n 0 then
+      Return (Done pr)
+    else
+      tmp <- Read (p + 1);
+      _ <- Write (p+1) r;
+      Return (Again (tmp, p))
+  done;
+  Return (snd pr).
+
+Definition valueOf {A} (o : loop_outcome A) :=
+  match o with
+  | Done v => v
+  | Again v => v
+  end.
+
+Opaque himp.
+
+(* Finally, it's correct. *)
+
+Theorem reverse_ok : forall p ls,
+  {{linkedList p ls}}
+    reverse p
+  {{r ~> linkedList r (rev ls)}}.
+Proof.
+  unfold reverse.
+  simp.
+  step.
+  loop_inv (fun o => exists ls1 ls2, [| ls = rev_append ls1 ls2 |]
+                                     * linkedList (fst (valueOf o)) ls2
+                                     * linkedList (snd (valueOf o)) ls1
+                                     * [| match o with
+                                          | Done (p, _) => p = 0
+                                          | _ => True
+                                          end |])%sep.
+  cases (a ==n 0); simp.
+  step.
+  cancel.
+  step.
+  setoid_rewrite (linkedList_nonnull _ n).
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  setoid_rewrite (linkedList_nonnull _ n).
+  cancel.
+  simp.
+  setoid_rewrite linkedList_null.
+  cancel.
+  equality.
+  simp.
+  step.
+  cancel.
+  simp.
+  setoid_rewrite linkedList_null.
+  cancel.
+  simp.
+  cancel.
+Qed.
+
+Opaque reverse.
+
+(* ** Calling [reverse] twice, to illustrate the *frame rule* *)
+
+Theorem reverse_two_ok : forall p1 ls1 p2 ls2,
+  {{linkedList p1 ls1 * linkedList p2 ls2}}
+    p1 <- reverse p1;
+    p2 <- reverse p2;
+    Return (p1, p2)
+  {{ps ~> linkedList (fst ps) (rev ls1) * linkedList (snd ps) (rev ls2)}}.
+Proof.
+  simp.
+  step.
+  use reverse_ok.
+  simp.
+  step.
+  use reverse_ok.
+  simp.
+  step.
+  cancel.
+Qed.
+
+
+(* ** Computing the length of a linked list *)
+
+(* To state a good loop invariant, it will be helpful to define
+ * *list segments* that end with some pointer beside null. *)
+Fixpoint linkedListSegment (p : nat) (ls : list nat) (q : nat) :=
+  match ls with
+    | nil => [| p = q |]
+    | x :: ls' => [| p <> 0 |] * exists p', p |-> x * (p+1) |-> p' * linkedListSegment p' ls' q
+  end%sep.
+
+(* Next, two [linkedListSegment] lemmas analogous to those for [linkedList]
+ * above *)
+
+Lemma linkedListSegment_empty : forall p ls,
+  linkedList p ls ===> linkedList p ls * linkedListSegment p nil p.
+Proof.
+  cancel.
+Qed.
+
+Lemma linkedListSegment_append : forall q r x ls p,
+  q <> 0
+  -> linkedListSegment p ls q * q |-> x * (q+1) |-> r ===> linkedListSegment p (ls ++ x :: nil) r.
+Proof.
+  induction ls; cancel; auto.
+  subst; cancel.
+  rewrite <- IHls; cancel; auto.
+Qed.
+
+(* One more [linkedList] lemma will be helpful.  We'll re-reveal the predicate's
+ * definition to prove the lemma. *)
+
+Transparent linkedList.
+
+Lemma linkedListSegment_null : forall ls p,
+  linkedListSegment p ls 0 ===> linkedList p ls.
+Proof.
+  induction ls; cancel; auto.
+Qed.
+
+Opaque linkedList linkedListSegment.
+
+Hint Rewrite <- app_assoc.
+Hint Rewrite app_length app_nil_r.
+
+Lemma move_along : forall A (ls : list A) x2 x1 x0 x,
+  ls = x2 ++ x1
+  -> x1 = x0 :: x
+  -> ls = (x2 ++ [x0]) ++ x.
+Proof.
+  simp.
+Qed.
+
+Hint Resolve move_along.
+
+(* Finally, this code is correct. *)
+Theorem length_ok : forall p ls,
+  {{linkedList p ls}}
+    q_len <- for q_len := (p, 0) loop
+      let (q, len) := q_len in
+      if q ==n 0 then
+        Return (Done q_len)
+      else
+        tmp <- Read (q + 1);
+        Return (Again (tmp, len+1))
+    done;
+    Return (snd q_len)
+  {{len ~> linkedList p ls * [| len = length ls |]}}.
+Proof.
+  simp.
+  step.
+  loop_inv (fun o => exists ls1 ls2, [| ls = ls1 ++ ls2 |]
+                                     * linkedListSegment p ls1 (fst (valueOf o))
+                                     * linkedList (fst (valueOf o)) ls2
+                                     * [| snd (valueOf o) = length ls1 |]
+                                     * [| match o with
+                                          | Done (q, _) => q = 0 /\ ls2 = nil
+                                          | _ => True
+                                          end |])%sep.
+  cases (a ==n 0); simp.
+  step.
+  setoid_rewrite linkedList_null.
+  cancel.
+  step.
+  setoid_rewrite (linkedList_nonnull _ n).
+  step.
+  simp.
+  step.
+  cancel.
+  eauto.
+  simp.
+  setoid_rewrite <- linkedListSegment_append.
+  cancel.
+  auto.
+  rewrite linkedListSegment_empty.
+  cancel.
+  simp.
+  step.
+  cancel.
+  simp.
+  simp.
+  rewrite linkedListSegment_null.
+  rewrite linkedList_null.
+  cancel.
 Qed.

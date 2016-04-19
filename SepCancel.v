@@ -277,7 +277,7 @@ Module Make(Import S : SEP).
 
   Ltac forAllAtoms p k :=
     match p with
-      | ?q * ?r => (forAllAtoms q k || forAllAtoms r k) || fail 2
+      | ?q * ?r => forAllAtoms q k || forAllAtoms r k
       | _ => k p
     end.
 

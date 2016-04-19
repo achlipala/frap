@@ -211,13 +211,15 @@ Module Make(Import S : SEP).
   Qed.
 
   Ltac normalize0 :=
-    setoid_rewrite exis_gulp
-    || setoid_rewrite lift_combine
-    || setoid_rewrite star_assoc
-    || setoid_rewrite star_combine_lift
-    || setoid_rewrite star_comm_lift
-    || setoid_rewrite star_assoc_lift
-    || setoid_rewrite star_comm_exis.
+    match goal with
+    | [ |- context[star ?p (exis ?q)] ] => rewrite (exis_gulp p q)
+    | [ |- context[star (star ?p (lift ?q)) (lift ?r)] ] => rewrite (lift_combine p q r)
+    | [ |- context[star ?p (star ?q ?r)] ] => rewrite (star_assoc p q r)
+    | [ |- context[star (lift ?p) (lift ?q)] ] => rewrite (star_combine_lift p q)
+    | [ |- context[star (lift ?p) ?q ] ] => rewrite (star_comm_lift p q)
+    | [ |- context[star (star ?p (lift ?q)) ?r] ] => rewrite (star_assoc_lift p q r)
+    | [ |- context[star (exis ?p) ?q] ] => rewrite (star_comm_exis p q)
+    end.
 
   Ltac normalizeL :=
     (apply exis_left || apply lift_left; intro; try congruence)
@@ -248,8 +250,11 @@ Module Make(Import S : SEP).
     lift.
   Qed.
   
-  Ltac normalize2 := setoid_rewrite lift_uncombine
-    || setoid_rewrite star_assoc.
+  Ltac normalize2 :=
+    match goal with
+    | [ |- context[star ?p lift (?P /\ ?Q)] ] => rewrite (lift_uncombine p P Q)
+    | [ |- context[star ?p (star ?q ?r)] ] => rewrite (star_assoc p q r)
+    end.
 
   Ltac normalizeLeft :=
     let s := fresh "s" in intro s;
@@ -307,7 +312,19 @@ Module Make(Import S : SEP).
     reflexivity.
   Qed.
 
+  Definition try_me_first (_ : hprop) := True.
+
   Ltac cancel1 :=
+    match goal with
+      | [ |- ?p ===> ?q ] =>
+        forAllAtoms p ltac:(fun p0 =>
+          (let H := fresh in assert (H : try_me_first p0) by eauto; clear H);
+          sendToBack p0;
+          forAllAtoms q ltac:(fun q0 =>
+            (let H := fresh in assert (H : try_me_first q0) by eauto; clear H);
+            sendToBack q0;
+            apply star_cancel'))
+    end ||
     match goal with
       | [ |- _ ===> ?Q ] =>
         match Q with

@@ -24,4 +24,5 @@ LambdaCalculusAndTypeSoundness.v
 TypesAndMutation.v
 DeepAndShallowEmbeddings_template.v
 DeepAndShallowEmbeddings.v
+SepCancel.v
 SeparationLogic.v

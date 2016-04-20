@@ -3130,8 +3130,8 @@ As a result, our extracted programs achieve the asymptotic performance that we w
 
 In our Hoare-logic examples so far, we have intentionally tread lightly when it comes to the potential aliasing\index{aliasing} of pointer variables in a program.
 Generally, we have only worked with, for instance, a single array at a time.
-Reasoning about multi-array programs generally depends on the fact that the arrays don't overlap in memory at all.
-Things are even more complicated with linked data structures, like linked lists and trees, which haven't even attempted up to now.
+Reasoning about multi-array programs usually depends on the fact that the arrays don't overlap in memory at all.
+Things are even more complicated with linked data structures, like linked lists and trees, which we haven't even attempted up to now.
 However, by using \emph{separation logic}\index{separation logic}, a popular variant of Hoare logic, we will find it quite pleasant to prove programs that used linked structures, with no need for explicit reasoning about aliasing, assuming that we keep all of our data structures disjoint from each other through simple coding patterns.
 
 
@@ -3139,7 +3139,7 @@ However, by using \emph{separation logic}\index{separation logic}, a popular var
 
 Before we get into proofs, let's fix a mixed-embedding object language.
 $$\begin{array}{rrcl}
-  \textrm{Commands} & c &::=& \mt{Return} \; v \mid x \leftarrow c; c \; f \mid \mt{Loop} \; i \; f \mid \mt{Fail} \\
+  \textrm{Commands} & c &::=& \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Loop} \; i \; f \mid \mt{Fail} \\
   &&& \mid \mt{Read} \; n \mid \mt{Write} \; n \; n \mid \mt{Alloc} \; n \mid \mt{Free} \; n \; n
 \end{array}$$
 
@@ -3177,7 +3177,7 @@ We could also have chosen to enforce in this rule that the region starts out as 
 
 Separation logic is based on two big ideas.
 The first one has to do with the \emph{assertion logic}\index{assertion logic}, which we use to write invariants; while the second one has to do with the \emph{program logic}\index{program logic}, which we use to prove that programs satisfy specifications.
-The assertion logic is based on predicates over \emph{partial memories}\emph{partial memories}, or finite maps from addresses to stored values.
+The assertion logic is based on predicates over \emph{partial memories}\index{partial memories}, or finite maps from addresses to stored values.
 Because they are finite, they omit infinitely many addresses, and it is crucial that we are able to describe heaps that intentionally leave addresses out of their domains.
 Informally, a predicate \emph{claims ownership}\index{ownership} of addresses in the domains of matching heaps.
 
@@ -3241,7 +3241,7 @@ $$\infer{(P * \exists x. \; Q(x)) \Leftrightarrow \exists x. \; P * Q(x)}{}
 
 This set of algebraic laws has a very special consequence: it supports automated proof of implications by \emph{cancellation}\index{cancellation}, where we repeatedly ``cross out'' matching subformulas on the two sides of the arrow.
 Consider this example formula that we might want to prove.
-$$(\exists q. \; \ptsto{p}{q} * \exists r. \; \ptsto{q}{r} * \ptsto{r}{0}) \Rightarrow (\exists a. \; \exists b. \; \exists c. \; \ptsto{r}{c} * \ptsto{p}{a} * \ptsto{a}{b})$$
+$$(\exists q. \; \ptsto{p}{q} * \exists r. \; \ptsto{q}{r} * \ptsto{r}{0}) \Rightarrow (\exists a. \; \exists b. \; \exists c. \; \ptsto{b}{c} * \ptsto{p}{a} * \ptsto{a}{b})$$
 
 First, the laws above allow us to bubble all quantifiers to the fronts of formulas.
 $$(\exists q, r. \; \ptsto{p}{q} * \ptsto{q}{r} * \ptsto{r}{0}) \Rightarrow (\exists a, b, c. \; \ptsto{b}{c} * \ptsto{p}{a} * \ptsto{a}{b})$$
@@ -3250,7 +3250,7 @@ Next, all $\exists$ to the left can be replaced with fresh free variables, while
 $$\ptsto{p}{q} * \ptsto{q}{r} * \ptsto{r}{0} \Rightarrow \; \ptsto{?b}{?c} \; * \; \ptsto{p}{?a} \; * \; \ptsto{?a}{?b}$$
 
 Next, we find matching subformulas to \emph{cancel}.
-We start by matching $\ptsto{p}{q}$ with $\ptsto{p}{?a}$, learning that $?a = q$ and reducing to this formula.
+We start by matching $\ptsto{p}{q}$ with $\ptsto{p}{?a}$, learning that $?a = q$ and reducing to the following formula.
 This crucial step relies on the three key properties of $*$, given in the second row of rules above: commutativity, associativity, and cancellativity\index{cancellativity}.
 $$\ptsto{q}{r} * \ptsto{r}{0} \Rightarrow \; \ptsto{?b}{?c} \; * \; \ptsto{q}{?b}$$
 
@@ -3288,14 +3288,14 @@ $$\infer{\hoare{\exists v. \; \ptsto{a}{v} * R(v)}{\mt{Read} \; a}{\lambda r. \;
 
 In words: before reading from address $a$, it must be the case that $a$ points to some value $v$, and predicate $R(v)$ records what else we know about the memory at that point.
 Afterward, we know that $a$ points to the result $r$ of the read operation, and $R$ is still present.
-We call $R$ a \emph{frame predicate}\emph{frame predicate}, recording what we know about parts of memory that the command does not touch directly.
+We call $R$ a \emph{frame predicate}\index{frame predicate}, recording what we know about parts of memory that the command does not touch directly.
 We might also say that the \emph{footprint} of this command is the singleton set $\{a\}$.
 In general, frame predicates record preserved facts about addresses outside a command's footprint.
 The next few rules don't have frame predicates baked in; we finish with a rule that adds them back, in a generic way for arbitrary Hoare triples.
 
 $$\infer{\hoare{\exists v. \; \ptsto{a}{v}}{\mt{Write} \; a \; v'}{\lambda \_. \; \ptsto{a}{v'}}}{}$$
 
-This last rule, for $\mt{Write}$, is even simpler, with no baked-in frame predicate.
+This last rule, for $\mt{Write}$, is even simpler.
 We see a straightforward illustration of overwriting $a$'s old value $v$ with the new value $v$'.
 
 $$\infer{\hoare{\emp}{\mt{Alloc} \; n}{\lambda r. \; \ptsto{r}{0^n}}}{}
@@ -3315,7 +3315,7 @@ Even more intuitively, when a program satisfies a spec, it also satisfies an ext
 For the pragmatics of proving particular programs, we defer to the accompanying Coq code.
 \modularity
 However, for modular proofs, the frame rule has such an important role that we want to emphasize it here.
-It is possible to define (recursively) a predicate $\mt{llist}(\ell, p)$, capturing the idea that the memory contains exactly an imperative linked list, rooted at pointer $p$, representing functional linked list $\ell$.
+It is possible to define (recursively) a predicate $\mt{llist}(\ell, p)$, capturing the idea that the heap contains exactly an imperative linked list, rooted at pointer $p$, representing functional linked list $\ell$.
 We can also prove a general specification for a list-reversal function:
 $$\forall \ell, p. \; \hoare{\mt{llist}(\ell, p)}{\texttt{reverse}(p)}{\lambda r. \; \mt{llist}(\mt{rev}(\ell), r)}$$
 
@@ -3333,7 +3333,7 @@ $$\begin{array}{l}
 \end{array}$$
 
 Note that this specification would be incorrect if the two input lists could share any memory cells!
-The separating conjunction $*$ in the precondition implicitly formalizes our expectiation of nonaliasing.
+The separating conjunction $*$ in the precondition implicitly formalizes our expectation of nonaliasing.
 The proof internals require only the basic rules for $\mt{Return}$ and sequencing, in addition to the rule of consequence, whose side conditions we discharge using the cancellation approach sketched in the previous section.
 
 Note also that this highly automatable proof style works just as well when calling functions associated with several different data structures in memory.

@@ -1,8 +1,3 @@
-(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 12: Separation Logic
-  * Author: Adam Chlipala
-  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
-
 Require Import Frap Setoid Classes.Morphisms SepCancel.
 
 Set Implicit Arguments.
@@ -25,8 +20,6 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 (** * Encore of last mixed-embedding language from last time *)
 
-(* Let's work with a variant of the imperative language from last time. *)
-
 Inductive loop_outcome acc :=
 | Done (a : acc)
 | Again (a : acc).
@@ -39,15 +32,11 @@ Inductive cmd : Set -> Type :=
 | Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc
 | Fail {result} : cmd result
 
-(* But let's also add memory allocation and deallocation. *)
 | Alloc (numWords : nat) : cmd nat
 | Free (base numWords : nat) : cmd unit.
 
 Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
 Notation "'for' x := i 'loop' c1 'done'" := (Loop i (fun x => c1)) (right associativity, at level 80).
-
-(* These helper functions respectively initialize a new span of memory and
- * remove a span of memory that the program is done with. *)
 
 Fixpoint initialize (h : heap) (base numWords : nat) : heap :=
   match numWords with
@@ -61,8 +50,6 @@ Fixpoint deallocate (h : heap) (base numWords : nat) : heap :=
   | S numWords' => deallocate (h $- base) (base+1) numWords'
   end.
 
-(* Let's do the semantics a bit differently this time, falling back on classic
- * small-step operational semantics. *)
 Inductive step : forall A, heap * cmd A -> heap * cmd A -> Prop :=
 | StepBindRecur : forall result result' (c1 c1' : cmd result') (c2 : result' -> cmd result) h h',
   step (h, c1) (h', c1')
@@ -94,11 +81,6 @@ Definition trsys_of (h : heap) {result} (c : cmd result) := {|
   Step := step (A := result)
 |}.
 
-(* Now let's get into the first distinctive feature of separation logic: an
- * assertion language that takes advantage of *pariality* of heaps.  We give our
- * definitions inside a module, which will shortly be used as a parameter to
- * another module (from the book library), to get some free automation for
- * implications between these assertions. *)
 Module Import S <: SEP.
   Definition hprop := heap -> Prop.
   (* A [hprop] is a regular old assertion over heaps. *)
@@ -359,10 +341,287 @@ Proof.
   reflexivity.
 Qed.
 
-(* Now, we carry out a moderately laborious soundness proof!  It's safe to skip
- * ahead to the text "Examples", but a few representative lemma highlights
- * include [invert_Read], [preservation], [progress], and the main theorem
- * [hoare_triple_sound]. *)
+
+(** * Examples *)
+
+Opaque heq himp lift star exis ptsto.
+
+(* Here comes some automation that we won't explain in detail, instead opting to
+ * use examples. *)
+
+Theorem use_lemma : forall result P' (c : cmd result) (Q : result -> assertion) P R,
+  hoare_triple P' c Q
+  -> P ===> P' * R
+  -> hoare_triple P c (fun r => Q r * R)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  eapply HtFrame.
+  eassumption.
+  eauto.
+Qed.
+
+Theorem HtRead' : forall a v,
+  hoare_triple (a |-> v)%sep (Read a) (fun r => a |-> v * [| r = v |])%sep.
+Proof.
+  simp.
+  apply HtWeaken with (exists r, a |-> r * [| r = v |])%sep.
+  eapply HtStrengthen.
+  apply HtRead.
+  simp.
+  cancel; auto.
+  subst; cancel.
+  cancel; auto.
+Qed.
+
+Theorem HtRead'' : forall p P R,
+  P ===> (exists v, p |-> v * R v)
+  -> hoare_triple P (Read p) (fun r => p |-> r * R r)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  apply HtRead.
+  assumption.
+Qed.
+
+Lemma HtReturn' : forall P {result : Set} (v : result) Q,
+    P ===> Q v
+    -> hoare_triple P (Return v) Q.
+Proof.
+  simp.
+  eapply HtStrengthen.
+  constructor.
+  simp.
+  cancel.
+Qed.
+
+
+(* Fancy theorem to help us rewrite within preconditions and postconditions *)
+Instance hoare_triple_morphism : forall A,
+  Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
+Proof.
+  Transparent himp.
+  repeat (hnf; intros).
+  unfold pointwise_relation in *; intuition subst.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+  Opaque himp.
+Qed.
+
+Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree.
+
+Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
+              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
+              || (eapply HtRead''; solve [ cancel ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
+              || (eapply HtConsequence; [ apply HtFail | .. ]).
+Ltac step := step0; simp.
+Ltac ht := simp; repeat step.
+Ltac conseq := simplify; eapply HtConsequence.
+Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
+                      || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
+Ltac loop_inv Inv := loop_inv0 Inv; ht.
+Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel; auto ] | ]).
+
+Ltac heq := intros; apply himp_heq; split.
+
+(* That's the end of the largely unexplained automation.  Let's prove some
+ * programs! *)
+
+
+(** ** Swapping with two pointers *)
+
+Definition swap p q :=
+  tmpp <- Read p;
+  tmpq <- Read q;
+  _ <- Write p tmpq;
+  Write q tmpp.
+
+Theorem swap_ok : forall p q a b,
+  {{p |-> a * q |-> b}}
+    swap p q
+  {{_ ~> p |-> b * q |-> a}}.
+Proof.
+Admitted.
+
+Opaque swap.
+
+Definition rotate p q r :=
+  _ <- swap p q;
+  swap q r.
+
+Theorem rotate_ok : forall p q r a b c,
+  {{p |-> a * q |-> b * r |-> c}}
+    rotate p q r
+  {{_ ~> p |-> b * q |-> c * r |-> a}}.
+Proof.
+Admitted.
+
+Opaque rotate.
+
+(** ** Initializing a fresh object *)
+
+Definition init :=
+  p <- Alloc 2;
+  _ <- Write p 7;
+  _ <- Write (p+1) 8;
+  Return p.
+
+Theorem init_ok :
+  {{emp}}
+    init
+  {{p ~> p |--> [7; 8]}}.
+Proof.
+Admitted.
+
+Opaque init.
+
+Theorem the_circle_of_life_ok :
+  {{emp}}
+    p <- init;
+    Free p 2
+  {{_ ~> emp}}.
+Proof.
+Admitted.
+
+Theorem ultra_combo_ok :
+  {{emp}}
+    p <- init;
+    _ <- swap p (p+1);
+    Return p
+  {{p ~> p |--> [8; 7]}}.
+Proof.
+Admitted.
+
+
+(** ** In-place reversal of a singly linked list *)
+
+(* Let's give a recursive definition of how a linked list should be laid out in
+ * memory. *)
+Fixpoint linkedList (p : nat) (ls : list nat) :=
+  match ls with
+    | nil => [| p = 0 |]
+      (* An empty list is associated with a null pointer and no memory
+       * contents. *)
+    | x :: ls' => [| p <> 0 |]
+                  * exists p', p |--> [x; p'] * linkedList p' ls'
+      (* A nonempty list is associated with a nonnull pointer and a two-cell
+       * struct, which points to a further list. *)
+  end%sep.
+
+(* The definition of [linkedList] is recursive in the list.  Let's also prove
+ * lemmas for simplifying [linkedList] invocations based on values of [p]. *)
+
+Theorem linkedList_null : forall ls,
+  linkedList 0 ls === [| ls = nil |].
+Proof.
+  heq; cases ls; cancel.
+Qed.
+
+Theorem linkedList_nonnull : forall p ls,
+  p <> 0
+  -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |--> [x; p'] * linkedList p' ls'.
+Proof.
+  heq; cases ls; cancel; match goal with
+                         | [ H : _ = _ :: _ |- _ ] => invert H
+                         end; cancel.
+Qed.
+
+Hint Rewrite <- rev_alt.
+Hint Rewrite rev_involutive.
+
+(* Let's hide the definition of [linkedList], so that we *only* reason about it
+ * via the two lemmas we just proved. *)
+Opaque linkedList.
+
+Definition reverse p :=
+  pr <- for pr := (p, 0) loop
+    let (p, r) := pr in
+    if p ==n 0 then
+      Return (Done pr)
+    else
+      tmp <- Read (p + 1);
+      _ <- Write (p+1) r;
+      Return (Again (tmp, p))
+  done;
+  Return (snd pr).
+
+(* Helper function to peel away the [Done]/[Again] status of a [loop_outcome] *)
+Definition valueOf {A} (o : loop_outcome A) :=
+  match o with
+  | Done v => v
+  | Again v => v
+  end.
+
+Theorem reverse_ok : forall p ls,
+  {{linkedList p ls}}
+    reverse p
+  {{r ~> linkedList r (rev ls)}}.
+Proof.
+Admitted.
+
+Opaque reverse.
+
+Theorem reverse_two_ok : forall p1 ls1 p2 ls2,
+  {{linkedList p1 ls1 * linkedList p2 ls2}}
+    p1 <- reverse p1;
+    p2 <- reverse p2;
+    Return (p1, p2)
+  {{ps ~> linkedList (fst ps) (rev ls1) * linkedList (snd ps) (rev ls2)}}.
+Proof.
+Admitted.
+
+
+(* ** Computing the length of a linked list *)
+
+(* A few algebraic properties of list operations: *)
+Hint Rewrite <- app_assoc.
+Hint Rewrite app_length app_nil_r.
+
+(* We tie a few of them together into this lemma. *)
+Lemma move_along : forall A (ls : list A) x2 x1 x0 x,
+  ls = x2 ++ x1
+  -> x1 = x0 :: x
+  -> ls = (x2 ++ [x0]) ++ x.
+Proof.
+  simp.
+Qed.
+
+Hint Resolve move_along.
+
+Theorem length_ok : forall p ls,
+  {{linkedList p ls}}
+    q_len <- for q_len := (p, 0) loop
+      let (q, len) := q_len in
+      if q ==n 0 then
+        Return (Done q_len)
+      else
+        tmp <- Read (q + 1);
+        Return (Again (tmp, len+1))
+    done;
+    Return (snd q_len)
+  {{len ~> linkedList p ls * [| len = length ls |]}}.
+Proof.
+Admitted.
+
+
+(** * Soundness proof *)
+
+Transparent heq himp lift star exis ptsto.
 
 Lemma invert_Return : forall {result : Set} (r : result) P Q,
   hoare_triple P (Return r) Q
@@ -566,8 +825,6 @@ Lemma length_zeroes : forall n,
     length (zeroes n) = n.
 Proof.
   induct n; simplify; auto.
-  rewrite app_length; simplify.
-  linear_arithmetic.
 Qed.
 
 Lemma initialize_fresh : forall a' h a numWords,
@@ -657,17 +914,6 @@ Proof.
   Transparent himp.
   apply H0; auto.
   Opaque himp.
-Qed.
-
-Lemma HtReturn' : forall P {result : Set} (v : result) Q,
-    P ===> Q v
-    -> hoare_triple P (Return v) Q.
-Proof.
-  simp.
-  eapply HtStrengthen.
-  constructor.
-  simp.
-  cancel.
 Qed.
 
 (* Temporarily transparent again! *)
@@ -904,464 +1150,4 @@ Proof.
   assert (disjoint (fst s) $0) by auto.
   assert (exists bound, forall a, a >= bound -> fst s $? a = None) by eauto.
   cases s; simp; eauto.
-Qed.
-
-(* Fancy theorem to help us rewrite within preconditions and postconditions *)
-Instance hoare_triple_morphism : forall A,
-  Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
-Proof.
-  Transparent himp.
-  repeat (hnf; intros).
-  unfold pointwise_relation in *; intuition subst.
-
-  eapply HtConsequence; eauto.
-  rewrite H; reflexivity.
-  intros.
-  hnf in H1.
-  specialize (H1 r _ eq_refl).
-  rewrite H1; reflexivity.
-
-  eapply HtConsequence; eauto.
-  rewrite H; reflexivity.
-  intros.
-  hnf in H1.
-  specialize (H1 r _ eq_refl).
-  rewrite H1; reflexivity.
-  Opaque himp.
-Qed.
-
-
-(** * Examples *)
-
-Opaque heq himp lift star exis ptsto.
-
-(* Here comes some automation that we won't explain in detail, instead opting to
- * use examples. *)
-
-Theorem use_lemma : forall result P' (c : cmd result) (Q : result -> assertion) P R,
-  hoare_triple P' c Q
-  -> P ===> P' * R
-  -> hoare_triple P c (fun r => Q r * R)%sep.
-Proof.
-  simp.
-  eapply HtWeaken.
-  eapply HtFrame.
-  eassumption.
-  eauto.
-Qed.
-
-Theorem HtRead' : forall a v,
-  hoare_triple (a |-> v)%sep (Read a) (fun r => a |-> v * [| r = v |])%sep.
-Proof.
-  simp.
-  apply HtWeaken with (exists r, a |-> r * [| r = v |])%sep.
-  eapply HtStrengthen.
-  apply HtRead.
-  simp.
-  cancel; auto.
-  subst; cancel.
-  cancel; auto.
-Qed.
-
-Theorem HtRead'' : forall p P R,
-  P ===> (exists v, p |-> v * R v)
-  -> hoare_triple P (Read p) (fun r => p |-> r * R r)%sep.
-Proof.
-  simp.
-  eapply HtWeaken.
-  apply HtRead.
-  assumption.
-Qed.
-
-Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree.
-
-Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
-              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
-              || (eapply HtRead''; solve [ cancel ])
-              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
-              || (eapply HtConsequence; [ apply HtFail | .. ]).
-Ltac step := step0; simp.
-Ltac ht := simp; repeat step.
-Ltac conseq := simplify; eapply HtConsequence.
-Ltac use_IH H := conseq; [ apply H | .. ]; ht.
-Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
-                      || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
-Ltac loop_inv Inv := loop_inv0 Inv; ht.
-Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
-              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel; auto ] | ]).
-
-Ltac heq := intros; apply himp_heq; split.
-
-(* That's the end of the largely unexplained automation.  Let's prove some
- * programs! *)
-
-
-(** ** Swapping with two pointers *)
-
-Definition swap p q :=
-  tmpp <- Read p;
-  tmpq <- Read q;
-  _ <- Write p tmpq;
-  Write q tmpp.
-
-(* Looking at the precondition here, note how we no longer work with explicit
- * functions over heaps.  All that is hidden within the assertion language.
- * Also note that the definition of [*] gives us nonaliasing of [p] and [q] for
- * free! *)
-Theorem swap_ok : forall p q a b,
-  {{p |-> a * q |-> b}}
-    swap p q
-  {{_ ~> p |-> b * q |-> a}}.
-Proof.
-  unfold swap.
-  (* [simp] is our generic simplifier for this file. *)
-  simp.
-  (* We generally just keep calling [step] to advance forward by one atomic
-   * statement. *)
-  step.
-  step.
-  (* We do often want to use [simp] to clean up the goal after [step] infers an
-   * intermediate assertion. *)
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  (* The [cancel] procedure repeatedly finds matching subformulas on the two
-   * sides of [===>], removing them and recurring, possibly learning the values
-   * of some unification variables each time. *)
-  cancel.
-  subst.
-  cancel.
-Qed.
-
-Opaque swap.
-(* This command prevents later proofs from peeking inside the implementation of
- * [swap].  Instead, we only reason about it through [swap_ok]. *)
-
-(* Two swaps in a row provide a kind of rotation across three addresses. *)
-Definition rotate p q r :=
-  _ <- swap p q;
-  swap q r.
-
-Theorem rotate_ok : forall p q r a b c,
-  {{p |-> a * q |-> b * r |-> c}}
-    rotate p q r
-  {{_ ~> p |-> b * q |-> c * r |-> a}}.
-Proof.
-  unfold rotate.
-  simp.
-  step.
-  (* Now we invoke our earlier theorem by name.  Note that its precondition only
-   * matches a subset of our current precondition.  The rest of state is left
-   * alone, which we can prove "for free" by the frame rule. *)
-  use swap_ok.
-  simp.
-  use swap_ok.
-  simp.
-  cancel.
-Qed.
-
-Opaque rotate.
-
-(** ** Initializing a fresh object *)
-
-Definition init :=
-  p <- Alloc 2;
-  _ <- Write p 7;
-  _ <- Write (p+1) 8;
-  Return p.
-
-Theorem init_ok :
-  {{emp}}
-    init
-  {{p ~> p |--> [7; 8]}}.
-Proof.
-  unfold init.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  cancel.
-Qed.
-
-Opaque init.
-
-Theorem the_circle_of_life_ok :
-  {{emp}}
-    p <- init;
-    Free p 2
-  {{_ ~> emp}}.
-Proof.
-  step.
-  use init_ok.
-  simp.
-  step.
-  cancel.
-Qed.
-
-Theorem ultra_combo_ok :
-  {{emp}}
-    p <- init;
-    _ <- swap p (p+1);
-    Return p
-  {{p ~> p |--> [8; 7]}}.
-Proof.
-  step.
-  use init_ok.
-  simp.
-  step.
-  use swap_ok.
-  simp.
-  step.
-  cancel.
-Qed.
-
-(** ** In-place reversal of a singly linked list *)
-
-(* Let's give a recursive definition of how a linked list should be laid out in
- * memory. *)
-Fixpoint linkedList (p : nat) (ls : list nat) :=
-  match ls with
-    | nil => [| p = 0 |]
-      (* An empty list is associated with a null pointer and no memory
-       * contents. *)
-    | x :: ls' => [| p <> 0 |]
-                  * exists p', p |--> [x; p'] * linkedList p' ls'
-      (* A nonempty list is associated with a nonnull pointer and a two-cell
-       * struct, which points to a further list. *)
-  end%sep.
-
-(* The definition of [linkedList] is recursive in the list.  Let's also prove
- * lemmas for simplifying [linkedList] invocations based on values of [p]. *)
-
-Theorem linkedList_null : forall ls,
-  linkedList 0 ls === [| ls = nil |].
-Proof.
-  (* Tactic [heq] breaks an equivalence into two implications. *)
-  heq; cases ls; cancel.
-Qed.
-
-Theorem linkedList_nonnull : forall p ls,
-  p <> 0
-  -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |--> [x; p'] * linkedList p' ls'.
-Proof.
-  heq; cases ls; cancel; match goal with
-                         | [ H : _ = _ :: _ |- _ ] => invert H
-                         end; cancel.
-Qed.
-
-Hint Rewrite <- rev_alt.
-Hint Rewrite rev_involutive.
-
-(* Let's hide the definition of [linkedList], so that we *only* reason about it
- * via the two lemmas we just proved. *)
-Opaque linkedList.
-
-(* In-place linked-list reverse, the "hello world" of separation logic! *)
-Definition reverse p :=
-  pr <- for pr := (p, 0) loop
-    let (p, r) := pr in
-    if p ==n 0 then
-      Return (Done pr)
-    else
-      tmp <- Read (p + 1);
-      _ <- Write (p+1) r;
-      Return (Again (tmp, p))
-  done;
-  Return (snd pr).
-
-(* Helper function to peel away the [Done]/[Again] status of a [loop_outcome] *)
-Definition valueOf {A} (o : loop_outcome A) :=
-  match o with
-  | Done v => v
-  | Again v => v
-  end.
-
-Theorem reverse_ok : forall p ls,
-  {{linkedList p ls}}
-    reverse p
-  {{r ~> linkedList r (rev ls)}}.
-Proof.
-  unfold reverse.
-  simp.
-  step.
-  (* When we reach a loop, we give the invariant with a special tactic. *)
-  loop_inv (fun o => exists ls1 ls2, [| ls = rev_append ls1 ls2 |]
-                                     * linkedList (fst (valueOf o)) ls2
-                                     * linkedList (snd (valueOf o)) ls1
-                                     * [| match o with
-                                          | Done (p, _) => p = 0
-                                          | _ => True
-                                          end |])%sep.
-  cases (a ==n 0); simp.
-  step.
-  cancel.
-  step.
-  (* We use [setoid_rewrite] for rewriting under binders ([exists], in this
-   * case).  Note that we also specify hypothesis [n] explicitly, since
-   * [setoid_rewrite] isn't smart enough to infer parameters otherwise. *)
-  setoid_rewrite (linkedList_nonnull _ n).
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  setoid_rewrite (linkedList_nonnull _ n).
-  cancel.
-  simp.
-  setoid_rewrite linkedList_null.
-  cancel.
-  equality.
-  simp.
-  step.
-  cancel.
-  simp.
-  setoid_rewrite linkedList_null.
-  cancel.
-  simp.
-  cancel.
-Qed.
-
-Opaque reverse.
-
-(* ** Calling [reverse] twice, to illustrate the *frame rule* *)
-
-Theorem reverse_two_ok : forall p1 ls1 p2 ls2,
-  {{linkedList p1 ls1 * linkedList p2 ls2}}
-    p1 <- reverse p1;
-    p2 <- reverse p2;
-    Return (p1, p2)
-  {{ps ~> linkedList (fst ps) (rev ls1) * linkedList (snd ps) (rev ls2)}}.
-Proof.
-  simp.
-  step.
-  use reverse_ok.
-  simp.
-  step.
-  use reverse_ok.
-  simp.
-  step.
-  cancel.
-Qed.
-(* Note that the intuitive correctness theorem would be *false* for lists
- * sharing any cells in common!  The inherent disjointness of [*] saves us from
- * worrying about those cases. *)
-
-
-(* ** Computing the length of a linked list *)
-
-(* To state a good loop invariant, it will be helpful to define
- * *list segments* that end with some pointer beside null. *)
-Fixpoint linkedListSegment (p : nat) (ls : list nat) (q : nat) :=
-  match ls with
-    | nil => [| p = q |]
-    | x :: ls' => [| p <> 0 |] * exists p', p |-> x * (p+1) |-> p' * linkedListSegment p' ls' q
-  end%sep.
-
-(* Next, two [linkedListSegment] lemmas analogous to those for [linkedList]
- * above *)
-
-Lemma linkedListSegment_empty : forall p ls,
-  linkedList p ls ===> linkedList p ls * linkedListSegment p nil p.
-Proof.
-  cancel.
-Qed.
-
-Lemma linkedListSegment_append : forall q r x ls p,
-  q <> 0
-  -> linkedListSegment p ls q * q |-> x * (q+1) |-> r ===> linkedListSegment p (ls ++ x :: nil) r.
-Proof.
-  induct ls; cancel; auto.
-  subst; cancel.
-  rewrite <- IHls; cancel; auto.
-Qed.
-
-(* One more [linkedList] lemma will be helpful.  We'll re-reveal the predicate's
- * definition to prove the lemma. *)
-
-Transparent linkedList.
-
-Lemma linkedListSegment_null : forall ls p,
-  linkedListSegment p ls 0 ===> linkedList p ls.
-Proof.
-  induct ls; cancel; auto.
-Qed.
-
-Opaque linkedList linkedListSegment.
-
-(* A few algebraic properties of list operations: *)
-Hint Rewrite <- app_assoc.
-Hint Rewrite app_length app_nil_r.
-
-(* We tie a few of them together into this lemma. *)
-Lemma move_along : forall A (ls : list A) x2 x1 x0 x,
-  ls = x2 ++ x1
-  -> x1 = x0 :: x
-  -> ls = (x2 ++ [x0]) ++ x.
-Proof.
-  simp.
-Qed.
-
-Hint Resolve move_along.
-
-Theorem length_ok : forall p ls,
-  {{linkedList p ls}}
-    q_len <- for q_len := (p, 0) loop
-      let (q, len) := q_len in
-      if q ==n 0 then
-        Return (Done q_len)
-      else
-        tmp <- Read (q + 1);
-        Return (Again (tmp, len+1))
-    done;
-    Return (snd q_len)
-  {{len ~> linkedList p ls * [| len = length ls |]}}.
-Proof.
-  simp.
-  step.
-  loop_inv (fun o => exists ls1 ls2, [| ls = ls1 ++ ls2 |]
-                                     * linkedListSegment p ls1 (fst (valueOf o))
-                                     * linkedList (fst (valueOf o)) ls2
-                                     * [| snd (valueOf o) = length ls1 |]
-                                     * [| match o with
-                                          | Done (q, _) => q = 0 /\ ls2 = nil
-                                          | _ => True
-                                          end |])%sep.
-  cases (a ==n 0); simp.
-  step.
-  setoid_rewrite linkedList_null.
-  cancel.
-  step.
-  setoid_rewrite (linkedList_nonnull _ n).
-  step.
-  simp.
-  step.
-  cancel.
-  eauto.
-  simp.
-  setoid_rewrite <- linkedListSegment_append.
-  cancel.
-  auto.
-  rewrite linkedListSegment_empty.
-  cancel.
-  simp.
-  step.
-  cancel.
-  simp.
-  simp.
-  rewrite linkedListSegment_null.
-  rewrite linkedList_null.
-  cancel.
 Qed.

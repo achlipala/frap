@@ -25,4 +25,5 @@ TypesAndMutation.v
 DeepAndShallowEmbeddings_template.v
 DeepAndShallowEmbeddings.v
 SepCancel.v
+SeparationLogic_template.v
 SeparationLogic.v

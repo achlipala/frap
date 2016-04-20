@@ -3126,6 +3126,56 @@ As a result, our extracted programs achieve the asymptotic performance that we w
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Separation Logic}
+
+In our Hoare-logic examples so far, we have intentionally tread lightly when it comes to the potential aliasing\index{aliasing} of pointer variables in a program.
+Generally, we have only worked with, for instance, a single array at a time.
+Reasoning about multi-array programs generally depends on the fact that the arrays don't overlap in memory at all.
+Things are even more complicated with linked data structures, like linked lists and trees, which haven't even attempted up to now.
+However, by using \emph{separation logic}\index{separation logic}, a popular variant of Hoare logic, we will find it quite pleasant to prove programs that used linked structures, with no need for explicit reasoning about aliasing, assuming that we keep all of our data structures disjoint from each other through simple coding patterns.
+
+
+\section{An Object Language with Dynamic Memory Allocation}
+
+Before we get into proofs, let's fix a mixed-embedding object language.
+$$\begin{array}{rrcl}
+  \textrm{Commands} & c &::=& \mt{Return} \; v \mid x \leftarrow c; c \; f \mid \mt{Loop} \; i \; f \mid \mt{Fail} \\
+  &&& \mid \mt{Read} \; n \mid \mt{Write} \; n \; n \mid \mt{Alloc} \; n \mid \mt{Free} \; n \; n
+\end{array}$$
+
+A small-step operational semantics explains what these commands mean.
+
+$$\infer{\smallstep{(h, x \leftarrow c_1; c_2(x))}{(h', x \leftarrow c'_1; c_2(x))}}{
+  \smallstep{(h, c_1)}{(h', c'_1)}
+}
+\quad \infer{\smallstep{(h, x \leftarrow \mt{Return} \; v; c(x))}{(h, c(v))}}{}$$
+
+$$\infer{\smallstep{(h, \mt{Loop} \; i \; f)}{(h, x \leftarrow f(\mt{Again}(i)); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
+
+$$\infer{\smallstep{(h, \mt{Read} \; a)}{(h, v)}}{
+  \msel{h}{a} = v
+}
+\quad \infer{\smallstep{(h, \mt{Write} \; a \; v')}{(\mupd{h}{a}{v'}, ())}}{
+  \msel{h}{a} = v
+}$$
+
+$$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, a)}}{
+  \dom{h} \cap [a, a+n) = \emptyset
+}
+\quad \infer{\smallstep{(h, \mt{Free} \; a \; n)}{(h - [a, a+n), ())}}{
+}$$
+
+A few remarks about the last four rules:
+The basic $\mt{Read}$ and $\mt{Write}$ operations now get \emph{stuck} when accessing unmapped addresses.
+The premise of the rule for $\mt{Alloc}$ enforces that address $a$ denotes a currently unmapped memory region of size $n$.
+We use a variety of convenient notations that we won't define in detail here, referring instead to the accompanying Coq code.
+Another notation uses $0^n$ to refer informally to a sequence of $n$ zeroes to write into memory.
+Similarly, the conclusion of the $\mt{Free}$ rule unmaps a whole size-$n$ region, starting at $a$.
+We could also have chosen to enforce in this rule that the region starts out as mapped into $h$.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

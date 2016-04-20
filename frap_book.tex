@@ -3339,8 +3339,56 @@ The proof internals require only the basic rules for $\mt{Return}$ and sequencin
 Note also that this highly automatable proof style works just as well when calling functions associated with several different data structures in memory.
 The frame rule provides a way to show that any function, in any library, preserves arbitrary memory state outside its footprint.
 
+\section{Soundness Proof}
 
+Our Hoare logic is sound with respect to the object language's operational semantics.
 
+\invariants
+\begin{theorem}
+  If $\hoare{P}{c}{Q}$ and $P(\mempty)$, then it is an invariant of the transition system starting from $(\mempty, c)$ that either the command has become a $\mt{Return}$ or another execution step is possible.
+\end{theorem}
+
+As usual, the key to the proof is to find a stronger invariant that can be proved by invariant induction.
+In this case, we use the invariant $\lambda (h, c). \; \hoare{\{h\}}{c}{Q}$.
+That is, assert a Hoare triple where the precondition enforces exact heap equality with the current heap.
+The postcondition can remain the same throughout execution.
+
+A few key lemmas are interesting enough to mention here; we leave other details to the Coq code.
+
+First, we need to prove that this fancier invariant implies the one from the theorem statement, and the most direct statement needs to be strengthened, to get the induction to go through.
+
+\begin{lemma}[Progress]
+  If $\hoare{P}{c}{Q}$ and $P(h_1)$, then either $c$ is a $\mt{Return}$ or it is possible to take a step from $(h_1 \uplus h_2, c)$, for any disjoint $h_2$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c}{Q}$.
+\end{proof}
+
+Note the essential inclusion of a disjoint union with the auxiliary heap $h_2$.
+Without this strengthening of the obvious property, we would get stuck in the case of the proof for the frame rule.
+
+\begin{lemma}[Preservation]
+  If $\smallstep{(h, c)}{(h', c')}$ and $\hoare{\{h\}}{c}{Q}$, then $\hoare{\{h'\}}{c'}{Q}$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\smallstep{(h, c)}{(h', c')}$.
+\end{proof}
+
+The different cases of the proof depend on some not-entirely-obvious inversion lemmas.
+For instance, here is the one we prove for $\mt{Write}$.
+
+\begin{lemma}
+  If $\hoare{P}{\mt{Write} \; a \; v'}{Q}$, then there exists $R$ such that:
+  \begin{itemize}
+  \item $P \Rightarrow \exists v. \; \ptsto{a}{v} * R$
+  \item $\ptsto{a}{v'} * R \Rightarrow Q(())$
+  \end{itemize}
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{\mt{Write} \; a \; v'}{Q}$.
+\end{proof}
+
+Again, without the introduction of the $R$ variable, we would get stuck proving the case for the frame rule.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

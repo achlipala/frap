@@ -308,7 +308,23 @@ Module Make(Import S : SEP).
     reflexivity.
   Qed.
 
-  Definition try_me_first (_ : hprop) := True.
+  Module Type TRY_ME_FIRST.
+    Parameter try_me_first : hprop -> Prop.
+
+    Axiom try_me_first_easy : forall p, try_me_first p.
+  End TRY_ME_FIRST.
+
+  Module TMF : TRY_ME_FIRST.
+    Definition try_me_first (_ : hprop) := True.
+
+    Theorem try_me_first_easy : forall p, try_me_first p.
+    Proof.
+      constructor.
+    Qed.
+  End TMF.
+
+  Import TMF.
+  Export TMF.
 
   Ltac cancel1 :=
     match goal with

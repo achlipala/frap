@@ -287,11 +287,7 @@ Module Make(Import S : SEP).
     intros; rewrite <- star_assoc; rewrite (star_comm p r); apply star_assoc.
   Qed.
 
-  Ltac sendToBack part :=
-    repeat match goal with
-             | [ |- context[(?p * part) * ?q] ] => setoid_rewrite (stb1 part p q)
-             | [ |- context[part * ?p] ] => setoid_rewrite (star_comm part p)
-           end.
+  Ltac sendToBack part := repeat (rewrite (stb1 part) || rewrite (star_comm part)).
 
   Theorem star_cancel' : forall p1 p2 q, p1 ===> p2
     -> p1 * q ===> p2 * q.

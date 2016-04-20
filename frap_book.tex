@@ -3259,6 +3259,88 @@ $$\ptsto{r}{0} \Rightarrow \; \ptsto{r}{?c}$$
 
 Now we can finish the proof by reflexivity of $\Rightarrow$, learning $?c = 0$.
 
+\section{Program Logic}
+
+We use our automatic cancellation procedure to discharge some of the premises from the rules of the program logic, which we present now.
+First, here are the rules that are (almost) exactly the same as from last chapter.
+
+$$\infer{\hoare{P}{\mt{Return} \; v}{\lambda r. \; P * \lift{r = v}}}{}
+\quad \infer{\hoare{P}{x \leftarrow c_1; c_2(x)}{R}}{
+  \hoare{P}{c_1}{Q}
+  & (\forall r. \; \hoare{Q(r)}{c_2(r)}{R})
+}$$
+
+$$\infer{\hoare{I(\mt{Again}(i))}{\mt{Loop} \; i \; f}{\lambda r. \; I(\mt{Done}(r))}}{
+  \forall a. \; \hoare{I(\mt{Again}(a))}{f(a)}{I}
+}
+\quad \infer{\hoare{\lift{\bot}}{\mt{Fail}}{\lambda \_. \; \lift{\bot}}}{}$$
+
+$$\infer{\hoare{P'}{c}{Q'}}{
+  \hoare{P}{c}{Q}
+  & P' \Rightarrow P
+  & \forall r. \; Q(r) \Rightarrow Q'(r)
+}$$
+
+More interesting are the rules for primitive memory operations.
+First, we have the rule for $\mt{Read}$.
+
+$$\infer{\hoare{\exists v. \; \ptsto{a}{v} * R(v)}{\mt{Read} \; a}{\lambda r. \; \ptsto{a}{r} * R(r)}}{}$$
+
+In words: before reading from address $a$, it must be the case that $a$ points to some value $v$, and predicate $R(v)$ records what else we know about the memory at that point.
+Afterward, we know that $a$ points to the result $r$ of the read operation, and $R$ is still present.
+We call $R$ a \emph{frame predicate}\emph{frame predicate}, recording what we know about parts of memory that the command does not touch directly.
+We might also say that the \emph{footprint} of this command is the singleton set $\{a\}$.
+In general, frame predicates record preserved facts about addresses outside a command's footprint.
+The next few rules don't have frame predicates baked in; we finish with a rule that adds them back, in a generic way for arbitrary Hoare triples.
+
+$$\infer{\hoare{\exists v. \; \ptsto{a}{v}}{\mt{Write} \; a \; v'}{\lambda \_. \; \ptsto{a}{v'}}}{}$$
+
+This last rule, for $\mt{Write}$, is even simpler, with no baked-in frame predicate.
+We see a straightforward illustration of overwriting $a$'s old value $v$ with the new value $v$'.
+
+$$\infer{\hoare{\emp}{\mt{Alloc} \; n}{\lambda r. \; \ptsto{r}{0^n}}}{}
+\quad \infer{\hoare{\ptsto{a}{\; ?^n}}{\mt{Free} \; a \; n}{\lambda \_. \; \emp}}{}$$
+
+The rules for allocation and deallocation deploy a few notations that we don't explain in detail here, with $0^n$ for sequences of $n$ zeroes and $?^n$ for sequences of $n$ arbitrary values.
+
+The next rule, the \emph{frame rule}\index{frame rule}, gives the second key idea of separation logic, supporting the \emph{small-footprint}\index{small-footprint style} reasoning style.
+
+$$\infer{\hoare{P * R}{c}{\lambda r. \; Q(r) * R}}{
+  \hoare{P}{c}{Q}
+}$$
+
+In other words, any Hoare triple can be extended by conjoining an arbitrary predicate $R$ in both precondition and postcondition.
+Even more intuitively, when a program satisfies a spec, it also satisfies an extended spec that records the state of some other part of memory that is untouched (i.e., is outside the command's footprint).
+
+For the pragmatics of proving particular programs, we defer to the accompanying Coq code.
+\modularity
+However, for modular proofs, the frame rule has such an important role that we want to emphasize it here.
+It is possible to define (recursively) a predicate $\mt{llist}(\ell, p)$, capturing the idea that the memory contains exactly an imperative linked list, rooted at pointer $p$, representing functional linked list $\ell$.
+We can also prove a general specification for a list-reversal function:
+$$\forall \ell, p. \; \hoare{\mt{llist}(\ell, p)}{\texttt{reverse}(p)}{\lambda r. \; \mt{llist}(\mt{rev}(\ell), r)}$$
+
+Now consider that we have the roots $p_1$ and $p_2$ of two disjoint lists, respectively representing $\ell_1$ and $\ell_2$.
+It is easy to instantiate the general theorem and get $\hoare{\mt{llist}(\ell_1, p_1)}{\texttt{reverse}(p_1)}{\lambda r. \; \mt{llist}(\mt{rev}(\ell_1), r)}$ and $\hoare{\mt{llist}(\ell_2, p_2)}{\texttt{reverse}(p_2)}{\lambda r. \; \mt{llist}(\mt{rev}(\ell_2), r)}$.
+Applying the frame rule to the former theorem, with $R = \mt{llist}(\ell_2, p_2)$, we get:
+$$\hoare{\mt{llist}(\ell_1, p_1) * \mt{llist}(\ell_2, p_2)}{\texttt{reverse}(p_1)}{\lambda r. \; \mt{llist}(\mt{rev}(\ell_1), r) * \mt{llist}(\ell_2, p_2)}$$
+Similarly, applying the frame rule to the latter, with $R = \mt{llist}(\mt{rev}(\ell_1), r)$, we get:
+$$\hoare{\mt{llist}(\ell_2, p_2) * \mt{llist}(\mt{rev}(\ell_1), r)}{\texttt{reverse}(p_2)}{\lambda r'. \; \mt{llist}(\mt{rev}(\ell_2), r') * \mt{llist}(\mt{rev}(\ell_1), r)}$$
+Now it is routine to derive the following spec for a larger program:
+$$\begin{array}{l}
+  \{\mt{llist}(\ell_1, p_1) * \mt{llist}(\ell_2, p_2)\} \\
+  \hspace{.2in} r \leftarrow \texttt{reverse}(p_1); r' \leftarrow \texttt{reverse}(p_2); \; \mt{Return}(r, r') \\
+  \{\lambda (r, r'). \; \mt{llist}(\mt{rev}(\ell_1), r) * \mt{llist}(\mt{rev}(\ell_2), r')\}
+\end{array}$$
+
+Note that this specification would be incorrect if the two input lists could share any memory cells!
+The separating conjunction $*$ in the precondition implicitly formalizes our expectiation of nonaliasing.
+The proof internals require only the basic rules for $\mt{Return}$ and sequencing, in addition to the rule of consequence, whose side conditions we discharge using the cancellation approach sketched in the previous section.
+
+Note also that this highly automatable proof style works just as well when calling functions associated with several different data structures in memory.
+The frame rule provides a way to show that any function, in any library, preserves arbitrary memory state outside its footprint.
+
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -3173,6 +3173,93 @@ Another notation uses $0^n$ to refer informally to a sequence of $n$ zeroes to w
 Similarly, the conclusion of the $\mt{Free}$ rule unmaps a whole size-$n$ region, starting at $a$.
 We could also have chosen to enforce in this rule that the region starts out as mapped into $h$.
 
+\section{Assertion Logic}
+
+Separation logic is based on two big ideas.
+The first one has to do with the \emph{assertion logic}\index{assertion logic}, which we use to write invariants; while the second one has to do with the \emph{program logic}\index{program logic}, which we use to prove that programs satisfy specifications.
+The assertion logic is based on predicates over \emph{partial memories}\emph{partial memories}, or finite maps from addresses to stored values.
+Because they are finite, they omit infinitely many addresses, and it is crucial that we are able to describe heaps that intentionally leave addresses out of their domains.
+Informally, a predicate \emph{claims ownership}\index{ownership} of addresses in the domains of matching heaps.
+
+\newcommand{\emp}[0]{\mt{emp}}
+\newcommand{\lift}[1]{[#1]}
+\newcommand{\ptsto}[2]{#1 \mapsto #2}
+
+We can describe the connectives of separation logic in terms of the sets of partial heaps that they accept.
+\begin{eqnarray*}
+  \emp &=& \{\mempty\} \\
+  \ptsto{p}{v} &=& \{\mupd{\mempty}{p}{v}\} \\
+  \lift{\phi} &=& \{h \mid \phi \land h = \mempty\} \\
+  \exists x. \; P(x) &=& \{h \mid \exists x. \; h \in P(x)\} \\
+  P * Q &=& \{h_1 \uplus h_2 \mid h_1 \in P \land h_2 \in Q\}
+\end{eqnarray*}
+
+The formula $\emp$ accepts only the empty heap, while formula $\ptsto{p}{v}$ accepts only the heap whose only address is $p$, mapped to value $v$.
+We overload the $\mapsto$ operator in that second line above, to denote ``points-to'' on the lefthand side of the equality and finite-map overriding on the righthand side.
+Notation $\lift{\phi}$ is \emph{lifting}\index{lifting pure propositions} a \emph{pure} (i.e., regular old mathematical) proposition $\phi$ into an assertion, enforcing both that the heap is empty and that $\phi$ is true.
+We also adapt the normal existential quantifier to this setting.
+
+The essential definition is the last one, of the \emph{separating conjunction}\index{separating conjunction} $*$.
+We use the notation $h_1 \uplus h_2$ for \emph{disjoint union} of heaps $h_1$ and $h_2$, implicitly enforcing $\dom{h_1} \cap \dom{h_2} = \emptyset$.
+The intuition of separating conjunction is that we \emph{partition} the overall heap into two subheaps, each of which matches one of the respective conjuncts $P$ and $Q$.
+This connective implicitly enforces \emph{lack of aliasing}, leading to separation logic's famous conciseness of specifications that combine data structures.
+
+We can also define natural comparison operators between assertions, overloading the usual notations for equivalence and implication of propositions.
+\begin{eqnarray*}
+  P \Leftrightarrow Q &=& \forall h. \; h \in P \Leftrightarrow h \in Q \\
+  P \Rightarrow Q &=& \forall h. \; h \in P \Rightarrow h \in Q
+\end{eqnarray*}
+
+The core connectives satisfy a number of handy algebraic laws.
+Here is a sampling.
+
+$$\infer{P * \lift{\phi} \Rightarrow Q}{
+  \phi \rightarrow (P \Rightarrow Q)
+}
+\quad \infer{P \Rightarrow Q * \lift{\phi}}{
+  \phi
+  & P \Rightarrow Q
+}
+\quad \infer{P \Leftrightarrow \lift{\phi} * P}{
+  \phi
+}$$
+
+$$\infer{P * Q \Leftrightarrow Q * P}{}
+\quad \infer{P * (Q * R) \Leftrightarrow (P * Q) * R}{}
+\quad \infer{P_1 * Q_1 \Rightarrow P_2 * Q_2}{
+  P_1 \Rightarrow P_2
+  & Q_1 \Rightarrow Q_2
+}$$
+
+$$\infer{(P * \exists x. \; Q(x)) \Leftrightarrow \exists x. \; P * Q(x)}{}
+\quad \infer{(\exists x. \; P(x)) \Rightarrow Q}{
+  \forall x. \; P(x) \Rightarrow Q
+}
+\quad \infer{P \Rightarrow \exists x. \; Q(x)}{
+  P \Rightarrow Q(v)
+}$$
+
+This set of algebraic laws has a very special consequence: it supports automated proof of implications by \emph{cancellation}\index{cancellation}, where we repeatedly ``cross out'' matching subformulas on the two sides of the arrow.
+Consider this example formula that we might want to prove.
+$$(\exists q. \; \ptsto{p}{q} * \exists r. \; \ptsto{q}{r} * \ptsto{r}{0}) \Rightarrow (\exists a. \; \exists b. \; \exists c. \; \ptsto{r}{c} * \ptsto{p}{a} * \ptsto{a}{b})$$
+
+First, the laws above allow us to bubble all quantifiers to the fronts of formulas.
+$$(\exists q, r. \; \ptsto{p}{q} * \ptsto{q}{r} * \ptsto{r}{0}) \Rightarrow (\exists a, b, c. \; \ptsto{b}{c} * \ptsto{p}{a} * \ptsto{a}{b})$$
+
+Next, all $\exists$ to the left can be replaced with fresh free variables, while all $\exists$ to the right can be replaced with fresh \emph{unification variables}\index{unification variables}, whose values, in terms of the free-variable values, we can deduce in the course of the proof.
+$$\ptsto{p}{q} * \ptsto{q}{r} * \ptsto{r}{0} \Rightarrow \; \ptsto{?b}{?c} \; * \; \ptsto{p}{?a} \; * \; \ptsto{?a}{?b}$$
+
+Next, we find matching subformulas to \emph{cancel}.
+We start by matching $\ptsto{p}{q}$ with $\ptsto{p}{?a}$, learning that $?a = q$ and reducing to this formula.
+This crucial step relies on the three key properties of $*$, given in the second row of rules above: commutativity, associativity, and cancellativity\index{cancellativity}.
+$$\ptsto{q}{r} * \ptsto{r}{0} \Rightarrow \; \ptsto{?b}{?c} \; * \; \ptsto{q}{?b}$$
+
+We run another cancellation step of $\ptsto{q}{r}$ against $\ptsto{q}{?b}$, learning $?q = r$.
+$$\ptsto{r}{0} \Rightarrow \; \ptsto{r}{?c}$$
+
+Now we can finish the proof by reflexivity of $\Rightarrow$, learning $?c = 0$.
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

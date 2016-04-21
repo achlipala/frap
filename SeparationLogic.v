@@ -10,9 +10,7 @@ Set Asymmetric Patterns.
 
 (** * Shared notations and definitions; main material starts afterward. *)
 
-Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 Definition heap := fmap nat nat.
-Definition assertion := heap -> Prop.
 
 Hint Extern 1 (_ <= _) => linear_arithmetic.
 Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
@@ -281,7 +279,7 @@ Infix "|->?" := allocated (at level 30) : sep_scope.
 
 (** * Finally, the Hoare logic *)
 
-Inductive hoare_triple : forall {result}, assertion -> cmd result -> (result -> assertion) -> Prop :=
+Inductive hoare_triple : forall {result}, hprop -> cmd result -> (result -> hprop) -> Prop :=
 (* First, four basic rules that look exactly the same as before *)
 | HtReturn : forall P {result : Set} (v : result),
     hoare_triple P (Return v) (fun r => P * [| r = v |])%sep
@@ -319,7 +317,7 @@ Inductive hoare_triple : forall {result}, assertion -> cmd result -> (result -> 
 (* Deallocation requires an argument pointing to the appropriate number of
  * words, taking us to a state where those addresses are unmapped. *)
 
-| HtConsequence : forall {result} (c : cmd result) P Q (P' : assertion) (Q' : _ -> assertion),
+| HtConsequence : forall {result} (c : cmd result) P Q (P' : hprop) (Q' : _ -> hprop),
     hoare_triple P c Q
     -> P' ===> P
     -> (forall r, Q r ===> Q' r)
@@ -339,7 +337,7 @@ Inductive hoare_triple : forall {result}, assertion -> cmd result -> (result -> 
 Notation "{{ P }} c {{ r ~> Q }}" :=
   (hoare_triple P%sep c (fun r => Q%sep)) (at level 90, c at next level).
 
-Lemma HtStrengthen : forall {result} (c : cmd result) P Q (Q' : _ -> assertion),
+Lemma HtStrengthen : forall {result} (c : cmd result) P Q (Q' : _ -> hprop),
     hoare_triple P c Q
     -> (forall r, Q r ===> Q' r)
     -> hoare_triple P c Q'.
@@ -349,7 +347,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : assertion),
+Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : hprop),
     hoare_triple P c Q
     -> P' ===> P
     -> hoare_triple P' c Q.
@@ -938,7 +936,7 @@ Opaque heq himp lift star exis ptsto.
 (* Here comes some automation that we won't explain in detail, instead opting to
  * use examples. *)
 
-Theorem use_lemma : forall result P' (c : cmd result) (Q : result -> assertion) P R,
+Theorem use_lemma : forall result P' (c : cmd result) (Q : result -> hprop) P R,
   hoare_triple P' c Q
   -> P ===> P' * R
   -> hoare_triple P c (fun r => Q r * R)%sep.

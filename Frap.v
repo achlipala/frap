@@ -1,4 +1,4 @@
-Require Import String Arith Omega Program Sets Relations Map Var Invariant Bool ModelCheck.
+Require Import Eqdep String Arith Omega Program Sets Relations Map Var Invariant Bool ModelCheck.
 Export String Arith Sets Relations Map Var Invariant Bool ModelCheck.
 Require Import List.
 Export List ListNotations.
@@ -58,6 +58,7 @@ end.
 Ltac fancy_neq :=
   repeat match goal with
          | _ => maps_neq
+         | [ H : @eq (nat -> _) _ _ |- _ ] => apply (f_equal (fun f => f 0)) in H
          | [ H : _ = _ |- _ ] => invert H
          end.
 
@@ -129,33 +130,46 @@ Ltac first_order := firstorder idtac.
 
 (** * Model checking *)
 
-Ltac model_check_done :=
-  apply MscDone; apply prove_oneStepClosure; simplify; propositional; subst;
-  repeat match goal with
-         | [ H : ?P |- _ ] =>
-           match type of P with
-           | Prop => invert H; simplify
-           end
-         end; equality.
+Ltac sets := Sets.sets ltac:(simpl in *; intuition (subst; auto)).
 
-Ltac singletoner :=
+Ltac model_check_invert1 :=
+  match goal with
+  | [ H : ?P |- _ ] =>
+    match type of P with
+    | Prop => invert H;
+              repeat match goal with
+                     | [ H : existT _ ?x _ = existT _ ?x _ |- _ ] =>
+                       apply inj_pair2 in H; subst
+                     end; simplify
+    end
+  end.
+
+Ltac model_check_invert := simplify; subst; repeat model_check_invert1.
+
+Lemma oneStepClosure_solve : forall A (sys : trsys A) I I',
+  oneStepClosure sys I I'
+  -> I = I'
+  -> oneStepClosure sys I I.
+Proof.
+  equality.
+Qed.
+
+Ltac singletoner := try (exfalso; solve [ sets ]);
   repeat match goal with
          (* | _ => apply singleton_in *)
          | [ |- _ ?S ] => idtac S; apply singleton_in
          | [ |- (_ \cup _) _ ] => apply singleton_in_other
          end.
 
+Ltac closure :=
+  repeat (apply oneStepClosure_empty
+          || (apply oneStepClosure_split; [ model_check_invert; try equality; solve [ singletoner ] | ])).
+
+Ltac model_check_done :=
+  apply MscDone; eapply oneStepClosure_solve; [ closure | simplify; solve [ sets ] ].
+
 Ltac model_check_step :=
-  eapply MscStep; [
-    repeat (apply oneStepClosure_empty
-            || (apply oneStepClosure_split; [ simplify;
-                                              repeat match goal with
-                                                     | [ H : ?P |- _ ] =>
-                                                       match type of P with
-                                                       | Prop => invert H; simplify; try congruence
-                                                       end
-                                                     end; solve [ singletoner ] | ]))
-  | simplify ].
+  eapply MscStep; [ closure | simplify ].
 
 Ltac model_check_steps1 := model_check_done || model_check_step.
 Ltac model_check_steps := repeat model_check_steps1.
@@ -223,5 +237,3 @@ Ltac simplify_map :=
     simplify_map' (m $+ (k, v)) tt ltac:(fun m' =>
                                            replace (@add A B m k v) with m' by maps_equal)
   end.
-
-Ltac sets := Sets.sets ltac:(simpl in *; intuition (subst; auto)).

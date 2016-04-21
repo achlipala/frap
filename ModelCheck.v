@@ -37,28 +37,30 @@ Proof.
 Qed.
 
 Inductive multiStepClosure {state} (sys : trsys state)
-  : (state -> Prop) -> (state -> Prop) -> Prop :=
-| MscDone : forall inv,
+  : (state -> Prop) -> (state -> Prop) -> (state -> Prop) -> Prop :=
+| MscDone : forall inv worklist,
     oneStepClosure sys inv inv
-    -> multiStepClosure sys inv inv
-| MscStep : forall inv inv' inv'',
-    oneStepClosure sys inv inv'
-    -> multiStepClosure sys inv' inv''
-    -> multiStepClosure sys inv inv''.
+    -> multiStepClosure sys inv worklist inv
+| MscStep : forall inv worklist inv' inv'',
+    oneStepClosure sys worklist inv'
+    -> multiStepClosure sys (inv \cup inv') (inv' \setminus inv) inv''
+    -> multiStepClosure sys inv worklist inv''.
 
-Lemma multiStepClosure_ok' : forall state (sys : trsys state) (inv inv' : state -> Prop),
-  multiStepClosure sys inv inv'
+Lemma multiStepClosure_ok' : forall state (sys : trsys state) (inv worklist inv' : state -> Prop),
+  multiStepClosure sys inv worklist inv'
   -> (forall st, sys.(Initial) st -> inv st)
   -> invariantFor sys inv'.
 Proof.
   induction 1; simpl; intuition eauto using oneStepClosure_done.
 
-  unfold oneStepClosure, oneStepClosure_current in *.
-  intuition eauto.
+  apply IHmultiStepClosure.
+  intuition.
+  apply H1 in H2.
+  sets idtac.
 Qed.
 
 Theorem multiStepClosure_ok : forall state (sys : trsys state) (inv : state -> Prop),
-  multiStepClosure sys sys.(Initial) inv
+  multiStepClosure sys sys.(Initial) sys.(Initial) inv
   -> invariantFor sys inv.
 Proof.
   eauto using multiStepClosure_ok'.

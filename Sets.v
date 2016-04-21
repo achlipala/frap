@@ -201,7 +201,7 @@ Inductive doSubtract A : list A -> list A -> list A -> Prop :=
   -> doSubtract ls ls0 ls'
   -> doSubtract (x :: ls) ls0 (x :: ls')
 | DsDrop : forall x ls ls0 ls',
-  List.In x ls
+  List.In x ls0
   -> doSubtract ls ls0 ls'
   -> doSubtract (x :: ls) ls0 ls'.
 
@@ -213,6 +213,7 @@ Theorem doSubtract_fwd : forall A x (ls ls0 ls' : list A),
 Proof.
   induction 1; simpl; intuition.
   subst; eauto.
+  tauto.
 Qed.
 
 Theorem doSubtract_bwd1 : forall A x (ls ls0 ls' : list A),
@@ -243,12 +244,18 @@ Proof.
   unfold constant; intuition eauto using doSubtract_fwd, doSubtract_bwd1, doSubtract_bwd2.
 Qed.
 
+Ltac fancy_neq :=
+  solve [ repeat match goal with
+                 | [ H : @eq (nat -> _) _ _ |- _ ] => apply (f_equal (fun f => f 0)) in H
+                 | [ H : _ = _ |- _ ] => inversion H; clear H; subst
+                 end ].
+
 Ltac doSubtract :=
   match goal with
   | [ |- context[constant ?ls \setminus constant ?ls0] ] =>
     erewrite (@doSubtract_ok _ ls ls0)
       by repeat (apply DsNil
-                 || (apply DsKeep; [ simpl; intuition congruence | ])
+                 || (apply DsKeep; [ simpl; intuition (congruence || fancy_neq) | ])
                  || (apply DsDrop; [ simpl; intuition congruence | ]))
   end.
 

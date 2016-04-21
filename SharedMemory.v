@@ -25,48 +25,42 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 (** * An object language with shared-memory concurrency *)
 
-Inductive loop_outcome acc :=
-| Done (a : acc)
-| Again (a : acc).
+(* Let's simplify the encoding by only working with commands that generate
+ * [nat]. *)
+Inductive loop_outcome :=
+| Done (a : nat)
+| Again (a : nat).
 
-Inductive cmd : Set -> Type :=
-| Return {result : Set} (r : result) : cmd result
-| Bind {result result'} (c1 : cmd result') (c2 : result' -> cmd result) : cmd result
-| Read (a : nat) : cmd nat
-| Write (a v : nat) : cmd unit
-| Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc
-| Fail {result} : cmd result
+Inductive cmd :=
+| Return (r : nat)
+| Bind (c1 : cmd) (c2 : nat -> cmd)
+| Read (a : nat)
+| Write (a v : nat)
+| Fail
 
 (* Now here's the new part: parallel composition of commands. *)
-| Par (c1 c2 : cmd unit) : cmd unit
+| Par (c1 c2 : cmd)
 
 (* Let's also add locking commands, where locks are named by [nat]s. *)
-| Lock (a : nat) : cmd unit
-| Unlock (a : nat) : cmd unit.
+| Lock (a : nat)
+| Unlock (a : nat).
 
 Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
-Notation "'for' x := i 'loop' c1 'done'" := (Loop i (fun x => c1)) (right associativity, at level 80).
 Infix "||" := Par.
 
 Definition locks := set nat.
 
-Inductive step : forall A, heap * locks * cmd A -> heap * locks * cmd A -> Prop :=
-| StepBindRecur : forall result result' (c1 c1' : cmd result') (c2 : result' -> cmd result) h h' l l',
+Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
+| StepBindRecur : forall c1 c1' c2 h h' l l',
   step (h, l, c1) (h', l', c1')
   -> step (h, l, Bind c1 c2) (h', l', Bind c1' c2)
-| StepBindProceed : forall (result result' : Set) (v : result') (c2 : result' -> cmd result) h l,
+| StepBindProceed : forall v c2 h l,
   step (h, l, Bind (Return v) c2) (h, l, c2 v)
-
-| StepLoop : forall (acc : Set) (init : acc) (body : acc -> cmd (loop_outcome acc)) h l,
-  step (h, l, Loop init body) (h, l, o <- body init; match o with
-                                                     | Done a => Return a
-                                                     | Again a => Loop a body
-                                                     end)
 
 | StepRead : forall h l a,
   step (h, l, Read a) (h, l, Return (h $! a))
 | StepWrite : forall h l a v,
-  step (h, l, Write a v) (h $+ (a, v), l, Return tt)
+  step (h, l, Write a v) (h $+ (a, v), l, Return 0)
 
 | StepParRecur1 : forall h l c1 c2 h' l' c1',
   step (h, l, c1) (h', l', c1')
@@ -74,19 +68,60 @@ Inductive step : forall A, heap * locks * cmd A -> heap * locks * cmd A -> Prop 
 | StepParRecur2 : forall h l c1 c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> step (h, l, Par c1 c2) (h', l', Par c1 c2')
-| StepParProceed1 : forall h l c2,
-   step (h, l, Par (Return tt) c2) (h, l, c2)
-| StepParProceed2 : forall h l c1,
-   step (h, l, Par c1 (Return tt)) (h, l, c1)
+| StepParProceed : forall h l,
+   step (h, l, Par (Return 0) (Return 0)) (h, l, Return 0)
 
 | StepLock : forall h l a,
   ~a \in l
-  -> step (h, l, Lock a) (h, l \cup {a}, Return tt)
+  -> step (h, l, Lock a) (h, l \cup {a}, Return 0)
 | StepUnlock : forall h l a,
   a \in l
-  -> step (h, l, Unlock a) (h, l \setminus {a}, Return tt).
+  -> step (h, l, Unlock a) (h, l \setminus {a}, Return 0).
 
-Definition trsys_of (h : heap) (l : locks) {result} (c : cmd result) := {|
+Definition trsys_of (h : heap) (l : locks) (c : cmd) := {|
   Initial := {(h, l, c)};
-  Step := step (A := result)
+  Step := step
 |}.
+
+
+Example two_increments_thread :=
+  _ <- Lock 0;
+  n <- Read 0;
+  _ <- Write 0 (n + 1);
+  Unlock 0.
+
+Example two_increments := two_increments_thread || two_increments_thread.
+
+Theorem two_increments_ok :
+  invariantFor (trsys_of $0 {} two_increments)
+               (fun p => let '(h, l, c) := p in
+                         c = Return 0
+                         -> h $! 0 = 2).
+Proof.
+  unfold two_increments, two_increments_thread.
+  simplify.
+  eapply invariant_weaken.
+  apply multiStepClosure_ok; simplify.
+
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_done.
+
+  simplify.
+  propositional; subst; try equality.
+  simplify.
+  reflexivity.
+Qed.

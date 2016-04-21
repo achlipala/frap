@@ -90,13 +90,25 @@ Example two_increments_thread :=
   _ <- Write 0 (n + 1);
   Unlock 0.
 
-Example two_increments := two_increments_thread || two_increments_thread.
+Example two_increments :=
+  _ <- (two_increments_thread || two_increments_thread);
+  n <- Read 0;
+  if n ==n 2 then
+    Return 0
+  else
+    Fail.
+
+Fixpoint notAboutToFail (c : cmd) : Prop :=
+  match c with
+  | Fail => False
+  | Bind c1 _ => notAboutToFail c1
+  | _ => True
+  end.
 
 Theorem two_increments_ok :
   invariantFor (trsys_of $0 {} two_increments)
-               (fun p => let '(h, l, c) := p in
-                         c = Return 0
-                         -> h $! 0 = 2).
+               (fun p => let '(_, _, c) := p in
+                         notAboutToFail c).
 Proof.
   unfold two_increments, two_increments_thread.
   simplify.
@@ -118,10 +130,415 @@ Proof.
   model_check_step.
   model_check_step.
   model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
   model_check_done.
 
   simplify.
-  propositional; subst; try equality.
+  propositional; subst; simplify; propositional.
+Qed.
+
+
+(** * Optimization #1: always run all purely local actions first. *)
+
+Fixpoint runLocal (c : cmd) : cmd :=
+  match c with
+  | Return _ => c
+  | Bind c1 c2 =>
+    match runLocal c1 with
+    | Return v => runLocal (c2 v)
+    | c1' => Bind c1' c2
+    end
+  | Read _ => c
+  | Write _ _ => c
+  | Fail => c
+  | Par c1 c2 =>
+    match runLocal c1, runLocal c2 with
+    | Return 0, Return 0 => Return 0
+    | c1', c2' => Par c1' c2'
+    end
+  | Lock _ => c
+  | Unlock _ => c
+  end.
+
+Inductive stepL : heap * locks * cmd -> heap * locks * cmd -> Prop :=
+| StepL : forall h l c h' l' c',
+  step (h, l, c) (h', l', c')
+  -> stepL (h, l, c) (h', l', runLocal c').
+
+Definition trsys_ofL (h : heap) (l : locks) (c : cmd) := {|
+  Initial := {(h, l, runLocal c)};
+  Step := stepL
+|}.
+
+Hint Constructors step stepL.
+
+Lemma run_Return : forall h l r h' l' c,
+  step^* (h, l, Return r) (h', l', c)
+  -> h' = h /\ l' = l /\ c = Return r.
+Proof.
+  induct 1; eauto.
+  invert H.
+Qed.
+
+Lemma run_Bind : forall h l c1 c2 h' l' c',
+  step^* (h, l, Bind c1 c2) (h', l', c')
+  -> (exists c1', step^* (h, l, c1) (h', l', c1')
+                  /\ c' = Bind c1' c2)
+     \/ (exists h'' l'' r, step^* (h, l, c1) (h'', l'', Return r)
+                           /\ step^* (h'', l'', c2 r) (h', l', c')).
+Proof.
+  induct 1; eauto.
+  invert H; eauto 10.
+
+  Ltac inst H :=
+    repeat match type of H with
+           | _ = _ -> _ => specialize (H eq_refl)
+           | forall x : ?T, _ =>
+             let y := fresh in evar (y : T); let y' := eval unfold y in y in
+               specialize (H y'); clear y
+           end.
+
+  inst IHtrc.
+  first_order; eauto 10.
+Qed.
+
+Lemma StepBindRecur_star : forall c1 c1' c2 h h' l l',
+    step^* (h, l, c1) (h', l', c1')
+    -> step^* (h, l, Bind c1 c2) (h', l', Bind c1' c2).
+Proof.
+  induct 1; eauto.
+  cases y.
+  cases p.
+  eauto.
+Qed.
+
+Lemma StepParRecur1_star : forall h l c1 c2 h' l' c1',
+  step^* (h, l, c1) (h', l', c1')
+  -> step^* (h, l, Par c1 c2) (h', l', Par c1' c2).
+Proof.
+  induct 1; eauto.
+  cases y.
+  cases p.
+  eauto.
+Qed.
+
+Lemma StepParRecur2_star : forall h l c1 c2 h' l' c2',
+  step^* (h, l, c2) (h', l', c2')
+  -> step^* (h, l, Par c1 c2) (h', l', Par c1 c2').
+Proof.
+  induct 1; eauto.
+  cases y.
+  cases p.
+  eauto.
+Qed.
+
+Hint Resolve StepBindRecur_star StepParRecur1_star StepParRecur2_star.
+
+Lemma runLocal_idem : forall c, runLocal (runLocal c) = runLocal c.
+Proof.
+  induct c; simplify; eauto.
+  cases (runLocal c); simplify; eauto.
+  rewrite IHc; auto.
+  rewrite IHc; auto.
+  cases (runLocal c1); simplify; eauto.
+  cases (runLocal c2); simplify; eauto.
+  cases r; eauto.
+  cases r0; eauto.
+  cases r; simplify; eauto.
+  rewrite IHc2; auto.
+  rewrite IHc2; auto.
+  cases r; simplify; eauto.
+  cases r; simplify; eauto.
+  cases r; simplify; eauto.
+  cases r; simplify; eauto.
+  rewrite IHc2; eauto.
+  rewrite IHc2; eauto.
+  cases r; simplify; eauto.
+  cases r; simplify; eauto.
+  rewrite IHc2; eauto.
+  rewrite IHc1; eauto.
+  equality.
+  equality.
+  equality.
+  rewrite IHc1; eauto.
+  equality.
+  equality.
+  equality.
+Qed.
+
+Lemma step_runLocal : forall h l c h' l' c',
+  step (h, l, c) (h', l', c')
+  -> (runLocal c = runLocal c' /\ h = h' /\ l = l')
+     \/ exists c'', step (h, l, runLocal c) (h', l', c'')
+                    /\ runLocal c'' = runLocal c'.
+Proof.
+  induct 1; simplify; first_order; eauto.
+
+  rewrite H0; equality.
+
+  cases (runLocal c1).
+  invert H0.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+  rewrite <- H1; eauto.
+
+  rewrite H0; equality.
+
+  cases (runLocal c1).
+  invert H0.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
   simplify.
-  reflexivity.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- H1.
+  right.
+  eexists.
+  propositional.
+  eauto.
+  simplify.
+  rewrite runLocal_idem.
+  equality.
+
+  rewrite H0; equality.
+
+  right.
+  cases (runLocal c1).
+  cases r.
+  cases (runLocal c2).
+  invert H0.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+  simplify.
+  rewrite H1; equality.
+  eexists; propositional.
+  eauto.
+
+  Lemma runLocal_left : forall c1 c2,
+    (forall r, runLocal c1 <> Return r)
+    -> runLocal (c1 || c2) = runLocal c1 || runLocal c2.
+  Proof.
+    simplify.
+    cases (runLocal c1); eauto.
+    unfold not in *.
+    exfalso; eauto.
+  Qed.
+
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+
+  eexists; propositional.
+  eauto.
+  rewrite runLocal_left.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  equality.
+  rewrite <- Heq.
+  rewrite runLocal_idem.
+  rewrite Heq.
+  equality.
+Qed.
+
+Lemma step_stepL' : forall h l c h' l' c',
+  step^* (h, l, c) (h', l', c')
+  -> stepL^* (h, l, runLocal c) (h', l', runLocal c').
+Proof.
+  induct 1; simplify; eauto.
+  cases y.
+  cases p.
+  inst IHtrc.
+  apply step_runLocal in H; first_order; subst.
+  rewrite H; eauto.
+  econstructor.
+  econstructor.
+  eauto.
+  equality.
+Qed.
+
+Theorem notAboutToFail_runLocal : forall c,
+  notAboutToFail (runLocal c)
+  -> notAboutToFail c.
+Proof.
+  induct c; simplify; auto.
+  cases (runLocal c); simplify; auto.
+Qed.
+
+Theorem step_stepL : forall h l c ,
+  invariantFor (trsys_ofL h l c) (fun p => let '(_, _, c) := p in
+                                           notAboutToFail c)
+  -> invariantFor (trsys_of h l c) (fun p =>
+                                      let '(_, _, c) := p in
+                                      notAboutToFail c).
+Proof.
+  unfold invariantFor; simplify.
+  propositional; subst.
+
+  cases s'.
+  cases p.
+  apply step_stepL' in H1.
+  apply H in H1; eauto using notAboutToFail_runLocal.
+Qed.
+
+Theorem two_increments_ok_again :
+  invariantFor (trsys_of $0 {} two_increments)
+               (fun p => let '(_, _, c) := p in
+                         notAboutToFail c).
+Proof.
+  apply step_stepL.
+  unfold two_increments, two_increments_thread.
+  simplify.
+  eapply invariant_weaken.
+  apply multiStepClosure_ok; simplify.
+
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_done.
+
+  simplify.
+  propositional; subst; simplify; propositional.
 Qed.

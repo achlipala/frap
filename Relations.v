@@ -14,6 +14,14 @@ Section trc.
 
   Hint Constructors trc.
 
+  Theorem trc_one : forall x y, R x y
+    -> trc x y.
+  Proof.
+    eauto.
+  Qed.
+
+  Hint Resolve trc_one.
+
   Theorem trc_trans : forall x y, trc x y
     -> forall z, trc y z
       -> trc x z.

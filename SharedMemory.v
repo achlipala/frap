@@ -111,7 +111,8 @@ Theorem two_increments_ok :
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-  unfold two_increments, two_increments_thread.
+Admitted.
+(*  unfold two_increments, two_increments_thread.
   simplify.
   eapply invariant_weaken.
   apply multiStepClosure_ok; simplify.
@@ -138,7 +139,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.
+Qed.*)
 
 
 (** * Optimization #1: always run all purely local actions first. *)
@@ -476,7 +477,8 @@ Theorem two_increments_ok_again :
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-  apply step_stepL.
+Admitted.
+(*  apply step_stepL.
   unfold two_increments, two_increments_thread.
   simplify.
   eapply invariant_weaken.
@@ -486,6 +488,42 @@ Proof.
   model_check_step.
   model_check_step.
   model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_step.
+  model_check_done.
+
+  simplify.
+  propositional; subst; equality.
+Qed.*)
+
+
+(** * Optimization #2: partial-order reduction *)
+
+Example independent_threads :=
+  _ <- ((a <- Read 0;
+          Write 1 (a + 1))
+        || (b <- Read 2;
+             Write 2 (b + 1)));
+  a <- Read 1;
+  if a ==n 1 then
+    Return 0
+  else
+    Fail.
+
+Theorem independent_threads_ok :
+  invariantFor (trsys_of $0 {} independent_threads)
+               (fun p => let '(_, _, c) := p in
+                         notAboutToFail c = true).
+Proof.
+  apply step_stepL.
+  unfold independent_threads.
+  simplify.
+  eapply invariant_weaken.
+  apply multiStepClosure_ok; simplify.
+
   model_check_step.
   model_check_step.
   model_check_step.

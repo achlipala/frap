@@ -59,8 +59,14 @@ Ltac fancy_neq :=
   repeat match goal with
          | _ => maps_neq
          | [ H : @eq (nat -> _) _ _ |- _ ] => apply (f_equal (fun f => f 0)) in H
-         | [ H : _ = _ |- _ ] => invert H
+         | [ H : @eq ?T _ _ |- _ ] =>
+           match eval compute in T with
+           | fmap _ _ => fail 1
+           | _ => invert H
+           end
          end.
+
+Ltac maps_equal' := progress Frap.Map.M.maps_equal; autorewrite with core; simpl.
 
 Ltac removeDups :=
   match goal with
@@ -69,7 +75,16 @@ Ltac removeDups :=
     erewrite (@removeDups_ok _ ls)
       by repeat (apply RdNil
                  || (apply RdNew; [ simpl; intuition (congruence || solve [ fancy_neq ]) | ])
-                 || (apply RdDup; [ simpl; intuition congruence | ]))
+                 || (apply RdDup; [ simpl; intuition (congruence || (repeat (maps_equal' || f_equal))) | ]))
+  end.
+
+Ltac doSubtract :=
+  match goal with
+  | [ |- context[constant ?ls \setminus constant ?ls0] ] =>
+    erewrite (@doSubtract_ok _ ls ls0)
+      by repeat (apply DsNil
+                 || (apply DsKeep; [ simpl; intuition (congruence || solve [ fancy_neq ]) | ])
+                 || (apply DsDrop; [ simpl; intuition (congruence || (repeat (maps_equal' || f_equal))) | ]))
   end.
 
 Ltac simpl_maps :=

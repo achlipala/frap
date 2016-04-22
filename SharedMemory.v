@@ -503,22 +503,23 @@ Qed.*)
 (** * Optimization #2: partial-order reduction *)
 
 Example independent_threads :=
-  _ <- ((a <- Read 0;
-          Write 1 (a + 1))
-        || (b <- Read 2;
-             Write 2 (b + 1)));
-  a <- Read 1;
-  if a ==n 1 then
-    Return 0
-  else
-    Fail.
+  (a <- Read 0;
+   _ <- Write 1 (a + 1);
+   a <- Read 1;
+   if a ==n 1 then
+     Return 0
+   else
+     Fail)
+  || (b <- Read 2;
+       Write 2 (b + 1)).
 
 Theorem independent_threads_ok :
   invariantFor (trsys_of $0 {} independent_threads)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-  apply step_stepL.
+Admitted.
+(*  apply step_stepL.
   unfold independent_threads.
   simplify.
   eapply invariant_weaken.
@@ -533,4 +534,159 @@ Proof.
 
   simplify.
   propositional; subst; equality.
+Qed.*)
+
+Inductive firstThread : cmd -> cmd -> cmd -> Prop :=
+| FtPar : forall c1 c2 c11 c12,
+  firstThread c1 c11 c12
+  -> firstThread (Par c1 c2) c11 (Par c12 c2)
+| FtDone : forall c,
+  match c with
+  | Par _ _ => False
+  | _ => True
+  end
+  -> firstThread c c (Return 0).
+
+Inductive nextAction : cmd -> cmd -> Prop :=
+| NaRead : forall a,
+    nextAction (Read a) (Read a)
+| NaWrite : forall a v,
+    nextAction (Write a v) (Write a v)
+| NaLock : forall l,
+    nextAction (Lock l) (Lock l)
+| NaUnlock : forall l,
+    nextAction (Unlock l) (Unlock l)
+| NaBind : forall c1 c2 c,
+    nextAction c1 c
+    -> nextAction (Bind c1 c2) c.
+
+Inductive commutes : cmd -> cmd -> Prop :=
+| ComReadRead : forall a1 a2,
+    commutes (Read a1) (Read a2)
+| ComReadWrite : forall a1 a2 v,
+    a1 <> a2
+    -> commutes (Read a1) (Write a2 v)
+| ComReadLock : forall a1 a2,
+    commutes (Read a1) (Lock a2)
+| ComReadUnlock : forall a1 a2,
+    commutes (Read a1) (Unlock a2)
+
+| ComWriteRead : forall a1 v a2,
+    a1 <> a2
+    -> commutes (Write a1 v) (Read a2)
+| ComWriteWrite : forall a1 a2 v1 v2,
+    a1 <> a2
+    -> commutes (Write a1 v1) (Write a2 v2)
+| ComWriteLock : forall a1 v a2,
+    commutes (Write a1 v) (Lock a2)
+| ComWriteUnlock : forall a1 v a2,
+    commutes (Write a1 v) (Unlock a2)
+
+| ComLockRead : forall a1 a2,
+    commutes (Lock a1) (Read a2)
+| ComLockWrite : forall a1 a2 v,
+    commutes (Lock a1) (Write a2 v)
+| ComLockLock : forall a1 a2,
+    a1 <> a2
+    -> commutes (Lock a1) (Lock a2)
+| ComLockUnlock : forall a1 a2,
+    a1 <> a2
+    -> commutes (Lock a1) (Unlock a2)
+
+| ComUnlockRead : forall a1 a2,
+    commutes (Unlock a1) (Read a2)
+| ComUnlockWrite : forall a1 a2 v,
+    commutes (Unlock a1) (Write a2 v)
+| ComUnlockLock : forall a1 a2,
+    a1 <> a2
+    -> commutes (Unlock a1) (Lock a2)
+| ComUnlockUnlock : forall a1 a2,
+    a1 <> a2
+    -> commutes (Unlock a1) (Unlock a2)
+
+| CommFail : forall c,
+    commutes c Fail
+| CommReturn : forall c r,
+    commutes c (Return r)
+| CommBind : forall c c1 c2,
+    commutes c c1
+    -> (forall r, commutes c (c2 r))
+    -> commutes c (Bind c1 c2)
+| CommPar : forall c c1 c2,
+    commutes c c1
+    -> commutes c c2
+    -> commutes c (Par c1 c2).
+
+Lemma commutes_sound1 : forall h l c2 h' l' c2',
+  step (h, l, c2) (h', l', c2')
+  -> forall c1 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
+  -> commutes c1 c2
+  -> exists h1 l1, step (h, l, c1) (h1, l1, c1')
+                   /\ step (h1, l1, c2) (h'', l'', c2').
+Proof.
+  induct 1; simplify; eauto.
+
+  invert H1.
+  apply IHstep in H0; first_order.
+  eauto.
+
+  invert H0; invert H; eauto.
+  do 2 eexists; propositional.
+  eauto.
+  replace (h' $! a) with (h' $+ (a1, v) $! a) by (simplify; equality).
+  eauto.
+
+  invert H0; invert H; eauto.
+  simplify.
+  eauto.
+  do 2 eexists; propositional.
+  eauto.
+  replace (h $+ (a, v) $+ (a1, v1)) with (h $+ (a1, v1) $+ (a, v)) by maps_equal.
+  eauto.
+
+  invert H1.
+  eapply IHstep in H5; eauto.
+  first_order; eauto.
+
+  invert H1.
+  eapply IHstep in H6; eauto.
+  first_order; eauto.
+
+  invert H1; invert H0; eauto.
+  do 2 eexists; propositional.
+  constructor.
+  sets.
+  replace ((l \cup {a}) \cup {a1}) with ((l \cup {a1}) \cup {a}) by sets.
+  constructor.
+  sets.
+  do 2 eexists; propositional.
+  constructor.
+  sets; propositional.
+  replace (l \cup {a} \setminus {a1}) with ((l \setminus {a1}) \cup {a}) by sets.
+  constructor.
+  sets.
+
+  invert H1; invert H0; eauto.
+  do 2 eexists; propositional.
+  constructor.
+  sets.
+  replace ((l \setminus {a}) \cup {a1}) with ((l \cup {a1}) \setminus {a}) by sets.
+  constructor.
+  sets.
+  do 2 eexists; propositional.
+  constructor.
+  sets; propositional.
+  replace ((l \setminus {a}) \setminus {a1}) with ((l \setminus {a1}) \setminus {a}) by sets.
+  constructor.
+  sets.
+Qed.
+
+Hint Constructors commutes.
+
+Lemma commutes_sound2 : forall h l c2 h' l' c2',
+  step (h, l, c2) (h', l', c2')
+  -> forall c1, commutes c1 c2
+                -> commutes c1 c2'.
+Proof.
+  induct 1; invert 1; simplify; eauto.
 Qed.

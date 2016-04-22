@@ -46,7 +46,7 @@ Infix "\subset" := subset (at level 70).
 Notation "[ x | P ]" := (scomp (fun x => P)).
 
 Ltac sets' tac :=
-  unfold In, constant, universe, check, union, intersection, complement, subseteq, subset, scomp in *;
+  unfold In, constant, universe, check, union, intersection, minus, complement, subseteq, subset, scomp in *;
     tauto || intuition tac.
 
 Ltac sets tac :=

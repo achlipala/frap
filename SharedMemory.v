@@ -68,8 +68,8 @@ Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepParRecur2 : forall h l c1 c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> step (h, l, Par c1 c2) (h', l', Par c1 c2')
-| StepParProceed : forall h l,
-   step (h, l, Par (Return 0) (Return 0)) (h, l, Return 0)
+| StepParProceed : forall h l r c,
+   step (h, l, Par (Return r) c) (h, l, c)
 
 | StepLock : forall h l a,
   ~a \in l
@@ -155,9 +155,9 @@ Fixpoint runLocal (c : cmd) : cmd :=
   | Write _ _ => c
   | Fail => c
   | Par c1 c2 =>
-    match runLocal c1, runLocal c2 with
-    | Return 0, Return 0 => Return 0
-    | c1', c2' => Par c1' c2'
+    match runLocal c1 with
+    | Return _ => runLocal c2
+    | c1' => Par c1' (runLocal c2)
     end
   | Lock _ => c
   | Unlock _ => c
@@ -244,29 +244,13 @@ Proof.
   rewrite IHc; auto.
   rewrite IHc; auto.
   cases (runLocal c1); simplify; eauto.
-  cases (runLocal c2); simplify; eauto.
-  cases r; eauto.
-  cases r0; eauto.
-  cases r; simplify; eauto.
-  rewrite IHc2; auto.
-  rewrite IHc2; auto.
-  cases r; simplify; eauto.
-  cases r; simplify; eauto.
-  cases r; simplify; eauto.
-  cases r; simplify; eauto.
-  rewrite IHc2; eauto.
-  rewrite IHc2; eauto.
-  cases r; simplify; eauto.
-  cases r; simplify; eauto.
-  rewrite IHc2; eauto.
-  rewrite IHc1; eauto.
-  equality.
-  equality.
-  equality.
-  rewrite IHc1; eauto.
-  equality.
-  equality.
-  equality.
+  rewrite IHc1; equality.
+  rewrite IHc2; equality.
+  rewrite IHc2; equality.
+  rewrite IHc2; equality.
+  rewrite IHc1; equality.
+  rewrite IHc2; equality.
+  rewrite IHc2; equality.
 Qed.
 
 Lemma runLocal_left : forall c1 c2,
@@ -363,45 +347,9 @@ Proof.
   rewrite H0; equality.
 
   right.
-  cases (runLocal c1).
-  cases r.
-  cases (runLocal c2).
-  invert H0.
+  cases (runLocal c1); eauto.
   eexists; propositional.
   eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-  simplify.
-  rewrite H1; equality.
-  eexists; propositional.
-  eauto.
-
   rewrite runLocal_left.
   rewrite <- Heq.
   rewrite runLocal_idem.
@@ -500,18 +448,11 @@ Theorem notAboutToFail_runLocal : forall c,
 Proof.
   induct c; simplify; auto.
   cases (runLocal c); simplify; auto.
-
-  Ltac bool := simplify; auto; propositional;
-               repeat match goal with
-                      | [ H : _ |- _ ] => apply andb_true_iff in H; propositional
-                      | [ H : _ = _ |- _ ] => rewrite H
-                      end; try equality.
-
-  cases (runLocal c1); bool.
-  cases (runLocal c2); bool.
-  cases r; bool.
-  cases r; bool.
-  cases r; bool.
+  cases (runLocal c1); simplify; auto; propositional;
+  repeat match goal with
+         | [ H : _ |- _ ] => apply andb_true_iff in H; propositional
+         | [ H : _ = _ |- _ ] => rewrite H
+         end; try equality.
 Qed.
 
 Theorem step_stepL : forall h l c ,

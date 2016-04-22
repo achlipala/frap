@@ -98,17 +98,18 @@ Example two_increments :=
   else
     Fail.
 
-Fixpoint notAboutToFail (c : cmd) : Prop :=
+Fixpoint notAboutToFail (c : cmd) : bool :=
   match c with
-  | Fail => False
+  | Fail => false
   | Bind c1 _ => notAboutToFail c1
-  | _ => True
+  | Par c1 c2 => notAboutToFail c1 && notAboutToFail c2
+  | _ => true
   end.
 
 Theorem two_increments_ok :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
-                         notAboutToFail c).
+                         notAboutToFail c = true).
 Proof.
   unfold two_increments, two_increments_thread.
   simplify.
@@ -136,7 +137,7 @@ Proof.
   model_check_done.
 
   simplify.
-  propositional; subst; simplify; propositional.
+  propositional; subst; equality.
 Qed.
 
 
@@ -268,6 +269,16 @@ Proof.
   equality.
 Qed.
 
+Lemma runLocal_left : forall c1 c2,
+  (forall r, runLocal c1 <> Return r)
+  -> runLocal (c1 || c2) = runLocal c1 || runLocal c2.
+Proof.
+  simplify.
+  cases (runLocal c1); eauto.
+  unfold not in *.
+  exfalso; eauto.
+Qed.
+
 Lemma step_runLocal : forall h l c h' l' c',
   step (h, l, c) (h', l', c')
   -> (runLocal c = runLocal c' /\ h = h' /\ l = l')
@@ -391,16 +402,6 @@ Proof.
   eexists; propositional.
   eauto.
 
-  Lemma runLocal_left : forall c1 c2,
-    (forall r, runLocal c1 <> Return r)
-    -> runLocal (c1 || c2) = runLocal c1 || runLocal c2.
-  Proof.
-    simplify.
-    cases (runLocal c1); eauto.
-    unfold not in *.
-    exfalso; eauto.
-  Qed.
-
   rewrite runLocal_left.
   rewrite <- Heq.
   rewrite runLocal_idem.
@@ -494,19 +495,31 @@ Proof.
 Qed.
 
 Theorem notAboutToFail_runLocal : forall c,
-  notAboutToFail (runLocal c)
-  -> notAboutToFail c.
+  notAboutToFail (runLocal c) = true
+  -> notAboutToFail c = true.
 Proof.
   induct c; simplify; auto.
   cases (runLocal c); simplify; auto.
+
+  Ltac bool := simplify; auto; propositional;
+               repeat match goal with
+                      | [ H : _ |- _ ] => apply andb_true_iff in H; propositional
+                      | [ H : _ = _ |- _ ] => rewrite H
+                      end; try equality.
+
+  cases (runLocal c1); bool.
+  cases (runLocal c2); bool.
+  cases r; bool.
+  cases r; bool.
+  cases r; bool.
 Qed.
 
 Theorem step_stepL : forall h l c ,
   invariantFor (trsys_ofL h l c) (fun p => let '(_, _, c) := p in
-                                           notAboutToFail c)
+                                           notAboutToFail c = true)
   -> invariantFor (trsys_of h l c) (fun p =>
                                       let '(_, _, c) := p in
-                                      notAboutToFail c).
+                                      notAboutToFail c = true).
 Proof.
   unfold invariantFor; simplify.
   propositional; subst.
@@ -520,7 +533,7 @@ Qed.
 Theorem two_increments_ok_again :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
-                         notAboutToFail c).
+                         notAboutToFail c = true).
 Proof.
   apply step_stepL.
   unfold two_increments, two_increments_thread.
@@ -540,5 +553,5 @@ Proof.
   model_check_done.
 
   simplify.
-  propositional; subst; simplify; propositional.
+  propositional; subst; equality.
 Qed.

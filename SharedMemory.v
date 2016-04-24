@@ -656,6 +656,32 @@ Inductive boundRunningTime : cmd -> nat -> Prop :=
     -> boundRunningTime c2 n2
     -> boundRunningTime (Par c1 c2) (pow2 (n1 + n2)).
 
+Theorem boundRunningTime_not_total : exists c, forall n, ~boundRunningTime c n.
+Proof.
+  Fixpoint scribbly (n : nat) : cmd :=
+    match n with
+    | O => Return 0
+    | S n' => _ <- Write n' 0; scribbly n'
+    end.
+
+  Lemma scribbly_time : forall n m,
+      boundRunningTime (scribbly n) m
+      -> m >= n.
+  Proof.
+    induct n; invert 1; auto.
+    invert H2.
+    specialize (H4 n0).
+    apply IHn in H4.
+    linear_arithmetic.
+  Qed.
+
+  exists (n <- Read 0; scribbly n); propositional.
+  invert H.
+  specialize (H4 (S n2)).
+  apply scribbly_time in H4.
+  linear_arithmetic.
+Qed.
+
 Lemma pow2_pos : forall n,
     pow2 n > 0.
 Proof.

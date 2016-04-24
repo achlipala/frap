@@ -536,18 +536,48 @@ Admitted.
   propositional; subst; equality.
 Qed.*)
 
-Inductive firstThread : cmd -> cmd -> cmd -> Prop :=
-| FtPar : forall c1 c2 c11 c12,
-  firstThread c1 c11 c12
-  -> firstThread (Par c1 c2) c11 (Par c12 c2)
-| FtDone : forall c,
-  match c with
-  | Par _ _ => False
-  | _ => True
-  end
-  -> firstThread c c (Return 0).
+Record summary := {
+  Reads : set nat;
+  Writes : set nat;
+  Locks : set nat
+}.
+
+Inductive summarize : cmd -> summary -> Prop :=
+| SumReturn : forall r s,
+    summarize (Return r) s
+| SumFail : forall s,
+    summarize Fail s
+| SumBind : forall c1 c2 s,
+    summarize c1 s
+    -> (forall r, summarize (c2 r) s)
+    -> summarize (Bind c1 c2) s
+| SumRead : forall a s,
+    a \in s.(Reads)
+    -> summarize (Read a) s
+| SumWrite : forall a v s,
+    a \in s.(Writes)
+    -> summarize (Write a v) s
+| SumLock : forall a s,
+    a \in s.(Locks)
+    -> summarize (Lock a) s
+| SumUnlock : forall a s,
+    a \in s.(Locks)
+    -> summarize (Unlock a) s.
+
+Inductive summarizeThreads : cmd -> list (cmd * summary) -> Prop :=
+| StPar : forall c1 c2 ss1 ss2,
+    summarizeThreads c1 ss1
+    -> summarizeThreads c2 ss2
+    -> summarizeThreads (Par c1 c2) (ss1 ++ ss2)
+| StAtomic : forall c s,
+    summarize c s
+    -> summarizeThreads c [(c, s)].
 
 Inductive nextAction : cmd -> cmd -> Prop :=
+| NaReturn : forall r,
+    nextAction (Return r) (Return r)
+| NaFail :
+    nextAction Fail Fail
 | NaRead : forall a,
     nextAction (Read a) (Read a)
 | NaWrite : forall a v,
@@ -560,133 +590,481 @@ Inductive nextAction : cmd -> cmd -> Prop :=
     nextAction c1 c
     -> nextAction (Bind c1 c2) c.
 
-Inductive commutes : cmd -> cmd -> Prop :=
-| ComReadRead : forall a1 a2,
-    commutes (Read a1) (Read a2)
-| ComReadWrite : forall a1 a2 v,
-    a1 <> a2
-    -> commutes (Read a1) (Write a2 v)
-| ComReadLock : forall a1 a2,
-    commutes (Read a1) (Lock a2)
-| ComReadUnlock : forall a1 a2,
-    commutes (Read a1) (Unlock a2)
+Definition commutes (c : cmd) (s : summary) : Prop :=
+  match c with
+  | Return _ => True
+  | Fail => True
+  | Read a => ~a \in s.(Writes)
+  | Write a _ => ~a \in s.(Reads) \cup s.(Writes)
+  | Lock a => ~a \in s.(Locks)
+  | Unlock a => ~a \in s.(Locks)
+  | _ => False
+  end.
 
-| ComWriteRead : forall a1 v a2,
-    a1 <> a2
-    -> commutes (Write a1 v) (Read a2)
-| ComWriteWrite : forall a1 a2 v1 v2,
-    a1 <> a2
-    -> commutes (Write a1 v1) (Write a2 v2)
-| ComWriteLock : forall a1 v a2,
-    commutes (Write a1 v) (Lock a2)
-| ComWriteUnlock : forall a1 v a2,
-    commutes (Write a1 v) (Unlock a2)
+Inductive stepC : heap * locks * list (cmd * summary) -> heap * locks * list (cmd * summary) -> Prop :=
+| StepDone : forall h l r s cs1 cs2,
+   stepC (h, l, cs1 ++ (Return r, s) :: cs2) (h, l, cs1 ++ cs2)
+| StepFirst : forall h l c h' l' c' s cs,
+  step (h, l, c) (h', l', c')
+  -> stepC (h, l, (c, s) :: cs) (h', l', (c', s) :: cs)
+| StepAny : forall h l c h' l' s cs1 c1 s1 cs2 c1',
+  (forall c0 h'' l'' c'', nextAction c c0
+                          -> List.Forall (fun c_s => commutes c0 (snd c_s)) (cs1 ++ (c1, s1) :: cs2)
+                          -> step (h, l, c) (h'', l'', c'')
+                          -> False)
+  -> step (h, l, c1) (h', l', c1')
+  -> stepC (h, l, (c, s) :: cs1 ++ (c1, s1) :: cs2) (h', l', (c, s) :: cs1 ++ (c1', s1) :: cs2).
 
-| ComLockRead : forall a1 a2,
-    commutes (Lock a1) (Read a2)
-| ComLockWrite : forall a1 a2 v,
-    commutes (Lock a1) (Write a2 v)
-| ComLockLock : forall a1 a2,
-    a1 <> a2
-    -> commutes (Lock a1) (Lock a2)
-| ComLockUnlock : forall a1 a2,
-    a1 <> a2
-    -> commutes (Lock a1) (Unlock a2)
+Definition trsys_ofC (h : heap) (l : locks) (cs : list (cmd * summary)) := {|
+  Initial := {(h, l, cs)};
+  Step := stepC
+|}.
 
-| ComUnlockRead : forall a1 a2,
-    commutes (Unlock a1) (Read a2)
-| ComUnlockWrite : forall a1 a2 v,
-    commutes (Unlock a1) (Write a2 v)
-| ComUnlockLock : forall a1 a2,
-    a1 <> a2
-    -> commutes (Unlock a1) (Lock a2)
-| ComUnlockUnlock : forall a1 a2,
-    a1 <> a2
-    -> commutes (Unlock a1) (Unlock a2)
 
-| CommFail : forall c,
-    commutes c Fail
-| CommReturn : forall c r,
-    commutes c (Return r)
-| CommBind : forall c c1 c2,
-    commutes c c1
-    -> (forall r, commutes c (c2 r))
-    -> commutes c (Bind c1 c2)
-| CommPar : forall c c1 c2,
-    commutes c c1
-    -> commutes c c2
-    -> commutes c (Par c1 c2).
-
-Lemma commutes_sound1 : forall h l c2 h' l' c2',
+Lemma commutes_sound : forall h l c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
-  -> forall c1 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
-  -> commutes c1 c2
+  -> forall s c1 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
+  -> summarize c2 s
+  -> commutes c1 s
   -> exists h1 l1, step (h, l, c1) (h1, l1, c1')
                    /\ step (h1, l1, c2) (h'', l'', c2').
 Proof.
   induct 1; simplify; eauto.
 
   invert H1.
-  apply IHstep in H0; first_order.
+  eapply IHstep in H0; eauto; first_order.
   eauto.
 
-  invert H0; invert H; eauto.
+  invert H0; invert H; simplify; propositional; eauto.
   do 2 eexists; propositional.
   eauto.
-  replace (h' $! a) with (h' $+ (a1, v) $! a) by (simplify; equality).
+  assert (a <> a0) by sets.
+  replace (h' $! a) with (h' $+ (a0, v) $! a) by (simplify; equality).
   eauto.
 
-  invert H0; invert H; eauto.
-  simplify.
-  eauto.
+  invert H0; invert H; simplify; propositional; eauto.
   do 2 eexists; propositional.
   eauto.
-  replace (h $+ (a, v) $+ (a1, v1)) with (h $+ (a1, v1) $+ (a, v)) by maps_equal.
+  assert (a <> a0) by sets.
+  replace (h $+ (a, v) $+ (a0, v0)) with (h $+ (a0, v0) $+ (a, v)) by maps_equal.
   eauto.
 
   invert H1.
-  eapply IHstep in H5; eauto.
-  first_order; eauto.
 
   invert H1.
-  eapply IHstep in H6; eauto.
-  first_order; eauto.
 
-  invert H1; invert H0; eauto.
+  invert H1; invert H0; simplify; propositional; eauto.
   do 2 eexists; propositional.
   constructor.
   sets.
-  replace ((l \cup {a}) \cup {a1}) with ((l \cup {a1}) \cup {a}) by sets.
+  replace ((l \cup {a}) \cup {a0}) with ((l \cup {a0}) \cup {a}) by sets.
   constructor.
   sets.
   do 2 eexists; propositional.
   constructor.
   sets; propositional.
-  replace (l \cup {a} \setminus {a1}) with ((l \setminus {a1}) \cup {a}) by sets.
+  replace (l \cup {a} \setminus {a0}) with ((l \setminus {a0}) \cup {a}) by sets.
   constructor.
   sets.
 
-  invert H1; invert H0; eauto.
+  invert H1; invert H0; simplify; propositional; eauto.
   do 2 eexists; propositional.
   constructor.
   sets.
-  replace ((l \setminus {a}) \cup {a1}) with ((l \cup {a1}) \setminus {a}) by sets.
+  replace ((l \setminus {a}) \cup {a0}) with ((l \cup {a0}) \setminus {a}) by sets.
   constructor.
   sets.
   do 2 eexists; propositional.
   constructor.
   sets; propositional.
-  replace ((l \setminus {a}) \setminus {a1}) with ((l \setminus {a1}) \setminus {a}) by sets.
+  replace ((l \setminus {a}) \setminus {a0}) with ((l \setminus {a0}) \setminus {a}) by sets.
   constructor.
   sets.
 Qed.
 
-Hint Constructors commutes.
+Hint Constructors summarize.
 
-Lemma commutes_sound2 : forall h l c2 h' l' c2',
-  step (h, l, c2) (h', l', c2')
-  -> forall c1, commutes c1 c2
-                -> commutes c1 c2'.
+Lemma summarize_step : forall h l c h' l' c' s,
+  step (h, l, c) (h', l', c')
+  -> summarize c s
+  -> summarize c' s.
 Proof.
   induct 1; invert 1; simplify; eauto.
+Qed.
+
+Lemma summarize_steps : forall h l c h' l' c' s,
+  step^* (h, l, c) (h', l', c')
+  -> summarize c s
+  -> summarize c' s.
+Proof.
+  induct 1; eauto.
+  cases y.
+  cases p.
+  eauto using summarize_step.
+Qed.
+
+Fixpoint pow2 (n : nat) : nat :=
+  match n with
+  | O => 1
+  | S n' => pow2 n' * 2
+  end.
+
+Inductive boundRunningTime : cmd -> nat -> Prop :=
+| BrtReturn : forall r,
+    boundRunningTime (Return r) 0
+| BrtFail :
+    boundRunningTime Fail 0
+| BrtRead : forall a,
+    boundRunningTime (Read a) 1
+| BrtWrite : forall a v,
+    boundRunningTime (Write a v) 1
+| BrtLock : forall a,
+    boundRunningTime (Lock a) 1
+| BrtUnlock : forall a,
+    boundRunningTime (Unlock a) 1
+| BrtBind : forall c1 c2 n1 n2,
+    boundRunningTime c1 n1
+    -> (forall r, boundRunningTime (c2 r) n2)
+    -> boundRunningTime (Bind c1 c2) (S (n1 + n2))
+| BrtPar : forall c1 c2 n1 n2,
+    boundRunningTime c1 n1
+    -> boundRunningTime c2 n2
+    -> boundRunningTime (Par c1 c2) (pow2 (n1 + n2)).
+
+Lemma pow2_pos : forall n,
+    pow2 n > 0.
+Proof.
+  induct n; simplify; auto.
+Qed.
+
+Lemma pow2_mono : forall n m,
+    n < m
+    -> pow2 n < pow2 m.
+Proof.
+  induct 1; simplify; auto.
+  specialize (pow2_pos n); linear_arithmetic.
+Qed.
+
+Hint Resolve pow2_mono.
+
+Lemma pow2_incr : forall n,
+    n < pow2 n.
+Proof.
+  induct n; simplify; auto.
+Qed.
+
+Hint Resolve pow2_incr.
+
+Lemma pow2_inv : forall n m,
+    pow2 n <= m
+    -> n < m.
+Proof.
+  simplify.
+  specialize (pow2_incr n).
+  linear_arithmetic.
+Qed.
+
+Lemma use_pow2 : forall n m k,
+    pow2 m <= S k
+    -> n <= m
+    -> n <= k.
+Proof.
+  simplify.
+  apply pow2_inv in H.
+  linear_arithmetic.
+Qed.
+
+Lemma use_pow2' : forall n m k,
+    pow2 m <= S k
+    -> n < m
+    -> pow2 n <= k.
+Proof.
+  simplify.
+  specialize (@pow2_mono n m).
+  linear_arithmetic.
+Qed.
+
+Hint Constructors boundRunningTime.
+
+Lemma boundRunningTime_step : forall c n h l h' l',
+    boundRunningTime c n
+    -> forall c', step (h, l, c) (h', l', c')
+    -> exists n', boundRunningTime c' n' /\ n' < n.
+Proof.
+  induct 1; invert 1; simplify; eauto.
+
+  apply IHboundRunningTime in H4; first_order; subst.
+  eexists; propositional.
+  eauto.
+  linear_arithmetic.
+
+  apply IHboundRunningTime1 in H3; first_order; subst.
+  eauto 6.
+
+  apply IHboundRunningTime2 in H3; first_order; subst.
+  eauto 6.
+
+  invert H.
+  simplify.
+  eauto.
+Qed.
+
+Require Import Classical.
+
+Theorem complete_trace : forall k c n,
+  boundRunningTime c n
+  -> n <= k
+  -> forall h l, exists h' l' c', step^* (h, l, c) (h', l', c')
+                                  /\ (forall h'' l'' c'',
+                                         step (h', l', c') (h'', l'', c'')
+                                         -> False).
+Proof.
+  induct k; simplify.
+  invert H; try linear_arithmetic.
+
+  do 3 eexists; propositional.
+  eauto.
+  invert H.
+
+  do 3 eexists; propositional.
+  eauto.
+  invert H.
+  specialize (pow2_pos (n1 + n2)).
+  linear_arithmetic.
+
+  invert H.
+
+  do 3 eexists; propositional.
+  eauto.
+  invert H.
+
+  do 3 eexists; propositional.
+  eauto.
+  invert H.
+
+  do 3 eexists; propositional.
+  apply trc_one.
+  eauto.
+  invert H.
+
+  do 3 eexists; propositional.
+  apply trc_one.
+  eauto.
+  invert H.
+
+  destruct (classic (a \in l)).
+  do 3 eexists; propositional.
+  eauto.
+  invert H1.
+  sets.
+  do 3 eexists; propositional.
+  apply trc_one.
+  eauto.
+  invert H1.
+
+  destruct (classic (a \in l)).
+  do 3 eexists; propositional.
+  apply trc_one.
+  eauto.
+  invert H1.
+  do 3 eexists; propositional.
+  eauto.
+  invert H1.
+  sets.
+
+  eapply IHk in H1; eauto; first_order.
+  cases x1.
+  specialize (H2 r).
+  eapply IHk in H2; eauto; first_order.
+  do 3 eexists; propositional.
+  eapply trc_trans.
+  apply StepBindRecur_star.
+  eassumption.
+  eapply TrcFront.
+  eauto.
+  eassumption.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+  do 3 eexists; propositional.
+  apply StepBindRecur_star.
+  eassumption.
+  invert H3.
+  eauto.
+
+  assert (Hb1 : boundRunningTime c1 n1) by assumption.
+  assert (Hb2 : boundRunningTime c2 n2) by assumption.
+  eapply IHk in H1; eauto using use_pow2; first_order.
+  invert H.
+  eapply IHk in H2; eauto using use_pow2; first_order.
+  invert H.
+  cases x1.
+  do 3 eexists; propositional.
+  apply trc_one.
+  eauto.
+  eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  do 3 eexists; propositional.
+  eauto.
+  invert H; eauto.
+  cases y.
+  cases p.
+  specialize (boundRunningTime_step Hb2 H3); first_order.
+  assert (boundRunningTime (Par x1 c) (pow2 (n1 + x3))) by eauto.
+  eapply IHk in H6; eauto using use_pow2'; first_order.
+  do 3 eexists; propositional.
+  eapply TrcFront.
+  eauto.
+  eassumption.
+  eauto.
+  cases y.
+  cases p.
+  specialize (boundRunningTime_step Hb1 H3); first_order.
+  assert (boundRunningTime (Par c c2) (pow2 (x2 + n2))) by eauto.
+  eapply IHk in H6; eauto using use_pow2'; first_order.
+  do 3 eexists; propositional.
+  eapply TrcFront.
+  eauto.
+  eassumption.
+  eauto.
+Qed.
+
+Lemma notAboutToFail_step : forall h l c h' l' c',
+    step (h, l, c) (h', l', c')
+    -> notAboutToFail c = false
+    -> notAboutToFail c' = false.
+Proof.
+  induct 1; simplify; eauto; try equality.
+
+  apply andb_false_iff in H0.
+  apply andb_false_iff.
+  propositional.
+
+  apply andb_false_iff in H0.
+  apply andb_false_iff.
+  propositional.
+Qed.
+
+Lemma notAboutToFail_steps : forall h l c h' l' c',
+    step^* (h, l, c) (h', l', c')
+    -> notAboutToFail c = false
+    -> notAboutToFail c' = false.
+Proof.
+  induct 1; simplify; eauto.
+  cases y.
+  cases p.
+  eauto using notAboutToFail_step.
+Qed.
+
+Lemma boundRunningTime_steps : forall h l c h' l' c',
+    step^* (h, l, c) (h', l', c')
+    -> forall n, boundRunningTime c n
+    -> exists n', boundRunningTime c' n' /\ n' <= n.
+Proof.
+  induct 1; simplify; eauto.
+  cases y.
+  cases p.
+  specialize (boundRunningTime_step H1 H); first_order.
+  eapply IHtrc in H2; eauto.
+  first_order.
+  eauto.
+Qed.
+
+Lemma translate_trace : forall h l c h' l' c',
+    step^* (h, l, c) (h', l', c')
+    -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
+    -> notAboutToFail c' = false
+    -> forall cs, summarizeThreads c cs
+    -> exists h' l' cs', stepC^* (h, l, cs) (h', l', cs')
+                         /\ Exists (fun c_s => notAboutToFail (fst c_s) = false) cs'.
+Proof.
+Admitted.
+
+Lemma Forall_Exists_contra : forall A (f : A -> bool) ls,
+    Exists (fun x => f x = false) ls
+    -> Forall (fun x => f x = true) ls
+    -> False.
+Proof.
+  induct 1; invert 1; equality.
+Qed.
+
+Theorem step_stepC : forall h l c (cs : list (cmd * summary)) n,
+  summarizeThreads c cs
+  -> boundRunningTime c n
+  -> invariantFor (trsys_ofC h l cs) (fun p => let '(_, _, cs) := p in
+                                               List.Forall (fun c_s => notAboutToFail (fst c_s) = true) cs)
+  -> invariantFor (trsys_of h l c) (fun p =>
+                                      let '(_, _, c) := p in
+                                      notAboutToFail c = true).
+Proof.
+  simplify.
+  apply NNPP; propositional.
+  unfold invariantFor in H2.
+  apply not_all_ex_not in H2; first_order.
+  apply imply_to_and in H2; propositional.
+  apply not_all_ex_not in H4; first_order.
+  apply imply_to_and in H2; propositional.
+  cases x0.
+  cases p.
+  subst.
+  simplify.
+  cases (notAboutToFail c0); propositional.
+  assert (exists n', boundRunningTime c0 n' /\ n' <= n) by eauto using boundRunningTime_steps.
+  first_order.
+  eapply complete_trace in H2; eauto.
+  first_order.
+  specialize (trc_trans H4 H2); simplify.
+  assert (notAboutToFail x2 = false) by eauto using notAboutToFail_steps.
+  unfold invariantFor in H1; simplify.
+  eapply translate_trace in H7; eauto.
+  first_order.
+  apply H1 in H7; auto.
+  eapply Forall_Exists_contra.
+  apply H9.
+  assumption.
 Qed.

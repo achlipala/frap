@@ -3412,6 +3412,10 @@ In addition to the basic structure of the languages from the last two chapters, 
 We follow the common ``threads and locks''\index{locks} style of synchronization, with commands $\mt{Lock} \; a$ and $\mt{Unlock} \; a$ for acquiring and releasing locks, respectively.
 We also have $c_1 || c_2$ for running commands $c_1$ and $c_2$ in parallel, giving a scheduler free reign to interleave their atomic steps.
 
+The operational semantics is small-step\index{small-step operational semantics}, especially because big-step semantics\index{big-step operational semantics} is notoriously awkward for concurrency.
+Each state of the system is a triple $(h, l, c)$, with $h$ and $c$ the heap and current command from our usual semantics.
+New component $l$ is a \emph{lockset}\index{lockset}, recording which locks are currently held, without distinguishing between different threads that might have taken them.
+
 $$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
   \smallstep{(h, l, c_1)}{(h', l', c'_1)}
 }
@@ -3438,6 +3442,10 @@ Note that the last two rules are the only source of \emph{nondeterminism}\index{
 This nondeterminism corresponds to the freedom we give to a scheduler\index{scheduler} that may pick which thread runs next.
 Though this kind of concurrent programming is very expressive and often achieves very high performance, it comes at a cost in reasoning, as there may be \emph{exponentially many different schedules} for a single program, measured with respect to the textual length of the program.
 A popular name for this pitfall is \emph{the state-explosion problem}\index{state-explosion problem}.
+
+Note also that we have omitted any looping constructs from this object language, so all programs terminate.
+The Coq formalization uses the mixed-embedding\index{mixed embedding} style, making it not entirely obvious that all programs really do terminate.
+In any case, if we must tame the state-explosion problem, we already have our work cut out for us, even when the state space rooted at any concrete state is finite!
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

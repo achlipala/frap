@@ -12,20 +12,21 @@ Set Asymmetric Patterns.
 
 Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 Definition heap := fmap nat nat.
-Definition assertion := heap -> Prop.
 
 Hint Extern 1 (_ <= _) => linear_arithmetic.
 Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
 
-Ltac simp := repeat (simplify; subst; propositional;
-                     try match goal with
-                         | [ H : ex _ |- _ ] => invert H
-                         end); try linear_arithmetic.
-
 
 (** * An object language with shared-memory concurrency *)
 
-(* Let's simplify the encoding by only working with commands that generate
+(* We're going to start investigating how to verify concurrent programs whose
+ * behavior is given with operational semantics.  There are a variety of
+ * different concurrency styles out there, with their distinctive practical and
+ * theoretical benefits; we'll start with the most venerable style, shared
+ * memory. *)
+
+(* We'll build on the mixed-embedding languages from the last two chapter. 
+ * Let's simplify the encoding by only working with commands that generate
  * [nat]. *)
 Inductive loop_outcome :=
 | Done (a : nat)
@@ -48,8 +49,13 @@ Inductive cmd :=
 Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
 Infix "||" := Par.
 
+(* As the program runs, it has not just a heap but also a set of locks that are
+ * taken at that moment. *)
 Definition locks := set nat.
 
+(* The first few rules below are basically the same as in last chapter, except
+ * that we relax the restriction on only reading/writing addresses that are
+ * explicitly mapped into the heap. *)
 Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepBindRecur : forall c1 c1' c2 h h' l l',
   step (h, l, c1) (h', l', c1')
@@ -62,6 +68,9 @@ Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepWrite : forall h l a v,
   step (h, l, Write a v) (h $+ (a, v), l, Return 0)
 
+(* First interesting twist: we can "push steps through" the [Par] operator on
+ * either side.  The choice of a side is the sole source of nondeterminism in
+ * this semantics, corresponding to the whims of a scheduler. *)
 | StepParRecur1 : forall h l c1 c2 h' l' c1',
   step (h, l, c1) (h', l', c1')
   -> step (h, l, Par c1 c2) (h', l', Par c1' c2)
@@ -69,6 +78,7 @@ Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
   step (h, l, c2) (h', l', c2')
   -> step (h, l, Par c1 c2) (h', l', Par c1 c2')
 
+(* To take a lock, it must not be held; and vice versa for releasing a lock. *)
 | StepLock : forall h l a,
   ~a \in l
   -> step (h, l, Lock a) (h, l \cup {a}, Return 0)
@@ -82,6 +92,30 @@ Definition trsys_of (h : heap) (l : locks) (c : cmd) := {|
 |}.
 
 
+
+(** * An example *)
+
+(* In this lecture, we'll focus on model checking as our program-proof
+ * technique.  Recall that model checking is all about reducing a problem to a
+ * reachability question in a finite-state system.  Our programs here have the
+ * (perhaps surprising!) property that termination is guaranteed, for any
+ * initial state, regardless of how the scheduler behaves.  Therefore, all
+ * programs of this language are finite-state and thus, in principle, amenable
+ * to model checking!  (We were careful to leave out looping constructs.)
+ * Let's define a simple two-thread program and model-check it. *)
+
+(* Throughout this file, we'll only be verifying that no thread could ever reach
+ * a [Fail] command that is next in line to execute, a property that is easy to
+ * phrase as an invariant of the transition system.  Here's how to compute
+ * whether a command is about to fail. *)
+Fixpoint notAboutToFail (c : cmd) : bool :=
+  match c with
+  | Fail => false
+  | Bind c1 _ => notAboutToFail c1
+  | Par c1 c2 => notAboutToFail c1 && notAboutToFail c2
+  | _ => true
+  end.
+
 Example two_increments_thread :=
   _ <- Lock 0;
   n <- Read 0;
@@ -93,21 +127,14 @@ Example two_increments_thread :=
 
 Example two_increments := two_increments_thread || two_increments_thread.
 
-Fixpoint notAboutToFail (c : cmd) : bool :=
-  match c with
-  | Fail => false
-  | Bind c1 _ => notAboutToFail c1
-  | Par c1 c2 => notAboutToFail c1 && notAboutToFail c2
-  | _ => true
-  end.
-
+(* Next, we do one of our standard boring (and slow; sorry!) model-checking
+ * proofs, where tactics explore the finite state space for us. *)
 Theorem two_increments_ok :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-Admitted.
-(*  unfold two_increments, two_increments_thread.
+  unfold two_increments, two_increments_thread.
   simplify.
   eapply invariant_weaken.
   apply multiStepClosure_ok; simplify.
@@ -130,11 +157,24 @@ Admitted.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
+
+(* Notice how every step of the process needs to consider all possibilities of
+ * threads that could run next, which, in general, gives us state spaces of size
+ * *exponential* in the program-text length.  That's really a shame from a
+ * performance perspective, isn't it?  Our goal now will be to apply
+ * *optimizations* that show equivalence with alternative transition systems
+ * whose state spaces are smaller.  By the end, we'll be able to check
+ * nontrivial concurrent programs by only computing state spaces with *linear*
+ * size in program-text length!  (The catch is that the technique only applies
+ * for programs accepted by a simple static analysis.) *)
 
 
 (** * Optimization #1: always run all purely local actions first. *)
 
+(* Here's a function that, in a single go, performs all simplifications that are
+ * *thread-local*.  That is, no other thread can observe those steps, as they
+ * don't touch the heap or lockset. *)
 Fixpoint runLocal (c : cmd) : cmd :=
   match c with
   | Return _ => c
@@ -151,6 +191,10 @@ Fixpoint runLocal (c : cmd) : cmd :=
   | Unlock _ => c
   end.
 
+(* We can define an alternative step relation that always runs [runLocal] as a
+ * kind of postprocessing on the new command.  This way, the model checker won't
+ * need to run separate exploration steps for all of those trivial
+ * simplifications. *)
 Inductive stepL : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepL : forall h l c h' l' c',
   step (h, l, c) (h', l', c')
@@ -160,6 +204,8 @@ Definition trsys_ofL (h : heap) (l : locks) (c : cmd) := {|
   Initial := {(h, l, runLocal c)};
   Step := stepL
 |}.
+
+(* Now we prove some basic facts; commentary resumes before [step_runLocal]. *)
 
 Hint Constructors step stepL.
 
@@ -234,6 +280,9 @@ Proof.
   equality.
 Qed.
 
+(* The key correctnss property: when an original step takes place, either it
+ * has no effect or can be duplicated when we apply [runLocal] both *before* and
+ * *after* the step. *)
 Lemma step_runLocal : forall h l c h' l' c',
   step (h, l, c) (h', l', c')
   -> (runLocal c = runLocal c' /\ h = h' /\ l = l')
@@ -267,6 +316,8 @@ Proof.
   rewrite runLocal_idem; equality.
 Qed.
 
+(* That was the main punchline.  Commentary resumes at [step_stepL]. *)
+
 Lemma step_stepL' : forall h l c h' l' c',
   step^* (h, l, c) (h', l', c')
   -> stepL^* (h, l, runLocal c) (h', l', runLocal c').
@@ -296,6 +347,9 @@ Proof.
          end; try equality.
 Qed.
 
+(* The key proof principle: to verify a can-never-fail invariant for the
+ * original semantics, it suffices to verify it for the new semantics
+ * instead. *)
 Theorem step_stepL : forall h l c ,
   invariantFor (trsys_ofL h l c) (fun p => let '(_, _, c) := p in
                                            notAboutToFail c = true)
@@ -312,13 +366,14 @@ Proof.
   apply H in H1; eauto using notAboutToFail_runLocal.
 Qed.
 
+(* Now watch as we verify that last example in fewer steps, with a smaller
+ * invariant! *)
 Theorem two_increments_ok_again :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-Admitted.
-(*  apply step_stepL.
+  apply step_stepL.
   unfold two_increments, two_increments_thread.
   simplify.
   eapply invariant_weaken.
@@ -336,11 +391,23 @@ Admitted.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
 
 
 (** * Optimization #2: partial-order reduction *)
 
+(* There was a key property lurking behind the soundness proof of our last
+ * optimization: *commutativity*, one of the most common ways to tame the
+ * state-space explosion from concurrency scheduling.  Specifically, the local
+ * steps performed by [runLocal] all *commute* with any steps taken in other
+ * threads, because they are agnostic to shared state.  Can we generalize the
+ * technique to also harness commutativity of operations that *do* depend on the
+ * shared state, but in particular controlled ways?  Why, yes we can!  The most
+ * popular such technique from the model-checking world is
+ * *partial order reduction*. *)
+
+(* First, here's an example where we should be able to do better than allowing
+ * either thread to run in every step, as we model-check. *)
 Example independent_threads :=
   (a <- Read 0;
    _ <- Write 1 (a + 1);
@@ -352,13 +419,14 @@ Example independent_threads :=
   || (b <- Read 2;
        Write 2 (b + 1)).
 
+(* Unfortunately, our existing model-checker does in fact follow the
+ * "exponential" strategy to build the state space. *)
 Theorem independent_threads_ok :
   invariantFor (trsys_of $0 {} independent_threads)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-Admitted.
-(*  apply step_stepL.
+  apply step_stepL.
   unfold independent_threads.
   simplify.
   eapply invariant_weaken.
@@ -373,14 +441,26 @@ Admitted.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
 
+(* It turns out that we can actually do model-checking where at each point we
+ * only explore the result of running *the first thread that is ready*!  Such a
+ * strategy isn't sound for all programs, but it is for our example here.  Why?
+ * Every pair of atomic actions between threads *commutes*.  That is, neither
+ * one affects whether the other is enabled to execute (the way that one [Lock]
+ * can disable another), and running the two actions in either order modifies
+ * shared state identically.  In such a case, we may always pick our favorite
+ * thread to step next. *)
+
+(* To make all that formal, we will do some static program analyze to summarize
+ * which atomic actions a thread might take. *)
 Record summary := {
   Reads : set nat;
   Writes : set nat;
   Locks : set nat
 }.
 
+(* Here is a relation to check the accuracy of a summary for a single thread. *)
 Inductive summarize : cmd -> summary -> Prop :=
 | SumReturn : forall r s,
     summarize (Return r) s
@@ -403,6 +483,8 @@ Inductive summarize : cmd -> summary -> Prop :=
     a \in s.(Locks)
     -> summarize (Unlock a) s.
 
+(* And here's one to check the accuracy of a summary for a list of threads.
+ * Each thread is packaged with its verified summary in the list. *)
 Inductive summarizeThreads : cmd -> list (cmd * summary) -> Prop :=
 | StPar : forall c1 c2 ss1 ss2,
     summarizeThreads c1 ss1
@@ -411,7 +493,10 @@ Inductive summarizeThreads : cmd -> list (cmd * summary) -> Prop :=
 | StAtomic : forall c s,
     summarize c s
     -> summarizeThreads c [(c, s)].
+(* We will use these expanded lists as the command type in the new semantics. *)
 
+(* To check commutativity, it is helpful to know which atomic command a thread
+ * could run next. *)
 Inductive nextAction : cmd -> cmd -> Prop :=
 | NaReturn : forall r,
     nextAction (Return r) (Return r)
@@ -429,6 +514,10 @@ Inductive nextAction : cmd -> cmd -> Prop :=
     nextAction c1 c
     -> nextAction (Bind c1 c2) c.
 
+(* We can succinctly capture which summaries describe threads that will commute
+ * with a particular atomic action.  The guarantee applies not just to the
+ * thread's first action but also to all others that it might reach later in
+ * execution. *)
 Definition commutes (c : cmd) (s : summary) : Prop :=
   match c with
   | Return _ => True
@@ -440,17 +529,38 @@ Definition commutes (c : cmd) (s : summary) : Prop :=
   | _ => False
   end.
 
+(* Now the new semantics: *)
 Inductive stepC : heap * locks * list (cmd * summary) -> heap * locks * list (cmd * summary) -> Prop :=
+
+(* It is always OK to let the first thread run. *)
 | StepFirst : forall h l c h' l' c' s cs,
   step (h, l, c) (h', l', c')
   -> stepC (h, l, (c, s) :: cs) (h', l', (c', s) :: cs)
+
+(* However, you may only pick another thread to run if it would be unsound to
+ * consider just the first thread.  The negation of the soundness condition is
+ * expressed in the first premise below. *)
 | StepAny : forall h l c h' l' s cs1 c1 s1 cs2 c1',
   (forall c0 h'' l'' c'', nextAction c c0
+                          (* The first thread [c] has some atomic action [c0]
+                           * ready to run. *)
                           -> List.Forall (fun c_s => commutes c0 (snd c_s)) (cs1 ++ (c1, s1) :: cs2)
+                          (* All other threads only contain actiosn that commute
+                           * with [c0]. *)
+
                           -> step (h, l, c) (h'', l'', c'')
+                          (* Finaly, [c] is actually enabled to run, which might
+                           * not be the case if [c0] is a locking command. *)
+
                           -> False)
+
+  (* If we passed that check, then we can step a single thread as expected! *)
   -> step (h, l, c1) (h', l', c1')
   -> stepC (h, l, (c, s) :: cs1 ++ (c1, s1) :: cs2) (h', l', (c, s) :: cs1 ++ (c1', s1) :: cs2).
+
+(* Notice how this definition turns the partial-order-reduction optimization
+ * "off and on" during state-space exploration.  We only restrict our attention
+ * to the first thread so long as the soundness condition above is true. *)
 
 Definition trsys_ofC (h : heap) (l : locks) (cs : list (cmd * summary)) := {|
   Initial := {(h, l, cs)};
@@ -458,6 +568,9 @@ Definition trsys_ofC (h : heap) (l : locks) (cs : list (cmd * summary)) := {|
 |}.
 
 
+(* Now we come to quite a few fairly complex lemmas.
+ * First, [commutes] really does allow other commands to swap order with the
+ * atomic action in question. *)
 Lemma commutes_sound' : forall h l c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> forall s c1 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
@@ -519,6 +632,8 @@ Proof.
   sets.
 Qed.
 
+(* Commentary now resumes at [commutes_sound]. *)
+
 Lemma step_nextAction_Return : forall r h l c h' l' c',
     step (h, l, c) (h', l', c')
     -> nextAction c (Return r)
@@ -568,6 +683,8 @@ Proof.
   induct 1; auto.
 Qed.
 
+(* [commutes] allows order-swapping even when the atomic action is embedded
+ * further within the structure of a larger command. *)
 Lemma commutes_sound : forall h l c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> forall s c1 c0 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
@@ -609,6 +726,9 @@ Qed.
 
 Hint Constructors summarize.
 
+(* The next two lemmas show that, once a summary is accurate for a command, it
+ * remains accurate throughout the whole execution lifetime of the command. *)
+
 Lemma summarize_step : forall h l c h' l' c' s,
   step (h, l, c) (h', l', c')
   -> summarize c s
@@ -628,6 +748,11 @@ Proof.
   eauto using summarize_step.
 Qed.
 
+(* The next technical device will require that we bound how many steps of
+ * execution particular commands could run for.  We use a conservative
+ * overapproximation that is easy to compute, phrased as a relation.
+ * Yes, it is time to get scared, as we must define exponentiation to compute
+ * large enough time bounds! *)
 Fixpoint pow2 (n : nat) : nat :=
   match n with
   | O => 1
@@ -656,6 +781,8 @@ Inductive boundRunningTime : cmd -> nat -> Prop :=
     -> boundRunningTime c2 n2
     -> boundRunningTime (Par c1 c2) (pow2 (n1 + n2)).
 
+(* Perhaps surprisingly, there exist commands that have no finite time bounds!
+ * Mixed-embedding languages often have these counterintuitive properties. *)
 Theorem boundRunningTime_not_total : exists c, forall n, ~boundRunningTime c n.
 Proof.
   Fixpoint scribbly (n : nat) : cmd :=
@@ -681,6 +808,8 @@ Proof.
   apply scribbly_time in H4.
   linear_arithmetic.
 Qed.
+
+(* Next, some boring properties of [pow2]. *)
 
 Lemma pow2_pos : forall n,
     pow2 n > 0.
@@ -737,6 +866,7 @@ Qed.
 
 Hint Constructors boundRunningTime.
 
+(* Key property: taking a step of execution lowers the running-time bound. *)
 Lemma boundRunningTime_step : forall c n h l h' l',
     boundRunningTime c n
     -> forall c', step (h, l, c) (h', l', c')
@@ -756,8 +886,34 @@ Proof.
   eauto 6.
 Qed.
 
+Lemma boundRunningTime_steps : forall h l c h' l' c',
+    step^* (h, l, c) (h', l', c')
+    -> forall n, boundRunningTime c n
+    -> exists n', boundRunningTime c' n' /\ n' <= n.
+Proof.
+  induct 1; simplify; eauto.
+  cases y.
+  cases p.
+  specialize (boundRunningTime_step H1 H); first_order.
+  eapply IHtrc in H2; eauto.
+  first_order.
+  eauto.
+Qed.
+
+(* Here we get a bit naughty and begin to depend on *classical logic*, as with
+ * the *law of the excluded middle*: [forall P, P \/ ~P].  You may not have
+ * noticed that we've never applied that principle explicitly so far! *)
 Require Import Classical.
 
+(* A very useful property: when a command has bounded running time, any
+ * execution starting from that command can be *completed* to one ending in a
+ * stuck state.  This property definitely wouldn't be true without the bound,
+ * if our language had explicit, unbounded loops.
+ *
+ * The fun thing about this proof is that we are essentially using tactics to
+ * define an interpreter for the object language, making arbitrary scheduling
+ * choices.  Implicit in the derivation is a proof that this interpreter always
+ * terminates, which we get by strong induction on the running-time bound. *)
 Theorem complete_trace : forall k c n,
   boundRunningTime c n
   -> n <= k
@@ -898,6 +1054,9 @@ Proof.
   eauto.
 Qed.
 
+(* We will apply completion to traces that end in violation of the
+ * not-about-to-fail invariant.  It is important that any extension of such a
+ * trace preserves that property. *)
 Lemma notAboutToFail_step : forall h l c h' l' c',
     step (h, l, c) (h', l', c')
     -> notAboutToFail c = false
@@ -925,20 +1084,8 @@ Proof.
   eauto using notAboutToFail_step.
 Qed.
 
-Lemma boundRunningTime_steps : forall h l c h' l' c',
-    step^* (h, l, c) (h', l', c')
-    -> forall n, boundRunningTime c n
-    -> exists n', boundRunningTime c' n' /\ n' <= n.
-Proof.
-  induct 1; simplify; eauto.
-  cases y.
-  cases p.
-  specialize (boundRunningTime_step H1 H); first_order.
-  eapply IHtrc in H2; eauto.
-  first_order.
-  eauto.
-Qed.
-
+(* One last technical device: we define a variant of [step^*] that tracks how
+ * many steps were made, which will come in handy for induction shortly. *)
 Inductive stepsi : nat -> heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepsiO : forall st,
     stepsi O st st
@@ -955,6 +1102,8 @@ Theorem steps_stepsi : forall st1 st2,
 Proof.
   induct 1; first_order; eauto.
 Qed.
+
+(* Some helper lemmas about Coq's quantification over lists *)
 
 Lemma Exists_app_fwd : forall A (P : A -> Prop) ls1 ls2,
     Exists P (ls1 ++ ls2)
@@ -973,6 +1122,42 @@ Proof.
   invert H0; eauto.
 Qed.
 
+Lemma Forall_app_fwd1 : forall A (P : A -> Prop) ls1 ls2,
+    Forall P (ls1 ++ ls2)
+    -> Forall P ls1.
+Proof.
+  induct ls1; invert 1; eauto.
+Qed.
+
+Lemma Forall_app_fwd2 : forall A (P : A -> Prop) ls1 ls2,
+    Forall P (ls1 ++ ls2)
+    -> Forall P ls2.
+Proof.
+  induct ls1; invert 1; simplify; subst; eauto.
+Qed.
+
+Hint Immediate Forall_app_fwd1 Forall_app_fwd2.
+
+Lemma Forall_app_bwd : forall A (P : A -> Prop) ls1 ls2,
+    Forall P ls1
+    -> Forall P ls2
+    -> Forall P (ls1 ++ ls2).
+Proof.
+  induct 1; simplify; eauto.
+Qed.
+
+Hint Resolve Forall_app_bwd.
+
+Lemma Forall2 : forall A (P Q R : A -> Prop) ls,
+    Forall P ls
+    -> Forall Q ls
+    -> (forall x, P x -> Q x -> R x)
+    -> Forall R ls.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+(* A connection between [notAboutToFail] in the old and new worlds *)
 Lemma summarizeThreads_aboutToFail : forall c cs,
     summarizeThreads c cs
     -> notAboutToFail c = false
@@ -998,6 +1183,8 @@ Hint Immediate summarizeThreads_nonempty.
 
 Hint Constructors stepC summarizeThreads.
 
+(* When we step a summarized thread, we can duplicate the step within one of the
+ * elements of the summary. *)
 Lemma step_pick : forall h l c h' l' c',
     step (h, l, c) (h', l', c')
     -> forall cs, summarizeThreads c cs
@@ -1047,7 +1234,10 @@ Proof.
   exact l'.
   exact h'.
 Qed.
-  
+
+(* The next few lemmas are quite technical.  Commentary resumes for
+ * [translate_trace]. *)
+
 Lemma translate_trace_matching : forall h l c h' l' c',
     step (h, l, c) (h', l', c')
     -> forall c0 s cs, summarizeThreads c ((c0, s) :: cs)
@@ -1134,22 +1324,6 @@ Proof.
   apply (f_equal (@length _)) in H3; simplify.
   linear_arithmetic.
 Qed.
-
-Lemma Forall_app_fwd1 : forall A (P : A -> Prop) ls1 ls2,
-    Forall P (ls1 ++ ls2)
-    -> Forall P ls1.
-Proof.
-  induct ls1; invert 1; eauto.
-Qed.
-
-Lemma Forall_app_fwd2 : forall A (P : A -> Prop) ls1 ls2,
-    Forall P (ls1 ++ ls2)
-    -> Forall P ls2.
-Proof.
-  induct ls1; invert 1; simplify; subst; eauto.
-Qed.
-
-Hint Immediate Forall_app_fwd1 Forall_app_fwd2.
 
 Lemma commute_writes : forall c1 c a s h l1' h' l' v,
   nextAction c1 c
@@ -1314,16 +1488,6 @@ Proof.
   eauto.
 Qed.
 
-Lemma Forall_app_bwd : forall A (P : A -> Prop) ls1 ls2,
-    Forall P ls1
-    -> Forall P ls2
-    -> Forall P (ls1 ++ ls2).
-Proof.
-  induct 1; simplify; eauto.
-Qed.
-
-Hint Resolve Forall_app_bwd.
-
 Lemma split_app : forall A (l1 l2 r1 r2 : list A),
     l1 ++ l2 = r1 ++ r2
     -> (exists r12, r1 = l1 ++ r12
@@ -1444,15 +1608,12 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Lemma Forall2 : forall A (P Q R : A -> Prop) ls,
-    Forall P ls
-    -> Forall Q ls
-    -> (forall x, P x -> Q x -> R x)
-    -> Forall R ls.
-Proof.
-  induct 1; invert 1; eauto.
-Qed.
-
+(* The heart of the soundness proof!  When a length-[i] derivation gets us to a
+ * stuck state that is about to fail, and when we have summarized the program,
+ * we can run that summary in the optimized semantics and also arrive at a state
+ * that is about to fail.  Thus, if we explore the optimized state space and
+ * find no failures, we can conclude lack of reachable failures in the original
+ * state space. *)
 Lemma translate_trace : forall i h l c h' l' c',
     stepsi i (h, l, c) (h', l', c')
     -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
@@ -1505,6 +1666,8 @@ Proof.
   induct 1; invert 1; equality.
 Qed.
 
+(* This theorem brings it all together, to reduce one invariant-proof problem to
+ * another that uses the optimized semantics. *)
 Theorem step_stepC : forall h l c (cs : list (cmd * summary)) n,
   summarizeThreads c cs
   -> boundRunningTime c n
@@ -1542,6 +1705,9 @@ Proof.
   assumption.
 Qed.
 
+(* Now we define some tactics to help us apply this technique automatically for
+ * concrete programs.  As usual, we won't explain how the tactics work. *)
+
 Ltac analyzer := repeat (match goal with
                          | [ |- context[if ?E then _ else _] ] => cases E
                          | _ => econstructor
@@ -1574,11 +1740,16 @@ Ltac por_step :=
 Ltac por_done :=
   apply MscDone; eapply oneStepClosure_solve; [ por_closure | simplify; solve [ sets ] ].
 
+(* OK, ready to return to our last example!  This time we will see state-space
+ * exploration that steps a single thread at a time, where the final invariant
+ * includes no states with multiple *partially executed* threads. *)
 Theorem independent_threads_ok_again :
   invariantFor (trsys_of $0 {} independent_threads)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
+  (* We need to supply that summary when invoking the proof principle, though we
+   * could also have used Ltac to compute it automatically. *)
   eapply step_stepC with (cs := [(_, {| Reads := {0, 1};
                                         Writes := {1};
                                         Locks := {} |})]
@@ -1606,6 +1777,8 @@ Proof.
 
   sets.
 
+  (* We computed an inexact running time.  By filling in zeroes for some
+   * existential variables, we commit to a concrete bound. *)
   Grab Existential Variables.
   exact 0.
   exact 0.

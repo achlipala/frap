@@ -635,18 +635,18 @@ Fixpoint pow2 (n : nat) : nat :=
   end.
 
 Inductive boundRunningTime : cmd -> nat -> Prop :=
-| BrtReturn : forall r,
-    boundRunningTime (Return r) 0
-| BrtFail :
-    boundRunningTime Fail 0
-| BrtRead : forall a,
-    boundRunningTime (Read a) 1
-| BrtWrite : forall a v,
-    boundRunningTime (Write a v) 1
-| BrtLock : forall a,
-    boundRunningTime (Lock a) 1
-| BrtUnlock : forall a,
-    boundRunningTime (Unlock a) 1
+| BrtReturn : forall r n,
+    boundRunningTime (Return r) n
+| BrtFail : forall n,
+    boundRunningTime Fail n
+| BrtRead : forall a n,
+    boundRunningTime (Read a) (S n)
+| BrtWrite : forall a v n,
+    boundRunningTime (Write a v) (S n)
+| BrtLock : forall a n,
+    boundRunningTime (Lock a) (S n)
+| BrtUnlock : forall a n,
+    boundRunningTime (Unlock a) (S n)
 | BrtBind : forall c1 c2 n1 n2,
     boundRunningTime c1 n1
     -> (forall r, boundRunningTime (c2 r) n2)
@@ -1514,4 +1514,77 @@ Proof.
   eapply Forall_Exists_contra.
   apply H9.
   assumption.
+Qed.
+
+Ltac analyzer := repeat (match goal with
+                         | [ |- context[if ?E then _ else _] ] => cases E
+                         | _ => econstructor
+                         end; simplify; try solve [ sets ]).
+
+Ltac por_solve := simplify; repeat econstructor; sets; linear_arithmetic.
+
+Ltac por_lister :=
+  repeat match goal with
+         | [ H : ?ls ++ _ = _ :: _ |- _ ] => cases ls; simplify; invert H
+         | [ H : @eq (list _) _ _ |- _ ] => apply (f_equal (@length _)) in H; simplify; linear_arithmetic
+         end.
+
+Ltac por_invert1 :=
+  match goal with
+  | [ H : forall (c0 : cmd) (h'' : heap) (l'' : locks) (c'' : cmd), _ -> _ |- _ ] =>
+    (exfalso; eapply H; try por_solve; por_lister; por_solve) || (clear H; por_lister)
+  | _ => model_check_invert1
+  end.
+
+Ltac por_invert := simplify; repeat por_invert1.
+
+Ltac por_closure :=
+  repeat (apply oneStepClosure_empty
+          || (apply oneStepClosure_split; [ por_invert; try equality; solve [ singletoner ] | ])).
+
+Ltac por_step :=
+  eapply MscStep; [ por_closure | simplify ].
+
+Ltac por_done :=
+  apply MscDone; eapply oneStepClosure_solve; [ por_closure | simplify; solve [ sets ] ].
+
+Theorem independent_threads_ok_again :
+  invariantFor (trsys_of $0 {} independent_threads)
+               (fun p => let '(_, _, c) := p in
+                         notAboutToFail c = true).
+Proof.
+  eapply step_stepC with (cs := [(_, {| Reads := {0, 1};
+                                        Writes := {1};
+                                        Locks := {} |})]
+                                  ++ [(_, {| Reads := {2};
+                                         Writes := {2};
+                                         Locks := {} |})]).
+  analyzer.
+  analyzer.
+
+  simplify.
+  eapply invariant_weaken.
+  apply multiStepClosure_ok; simplify.
+
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+  por_step.
+
+  por_done.
+
+  sets.
+
+  Grab Existential Variables.
+  exact 0.
+  exact 0.
+  exact 0.
+  exact 0.
+  exact 0.
+  exact 0.
 Qed.

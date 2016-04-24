@@ -1015,15 +1015,206 @@ Proof.
   eauto.
 Qed.
 
-Lemma translate_trace : forall h l c h' l' c',
-    step^* (h, l, c) (h', l', c')
+Inductive stepsi : nat -> heap * locks * cmd -> heap * locks * cmd -> Prop :=
+| StepsiO : forall st,
+    stepsi O st st
+| StepsiS : forall st1 st2 st3 i,
+    step st1 st2
+    -> stepsi i st2 st3
+    -> stepsi (S i) st1 st3.
+
+Hint Constructors stepsi.
+
+Theorem steps_stepsi : forall st1 st2,
+    step^* st1 st2
+    -> exists i, stepsi i st1 st2.
+Proof.
+  induct 1; first_order; eauto.
+Qed.
+
+Lemma Exists_app_fwd : forall A (P : A -> Prop) ls1 ls2,
+    Exists P (ls1 ++ ls2)
+    -> Exists P ls1 \/ Exists P ls2.
+Proof.
+  induct ls1; invert 1; simplify; subst; eauto.
+  apply IHls1 in H1; propositional; eauto.
+Qed.
+
+Lemma Exists_app_bwd : forall A (P : A -> Prop) ls1 ls2,
+    Exists P ls1 \/ Exists P ls2
+    -> Exists P (ls1 ++ ls2).
+Proof.
+  induct ls1; simplify; propositional; eauto.
+  invert H0.
+  invert H0; eauto.
+Qed.
+
+Lemma summarizeThreads_aboutToFail : forall c cs,
+    summarizeThreads c cs
+    -> notAboutToFail c = false
+    -> Exists (fun c_s => notAboutToFail (fst c_s) = false) cs.
+Proof.
+  induct 1; simplify; eauto.
+
+  apply andb_false_iff in H1; propositional; eauto using Exists_app_bwd.
+Qed.
+
+Hint Resolve summarizeThreads_aboutToFail.
+
+Lemma summarizeThreads_nonempty : forall c,
+    summarizeThreads c []
+    -> False.
+Proof.
+  induct 1.
+  cases ss1; simplify; eauto.
+  equality.
+Qed.
+
+Hint Immediate summarizeThreads_nonempty.
+
+Hint Constructors stepC summarizeThreads.
+
+Lemma step_pick : forall h l c h' l' c',
+    step (h, l, c) (h', l', c')
+    -> forall cs, summarizeThreads c cs
+    -> exists cs1 c0 s cs2 c0', cs = cs1 ++ (c0, s) :: cs2
+                                /\ ((step (h, l, c0) (h', l', c0')
+                                     /\ summarizeThreads c' (cs1 ++ (c0', s) :: cs2))
+                                    \/ exists r, c0 = Return r
+                                                 /\ h' = h
+                                                 /\ l' = l
+                                                 /\ summarizeThreads c' (cs1 ++ cs2)).
+Proof.
+  induct 1; invert 1.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
+
+  apply IHstep in H3; first_order; subst.
+  rewrite <- app_assoc.
+  simplify.
+  do 5 eexists; propositional.
+  left; propositional.
+  eauto.
+  change (x ++ (x3, x1) :: x2 ++ ss2)
+         with (x ++ ((x3, x1) :: x2) ++ ss2).
+  rewrite app_assoc.
+  eauto.
+  rewrite <- app_assoc; simplify.
+  do 5 eexists; propositional.
+  right; eexists; propositional.
+  rewrite app_assoc.
+  eauto.
+
+  invert H1.
+
+  apply IHstep in H5; first_order; subst.
+  rewrite app_assoc.
+  do 5 eexists; propositional.
+  left; propositional.
+  eauto.
+  rewrite <- app_assoc.
+  eauto.
+  rewrite app_assoc.
+  do 5 eexists; propositional.
+  right; eexists; propositional.
+  rewrite <- app_assoc.
+  eauto.
+
+  invert H1.
+
+  invert H2.
+  eexists [], _, _, _, _; simplify; propositional.
+  eauto 10.
+
+  invert H0.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto using summarize_step.
+
+  eexists [], _, _, [], _; simplify; propositional; eauto using summarize_step.
+
+  (* Here's a gnarly bit to make up for simplification in the proof above.
+   * Some existential variables weren't determined, but we can pick their values
+   * here. *)
+  Grab Existential Variables.
+  exact Fail.
+  exact Fail.
+  exact Fail.
+  exact l'.
+  exact h'.
+Qed.
+  
+Lemma translate_trace_matching : forall h l c h' l' c',
+    step (h, l, c) (h', l', c')
+    -> forall c0 s cs, summarizeThreads c ((c0, s) :: cs)
+    -> ~(exists c1 h'0 l'0 c'0,
+            nextAction c0 c1
+            /\ Forall (fun c_s => commutes c1 (snd c_s)) cs
+            /\ step (h, l, c0) (h'0, l'0, c'0))
+    -> exists cs', stepC (h, l, (c0, s) :: cs) (h', l', cs')
+                   /\ summarizeThreads c' cs'.
+Proof.
+  simplify.
+  eapply step_pick in H; eauto.
+  first_order; subst.
+
+  cases x; simplify.
+
+  invert H.
+  eauto.
+
+  invert H.
+  eauto 10.
+
+  cases x; simplify.
+
+  invert H.
+  eexists; propositional.
+  apply StepDone with (cs1 := []).
+  eauto.
+
+  invert H.
+  change ((c0, s) :: x ++ (Return x4, x1) :: x2)
+  with (((c0, s) :: x) ++ (Return x4, x1) :: x2).
+  eauto.
+Qed.
+
+Lemma translate_trace : forall i h l c h' l' c',
+    stepsi i (h, l, c) (h', l', c')
     -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
     -> notAboutToFail c' = false
     -> forall cs, summarizeThreads c cs
     -> exists h' l' cs', stepC^* (h, l, cs) (h', l', cs')
                          /\ Exists (fun c_s => notAboutToFail (fst c_s) = false) cs'.
 Proof.
-Admitted.
+  induct i; simplify.
+
+  invert H.
+  eauto 10.
+
+  cases cs.
+  exfalso; eauto.
+  cases p.
+  destruct (classic (exists c1 h' l' c', nextAction c0 c1
+                                         /\ Forall (fun c_s => commutes c1 (snd c_s)) cs
+                                         /\ step (h, l, c0) (h', l', c'))).
+
+  admit.
+
+  invert H.  
+  cases st2.
+  cases p.
+  eapply translate_trace_matching in H5; eauto.
+  first_order.
+  eapply IHi in H6; eauto.
+  first_order.
+  eauto 6.
+Qed.
 
 Lemma Forall_Exists_contra : forall A (f : A -> bool) ls,
     Exists (fun x => f x = false) ls
@@ -1061,6 +1252,7 @@ Proof.
   specialize (trc_trans H4 H2); simplify.
   assert (notAboutToFail x2 = false) by eauto using notAboutToFail_steps.
   unfold invariantFor in H1; simplify.
+  apply steps_stepsi in H7; first_order.
   eapply translate_trace in H7; eauto.
   first_order.
   apply H1 in H7; auto.

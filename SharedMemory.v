@@ -458,7 +458,7 @@ Definition trsys_ofC (h : heap) (l : locks) (cs : list (cmd * summary)) := {|
 |}.
 
 
-Lemma commutes_sound : forall h l c2 h' l' c2',
+Lemma commutes_sound' : forall h l c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> forall s c1 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
   -> summarize c2 s
@@ -517,6 +517,94 @@ Proof.
   replace ((l \setminus {a}) \setminus {a0}) with ((l \setminus {a0}) \setminus {a}) by sets.
   constructor.
   sets.
+Qed.
+
+Lemma step_nextAction_Return : forall r h l c h' l' c',
+    step (h, l, c) (h', l', c')
+    -> nextAction c (Return r)
+    -> h' = h /\ l' = l /\ (forall h'' l'', step (h'', l'', c) (h'', l'', c')).
+Proof.
+  induct 1; invert 1; propositional; eauto.
+Qed.
+
+Lemma step_nextAction_other : forall c0 h l c h' l' c',
+    step (h, l, c) (h', l', c')
+    -> nextAction c c0
+    -> (forall r, c0 <> Return r)
+    -> exists f c0', step (h, l, c0) (h', l', c0')
+                     /\ c = f c0
+                     /\ c' = f c0'
+                     /\ forall h1 l1 h2 l2 c0'', step (h1, l1, c0) (h2, l2, c0'')
+                                                 -> step (h1, l1, f c0) (h2, l2, f c0'').
+Proof.
+  induct 1; invert 1; first_order; subst; eauto.
+
+  exists (fun X => x <- x X; c2 x); eauto 10.
+
+  invert H3.
+  unfold not in *; exfalso; eauto.
+
+  exists (fun X => X); eauto.
+
+  exists (fun X => X); eauto.
+
+  exists (fun X => X); eauto 10.
+
+  exists (fun X => X); eauto 10.
+Qed.
+
+Lemma nextAction_couldBe : forall c c0,
+    nextAction c c0
+    -> match c0 with
+       | Return _ => True
+       | Fail => True
+       | Read _ => True
+       | Write _ _ => True
+       | Lock _ => True
+       | Unlock _ => True
+       | _ => False
+       end.
+Proof.
+  induct 1; auto.
+Qed.
+
+Lemma commutes_sound : forall h l c2 h' l' c2',
+  step (h, l, c2) (h', l', c2')
+  -> forall s c1 c0 h'' l'' c1', step (h', l', c1) (h'', l'', c1')
+  -> summarize c2 s
+  -> nextAction c1 c0
+  -> commutes c0 s
+  -> exists h1 l1, step (h, l, c1) (h1, l1, c1')
+                   /\ step (h1, l1, c2) (h'', l'', c2').
+Proof.
+  simplify.
+
+  assert (Hc : commutes c0 s) by assumption.
+  specialize (nextAction_couldBe H2).
+  cases c0; propositional.
+
+  assert (Hs : step (h', l', c1) (h'', l'', c1')) by assumption.
+  eapply step_nextAction_Return in H0; eauto; propositional; subst.
+  eauto.
+
+  eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
+  eapply commutes_sound' with (c2 := c2) (c1 := Read a) in H3; eauto.
+  first_order; eauto.
+
+  eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
+  eapply commutes_sound' with (c2 := c2) (c1 := Write a v) in H3; eauto.
+  first_order; eauto.
+
+  eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
+  invert H0.
+
+  eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
+  eapply commutes_sound' with (c2 := c2) (c1 := Lock a) in H3; eauto.
+  first_order; eauto.
+
+  eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
+  eapply commutes_sound' with (c2 := c2) (c1 := Unlock a) in H3; eauto.
+  first_order; eauto.
 Qed.
 
 Hint Constructors summarize.
@@ -1137,11 +1225,21 @@ Lemma commutes_noblock : forall c c0,
   -> forall c1 s, summarize c1 s
   -> commutes c0 s
   -> forall h1' l1' c1', step (h, l, c1) (h1', l1', c1')
-  -> exists h'' l'' c'', step (h1', l1', c) (h'', l'', c'').
+  -> exists h'' l'', step (h1', l1', c) (h'', l'', c').
 Proof.
   induct 1; invert 1.
 
   induct 1; simplify; eauto.
+  invert H0.
+  invert H0.
+  invert H3; eauto.
+  invert H1; eauto.
+  invert H1; eauto.
+  assert (a0 <> a) by sets.
+  replace (h' $! a) with (h' $+ (a0, v) $! a) by (simplify; equality).
+  eauto.
+  invert H1; eauto.
+  invert H1; eauto.
 
   induct 1; simplify; eauto.
 
@@ -1152,11 +1250,11 @@ Proof.
   invert H2; eauto.
   invert H2; eauto.
   invert H2; eauto.
-  do 3 eexists.
+  do 2 eexists.
   constructor.
   sets.
   invert H2; eauto.
-  do 3 eexists.
+  do 2 eexists.
   constructor.
   sets.
 
@@ -1167,11 +1265,11 @@ Proof.
   invert H2; eauto.
   invert H2; eauto.
   invert H2; eauto.
-  do 3 eexists.
+  do 2 eexists.
   constructor.
   sets.
   invert H2; eauto.
-  do 3 eexists.
+  do 2 eexists.
   constructor.
   sets.
 
@@ -1181,11 +1279,11 @@ Proof.
   invert H5; eauto.
   invert H3; eauto.
   invert H3.
-  do 3 eexists; eapply commute_writes in H2; eauto.
+  do 2 eexists; eapply commute_writes in H2; eauto.
   invert H3.
-  do 3 eexists; eapply commute_locks in H2; eauto.
+  do 2 eexists; eapply commute_locks in H2; eauto.
   invert H3.
-  do 3 eexists; eapply commute_unlocks in H2; eauto.
+  do 2 eexists; eapply commute_unlocks in H2; eauto.
 
   eauto.
 Qed.
@@ -1216,6 +1314,35 @@ Proof.
 Qed.
 
 Hint Rewrite app_length.
+
+Lemma step_out_of_summarizeThreads : forall c cs1 c0 s cs2,
+    summarizeThreads c (cs1 ++ (c0, s) :: cs2)
+    -> forall h l c0' s' h' l', step (h, l, c0') (h', l', c0)
+    -> summarize c0' s'
+    -> exists c', summarizeThreads c' (cs1 ++ (c0', s') :: cs2)
+                  /\ step (h, l, c') (h', l', c).
+Proof.
+  induct 1; simplify.
+
+  apply split_center in x; first_order; subst.
+  
+  eapply IHsummarizeThreads1 in H1; try reflexivity; eauto.
+  first_order.
+  change (cs1 ++ (c0', s') :: x ++ ss2) with (cs1 ++ ((c0', s') :: x) ++ ss2).
+  rewrite app_assoc.
+  eauto.
+
+  eapply IHsummarizeThreads2 in H1; try reflexivity; eauto.
+  first_order.
+  rewrite <- app_assoc.
+  eauto.
+
+  cases cs1; simplify.
+  invert x.
+  eauto using summarize_step.
+  invert x.
+  cases cs1; simplify; try equality.
+Qed.
 
 Lemma translate_trace_commute : forall i h l c h' l' c',
     stepsi (S i) (h, l, c) (h', l', c')
@@ -1277,7 +1404,11 @@ Proof.
   first_order.
   eapply IHstepsi in H3; clear IHstepsi; eauto using summarize_step.
   first_order.
-  admit.
+  eapply commutes_sound with (c1 := c0) (c2 := x4) (c0 := x) in H10; eauto.
+  first_order.
+  eapply step_out_of_summarizeThreads with (cs1 := (x2, s) :: x3) in H11; eauto.
+  simplify; first_order.
+  eauto 10.
 Qed.
 
 Lemma summarizeThreads_Forall : forall c cs,

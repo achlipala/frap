@@ -68,8 +68,6 @@ Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 | StepParRecur2 : forall h l c1 c2 h' l' c2',
   step (h, l, c2) (h', l', c2')
   -> step (h, l, Par c1 c2) (h', l', Par c1 c2')
-| StepParProceed : forall h l r c,
-   step (h, l, Par (Return r) c) (h, l, c)
 
 | StepLock : forall h l a,
   ~a \in l
@@ -87,16 +85,13 @@ Definition trsys_of (h : heap) (l : locks) (c : cmd) := {|
 Example two_increments_thread :=
   _ <- Lock 0;
   n <- Read 0;
-  _ <- Write 0 (n + 1);
-  Unlock 0.
-
-Example two_increments :=
-  _ <- (two_increments_thread || two_increments_thread);
-  n <- Read 0;
-  if n ==n 2 then
-    Return 0
+  if n <=? 1 then
+    _ <- Write 0 (n + 1);
+    Unlock 0
   else
     Fail.
+
+Example two_increments := two_increments_thread || two_increments_thread.
 
 Fixpoint notAboutToFail (c : cmd) : bool :=
   match c with
@@ -131,10 +126,6 @@ Admitted.
   model_check_step.
   model_check_step.
   model_check_step.
-  model_check_step.
-  model_check_step.
-  model_check_step.
-  model_check_step.
   model_check_done.
 
   simplify.
@@ -155,11 +146,7 @@ Fixpoint runLocal (c : cmd) : cmd :=
   | Read _ => c
   | Write _ _ => c
   | Fail => c
-  | Par c1 c2 =>
-    match runLocal c1 with
-    | Return _ => runLocal c2
-    | c1' => Par c1' (runLocal c2)
-    end
+  | Par c1 c2 => Par (runLocal c1) (runLocal c2)
   | Lock _ => c
   | Unlock _ => c
   end.
@@ -244,24 +231,7 @@ Proof.
   cases (runLocal c); simplify; eauto.
   rewrite IHc; auto.
   rewrite IHc; auto.
-  cases (runLocal c1); simplify; eauto.
-  rewrite IHc1; equality.
-  rewrite IHc2; equality.
-  rewrite IHc2; equality.
-  rewrite IHc2; equality.
-  rewrite IHc1; equality.
-  rewrite IHc2; equality.
-  rewrite IHc2; equality.
-Qed.
-
-Lemma runLocal_left : forall c1 c2,
-  (forall r, runLocal c1 <> Return r)
-  -> runLocal (c1 || c2) = runLocal c1 || runLocal c2.
-Proof.
-  simplify.
-  cases (runLocal c1); eauto.
-  unfold not in *.
-  exfalso; eauto.
+  equality.
 Qed.
 
 Lemma step_runLocal : forall h l c h' l' c',
@@ -286,145 +256,15 @@ Proof.
 
   rewrite H0; equality.
 
-  cases (runLocal c1).
-  invert H0.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
+  right; eexists; propositional.
   eauto.
   simplify.
-  rewrite runLocal_idem.
+  rewrite runLocal_idem; equality.
   equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
+  right; eexists; propositional.
   eauto.
   simplify.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
-  eauto.
-  simplify.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
-  eauto.
-  simplify.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
-  eauto.
-  simplify.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
-  eauto.
-  simplify.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- H1.
-  right.
-  eexists.
-  propositional.
-  eauto.
-  simplify.
-  rewrite runLocal_idem.
-  equality.
-
-  rewrite H0; equality.
-
-  right.
-  cases (runLocal c1); eauto.
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
-
-  eexists; propositional.
-  eauto.
-  rewrite runLocal_left.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  equality.
-  rewrite <- Heq.
-  rewrite runLocal_idem.
-  rewrite Heq.
-  equality.
+  rewrite runLocal_idem; equality.
 Qed.
 
 Lemma step_stepL' : forall h l c h' l' c',
@@ -484,7 +324,6 @@ Admitted.
   eapply invariant_weaken.
   apply multiStepClosure_ok; simplify.
 
-  model_check_step.
   model_check_step.
   model_check_step.
   model_check_step.
@@ -602,8 +441,6 @@ Definition commutes (c : cmd) (s : summary) : Prop :=
   end.
 
 Inductive stepC : heap * locks * list (cmd * summary) -> heap * locks * list (cmd * summary) -> Prop :=
-| StepDone : forall h l r s cs1 cs2,
-   stepC (h, l, cs1 ++ (Return r, s) :: cs2) (h, l, cs1 ++ cs2)
 | StepFirst : forall h l c h' l' c' s cs,
   step (h, l, c) (h', l', c')
   -> stepC (h, l, (c, s) :: cs) (h', l', (c', s) :: cs)
@@ -803,10 +640,6 @@ Proof.
 
   apply IHboundRunningTime2 in H3; first_order; subst.
   eauto 6.
-
-  invert H.
-  simplify.
-  eauto.
 Qed.
 
 Require Import Classical.
@@ -926,29 +759,6 @@ Proof.
   invert H.
   eapply IHk in H2; eauto using use_pow2; first_order.
   invert H.
-  cases x1.
-  do 3 eexists; propositional.
-  apply trc_one.
-  eauto.
-  eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
-  do 3 eexists; propositional.
-  eauto.
-  invert H; eauto.
   do 3 eexists; propositional.
   eauto.
   invert H; eauto.
@@ -1078,12 +888,8 @@ Lemma step_pick : forall h l c h' l' c',
     step (h, l, c) (h', l', c')
     -> forall cs, summarizeThreads c cs
     -> exists cs1 c0 s cs2 c0', cs = cs1 ++ (c0, s) :: cs2
-                                /\ ((step (h, l, c0) (h', l', c0')
-                                     /\ summarizeThreads c' (cs1 ++ (c0', s) :: cs2))
-                                    \/ exists r, c0 = Return r
-                                                 /\ h' = h
-                                                 /\ l' = l
-                                                 /\ summarizeThreads c' (cs1 ++ cs2)).
+                                /\ step (h, l, c0) (h', l', c0')
+                                /\ summarizeThreads c' (cs1 ++ (c0', s) :: cs2).
 Proof.
   induct 1; invert 1.
 
@@ -1099,15 +905,9 @@ Proof.
   rewrite <- app_assoc.
   simplify.
   do 5 eexists; propositional.
-  left; propositional.
   eauto.
   change (x ++ (x3, x1) :: x2 ++ ss2)
          with (x ++ ((x3, x1) :: x2) ++ ss2).
-  rewrite app_assoc.
-  eauto.
-  rewrite <- app_assoc; simplify.
-  do 5 eexists; propositional.
-  right; eexists; propositional.
   rewrite app_assoc.
   eauto.
 
@@ -1116,23 +916,11 @@ Proof.
   apply IHstep in H5; first_order; subst.
   rewrite app_assoc.
   do 5 eexists; propositional.
-  left; propositional.
   eauto.
-  rewrite <- app_assoc.
-  eauto.
-  rewrite app_assoc.
-  do 5 eexists; propositional.
-  right; eexists; propositional.
   rewrite <- app_assoc.
   eauto.
 
   invert H1.
-
-  invert H2.
-  eexists [], _, _, _, _; simplify; propositional.
-  eauto 10.
-
-  invert H0.
 
   eexists [], _, _, [], _; simplify; propositional; eauto using summarize_step.
 
@@ -1142,9 +930,6 @@ Proof.
    * Some existential variables weren't determined, but we can pick their values
    * here. *)
   Grab Existential Variables.
-  exact Fail.
-  exact Fail.
-  exact Fail.
   exact l'.
   exact h'.
 Qed.
@@ -1170,18 +955,345 @@ Proof.
 
   invert H.
   eauto 10.
+Qed.
 
-  cases x; simplify.
+Lemma nextAction_det : forall c c0,
+    nextAction c c0
+    -> forall h l h' l' c', step (h, l, c) (h', l', c')
+    -> forall h'' l'' c'', step (h, l, c) (h'', l'', c'')
+    -> h' = h'' /\ l'' = l' /\ c'' = c'.
+Proof.
+  induct 1; invert 1; invert 1; auto.
 
+  eapply IHnextAction in H2; eauto.
+  equality.
+
+  invert H2.
+
+  invert H2.
+Qed.
+
+Lemma split_center : forall A (x : A) l1 l2 r1 r2,
+    l1 ++ l2 = r1 ++ x :: r2
+    -> (exists r21, r2 = r21 ++ l2
+                    /\ l1 = r1 ++ x :: r21)
+       \/ (exists r12, r1 = l1 ++ r12
+                       /\ l2 = r12 ++ x :: r2).
+Proof.
+  induct l1; simplify; subst; eauto.
+
+  cases r1; simplify.
+  invert H; eauto.
   invert H.
+  apply IHl1 in H2; first_order; subst; eauto.
+Qed.
+
+Hint Rewrite app_length.
+
+Lemma step_into_summarizeThreads : forall c0 cs1 c s cs2,
+    summarizeThreads c0 (cs1 ++ (c, s) :: cs2)
+    -> forall h l h' l' c', step (h, l, c) (h', l', c')
+    -> exists c0', step (h, l, c0) (h', l', c0')
+                   /\ summarizeThreads c0' (cs1 ++ (c', s) :: cs2).
+Proof.
+  induct 1; simplify.
+  apply split_center in x; first_order; subst.
+  
+  eapply IHsummarizeThreads1 in H1; eauto.
+  first_order.
   eexists; propositional.
-  apply StepDone with (cs1 := []).
+  eauto.
+  change (summarizeThreads (x0 || c2) (cs1 ++ ((c', s) :: x) ++ ss2)).
+  rewrite app_assoc.
   eauto.
 
-  invert H.
-  change ((c0, s) :: x ++ (Return x4, x1) :: x2)
-  with (((c0, s) :: x) ++ (Return x4, x1) :: x2).
+  eapply IHsummarizeThreads2 in H1; eauto.
+  first_order.
+  rewrite <- app_assoc.
   eauto.
+
+  cases cs1; simplify.
+  invert x.
+  eauto using summarize_step.
+
+  invert x.
+  apply (f_equal (@length _)) in H3; simplify.
+  linear_arithmetic.
+Qed.
+
+Lemma Forall_app_fwd1 : forall A (P : A -> Prop) ls1 ls2,
+    Forall P (ls1 ++ ls2)
+    -> Forall P ls1.
+Proof.
+  induct ls1; invert 1; eauto.
+Qed.
+
+Lemma Forall_app_fwd2 : forall A (P : A -> Prop) ls1 ls2,
+    Forall P (ls1 ++ ls2)
+    -> Forall P ls2.
+Proof.
+  induct ls1; invert 1; simplify; subst; eauto.
+Qed.
+
+Hint Immediate Forall_app_fwd1 Forall_app_fwd2.
+
+Lemma commute_writes : forall c1 c a s h l1' h' l' v,
+  nextAction c1 c
+  -> a \in Writes s
+  -> commutes c s
+  -> forall c1', step (h, l1', c1) (h', l', c1')
+  -> step (h $+ (a, v), l1', c1) (h' $+ (a, v), l', c1').
+Proof.
+  induct 1; simplify.
+
+  invert H1.
+
+  invert H1.
+
+  invert H1.
+  replace (h' $! a0) with (h' $+ (a, v) $! a0).
+  eauto.
+  assert (a <> a0) by sets.
+  simplify; equality.
+
+  invert H1.
+  replace (h $+ (a0, v0) $+ (a, v)) with (h $+ (a, v) $+ (a0, v0)).
+  eauto.
+  assert (a <> a0) by sets.
+  maps_equal.
+
+  invert H1.
+  eauto.
+
+  invert H1.
+  eauto.
+
+  invert H2; eauto.
+Qed.
+
+Lemma commute_locks : forall c1 c a s h l1' h' l',
+  nextAction c1 c
+  -> a \in Locks s
+  -> commutes c s
+  -> forall c1', step (h, l1', c1) (h', l', c1')
+  -> step (h, l1' \cup {a}, c1) (h', l' \cup {a}, c1').
+Proof.
+  induct 1; simplify.
+
+  invert H1.
+
+  invert H1.
+
+  invert H1; eauto.
+
+  invert H1; eauto.
+
+  invert H1.
+  replace ((l1' \cup {l}) \cup {a}) with ((l1' \cup {a}) \cup {l}) by sets.
+  constructor.
+  sets.
+
+  invert H1.
+  replace ((l1' \setminus {l}) \cup {a}) with ((l1' \cup {a}) \setminus {l}) by sets.
+  constructor.
+  sets.
+
+  invert H2; eauto.
+Qed.
+
+Lemma commute_unlocks : forall c1 c a s h l1' h' l',
+  nextAction c1 c
+  -> a \in Locks s
+  -> commutes c s
+  -> forall c1', step (h, l1', c1) (h', l', c1')
+  -> step (h, l1' \setminus {a}, c1) (h', l' \setminus {a}, c1').
+Proof.
+  induct 1; simplify.
+
+  invert H1.
+
+  invert H1.
+
+  invert H1; eauto.
+
+  invert H1; eauto.
+
+  invert H1.
+  replace (l1' \cup {l} \setminus {a}) with ((l1' \setminus {a}) \cup {l}) by sets.
+  constructor.
+  sets.
+
+  invert H1.
+  replace ((l1' \setminus {l}) \setminus {a}) with ((l1' \setminus {a}) \setminus {l}) by sets.
+  constructor.
+  sets.
+
+  invert H2; eauto.
+Qed.
+
+Lemma commutes_noblock : forall c c0,
+  nextAction c c0
+  -> forall h l h' l' c', step (h, l, c) (h', l', c')
+  -> forall c1 s, summarize c1 s
+  -> commutes c0 s
+  -> forall h1' l1' c1', step (h, l, c1) (h1', l1', c1')
+  -> exists h'' l'' c'', step (h1', l1', c) (h'', l'', c'').
+Proof.
+  induct 1; invert 1.
+
+  induct 1; simplify; eauto.
+
+  induct 1; simplify; eauto.
+
+  induct 1; simplify; eauto.
+  invert H0.
+  invert H0.
+  invert H4; eauto.
+  invert H2; eauto.
+  invert H2; eauto.
+  invert H2; eauto.
+  do 3 eexists.
+  constructor.
+  sets.
+  invert H2; eauto.
+  do 3 eexists.
+  constructor.
+  sets.
+
+  induct 1; simplify; eauto.
+  invert H0.
+  invert H0.
+  invert H4; eauto.
+  invert H2; eauto.
+  invert H2; eauto.
+  invert H2; eauto.
+  do 3 eexists.
+  constructor.
+  sets.
+  invert H2; eauto.
+  do 3 eexists.
+  constructor.
+  sets.
+
+  induct 1; simplify; eauto.
+  invert H1.
+  invert H1.
+  invert H5; eauto.
+  invert H3; eauto.
+  invert H3.
+  do 3 eexists; eapply commute_writes in H2; eauto.
+  invert H3.
+  do 3 eexists; eapply commute_locks in H2; eauto.
+  invert H3.
+  do 3 eexists; eapply commute_unlocks in H2; eauto.
+
+  eauto.
+Qed.
+
+Lemma Forall_app_bwd : forall A (P : A -> Prop) ls1 ls2,
+    Forall P ls1
+    -> Forall P ls2
+    -> Forall P (ls1 ++ ls2).
+Proof.
+  induct 1; simplify; eauto.
+Qed.
+
+Hint Resolve Forall_app_bwd.
+
+Lemma split_app : forall A (l1 l2 r1 r2 : list A),
+    l1 ++ l2 = r1 ++ r2
+    -> (exists r12, r1 = l1 ++ r12
+                    /\ l2 = r12 ++ r2)
+       \/ (exists r21, r2 = r21 ++ l2
+                       /\ l1 = r1 ++ r21).
+Proof.
+  induct l1; simplify; subst; eauto.
+
+  cases r1; simplify; subst.
+  right; eexists (_ :: _); simplify; eauto.
+  invert H.
+  apply IHl1 in H2; first_order; subst; eauto.
+Qed.
+
+Hint Rewrite app_length.
+
+Lemma translate_trace_commute : forall i h l c h' l' c',
+    stepsi (S i) (h, l, c) (h', l', c')
+    -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
+    -> forall c0 s cs, summarizeThreads c ((c0, s) :: cs)
+    -> forall x, nextAction c0 x
+    -> Forall (fun c_s => summarize (fst c_s) (snd c_s) /\ commutes x (snd c_s)) cs
+    -> forall x0 x1 x2, step (h, l, c0) (x0, x1, x2)
+    -> exists h'' l'' c'', step (h, l, c0) (h'', l'', x2)
+                           /\ summarizeThreads c'' ((x2, s) :: cs)
+                           /\ stepsi i (h'', l'', c'') (h', l', c').
+Proof.
+  induct 1; simplify.
+  invert H0.
+
+  clear IHstepsi.
+  eapply step_pick in H; eauto.
+  first_order; subst.
+
+  cases x3; simplify.
+  invert H.
+  eapply nextAction_det in H0; eauto; propositional; subst.
+  eauto 10.
+
+  invert H.
+  change ((c0, s) :: x3 ++ (x4, x5) :: x6)
+  with (((c0, s) :: x3) ++ (x4, x5) :: x6) in H2.
+  eapply step_into_summarizeThreads in H2; eauto.
+  first_order.
+  apply Forall_app_fwd2 in H4.
+  invert H4; simplify; propositional.
+  eapply commutes_noblock in H3; eauto.
+  first_order.
+  eapply step_into_summarizeThreads with (cs1 := []) in H6; eauto.
+  first_order.
+
+  cases st2.
+  cases p.
+  cases st0.
+  cases p.
+  eapply step_pick in H; eauto.
+  first_order.
+
+  cases x3; simplify.
+  invert H.
+  eapply nextAction_det in H0; eauto; propositional; subst.
+  eauto 10.
+
+  invert H.
+  change ((c0, s) :: x3 ++ (x4, x5) :: x6)
+  with (((c0, s) :: x3) ++ (x4, x5) :: x6) in H2.
+  eapply step_into_summarizeThreads in H2; eauto.
+  first_order.
+  specialize (Forall_app_fwd1 _ _ H4).
+  apply Forall_app_fwd2 in H4.
+  invert H4; simplify; propositional.
+  assert (Hn : nextAction c0 x) by assumption.
+  eapply commutes_noblock in H3; eauto.
+  first_order.
+  eapply IHstepsi in H3; clear IHstepsi; eauto using summarize_step.
+  first_order.
+  admit.
+Qed.
+
+Lemma summarizeThreads_Forall : forall c cs,
+    summarizeThreads c cs
+    -> Forall (fun c_s => summarize (fst c_s) (snd c_s)) cs.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Lemma Forall2 : forall A (P Q R : A -> Prop) ls,
+    Forall P ls
+    -> Forall Q ls
+    -> (forall x, P x -> Q x -> R x)
+    -> Forall R ls.
+Proof.
+  induct 1; invert 1; eauto.
 Qed.
 
 Lemma translate_trace : forall i h l c h' l' c',
@@ -1204,7 +1316,19 @@ Proof.
                                          /\ Forall (fun c_s => commutes c1 (snd c_s)) cs
                                          /\ step (h, l, c0) (h', l', c'))).
 
-  admit.
+  first_order.
+  eapply translate_trace_commute in H; eauto.
+  first_order.
+  eapply IHi in H7; eauto.
+  first_order.
+  do 3 eexists; propositional.
+  eapply TrcFront.
+  eauto.
+  eassumption.
+  assumption.
+  apply summarizeThreads_Forall in H2.
+  invert H2.
+  eauto using Forall2.
 
   invert H.  
   cases st2.

@@ -1050,7 +1050,7 @@ In the next chapter, we meet a technique for finding invariants automatically, i
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Model Checking}
+\chapter{\label{model_checking}Model Checking}
 
 Our analyses so far have been tedious for at least two different reasons.
 First, we've hand-crafted definitions of transition systems, rather than just writing programs in conventional programming languages.
@@ -3446,6 +3446,82 @@ A popular name for this pitfall is \emph{the state-explosion problem}\index{stat
 Note also that we have omitted any looping constructs from this object language, so all programs terminate.
 The Coq formalization uses the mixed-embedding\index{mixed embedding} style, making it not entirely obvious that all programs really do terminate.
 In any case, if we must tame the state-explosion problem, we already have our work cut out for us, even when the state space rooted at any concrete state is finite!
+
+
+\section{Shrinking the State Space via Local Actions}
+
+\newcommand{\natf}[1]{\mt{natf}(#1)}
+
+Recall our study of \emph{model checking}\index{model checking} in Chapter \ref{model_checking}.
+With a little cleverness, many problems in program verification can be reduced to exploration of finite state spaces of transition systems.
+In particular, we looked at \emph{safety properties}, which can be expressed as invariants of transition systems.
+One simply follows all the edges in the graph determined by a transition system, accepting the program if that process terminates without finding a state that violates the invariant.
+For our object language in this chapter, a good safety property is that commands are \emph{not about to fail}, formalized as:
+\begin{eqnarray*}
+  \natf{\mt{Fail}} &=& \bot \\
+  \natf{x \leftarrow c_1; c_x(x)} &=& \natf{c_1} \\
+  \natf{c_1 || c_2} &=& \natf{c_1} \land \natf{c_2} \\
+  \natf{\_} &=& \top
+\end{eqnarray*}
+
+Here is an example of a program execution that avoids failures.
+\begin{eqnarray*}
+  (\mupd{\mempty}{0}{1}, \emptyset, n \leftarrow \mt{Read} \; 0; \mt{Write} \; 0 \; (n+1))
+  &\rightarrow& (\mupd{\mempty}{0}{1}, \emptyset, n \leftarrow \mt{Return} \; 1; \mt{Write} \; 0 \; (n+1)) \\
+  &\rightarrow& (\mupd{\mempty}{0}{1}, \emptyset, \mt{Write} \; 0 \; (1+1)) \\
+  &\rightarrow& (\mupd{\mempty}{0}{2}, \emptyset, \mt{Return} \; 0)
+\end{eqnarray*}
+
+\newcommand{\rl}[1]{{\left \lfloor #1 \right \rfloor}}
+
+When exploring the state space of this program, a n\"aive model checker will generate each of these states explicitly, even the ``silly'' second one that reduces to the third without reading or writing the shared state.
+We can short-circuit those extra states by writing a simple function that makes all appropriate purely local reductions, everywhere within a command.
+\begin{eqnarray*}
+  \rl{x \leftarrow c_1; c_2(x)} &=& \rl{c_2(v)}\textrm{, when $\rl{c_1} = \mt{Return} \; v$} \\
+  \rl{x \leftarrow c_1; c_2(x)} &=& x \leftarrow \rl{c_1}; \rl{c_2(x)}\textrm{, when $\rl{c_1}$ is not $\mt{Return}$} \\
+  \rl{c_1 || c_2} &=& \rl{c_1} || \rl{c_2} \\
+  \rl{c} &=& c
+\end{eqnarray*}
+
+\newcommand{\smallstepL}[2]{#1 \to_L #2}
+
+Using this relation, we can define an alternative step relation that short-circuits local steps.
+$$\infer{\smallstepL{(h, l, c)}{(h', l', \rl{c'})}}{
+  \smallstep{(h, l, c)}{(h', l', c')}
+}$$
+
+The base semantics can be used to define transition systems in the usual way, with $\mathbb T(h, l, c) = (\{(h, l, c)\}, \to)$.
+We can also define short-circuiting transition systems with $\mathbb T_L(h, l, c) = (\{(h, l, \rl{c})\}, \to_L)$.
+A theorem shows that the latter overapproximates the former.
+
+\begin{theorem}
+  If $\mt{natf}$ is an invariant of $\mathbb T_L(h, l, c)$, then it is also an invariant of $\mathbb T(h, l, c)$.
+\end{theorem}
+\begin{proof}
+  By induction on a trace $\smallsteps{(h, l, c)}{(h', l', c')}$, matching each original step with zero or one alternative steps.
+  We appeal to a number of lemmas, some of which are summarized below.
+\end{proof}
+
+\begin{lemma}\label{rl_idem}
+  For all $c$, $\rl{\rl{c}} = \rl{c}$.
+\end{lemma}
+\begin{proof}
+  By induction on the structure of $c$.
+\end{proof}
+
+\begin{lemma}
+  If $\smallstep{(h, l, c)}{(h', l', c')}$, then either $(h', l') = (h, l)$ and $\rl{c'} = \rl{c}$ (the step was local), or there exists $c''$ where $\smallstep{(h, l, \rl{c})}{(h', l', c'')}$ and $\rl{c''} = \rl{c'}$ (the step was not local).
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\smallstep{(h, l, c)}{(h', l', c')}$, appealing in places to to Lemma \ref{rl_idem}.
+\end{proof}
+
+\begin{lemma}
+  If $\natf{\rl{c}}$, then $\natf{c}$.
+\end{lemma}
+\begin{proof}
+  By induction on the structure of $c$.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

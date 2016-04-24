@@ -1748,14 +1748,14 @@ Theorem independent_threads_ok_again :
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
 Proof.
-  (* We need to supply that summary when invoking the proof principle, though we
+  (* We need to supply the summary when invoking the proof principle, though we
    * could also have used Ltac to compute it automatically. *)
   eapply step_stepC with (cs := [(_, {| Reads := {0, 1};
                                         Writes := {1};
                                         Locks := {} |})]
                                   ++ [(_, {| Reads := {2};
-                                         Writes := {2};
-                                         Locks := {} |})]).
+                                             Writes := {2};
+                                             Locks := {} |})]).
   analyzer.
   analyzer.
 

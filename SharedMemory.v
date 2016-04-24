@@ -28,10 +28,6 @@ Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
 (* We'll build on the mixed-embedding languages from the last two chapter. 
  * Let's simplify the encoding by only working with commands that generate
  * [nat]. *)
-Inductive loop_outcome :=
-| Done (a : nat)
-| Again (a : nat).
-
 Inductive cmd :=
 | Return (r : nat)
 | Bind (c1 : cmd) (c2 : nat -> cmd)

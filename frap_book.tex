@@ -3393,6 +3393,55 @@ Again, without the introduction of the $R$ variable, we would get stuck proving 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Introduction to Reasoning About Shared-Memory Concurrency}
+
+Separation logic~\index{separation logic} tames sharing of a mutable memory across libraries and data structures.
+We will need some additional techniques when we add concurrency to the mix, resulting in the \emph{shared-memory}\index{shared-memory concurrency} style of concurrency.
+This chapter introduces a basic style of operational semantics for shared memory, also studying its use in model checking, including with an important optimization called partial-order reduction.
+The next chapter shows how to prove deeper properties of fancier programs, by extending the Hoare-logic approach to shared-memory concurrency.
+Then the chapter after that shows how to formalize and reason about a different style of concurrency, message passing.
+
+\section{An Object Language with Shared-Memory Concurrency}
+
+For the next two chapters, we work with this object language.
+$$\begin{array}{rrcl}
+  \textrm{Commands} & c &::=& \mt{Fail} \mid \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Read} \; a \mid \mt{Write} \; a \; v \mid \mt{Lock} \; a \mid \mt{Unlock} \; a \mid c || c
+\end{array}$$
+
+In addition to the basic structure of the languages from the last two chapters, we have three features specific to concurrency.
+We follow the common ``threads and locks''\index{locks} style of synchronization, with commands $\mt{Lock} \; a$ and $\mt{Unlock} \; a$ for acquiring and releasing locks, respectively.
+We also have $c_1 || c_2$ for running commands $c_1$ and $c_2$ in parallel, giving a scheduler free reign to interleave their atomic steps.
+
+$$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
+  \smallstep{(h, l, c_1)}{(h', l', c'_1)}
+}
+\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, k, c_2(v))}}{}$$
+
+$$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; \msel{h}{a})}}{}
+\quad \infer{\smallstep{(h, l, \mt{Write} \; a \; v)}{(\mupd{h}{a}{v}, l, \mt{Return} \; 0)}}{}$$
+
+$$\infer{\smallstep{(h, l, \mt{Lock} \; a)}{(h, l \cup \{a\}, \mt{Return} \; 0)}}{
+  a \notin l
+}
+\quad \infer{\smallstep{(h, l, \mt{Unlock} \; a)}{(h, l \setminus \{a\}, \mt{Return} \; 0)}}{
+  a \in l
+}$$
+
+$$\infer{\smallstep{(h, l, c_1 || c_2)}{(h', l', c'_1 || c_2)}}{
+  \smallstep{(h, l, c_1)}{(h', l', c'_1)}
+}
+\quad \infer{\smallstep{(h, l, c_1 || c_2)}{(h', l', c_1 || c'_2)}}{
+  \smallstep{(h, l, c_2)}{(h', l', c'_2)}
+}$$
+
+Note that the last two rules are the only source of \emph{nondeterminism}\index{nondeterminism} in this semantics, where a single state can step to multiple different next states.
+This nondeterminism corresponds to the freedom we give to a scheduler\index{scheduler} that may pick which thread runs next.
+Though this kind of concurrent programming is very expressive and often achieves very high performance, it comes at a cost in reasoning, as there may be \emph{exponentially many different schedules} for a single program, measured with respect to the textual length of the program.
+A popular name for this pitfall is \emph{the state-explosion problem}\index{state-explosion problem}.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

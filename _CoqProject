@@ -27,3 +27,4 @@ DeepAndShallowEmbeddings.v
 SepCancel.v
 SeparationLogic_template.v
 SeparationLogic.v
+SharedMemory.v

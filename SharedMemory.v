@@ -705,7 +705,7 @@ Proof.
   first_order; eauto.
 
   eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.
-  eapply commutes_sound' with (c2 := c2) (c1 := Write a v) in H3; eauto.
+  eapply commutes_sound' with (c2 := c2) (c1 := Write a v) in H; eauto; try solve [ simplify; sets ].
   first_order; eauto.
 
   eapply step_nextAction_other in H0; eauto; first_order; subst; try equality.

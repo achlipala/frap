@@ -3714,11 +3714,64 @@ We overload $\mt{natf}$ to apply to threads summaries $S$, where $\natf{S}$ iff 
 \end{proof}
 
 \begin{lemma}\label{translate_trace_commute}
-  If $(h, l, c) \to^{i+1} (h', l', c')$, where that last state is stuck, and if $\summT{c}{\concat{(c_0, s)}{S}}$, $\na{c_0} = x$, an$S$ is an accurate summary of threads that all commute with $x$, and $\smallstep{(h, l, c_0)}{(h_0, l_0, c'_0)}$, then there exists $c''$ such that $\summT{c''}{\concat{(c'_0, s)}{S}}$ and $(h_0, l_0, c'') \to^i (h', l', c')$.
+  If $(h, l, c) \to^{i+1} (h', l', c')$, where that last state is stuck, and if $\summT{c}{\concat{(c_0, s)}{S}}$, $\na{c_0} = x$, and $S$ is an accurate summary of threads that all commute with $x$, and $\smallstep{(h, l, c_0)}{(h_0, l_0, c'_0)}$, then there exists $c''$ such that $\summT{c''}{\concat{(c'_0, s)}{S}}$ and $(h_0, l_0, c'') \to^i (h', l', c')$.
 \end{lemma}
 \begin{proof}
   By induction on the derivation of $(h, l, c) \to^{i+1} (h', l', c')$, appealing to a few crucial lemmas, such as single-step determinism of any state in $\mt{nextAction}$'s domain, plus the soundness of $\mt{commutes}$ with respect to single steps of pairs of commands, plus the fact that single steps preserve the accuracy of summaries.
 \end{proof}
+
+\section{Partial-Order Reduction More Generally}
+
+The key insights of the prior section can be adapted to prove soundness of a whole family of optimizations by partial-order reduction.
+In general, we apply the optimization to remove edges from a state-space graph, whose nodes are states and whose edges are labeled with \emph{actions} $\alpha$.
+In our setting, $\alpha$ is the identifier of the thread scheduled to run next.
+To do model checking, the graph need not be materialized in memory in one go.
+Instead, as an optimization, the graph tends to be constructed on the fly, during state-space exploration.
+
+The proofs from the last two sections only apply to check the invariant that no thread is about to fail.
+However, the results easily generalize to arbitrary \emph{safety properties}\index{safety properties}, which can be expressed as decidable invariants on states.
+Another important class of specifications is \emph{liveness properties}\index{liveness properties}, the most canonical example of which is \emph{termination}, phrased in terms of reachability of some subsets of states designated as \emph{finished}.
+There are many other useful liveness properties.
+Another example applies to a producer-consumer system\index{producer-consumer systems}, where one thread continually enqueues new work into a queue, and another thread continually dequeues work items and does something with them.
+A good liveness property for that system could be that, whenever the producer enqueues an item, the consumer eventually dequeues it, and from there the consumer eventually takes some visible action based on the value of the item.
+Our general treatment of partial-order reduction is parameterized on some property $\phi$ over states, and it may be safety, liveness, or a combination of the two.
+
+Every state $s$ of the transition system has an associated set $\mathcal E(s)$ of identifiers for threads that are enabled to run in $s$.
+The partial-order reduction optimization conceptually is based on picking a function $\mathcal A$, mapping each state $s$ to an \emph{ample set}\index{ample sets} $\mathcal A(s)$ of threads to consider in state-space exploration.
+A few eligibility criteria apply, for every state $s$.
+
+\begin{description}
+  \item[Readiness] \index{readiness}$\mathcal A(s) \subseteq \mathcal E(s)$.  That is, we do not select any threads that are not actually ready to run.
+  \item[Progress] \index{progress (partial-order reduction)}If $\mathcal A(s) = \emptyset$, then $\mathcal E(s) = \emptyset$.  That is, so long as any thread at all can step, we select at least one thread.
+  \item[Commutativity] \index{commutativity (partial-order reduction)}Consider all executions starting at $s$ and taking steps only with the threads \emph{not} in $\mathcal A(s)$.  These executions only include actions that commute with the next actions of the threads in $\mathcal A(s)$.  As a consequence, any actions that run before elements of the ample set can be reordered to follow the execution of any ample-set element.
+  \item[Invisibility] \index{invisibility}If $\mathcal A(s) \neq \mathcal E(s)$, then no action in $\mathcal A(s)$ modifies the truth of $\phi$.
+\end{description}
+
+Any ample-set algorithm leads to a different variant of $\to_C$ from the prior section, and it is possible to prove that any such transition system is a sound abstraction of the original.
+
+As an example of a different heuristic, consider a weakness of the one from the prior section: when we pick a thread $c$ as the only one to consider running next, $c$'s first action must commute with \emph{any action that any other thread might ever run, for the entire rest of the execution}.
+However, imagine that thread $c$ holds some lock $a$.
+We might formalize that notion by saying that (1) $a$ is in the lockset, and (2) the other threads, running independently, will never manage to run an $\mt{Unlock} \; a$ command.
+A computable static analysis can verify this statement for many nontrivial programs.
+Now consider which summaries of the other threads we can get away with comparing against $c$ for commutativity.
+We only need to collect the actions that other threads can run \emph{before each one reaches its first occurrence of $\mt{Lock} \; a$}.
+The reason is that, if $c$ holds lock $a$ and hasn't run yet, no other thread can progress past its first $\mt{Lock} \; a$.
+Now threads may share addresses for read and write access, yet still take advantage of the optimization, when accesses are properly protected by locks.
+
+The conditions above are only sufficient because we left unbounded loops out of our object language.
+What happens if we add them back in?
+Consider this program:
+$$(\mt{while} \; (\mt{true}) \; \{ \; \mt{Write} \; 0 \; 0 \; \}) \; || \; (n \leftarrow \mt{Read} \; 1; \mt{Fail})$$
+An optimization in the spirit of our original from the prior section would happily decree that it is safe always to pick the first thread to run.
+This reduced state transition system never gets around to running the second thread, so exploring the state space never finds the failure!
+To plug this soundness hole, we add a final condition on the ample sets.
+
+\begin{description}
+  \item[Fairness] \index{fairness}If there is a cycle in the state space where $\alpha$ is enabled at some point, then $\alpha \in \mathcal A(s)$ for some $s$ in the cycle.
+\end{description}
+
+This condition effectively forces the ample set for the example program above to include the second thread.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

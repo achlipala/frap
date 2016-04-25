@@ -17,3 +17,4 @@ Just run `make` here to build everything, including the book `frap.pdf` and the 
 * Chapter 10: `HoareLogic.v`
 * Chapter 11: `DeepAndShallowEmbeddings.v`
 * Chapter 12: `SeparationLogic.v`
+* Chapter 13: `SharedMemory.v`

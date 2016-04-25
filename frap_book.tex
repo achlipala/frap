@@ -3490,11 +3490,12 @@ $$\infer{\smallstepL{(h, l, c)}{(h', l', \rl{c'})}}{
   \smallstep{(h, l, c)}{(h', l', c')}
 }$$
 
-The base semantics can be used to define transition systems in the usual way, with $\mathbb T(h, l, c) = (\{(h, l, c)\}, \to)$.
-We can also define short-circuiting transition systems with $\mathbb T_L(h, l, c) = (\{(h, l, \rl{c})\}, \to_L)$.
+The base semantics can be used to define transition systems in the usual way, with $\mathbb T(h, l, c) = \angled{\{(h, l, c)\}, \to}$.
+We can also define short-circuiting transition systems with $\mathbb T_L(h, l, c) = \angled{\{(h, l, \rl{c})\}, \to_L}$.
 A theorem shows that the latter overapproximates the former.
 
-\begin{theorem}
+\abstraction
+\begin{theorem}\label{local}
   If $\mt{natf}$ is an invariant of $\mathbb T_L(h, l, c)$, then it is also an invariant of $\mathbb T(h, l, c)$.
 \end{theorem}
 \begin{proof}
@@ -3521,6 +3522,202 @@ A theorem shows that the latter overapproximates the former.
 \end{lemma}
 \begin{proof}
   By induction on the structure of $c$.
+\end{proof}
+
+
+\section{Basic Partial-Order Reduction}
+
+What made the reduction in Theorem \ref{local} sound?
+It was that local actions \emph{commute}\index{commute}\index{commutativity} with all actions in other threads.
+A particular run of a system in the base semantics might indeed choose to run a nonlocal action before a local action that is enabled.
+However, we can \emph{reorder} any such action to instead come after every enabled local action, without affecting the final state.
+This reordering is an example of commutativity in action.
+
+By recognizing and exploiting other varieties of commutativity, we can shrink state spaces even further, even reducing the spaces of certain interesting program families from exponential size to linear size.
+A popular technique of this kind is \emph{partial-order reduction}\index{partial-order reduction}.
+We formalize a simple variant of it in this section (and in the accompanying Coq code), then sketch a less formal generalization in the chapter's final section.
+
+\newcommand{\summ}[2]{\mt{summarize}(#1, #2)}
+
+To check commutativity more flexibly, we must use more than just the fact that a local action commutes with any action in another thread.
+For instance, we should take advantage of the fact that any two $\mt{Read}$ actions commute.
+We will do some \emph{static analysis}\index{static analysis} of programs to overapproximate which kinds of atomic actions they might perform.
+Such an analysis is designed to be trivially computable.
+Here's an example of one analysis, formulated as a relation $\summ{c}{(r, w, \ell)}$, which asserts that the only globally visible actions that could be performed by thread $c$ are reads to addresses in $r$, writes to addresses in $w$, and acquires or releases of locks in $\ell$.
+
+$$\infer{\summ{\mt{Return} \; r}{s}}{}
+\quad \infer{\summ{\mt{Fail}}{s}}{}
+\quad \infer{\summ{x \leftarrow c_1; c_2(x)}{s}}{
+    \summ{c_1}{s}
+    & \forall r. \; \summ{c_2(r)}{s}
+}$$
+
+$$\infer{\summ{\mt{Read} \; a}{(r, w, \ell)}}{
+  a \in r
+}
+\quad \infer{\summ{\mt{Write} \; a \; v}{(r, w, \ell)}}{
+  a \in w
+}$$
+
+$$\infer{\summ{\mt{Lock} \; a}{(r, w, \ell)}}{
+  a \in \ell
+}
+\quad \infer{\summ{\mt{Unlock} \; a}{(r, w, \ell)}}{
+  a \in \ell
+}$$
+
+Another relation summarizes a command as a flat list of threads, each with its own summary of the above variety.
+
+\newcommand{\summT}[2]{\mt{summarizeThreads}(#1, #2)}
+
+$$\infer{\summT{c_1 || c_2}{\concat{S_1}{S_2}}}{
+  \summT{c_1}{S_1}
+  & \summT{c_2}{S_2}
+}
+\quad \infer{\summT{c}{(c, s)}}{
+  \summ{c}{s}
+}$$
+
+\newcommand{\na}[1]{\mt{nextAction}(#1)}
+
+Those relations do all we need to do to record which actions a thread might not commute with.
+The other key ingredient is an extractor for the next atomic action in a thread, written as a partial function.
+\begin{eqnarray*}
+  \na{\mt{Return} \; r} &=& \mt{Return} \; r \\
+  \na{\mt{Fail}} &=& \mt{Fail} \\
+  \na{\mt{Read} \; a} &=& \mt{Read} \; a \\
+  \na{\mt{Write} \; a \; v} &=& \mt{Write} \; a \; v \\
+  \na{\mt{Lock} \; a} &=& \mt{Lock} \; a \\
+  \na{\mt{Unlock} \; a} &=& \mt{Unlock} \; a \\
+  \na{x \leftarrow c_1; c_2(x)} &=& \na{c_1}
+\end{eqnarray*}
+
+Given a next atomic action and a summary of another thread, it is now easy to define commutativity of the two.
+\newcommand{\commu}[2]{\mt{commutes}(#1, #2)}
+\begin{eqnarray*}
+  \commu{\mt{Return} \; \_}{\_} &=& \top \\
+  \commu{\mt{Fail}}{\_} &=& \top \\
+  \commu{\mt{Read} \; a}{(\_, w, \_)} &=& a \notin w \\
+  \commu{\mt{Write} \; a \; \_}{(r, w, \_)} &=& a \notin r \cup w \\
+  \commu{\mt{Lock} \; a}{(\_, \_, \ell)} &=& a \notin \ell \\
+  \commu{\mt{Unlock} \; a}{(\_, \_, \ell)} &=& a \notin \ell \\
+  \commu{\_}{\_} &=& \bot
+\end{eqnarray*}
+
+\newcommand{\pors}[1]{\mt{porSafe}(#1)}
+
+With these ingredients, we can define a predicate $\mt{porSafe}$ that figures out when a state is eligible for the partial-order reduction optimization, which is to force the first thread to run next, ignoring the other threads for now.
+(With a bit more complexity, we could also support other strict subsets of the threads that are selected to run.)
+This optimization is only safe when the first thread can take a step and when that step commutes with any actions that other threads might perform.
+Formally, we define $\pors{h, l, \concat{(c, s)}{S}}$ as follows, recalling that $s$ is a summary of thread $c$, and $S$ is the remaining threads, with their own summary information.
+\begin{itemize}
+\item There is some $c_0$ where $\na{c} = c_0$.  That is, thread $c$ has some atomic action lined up to run next.
+\item There exist $h'$, $l'$, and $c'$ such that $\smallstep{(h, l, c)}{(h', l', c')}$.  That is, thread $c$ is actually able to take a step, which might not be possible if e.g. trying to take a lock that is already held.
+\item For every $(c_1, s) \in S$, we have $\commu{c_0}{c_1}$.  That is, all actions that other threads might perform commute with $c_0$, the first action of $c$.
+\end{itemize}
+
+\newcommand{\smallstepC}[2]{#1 \to_C #2}
+
+With the applicability condition defined, it is now straightforward to define an optimized step relation.
+
+$$\infer{\smallstepC{(h, l, \concat{(c, s)}{S})}{(h', l', \concat{(c', s)}{S})}}{
+  \smallstep{(h, l, c)}{(h', l', c')}
+}$$
+
+$$\infer{\smallstepC{(h, l, S)}{(h', l', \concat{S_1}{\concat{(c', s)}{S_2}})}}{
+  \neg \pors{h, l, S}
+  & S = \concat{S_1}{\concat{(c, s)}{S_2}}
+  & \smallstep{(h, l, c)}{(h', l', c')}
+}$$
+
+The whole thing is wrapped up into transition systems as $\mathbb T_C(h, l, S) = \angled{\{(h, l, S)\}, \to_C}$.
+
+\newcommand{\tof}[2]{\mt{timeOf}(#1, #2)}
+
+Our proof of soundness for this reduction will depend on having some constant upper bound on program execution time.
+This relation computes a conservative overapproximation.
+
+$$\infer{\tof{\mt{Return} \; r}{n}}{}
+\quad \infer{\tof{\mt{Fail}}{n}}{}
+\quad \infer{\tof{\mt{Read} \; a}{n+1}}{}
+\quad \infer{\tof{\mt{Write} \; a \; v}{n+1}}{}$$
+
+$$\infer{\tof{\mt{Lock} \; a}{n+1}}{}
+\quad \infer{\tof{\mt{Unlock} \; a}{n+1}}{}$$
+
+$$\infer{\tof{x \leftarrow c_1; c_2(x)}{n_1 + n_2 + 1}}{
+  \tof{c_1}{n_1}
+  & \forall r. \; \tof{c_2(r)}{n_2}
+}
+\quad \infer{\tof{c_1 || c_2}{2^{n_1 + n_2}}}{
+  \tof{c_1}{n_1}
+  & \tof{c_2}{n_2}
+}$$
+
+It may be surprising that, in our formal mixed embedding, there exist commands with no provable upper bounds, according to this relation.
+We leave it as an exercise to the reader to find a concrete example.
+(Actually, the Coq code includes an example and its proof of unboundedness.)
+
+One last ingredient is to work with a relation $\to^i$, which is the $i$-way self-composition of $\to^*$.
+It is easy to show that whenever $x \to^* y$, there exists $i$ such that $x \to^i y$.
+
+\newcommand{\smallstepsC}[2]{#1 \to_C^* #2}
+
+With these ingredients, we can state the reduction theorem.
+We overload $\mt{natf}$ to apply to threads summaries $S$, where $\natf{S}$ iff for every $(c, s) \in S$ we have $\mt{natf}(c)$.
+\abstraction
+\begin{theorem}
+  If $\summT{c}{S}$ and $\tof{c}{n}$, then to prove $\mt{natf}$ as an invariant of $\mathbb T(h, l, c)$, it suffices to prove $\mt{natf}$ as an invariant of $\mathbb T_C(h, l, S)$.
+\end{theorem}
+\begin{proof}
+  We assume for the sake of contradiction that there exists some derivation $\smallsteps{(h, l, c)}{(h', l', c')}$, where $\neg \natf{h', l', c'}$.
+  First, since $c$ runs in bounded time, by Lemma \ref{completion}, we can \emph{complete} that execution to continue running to some $(h'', l'', c'')$, which is a stuck state.
+  By Lemma \ref{stillFailing}, $\neg \natf{h'', l'', c''}$.
+  Next, we conclude that there exists $i$ such that $(h, l, c) \to^i (h'', l'', c'')$.
+  By Lemma \ref{translate_trace}, there exist $h'$, $l'$, and $S'$ where $\smallstepsC{(h, l, S)}{(h', l', S')}$ and $\neg \natf{S'}$.
+  These facts contradict our assumption that $\mt{natf}$ is an invariant of $\mathbb T_C(h, l, S)$.
+\end{proof}
+
+\begin{lemma}\label{completion}
+  If $\tof{c}{n}$, then there exist $h'$, $l'$, and $c'$ where $\smallsteps{(h, l, c)}{(h', l', c')}$, such that $(h', l', c')$ is a stuck state.
+\end{lemma}
+\begin{proof}
+  By strong induction\index{strong induction} on $n$.
+\end{proof}
+
+\begin{lemma}\label{stillFailing}
+  If $\smallsteps{(h, l, c)}{(h', l', c')}$ and $\neg \natf{c}$, then $\neg \natf{c'}$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\smallsteps{(h, l, c)}{(h', l', c')}$, with a nested induction on the derivations of individual steps.
+\end{proof}
+
+\begin{lemma}\label{translate_trace}
+  If $(h, l, c) \to^i (h', l', c')$, and $(h', l', c')$ is stuck and about to fail, and $\summT{c}{S}$, then there exist $h'$, $l'$, and $S'$ such that $\smallstepsC{(h, l, S)}{(h', l', S')}$ and $\neg \natf{S'}$.
+\end{lemma}
+\begin{proof}
+  By induction on $i$.
+  Note that induction on the structure of a derivation $\smallsteps{(h, l, c)}{(h', l', c')}$ would \emph{not} be sufficient here, as we will see in the proof sketch below that we sometimes invoke the induction hypothesis on an execution trace that is not just the tail of the one we started with.
+
+  If $i = 0$, then $(h, l, c)$ is already about to fail, and the conclusion follows trivially.
+
+  Otherwise, $i = i' + 1$ for some $i'$.
+  We proceed by cases on the truth of $\pors{h, l, S}$.
+
+  If $\neg \pors{h, l, S}$, then we invert the derivation $(h, l, c) \to^i (h', l', c')$ to conclude $\smallstep{(h, l, c)}{(h'', l'', c'')}$ and $(h'', l'', c'') \to^{i'} (h', l', c')$ for some intermediate state.
+  $\to_C$ is easily able to match that first step, as the optimization is disabled, and the rest follows directly by appeal to the induction hypothesis.
+
+  Otherwise, $\pors{h, l, S}$, and the key optimization is enabled, so that $\to_C$ only allows the first thread to run.
+  The next deduction is not immediate, because the first original step $\smallstep{(h, l, c)}{(h'', l'', c'')}$ may have chosen a thread beside the first.
+  However, the trace $(h, l, c) \to^{i'+1} (h', l', c')$ \emph{must} eventually pick the first thread to run, and we apply Lemma \ref{translate_trace_commute} to \emph{commute} that eventual step to the front of the derivation, showing its equivalence to one that runs the first thread and then takes $i'$ additional steps to $(h', l', c')$.
+  At this point the induction hypothesis applies to those $i'$ steps, to finish the proof.
+\end{proof}
+
+\begin{lemma}\label{translate_trace_commute}
+  If $(h, l, c) \to^{i+1} (h', l', c')$, where that last state is stuck, and if $\summT{c}{\concat{(c_0, s)}{S}}$, $\na{c_0} = x$, an$S$ is an accurate summary of threads that all commute with $x$, and $\smallstep{(h, l, c_0)}{(h_0, l_0, c'_0)}$, then there exists $c''$ such that $\summT{c''}{\concat{(c'_0, s)}{S}}$ and $(h_0, l_0, c'') \to^i (h', l', c')$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $(h, l, c) \to^{i+1} (h', l', c')$, appealing to a few crucial lemmas, such as single-step determinism of any state in $\mt{nextAction}$'s domain, plus the soundness of $\mt{commutes}$ with respect to single steps of pairs of commands, plus the fact that single steps preserve the accuracy of summaries.
 \end{proof}
 
 

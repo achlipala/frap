@@ -40,7 +40,7 @@ Notation "{ x1 , .. , xN }" := (constant (cons x1 (.. (cons xN nil) ..))).
 Notation "[ P ]" := (check P).
 Infix "\cup" := union (at level 40).
 Infix "\cap" := intersection (at level 40).
-Infix "\setminus" := minus (at level 70).
+Infix "\setminus" := minus (at level 40).
 Infix "\subseteq" := subseteq (at level 70).
 Infix "\subset" := subset (at level 70).
 Notation "[ x | P ]" := (scomp (fun x => P)).

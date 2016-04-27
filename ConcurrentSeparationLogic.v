@@ -908,19 +908,64 @@ Lemma lockChunks_lock : forall a l I linvs,
 Proof.
   simp.
   apply lockChunks_lock' with (f := fun n => n); auto.
-Qed.  
+Qed.
+
+Lemma lockChunks_unlock' : forall l I linvs (f : nat -> nat) a,
+    f a \in l
+    -> nth_error linvs a = Some I
+    -> (forall x y, f x = f y -> x = y)
+    -> I * bigstar (fun i I => (~f i \in l) ===> I)%sep linvs ===> bigstar (fun i I => (~(f i \in l \setminus {f a})) ===> I)%sep linvs.
+Proof.
+  induct linvs; simplify.
+
+  cases a; simplify; equality.
+
+  cases a0; simplify.
+  invert H0.
+  rewrite guarded_false by sets.
+  rewrite guarded_true by sets.
+  cancel.
+  apply bigstar_impl.
+  simp.
+  apply guarded_impl.
+  sets.
+  apply H0; propositional.
+  apply H1 in H4.
+  equality.
+
+  apply (IHlinvs (fun n => f (S n))) in H0; auto.
+  rewrite <- H0.
+  cancel.
+  apply guarded_impl.
+  sets.
+  apply H2; propositional.
+  apply H1 in H5.
+  equality.
+  simp.
+  apply H1 in H2.
+  equality.
+Qed.
+
+Lemma lockChunks_unlock : forall a l I linvs,
+    a \in l
+    -> nth_error linvs a = Some I
+    -> I * lockChunks l linvs ===> lockChunks (l \setminus {a}) linvs.
+Proof.
+  simp.
+  apply lockChunks_unlock' with (f := fun n => n); auto.
+Qed.
 
 Lemma preservation : forall linvs {result} (c : cmd result) h l c' h' l',
     step (h, l, c) (h', l', c')
-    -> forall P Q, hoare_triple linvs P c Q
-                   -> (P * lockChunks l linvs)%sep h
-                   -> exists P', hoare_triple linvs P' c' Q
-                                 /\ (P' * lockChunks l' linvs)%sep h'.
+    -> forall P Q R, hoare_triple linvs P c Q
+                     -> (P * R * lockChunks l linvs)%sep h
+                     -> exists P', hoare_triple linvs P' c' Q
+                                   /\ (P' * R * lockChunks l' linvs)%sep h'.
 Proof.
   induct 1; simplify.
 
   apply invert_Bind in H0; simp.
-  apply IHstep in H0; eauto.
+  eapply IHstep in H0; eauto.
   simp.
   eauto.
   
@@ -943,7 +988,7 @@ Proof.
   eauto.
 
   apply invert_Read in H0; simp.
-  assert ((exists v, a |-> v * (x v * lockChunks l' linvs))%sep h').
+  assert ((exists v, a |-> v * (x v * R * lockChunks l' linvs))%sep h').
   eapply use_himp; try eassumption.
   rewrite H0.
   cancel.
@@ -955,7 +1000,7 @@ Proof.
   cancel.
 
   apply invert_Write in H0; simp.
-  assert ((exists v, a |-> v * (x * lockChunks l' linvs))%sep h).
+  assert ((exists v, a |-> v * (x * R * lockChunks l' linvs))%sep h).
   eapply use_himp; try eassumption.
   rewrite H0.
   cancel.
@@ -971,7 +1016,7 @@ Proof.
   eexists; propositional.
   apply HtReturn'.
   eassumption.
-  apply use_himp with ((P * lockChunks l' linvs) * a |--> zeroes numWords)%sep.
+  apply use_himp with ((P * R * lockChunks l' linvs) * a |--> zeroes numWords)%sep.
   cancel.
   apply use_himp with ((fun h' => h' = h) * a |--> zeroes numWords)%sep.
   cancel.
@@ -999,7 +1044,50 @@ Proof.
   rewrite <- H3.
   cancel.
   apply lockChunks_lock; auto.
-Admitted.
+
+  apply invert_Unlock in H0.
+  simp.
+  eexists; propositional.
+  apply HtReturn'; auto.
+  eapply use_himp; try eassumption.
+  rewrite H3.
+  cancel.
+  rewrite <- lockChunks_unlock; eauto.
+  cancel.
+
+  apply invert_Par in H0.
+  simp.
+  eapply IHstep in H2.
+  simp.
+  eexists; propositional.
+  eapply HtStrengthen.
+  econstructor.
+  eassumption.
+  eassumption.
+  simp.
+  cases r; auto.
+  eapply use_himp; try eassumption.
+  cancel.
+  eapply use_himp; try eassumption.
+  cancel.
+  
+  apply invert_Par in H0.
+  simp.
+  eapply IHstep in H0.
+  simp.
+  eexists; propositional.
+  eapply HtStrengthen.
+  econstructor.
+  eassumption.
+  eassumption.
+  simp.
+  cases r; auto.
+  eapply use_himp; try eassumption.
+  cancel.
+  eapply use_himp; try eassumption.
+  rewrite H3.
+  cancel.
+Qed.
 
 Definition allLockChunks (linvs : list hprop) := bigstar (fun _ I => I) linvs.
 
@@ -1045,7 +1133,13 @@ Proof.
   cases s'.
   cases p.
   simp.
-  eauto using preservation.
+  eapply preservation with (R := emp%sep) in H1; eauto.
+  simp.
+  eexists; propositional; eauto.
+  eapply use_himp; try eassumption.
+  cancel.
+  eapply use_himp; try eassumption.
+  cancel.
 Qed.
 
 Fixpoint notAboutToFail {result} (c : cmd result) :=

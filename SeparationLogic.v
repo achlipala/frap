@@ -174,8 +174,8 @@ Module Import S <: SEP.
   Qed.
 
   Theorem lift_right : forall p q (R : Prop),
-    R
-    -> p ===> q
+    p ===> q
+    -> R
     -> p ===> q * [| R |].
   Proof.
     t.
@@ -1341,6 +1341,7 @@ Proof.
   step.
   setoid_rewrite linkedList_null.
   cancel.
+  simp.
   step.
   setoid_rewrite (linkedList_nonnull _ n).
   step.
@@ -1352,6 +1353,8 @@ Proof.
   setoid_rewrite <- linkedListSegment_append.
   cancel.
   auto.
+  simp.
+  simp.
   rewrite linkedListSegment_empty.
   cancel.
   simp.
@@ -1362,4 +1365,5 @@ Proof.
   rewrite linkedListSegment_null.
   rewrite linkedList_null.
   cancel.
+  simp.
 Qed.

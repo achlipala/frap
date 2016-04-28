@@ -158,8 +158,8 @@ Module Import S <: SEP.
   Qed.
 
   Theorem lift_right : forall p q (R : Prop),
-    R
-    -> p ===> q
+    p ===> q
+    -> R
     -> p ===> q * [| R |].
   Proof.
     t.

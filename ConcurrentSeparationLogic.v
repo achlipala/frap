@@ -81,7 +81,8 @@ Inductive step : forall A, heap * locks * cmd A -> heap * locks * cmd A -> Prop 
   h $? a = Some v
   -> step (h, l, Write a v') (h $+ (a, v'), l, Return tt)
 | StepAlloc : forall h l numWords a,
-  (forall i, i < numWords -> h $? (a + i) = None)
+  a <> 0
+  -> (forall i, i < numWords -> h $? (a + i) = None)
   -> step (h, l, Alloc numWords) (initialize h a numWords, l, Return a)
 | StepFree : forall h l a numWords,
   step (h, l, Free a numWords) (deallocate h a numWords, l, Return tt)
@@ -182,8 +183,8 @@ Module Import S <: SEP.
   Qed.
 
   Theorem lift_right : forall p q (R : Prop),
-    R
-    -> p ===> q
+    p ===> q
+    -> R
     -> p ===> q * [| R |].
   Proof.
     t.
@@ -306,7 +307,7 @@ Inductive hoare_triple (linvs : list hprop) : forall {result}, hprop -> cmd resu
 | HtWrite : forall a v',
     hoare_triple linvs (exists v, a |-> v)%sep (Write a v') (fun _ => a |-> v')%sep
 | HtAlloc : forall numWords,
-    hoare_triple linvs emp%sep (Alloc numWords) (fun r => r |--> zeroes numWords)%sep
+    hoare_triple linvs emp%sep (Alloc numWords) (fun r => r |--> zeroes numWords * [| r <> 0 |])%sep
 | HtFree : forall a numWords,
     hoare_triple linvs (a |->? numWords)%sep (Free a numWords) (fun _ => emp)%sep
 
@@ -418,7 +419,6 @@ Qed.
 Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree
               || (eapply HtLock; simplify; solve [ eauto ])
               || (eapply HtUnlock; simplify; solve [ eauto ]).
-
 Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
               || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
               || (eapply HtRead''; solve [ cancel ])
@@ -438,13 +438,51 @@ Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
 
 Ltac heq := intros; apply himp_heq; split.
 
+(* Fancy theorem to help us rewrite within preconditions and postconditions *)
+Instance hoare_triple_morphism : forall linvs A,
+  Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple linvs A).
+Proof.
+  Transparent himp.
+  repeat (hnf; intros).
+  unfold pointwise_relation in *; intuition subst.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+
+  eapply HtConsequence; eauto.
+  rewrite H; reflexivity.
+  intros.
+  hnf in H1.
+  specialize (H1 r _ eq_refl).
+  rewrite H1; reflexivity.
+  Opaque himp.
+Qed.
+
+Theorem try_ptsto_first : forall a v, try_me_first (ptsto a v).
+Proof.
+  simplify.
+  apply try_me_first_easy.
+Qed.
+
+Hint Resolve try_ptsto_first.
+
+
+(** ** The nonzero shared counter *)
+
 Example incrementer :=
   for i := tt loop
     _ <- Lock 0;
     n <- Read 0;
     _ <- Write 0 (n + 1);
     _ <- Unlock 0;
-    Return (Again tt)
+    if n ==n 0 then
+      Fail
+    else
+      Return (Again tt)
   done.
 
 Definition incrementer_inv := 
@@ -454,12 +492,210 @@ Theorem incrementers_ok :
     [incrementer_inv] ||- {{emp}} (incrementer || incrementer) {{_ ~> emp}}.
 Proof.
   unfold incrementer, incrementer_inv.
-  simp.
   fork (emp%sep) (emp%sep).
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  cases (r0 ==n 0).
+  step.
+  cancel.
+  linear_arithmetic.
+  cancel.
+  step.
   cancel.
   cancel.
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  cases (r0 ==n 0).
+  step.
+  cancel.
+  linear_arithmetic.
+  cancel.
+  step.
+  cancel.
+  cancel.
+  cancel.
+  cancel.
+Qed.
+
+
+(** ** Producer-consumer with a linked list *)
+
+Fixpoint linkedList (p : nat) (ls : list nat) :=
+  match ls with
+    | nil => [| p = 0 |]
+    | x :: ls' => [| p <> 0 |]
+                  * exists p', p |--> [x; p'] * linkedList p' ls'
+  end%sep.
+
+Theorem linkedList_null : forall ls,
+  linkedList 0 ls === [| ls = nil |].
+Proof.
+  heq; cases ls; cancel.
+Qed.
+
+Theorem linkedList_nonnull : forall p ls,
+  p <> 0
+  -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |--> [x; p'] * linkedList p' ls'.
+Proof.
+  heq; cases ls; cancel; match goal with
+                         | [ H : _ = _ :: _ |- _ ] => invert H
+                         end; cancel.
+Qed.
+
+Example producer :=
+  _ <- for i := 0 loop
+    cell <- Alloc 2;
+    _ <- Write cell i;
+    _ <- Lock 0;
+    head <- Read 0;
+    _ <- Write (cell+1) head;
+    _ <- Write 0 cell;
+    _ <- Unlock 0;
+    Return (Again (2 + i))
+  done;
+  Return tt.
+
+Fixpoint isEven (n : nat) : bool :=
+  match n with
+  | O => true
+  | S (S n) => isEven n
+  | _ => false
+  end.
+
+Example consumer :=
+  for i := tt loop
+    _ <- Lock 0;
+    head <- Read 0;
+    if head ==n 0 then
+      _ <- Unlock 0;
+      Return (Again tt)
+    else
+      tail <- Read (head+1);
+      _ <- Write 0 tail;
+      _ <- Unlock 0;
+      data <- Read head;
+      _ <- Free head 2;
+      if isEven data then
+        Return (Again tt)
+      else
+        Fail
+  done.
+
+Definition producer_consumer_inv :=
+  (exists ls p, 0 |-> p * linkedList p ls * [| forallb isEven ls = true |])%sep.
+
+Definition valueOf {A} (o : loop_outcome A) :=
+  match o with
+  | Done v => v
+  | Again v => v
+  end.
+
+Theorem producer_consumer_ok :
+  [producer_consumer_inv] ||- {{emp}} producer || consumer {{_ ~> emp}}.
+Proof.
+  unfold producer_consumer_inv, producer, consumer.
+  fork (emp%sep) (emp%sep).
+
+  step.
+  loop_inv0 (fun o => [| isEven (valueOf o) = true |]%sep).
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  erewrite (linkedList_nonnull _ H0).
+  cancel.
+  simp.
+  rewrite H1, H4.
+  simp.
+  simp.
+  step.
+  cancel.
+  cancel.
+  cancel.
+  step.
+  cancel.
+  
+  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  cases (r0 ==n 0).
+  step.
+  step.
+  simp.
+  step.
+  cancel.
+  setoid_rewrite (linkedList_nonnull _ n).
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  apply andb_true_iff in H.
+  simp.
+  step.
+  step.
+  simp.
+  step.
+  step.
+  simp.
+  cases (isEven r4).
+  step.
+  cancel.
+  step.
+  cancel.
+  simp.
+  rewrite Heq in H2.
+  simp.
+  equality.
   cancel.
   cancel.
   cancel.
@@ -508,6 +744,8 @@ Proof.
   eapply HtFrame; eauto.
   eapply HtFrame; eauto.
 Qed.
+
+Transparent heq himp lift star exis ptsto.
 
 Lemma invert_Loop : forall linvs {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) P Q,
     hoare_triple linvs P (Loop init body) Q
@@ -602,7 +840,7 @@ Qed.
 
 Lemma invert_Alloc : forall linvs numWords P Q,
   hoare_triple linvs P (Alloc numWords) Q
-  -> forall r, P * r |--> zeroes numWords ===> Q r.
+  -> forall r, P * r |--> zeroes numWords * [| r <> 0 |] ===> Q r.
 Proof.
   induct 1; simp; eauto.
 
@@ -1108,7 +1346,7 @@ Proof.
   eapply use_himp; try apply H5.
   cancel.
 
-  apply invert_Alloc with (r := a) in H0.
+  apply invert_Alloc with (r := a) in H1.
   eexists; propositional.
   apply HtReturn'.
   eassumption.

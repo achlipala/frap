@@ -31,8 +31,8 @@ Module Type SEP.
     (Q -> p ===> r)
     -> p * [| Q |] ===> r.
   Axiom lift_right : forall p q (R : Prop),
-    R
-    -> p ===> q
+    p ===> q
+    -> R
     -> p ===> q * [| R |].
   Axiom extra_lift : forall (P : Prop) p,
     P
@@ -138,8 +138,8 @@ Module Make(Import S : SEP).
     apply lift_left; intro.
     rewrite extra_lift with (P := True) (p := [| P /\ Q |]); auto.
     apply lift_right.
-    tauto.
     reflexivity.
+    tauto.
   Qed.
 
   Lemma star_combine_lift2 : forall P Q, [| P /\ Q |] ===> [| P |] * [| Q |].
@@ -472,5 +472,5 @@ Module Make(Import S : SEP).
                                                basic_cancel
                                              end)
                      | [ |- _ ===> _ ] => intuition (try congruence)
-                     end; intuition (try eassumption).
+                     end; intuition idtac.
 End Make.

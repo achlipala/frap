@@ -362,6 +362,113 @@ Proof.
   reflexivity.
 Qed.
 
+(** * Examples *)
+
+Opaque heq himp lift star exis ptsto.
+
+(* Here comes some automation that we won't explain in detail, instead opting to
+ * use examples. *)
+
+Theorem use_lemma : forall linvs result P' (c : cmd result) (Q : result -> hprop) P R,
+  hoare_triple linvs P' c Q
+  -> P ===> P' * R
+  -> hoare_triple linvs P c (fun r => Q r * R)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  eapply HtFrame.
+  eassumption.
+  eauto.
+Qed.
+
+Theorem HtRead' : forall linvs a v,
+  hoare_triple linvs (a |-> v)%sep (Read a) (fun r => a |-> v * [| r = v |])%sep.
+Proof.
+  simp.
+  apply HtWeaken with (exists r, a |-> r * [| r = v |])%sep.
+  eapply HtStrengthen.
+  apply HtRead.
+  simp.
+  cancel; auto.
+  subst; cancel.
+  cancel; auto.
+Qed.
+
+Theorem HtRead'' : forall linvs p P R,
+  P ===> (exists v, p |-> v * R v)
+  -> hoare_triple linvs P (Read p) (fun r => p |-> r * R r)%sep.
+Proof.
+  simp.
+  eapply HtWeaken.
+  apply HtRead.
+  assumption.
+Qed.
+
+Lemma HtReturn' : forall linvs P {result : Set} (v : result) Q,
+    P ===> Q v
+    -> hoare_triple linvs P (Return v) Q.
+Proof.
+  simp.
+  eapply HtStrengthen.
+  constructor.
+  simp.
+  cancel.
+Qed.
+
+Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree
+              || (eapply HtLock; simplify; solve [ eauto ])
+              || (eapply HtUnlock; simplify; solve [ eauto ]).
+
+Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
+              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
+              || (eapply HtRead''; solve [ cancel ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
+              || (eapply HtConsequence; [ apply HtFail | .. ]).
+Ltac step := step0; simp.
+Ltac ht := simp; repeat step.
+Ltac conseq := simplify; eapply HtConsequence.
+Ltac use_IH H := conseq; [ apply H | .. ]; ht.
+Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
+                      || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
+Ltac loop_inv Inv := loop_inv0 Inv; ht.
+Ltac fork0 P1 P2 := apply HtWeaken with (P := (P1 * P2)%sep); [ apply HtPar | ].
+Ltac fork P1 P2 := fork0 P1 P2 || (eapply HtStrengthen; [ fork0 P1 P2 | ]).
+Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel; auto ] | ]).
+
+Ltac heq := intros; apply himp_heq; split.
+
+Example incrementer :=
+  for i := tt loop
+    _ <- Lock 0;
+    n <- Read 0;
+    _ <- Write 0 (n + 1);
+    _ <- Unlock 0;
+    Return (Again tt)
+  done.
+
+Definition incrementer_inv := 
+  (exists n, 0 |-> n * [| n > 0 |])%sep.
+
+Theorem incrementers_ok :
+    [incrementer_inv] ||- {{emp}} (incrementer || incrementer) {{_ ~> emp}}.
+Proof.
+  unfold incrementer, incrementer_inv.
+  simp.
+  fork (emp%sep) (emp%sep).
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  cancel.
+  cancel.
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  cancel.
+  cancel.
+  cancel.
+  cancel.
+Qed.
+
+
+(** * Soundness proof *)
+
 Hint Resolve himp_refl.
 
 Lemma invert_Return : forall linvs {result : Set} (r : result) P Q,
@@ -657,17 +764,6 @@ Proof.
   Transparent himp.
   apply H0; auto.
   Opaque himp.
-Qed.
-
-Lemma HtReturn' : forall linvs P {result : Set} (v : result) Q,
-    P ===> Q v
-    -> hoare_triple linvs P (Return v) Q.
-Proof.
-  simp.
-  eapply HtStrengthen.
-  constructor.
-  simp.
-  cancel.
 Qed.
 
 Opaque heq himp lift star exis ptsto.

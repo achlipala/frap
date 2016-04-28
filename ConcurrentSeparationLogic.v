@@ -493,50 +493,23 @@ Theorem incrementers_ok :
 Proof.
   unfold incrementer, incrementer_inv.
   fork (emp%sep) (emp%sep).
-  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  cases (r0 ==n 0).
-  step.
+
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  cases (r0 ==n 0); ht.
   cancel.
   linear_arithmetic.
   cancel.
-  step.
   cancel.
   cancel.
-  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  cases (r0 ==n 0).
-  step.
+
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  cases (r0 ==n 0); ht.
   cancel.
   linear_arithmetic.
   cancel.
-  step.
   cancel.
   cancel.
+
   cancel.
   cancel.
 Qed.
@@ -618,79 +591,29 @@ Theorem producer_consumer_ok :
   [producer_consumer_inv] ||- {{emp}} producer || consumer {{_ ~> emp}}.
 Proof.
   unfold producer_consumer_inv, producer, consumer.
-  fork (emp%sep) (emp%sep).
+  fork (emp%sep) (emp%sep); ht.
 
-  step.
-  loop_inv0 (fun o => [| isEven (valueOf o) = true |]%sep).
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
+  loop_inv (fun o => [| isEven (valueOf o) = true |]%sep).
   erewrite (linkedList_nonnull _ H0).
   cancel.
   simp.
   rewrite H1, H4.
   simp.
   simp.
-  step.
   cancel.
   cancel.
-  cancel.
-  step.
   cancel.
   
-  loop_inv0 (fun _ : loop_outcome unit => emp%sep).
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
   cases (r0 ==n 0).
-  step.
-  step.
-  simp.
-  step.
+  ht.
   cancel.
   setoid_rewrite (linkedList_nonnull _ n).
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
+  ht.
   apply andb_true_iff in H.
   simp.
-  step.
-  step.
-  simp.
-  step.
-  step.
-  simp.
-  cases (isEven r4).
-  step.
+  cases (isEven r4); ht.
   cancel.
-  step.
   cancel.
   simp.
   rewrite Heq in H2.
@@ -699,6 +622,7 @@ Proof.
   cancel.
   cancel.
   cancel.
+
   cancel.
 Qed.
 

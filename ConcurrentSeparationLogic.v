@@ -627,6 +627,126 @@ Proof.
 Qed.
 
 
+(** ** A length-3 producer-consumer chain *)
+
+Example stage1 :=
+  _ <- for i := 0 loop
+    cell <- Alloc 2;
+    _ <- Write cell i;
+    _ <- Lock 0;
+    head <- Read 0;
+    _ <- Write (cell+1) head;
+    _ <- Write 0 cell;
+    _ <- Unlock 0;
+    Return (Again (2 + i))
+  done;
+  Return tt.
+
+Example stage2 :=
+  for i := tt loop
+    _ <- Lock 0;
+    head <- Read 0;
+    if head ==n 0 then
+      _ <- Unlock 0;
+      Return (Again tt)
+    else
+      tail <- Read (head+1);
+      _ <- Write 0 tail;
+      _ <- Unlock 0;
+
+      _ <- Lock 1;
+      head' <- Read 1;
+      _ <- Write (head+1) head';
+      _ <- Write 1 head;
+      _ <- Unlock 1;
+
+      Return (Again tt)
+  done.
+
+Example stage3 :=
+  for i := tt loop
+    _ <- Lock 1;
+    head <- Read 1;
+    if head ==n 0 then
+      _ <- Unlock 1;
+      Return (Again tt)
+    else
+      tail <- Read (head+1);
+      _ <- Write 1 tail;
+      _ <- Unlock 1;
+      data <- Read head;
+      _ <- Free head 2;
+      if isEven data then
+        Return (Again tt)
+      else
+        Fail
+  done.
+
+Definition stages_inv root :=
+  (exists ls p, root |-> p * linkedList p ls * [| forallb isEven ls = true |])%sep.
+
+Theorem stages_ok :
+  [stages_inv 0; stages_inv 1] ||- {{emp}} stage1 || stage2 || stage3 {{_ ~> emp}}.
+Proof.
+  unfold stages_inv, stage1, stage2, stage3.
+  fork (emp%sep) (emp%sep); ht.
+  fork (emp%sep) (emp%sep); ht.
+
+  loop_inv (fun o => [| isEven (valueOf o) = true |]%sep).
+  erewrite (linkedList_nonnull _ H0).
+  cancel.
+  simp.
+  rewrite H1, H4.
+  simp.
+  simp.
+  cancel.
+  cancel.
+  cancel.
+  
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  simp.
+  cases (r0 ==n 0).
+  ht.
+  cancel.
+  setoid_rewrite (linkedList_nonnull _ n).
+  ht.
+  apply andb_true_iff in H.
+  simp.
+  erewrite (linkedList_nonnull _ H1).
+  cancel.
+  simp.
+  apply andb_true_iff in H0.
+  apply andb_true_iff.
+  simp.
+  cancel.
+  cancel.
+  cancel.
+
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  simp.
+  cases (r0 ==n 0).
+  ht.
+  cancel.
+  setoid_rewrite (linkedList_nonnull _ n).
+  ht.
+  apply andb_true_iff in H.
+  simp.
+  simp.
+  cases (isEven r4); ht.
+  cancel.
+  cancel.
+  simp.
+  rewrite Heq in H2.
+  simp.
+  equality.
+  cancel.
+  cancel.
+  cancel.
+
+  cancel.
+Qed.
+
+
 (** * Soundness proof *)
 
 Hint Resolve himp_refl.

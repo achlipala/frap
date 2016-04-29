@@ -1,6 +1,6 @@
 \documentclass{amsbook}
 
-\usepackage{hyperref,url,amsmath,amssymb,proof,stmaryrd,tikz-cd}
+\usepackage{hyperref,url,amsmath,amssymb,proof,stmaryrd,tikz-cd,mathabx}
 
 \newtheorem{theorem}{Theorem}[chapter]
 \newtheorem{lemma}[theorem]{Lemma}
@@ -3886,6 +3886,118 @@ Conversely, when a thread releases a lock, it appears as if \emph{the lock grabs
 The rules are coordinating conceptual ownership transfers between local memory and the global lock memory.
 
 The accompanying Coq code shows a few example verifications of interesting programs.
+
+\section{Soundness Proof}
+
+\newcommand{\guarded}[2]{#1 \longrightarrow #2}
+
+We can adapt the separation-logic soundness proof to concurrency, with just a few new ideas.
+First, we will appreciate some new connectives for writing assertions.
+One simple one is a guarded predicate, defined like so, for pure proposition $\phi$ (the guard) and separation-logic assertion $P$.
+\begin{eqnarray*}
+  \guarded{\phi}{P} &=& \mt{if} \; \phi \; \mt{then} \; P \; \mt{else} \; \emp
+\end{eqnarray*}
+
+\renewcommand{\bigstar}[3]{\Asterisk_{#1 \in #2} #3}
+\newcommand{\bigstarp}[3]{\Asterisk_{#1 \in #2} {\left ( #3 \right )}}
+
+The other key addition will be the ``big star,'' \emph{iterated separating conjunction}, with quantification over finite sets, written like $\bigstar{x}{S}{P(x)}$.
+The definition is:
+\begin{eqnarray*}
+  \bigstar{x}{\{v_1, \ldots, v_n\}}{P(x)} &=& P(v_1) * \ldots * P(v_n)
+\end{eqnarray*}
+
+The reader may be worried about the inherently unordered nature of sets.
+For each ordering of a set, we get a syntactically distinct formula on the righthand side of the defining equation.
+Luckily, separating conjunction $*$ is associative and commutative, so all orders lead to logically equivalent formulas.
+
+With those preliminaries out of the way, we can state the soundness theorem, referring again to the \emph{not-about-to-fail} predicate $\mathsf{natf}$ from last chapter, extended appropriately to say that loops are not about to fail.
+
+\invariants
+\begin{theorem}[Soundness]
+  If $\hoare{P}{c}{Q}$, and if a heap $h$ satisfies the predicate $(P * \bigstar{\ell}{L}{\mathcal I(\ell)})$, then $\mathsf{natf}$ is an invariant of the system starting at state $(h, \emptyset, c)$.
+\end{theorem}
+
+The theorem lays out restrictions on the starting heap.
+It must have a segment to serve as the root thread's local heap, matching precondition $P$.
+Then, for each lock $\ell \in L$, there must be an associated memory region satisfying $\mathcal I(\ell)$.
+Our use of separating conjunction forces each of these regions to occupy disjoint memory from all the others.
+
+Some key lemmas support the proof.
+Here are the highlights.
+The first is representative of a family of lemmas that we prove, one for each syntactic construct of the object language.
+
+\begin{lemma}
+  If $\hoare{P}{\mt{Read} \; a}{Q}$, then there exists $R$ such that $P \Rightarrow \exists v. \; \ptsto{a}{v} * R(v)$ and, for all $r$, $\ptsto{a}{r} * R(r) \Rightarrow Q(r)$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{\mt{Read} \; a}{Q}$.
+\end{proof}
+
+As another example incorporating more of the complexities of concurrency, we have this lemma.
+
+\begin{lemma}
+  If $\hoare{P}{c_1 || c_2}{Q}$, then there exist $P_1$, $P_2$, $Q_1$, and $Q_2$ such that $\hoare{P_1}{c_1}{Q_1}$, $\hoare{P_2}{c_2}{Q_2}$, $P \Rightarrow P_1 * P_2$, and $Q_1(()) * Q_2(()) \Rightarrow Q(())$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c_1 || c_2}{Q}$.
+  One somewhat surprising case is when the frame rule begins the derivation.
+  We have some predicate $R$ that is added to both the precondition and postcondition.
+  In picking $P_1$, $P_2$, $Q_1$, and $Q_2$, we have a choice as to where we incorporate $R$.
+  The two threads together leave $R$ alone, so clearly either thread individually does, too.
+  Therefore, we arbitrarily incorporate $R$ in $P_1$ and $Q_1$.
+\end{proof}
+
+Two lemmas express crucial techniques to isolate elements within iterated conjunction.
+
+\begin{lemma}\label{chunkslock}
+  If $v \in S$, then $\bigstar{x}{S}{P(x)} \Rightarrow P(v) * \bigstar{x}{S \setminus \{v\}}{P(x)}$.
+\end{lemma}
+\begin{proof}
+  By induction on the cardinality of $S$.
+\end{proof}
+
+\begin{lemma}\label{chunksunlock}
+  If $v \notin S$, then $P(v) * \bigstar{x}{S}{P(x)} \Rightarrow \bigstar{x}{S \cup \{v\}}{P(x)}$.
+\end{lemma}
+\begin{proof}
+  By induction on the cardinality of $S$.
+\end{proof}
+
+\begin{lemma}[Preservation]\label{cslpreservation}
+  If $\smallstep{(h, l, c)}{(h', l', c')}$, $\hoare{P}{c}{Q}$, and $h$ satisfies $(P * R * \bigstarp{\ell}{L}{\guarded{\ell \notin l}{\mathcal I(\ell)}})$, then there exists $P'$ such that $\hoare{P'}{c'}{Q}$, where $h'$ satisfies $(P' * R * \bigstarp{\ell}{L}{\guarded{\ell \notin l'}{\mathcal I(\ell)}})$.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\smallstep{(h, l, c)}{(h', l', c')}$.
+  The cases for lock and unlock respectively use Lemmas \ref{chunkslock} and \ref{chunksunlock}.
+  Note that we include the parameter $R$ solely to get a strong enough induction hypothesis for steps of commands $c_1 || c_2$.
+  We need to know that a step by one thread does not change the private heap of the other thread.
+  To draw that conclusion, in appealing to the induction hypothesis, we extend $R$ with precisely that private state.
+\end{proof}
+
+\begin{lemma}\label{nonelocked}
+  $\bigstar{\ell}{L}{\mathcal I(\ell)} \Rightarrow \bigstarp{\ell}{L}{\guarded{\ell \notin \emptyset}{\mathcal I(\ell)}}$.
+\end{lemma}
+\begin{proof}
+  By induction on the cardinality of $L$.
+\end{proof}
+
+\begin{lemma}\label{cslinvariant}
+  If $\hoare{P}{c}{Q}$, and if a heap $h$ satisfies the predicate $(P * \bigstar{\ell}{L}{\mathcal I(\ell)})$, then an invariant of the system starting at state $(h, \emptyset, c)$ is: for reachable state $(h', l', c')$, there exists $P'$ where $\hoare{P'}{c'}{Q}$, such that $h'$ satisfies $(P' * \bigstar{\ell}{L}{\guarded{\ell \notin L}{\mathcal I(\ell)}})$.
+\end{lemma}
+\begin{proof}
+  By invariant induction\index{invariant induction}, using Lemma \ref{nonelocked} for the base case and Lemma \ref{cslpreservation} for the induction step, the latter with $R = \emp$.
+\end{proof}
+
+\begin{lemma}[Progress]\label{cslprogress}
+  If $\hoare{P}{c}{Q}$ and $c$ is about to fail, then $P$ is unsatisfiable.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\hoare{P}{c}{Q}$.
+\end{proof}
+
+The overall soundness proof proceeds by invariant weakening\index{invariant weakening} to the invariant established by Lemma \ref{cslinvariant}.
+We prove the inclusion of new invariant in old by Lemma \ref{cslprogress}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -3773,6 +3773,120 @@ To plug this soundness hole, we add a final condition on the ample sets.
 This condition effectively forces the ample set for the example program above to include the second thread.
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Concurrent Separation Logic}
+
+The last two chapters respectively introduced techniques for reasoning about two tricky aspects of programs: heap-allocated linked data structures\index{linked data structures} and shared-memory concurrency\index{shared-memory concurrency}.
+When we add concurrency to the mix for a program-reasoning problem, we are often surprised at how much more complex it becomes.
+This chapter introduces a pleasant exception to the rule, \emph{concurrent separation logic}\index{concurrent separation logic}, a rather small addition to separation logic\index{separation logic} that supports invariant-based reasoning about threads-and-locks shared-memory programs.
+
+\section{Object Language: Loops and Locks}
+
+Here's the object language we adopt, which should be old hat by now, just mixing together features of the object languages from the previous two chapters.
+
+$$\begin{array}{rrcl}
+  \textrm{Commands} & c &::=& \mt{Fail} \mid \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Loop} \; i \; f \\
+  &&& \mid \mt{Read} \; a \mid \mt{Write} \; a \; v \mid \mt{Lock} \; a \mid \mt{Unlock} \; a \mid c || c
+\end{array}$$
+
+$$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
+  \smallstep{(h, l, c_1)}{(h', l', c'_1)}
+}
+\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, k, c_2(v))}}{}$$
+
+$$\infer{\smallstep{(h, l, \mt{Loop} \; i \; f)}{(h, l, x \leftarrow f(\mt{Again}(i)); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
+
+$$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; v)}}{
+  \msel{h}{a} = v
+}
+\quad \infer{\smallstep{(h, l, \mt{Write} \; a \; v')}{(\mupd{h}{a}{v'}, l, \mt{Return} \; ())}}{
+  \msel{h}{a} = v
+}$$
+
+$$\infer{\smallstep{(h, l, \mt{Lock} \; a)}{(h, l \cup \{a\}, \mt{Return} \; ())}}{
+  a \notin l
+}
+\quad \infer{\smallstep{(h, l, \mt{Unlock} \; a)}{(h, l \setminus \{a\}, \mt{Return} \; ())}}{
+  a \in l
+}$$
+
+$$\infer{\smallstep{(h, l, c_1 || c_2)}{(h', l', c'_1 || c_2)}}{
+  \smallstep{(h, l, c_1)}{(h', l', c'_1)}
+}
+\quad \infer{\smallstep{(h, l, c_1 || c_2)}{(h', l', c_1 || c'_2)}}{
+  \smallstep{(h, l, c_2)}{(h', l', c'_2)}
+}$$
+
+
+\section{The Program Logic}
+
+We will build on basic separation logic, using the same kind of assertions and even adopting all of the original rules unchanged.
+Here they are again, for easy reference.
+
+$$\infer{\hoare{\emp}{\mt{Return} \; v}{\lambda r. \; \lift{r = v}}}{}
+\quad \infer{\hoare{P}{x \leftarrow c_1; c_2(x)}{R}}{
+  \hoare{P}{c_1}{Q}
+  & (\forall r. \; \hoare{Q(r)}{c_2(r)}{R})
+}$$
+
+$$\infer{\hoare{I(\mt{Again}(i))}{\mt{Loop} \; i \; f}{\lambda r. \; I(\mt{Done}(r))}}{
+  \forall a. \; \hoare{I(\mt{Again}(a))}{f(a)}{I}
+}
+\quad \infer{\hoare{\lift{\bot}}{\mt{Fail}}{\lambda \_. \; \lift{\bot}}}{}$$
+
+$$\infer{\hoare{\exists v. \; \ptsto{a}{v} * R(v)}{\mt{Read} \; a}{\lambda r. \; \ptsto{a}{r} * R(r)}}{}
+\quad \infer{\hoare{\exists v. \; \ptsto{a}{v}}{\mt{Write} \; a \; v'}{\lambda \_. \; \ptsto{a}{v'}}}{}$$
+
+$$\infer{\hoare{\emp}{\mt{Alloc} \; n}{\lambda r. \; \ptsto{r}{0^n}}}{}
+\quad \infer{\hoare{\ptsto{a}{\; ?^n}}{\mt{Free} \; a \; n}{\lambda \_. \; \emp}}{}$$
+
+$$\infer{\hoare{P'}{c}{Q'}}{
+  \hoare{P}{c}{Q}
+  & P' \Rightarrow P
+  & \forall r. \; Q(r) \Rightarrow Q'(r)
+}
+\quad \infer{\hoare{P * R}{c}{\lambda r. \; Q(r) * R}}{
+  \hoare{P}{c}{Q}
+}$$
+
+\modularity
+When two threads use disjoint regions of memory, it is trivial to apply this rule of Concurrent Separation Logic to verify the threads independently.
+$$\infer{\hoare{P_1 * P_2}{c_1 || c_2}{\lambda r. \; Q_1(r) * Q_2(r)}}{
+  \hoare{P_1}{c_1}{Q_1}
+  & \hoare{P_2}{c_2}{Q_2}
+}$$
+The separating conjunction $*$ turned out to be just the right way to express the idea of ``splitting the heap into a part for the first thread and a part for the second thread.''
+Because $c_1$ and $c_2$ touch disjoint memory regions, all of their memory operations commute\index{commutativity}, so that we need not worry about the state-explosion problem, in all the ways that the scheduler might interleave their steps.
+
+However, with realistic shared-memory programs, we don't get off that easy.
+Threads \emph{do} share memory regions, using \emph{synchronization}\index{synchronization} to tame the state-explosion problem.
+Our object language includes locks as its example of synchronization, and Concurrent Separation Logic is specialized to locks.
+We may keep the simplistic-seeming rule for parallel composition and implicitly enrich its power by adding a twist, in the form of some other rules.
+
+The big twist is that we parameterize everything over some finite set $L$ of locks that may be used.
+\invariants
+Furthermore, another parameter is a function $\mathcal I$ that maps locks to invariants, which have the same type as preconditions.
+The idea is this: when no one holds a lock, \emph{the lock owns a chunk of memory that satisifes its invariant}.
+When a thread holds the lock, the lock doesn't own any memory; it is waiting for the thread to unlock it and \emph{donate back} a chunk of memory satisfying the invariant.
+We now think of the precondition of a Hoare triple as only describing the \emph{local memory} of a thread, which no other thread may access; while locks and their invariants coordinate the \emph{shared memory} regions of an application.
+The proof rules will coordinate dynamic motion of memory regions between the shared regions and local regions.
+This motion is only part of a proof technique; it has no runtime content reflected in the operational semantics!
+
+With all of that set-up, the final two rules may seem surprisingly simple.
+$$\infer{\hoare{\emp}{\mt{Lock} \; a}{\lambda \_. \; \mathcal I(a)}}{
+  a \in L
+}
+\quad \infer{\hoare{\mathcal I(a)}{\mt{Unlock} \; a}{\lambda \_. \; \emp}}{
+  a \in L
+}$$
+
+When a thread takes a lock, it appears as if \emph{a memory chunk satisfying that lock's invariant materializes in the local memory space}.
+Conversely, when a thread releases a lock, it appears as if \emph{the lock grabs a memory chunk satisfying the invariant out of the local memory space}.
+The rules are coordinating conceptual ownership transfers between local memory and the global lock memory.
+
+The accompanying Coq code shows a few example verifications of interesting programs.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -3983,7 +3983,7 @@ Two lemmas express crucial techniques to isolate elements within iterated conjun
 \end{proof}
 
 \begin{lemma}\label{cslinvariant}
-  If $\hoare{P}{c}{Q}$, and if a heap $h$ satisfies the predicate $(P * \bigstar{\ell}{L}{\mathcal I(\ell)})$, then an invariant of the system starting at state $(h, \emptyset, c)$ is: for reachable state $(h', l', c')$, there exists $P'$ where $\hoare{P'}{c'}{Q}$, such that $h'$ satisfies $(P' * \bigstar{\ell}{L}{\guarded{\ell \notin L}{\mathcal I(\ell)}})$.
+  If $\hoare{P}{c}{Q}$, and if a heap $h$ satisfies the predicate $(P * \bigstar{\ell}{L}{\mathcal I(\ell)})$, then an invariant of the system starting at state $(h, \emptyset, c)$ is: for reachable state $(h', l', c')$, there exists $P'$ where $\hoare{P'}{c'}{Q}$, such that $h'$ satisfies $(P' * \bigstarp{\ell}{L}{\guarded{\ell \notin l'}{\mathcal I(\ell)}})$.
 \end{lemma}
 \begin{proof}
   By invariant induction\index{invariant induction}, using Lemma \ref{nonelocked} for the base case and Lemma \ref{cslpreservation} for the induction step, the latter with $R = \emp$.
@@ -3996,7 +3996,7 @@ Two lemmas express crucial techniques to isolate elements within iterated conjun
   By induction on the derivation of $\hoare{P}{c}{Q}$.
 \end{proof}
 
-The overall soundness proof proceeds by invariant weakening\index{invariant weakening} to the invariant established by Lemma \ref{cslinvariant}.
+The overall soundness proof proceeds by invariant weakening\index{invariant weakening} with the invariant established by Lemma \ref{cslinvariant}.
 We prove the inclusion of new invariant in old by Lemma \ref{cslprogress}.
 
 

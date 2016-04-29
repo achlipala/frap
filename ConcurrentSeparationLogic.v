@@ -8,6 +8,12 @@ Require Import Frap Setoid Classes.Morphisms SepCancel.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+
+(* Let's combine the subjects of the last two lectures, to let us prove
+ * correctness of concurrent programs that do dynamic management of shared
+ * memory. *)
+
+
 (** * Shared notations and definitions; main material starts afterward. *)
 
 Notation heap := (fmap nat nat).
@@ -24,11 +30,18 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 (** * A shared-memory concurrent language with loops *)
 
-(* Let's work with a variant of the imperative language from last time. *)
+(* Let's work with a variant of the shared-memory concurrent language from last
+ * time.  We add back in result types, loops, and dynamic memory allocation. *)
 
 Inductive loop_outcome acc :=
 | Done (a : acc)
 | Again (a : acc).
+
+Definition valueOf {A} (o : loop_outcome A) :=
+  match o with
+  | Done v => v
+  | Again v => v
+  end.
 
 Inductive cmd : Set -> Type :=
 | Return {result : Set} (r : result) : cmd result
@@ -44,6 +57,9 @@ Inductive cmd : Set -> Type :=
 | Free (base numWords : nat) : cmd unit
 
 | Par (c1 c2 : cmd unit) : cmd unit.
+
+(* The next span of definitions is copied from SeparationLogic.v.  Skip ahead to
+ * the word "Finally" to see what's new. *)
 
 Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
 Notation "'for' x := i 'loop' c1 'done'" := (Loop i (fun x => c1)) (right associativity, at level 80).
@@ -287,10 +303,13 @@ Infix "|->?" := allocated (at level 30) : sep_scope.
 
 (* The whole thing is parameterized on a map from locks to invariants on their
  * owned state.  The map is a list, with lock [i] getting the [i]th invariant in
- * the list.  Lock numbers at or beyond the list length are forbidden. *)
+ * the list.  Lock numbers at or beyond the list length are forbidden.  Beyond
+ * this new wrinkle, the type signature of the predicate is the same. *)
 
 Inductive hoare_triple (linvs : list hprop) : forall {result}, hprop -> cmd result -> (result -> hprop) -> Prop :=
-(* First, we have the basic separation-logic rules from before. *)
+
+(* First, we have the basic separation-logic rules from before.  The only change
+ * is in the threading-through of parameter [linvs]. *)
 | HtReturn : forall P {result : Set} (v : result),
     hoare_triple linvs P (Return v) (fun r => P * [| r = v |])%sep
 | HtBind : forall P {result' result} (c1 : cmd result') (c2 : result' -> cmd result) Q R,
@@ -363,12 +382,13 @@ Proof.
   reflexivity.
 Qed.
 
+
 (** * Examples *)
 
 Opaque heq himp lift star exis ptsto.
 
 (* Here comes some automation that we won't explain in detail, instead opting to
- * use examples. *)
+ * use examples.  Search for "nonzero" to skip ahead to the first one. *)
 
 Theorem use_lemma : forall linvs result P' (c : cmd result) (Q : result -> hprop) P R,
   hoare_triple linvs P' c Q
@@ -473,6 +493,12 @@ Hint Resolve try_ptsto_first.
 
 (** ** The nonzero shared counter *)
 
+(* This program has two threads shared a numeric counter, which starts out as
+ * nonzero and remains that way, since each thread only increments the counter,
+ * with the lock held to avoid race conditions.  (Actually, the lock isn't
+ * needed to maintain the property in this case, but it's a pleasant starting
+ * example, and reasoning about racey code is more involved.) *)
+
 Example incrementer :=
   for i := tt loop
     _ <- Lock 0;
@@ -485,6 +511,8 @@ Example incrementer :=
       Return (Again tt)
   done.
 
+(* Recall that each lock has an associated invariant.  This program only uses
+ * lock 0, and here's its invariant: memory cell 0 holds a positive number. *)
 Definition incrementer_inv := 
   (exists n, 0 |-> n * [| n > 0 |])%sep.
 
@@ -492,8 +520,13 @@ Theorem incrementers_ok :
     [incrementer_inv] ||- {{emp}} (incrementer || incrementer) {{_ ~> emp}}.
 Proof.
   unfold incrementer, incrementer_inv.
+  (* When we must prove a parallel composition, we manually explain how to split
+   * the precondition into two, one for each new thread.  In this case, there is
+   * no local state to share, so both sides are empty. *)
   fork (emp%sep) (emp%sep).
 
+  (* This loop invariant is also trivial, since neither thread has persistent
+   * local state. *)
   loop_inv (fun _ : loop_outcome unit => emp%sep).
   cases (r0 ==n 0); ht.
   cancel.
@@ -514,8 +547,40 @@ Proof.
   cancel.
 Qed.
 
+(* Hm, we used exactly the same proof code for each thread, which makes sense,
+ * since they share the same code.  Let's take advantage of this symmetry to
+ * prove that any 2^n-way composition of this code remains correct. *)
+
+Fixpoint incrementers (n : nat) :=
+  match n with
+  | O => incrementer
+  | S n' => incrementers n' || incrementers n'
+  end.
+
+Theorem any_incrementers_ok : forall n,
+    [incrementer_inv] ||- {{emp}} incrementers n {{_ ~> emp}}.
+Proof.
+  induct n; simp.
+
+  unfold incrementer, incrementer_inv.
+  loop_inv (fun _ : loop_outcome unit => emp%sep).
+  cases (r0 ==n 0); ht.
+  cancel.
+  linear_arithmetic.
+  cancel.
+  cancel.
+  cancel.
+
+  fork (emp%sep) (emp%sep); eauto.
+  cancel.
+  cancel.
+Qed.
+
 
 (** ** Producer-consumer with a linked list *)
+
+(* First, here's a literal repetition of the definition of linked lists from
+ * SeparationLogic.v. *)
 
 Fixpoint linkedList (p : nat) (ls : list nat) :=
   match ls with
@@ -538,6 +603,12 @@ Proof.
                          | [ H : _ = _ :: _ |- _ ] => invert H
                          end; cancel.
 Qed.
+
+(* Now let's use linked lists as shared stacks for communication between
+ * threads, with a lock protecting each stack.  To start out with, here's a
+ * producer-consumer example with just one stack.  The producer is looping
+ * pushing the consecutive even numbers to the stack, and the consumer is
+ * looping popping numbers and failing if they're odd. *)
 
 Example producer :=
   _ <- for i := 0 loop
@@ -578,15 +649,12 @@ Example consumer :=
         Fail
   done.
 
+(* Invariant of the only lock: cell 0 points to a linked list, whose elements
+ * are all even. *)
 Definition producer_consumer_inv :=
   (exists ls p, 0 |-> p * linkedList p ls * [| forallb isEven ls = true |])%sep.
 
-Definition valueOf {A} (o : loop_outcome A) :=
-  match o with
-  | Done v => v
-  | Again v => v
-  end.
-
+(* Let's prove that the program is correct (can never [Fail]). *)
 Theorem producer_consumer_ok :
   [producer_consumer_inv] ||- {{emp}} producer || consumer {{_ ~> emp}}.
 Proof.
@@ -628,6 +696,12 @@ Qed.
 
 
 (** ** A length-3 producer-consumer chain *)
+
+(* Here's a variant on the last example.  Now we have three stages.
+ * Stage 1: push consecutive even numbers to stack 1.
+ * Stage 2: pop from stack 1 and push to stack 1, reusing the memory for the
+ *          list node.
+ * Stage 3: pop from stack 2 and fail if odd. *)
 
 Example stage1 :=
   _ <- for i := 0 loop
@@ -682,6 +756,7 @@ Example stage3 :=
         Fail
   done.
 
+(* Same invariant as before, for each of the two stacks. *)
 Definition stages_inv root :=
   (exists ls p, root |-> p * linkedList p ls * [| forallb isEven ls = true |])%sep.
 
@@ -748,6 +823,11 @@ Qed.
 
 
 (** * Soundness proof *)
+
+(* We can still prove that the logic is sound.  That is, any state compatible
+ * with a proved Hoare triple has the invariant that it never fails.  See the
+ * book PDF for a sketch of the important technical devices and lemmas in this
+ * proof. *)
 
 Hint Resolve himp_refl.
 

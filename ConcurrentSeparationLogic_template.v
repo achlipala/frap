@@ -1,17 +1,7 @@
-(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 14: Concurrent Separation Logic
-  * Author: Adam Chlipala
-  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
-
 Require Import Frap Setoid Classes.Morphisms SepCancel.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
-
-
-(* Let's combine the subjects of the last two lectures, to let us prove
- * correctness of concurrent programs that do dynamic management of shared
- * memory. *)
 
 
 (** * Shared notations and definitions; main material starts afterward. *)
@@ -29,9 +19,6 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 
 (** * A shared-memory concurrent language with loops *)
-
-(* Let's work with a variant of the shared-memory concurrent language from last
- * time.  We add back in result types, loops, and dynamic memory allocation. *)
 
 Inductive loop_outcome acc :=
 | Done (a : acc)
@@ -57,9 +44,6 @@ Inductive cmd : Set -> Type :=
 | Free (base numWords : nat) : cmd unit
 
 | Par (c1 c2 : cmd unit) : cmd unit.
-
-(* The next span of definitions is copied from SeparationLogic.v.  Skip ahead to
- * the word "Finally" to see what's new. *)
 
 Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
 Notation "'for' x := i 'loop' c1 'done'" := (Loop i (fun x => c1)) (right associativity, at level 80).
@@ -122,9 +106,6 @@ Definition trsys_of (h : heap) (l : locks) {result} (c : cmd result) := {|
   Step := step (A := result)
 |}.
 
-(* Next, we define our notion of assertion and instantiate the generic
- * separation-logic cancelation automation, in exactly the same way as
- * before. *)
 Module Import S <: SEP.
   Definition hprop := heap -> Prop.
   (* We add the locks to the mix. *)
@@ -439,10 +420,10 @@ Qed.
 Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree
               || (eapply HtLock; simplify; solve [ eauto ])
               || (eapply HtUnlock; simplify; solve [ eauto ]).
-Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
-              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
+Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel ])
+              || (eapply use_lemma; [ eapply HtRead' | solve [ cancel ] ])
               || (eapply HtRead''; solve [ cancel ])
-              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel ] | ])
               || (eapply HtConsequence; [ apply HtFail | .. ]).
 Ltac step := step0; simp.
 Ltac ht := simp; repeat step.
@@ -453,8 +434,8 @@ Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
 Ltac loop_inv Inv := loop_inv0 Inv; ht.
 Ltac fork0 P1 P2 := apply HtWeaken with (P := (P1 * P2)%sep); [ apply HtPar | ].
 Ltac fork P1 P2 := fork0 P1 P2 || (eapply HtStrengthen; [ fork0 P1 P2 | ]).
-Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
-              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel; auto ] | ]).
+Ltac use H := (eapply use_lemma; [ eapply H | cancel ])
+              || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel ] | ]).
 
 Ltac heq := intros; apply himp_heq; split.
 
@@ -495,9 +476,7 @@ Hint Resolve try_ptsto_first.
 
 (* This program has two threads shared a numeric counter, which starts out as
  * nonzero and remains that way, since each thread only increments the counter,
- * with the lock held to avoid race conditions.  (Actually, the lock isn't
- * needed to maintain the property in this case, but it's a pleasant starting
- * example, and reasoning about racey code is more involved.) *)
+ * with the lock held to avoid race conditions. *)
 
 Example incrementer :=
   for i := tt loop
@@ -511,45 +490,33 @@ Example incrementer :=
       Return (Again tt)
   done.
 
-(* Recall that each lock has an associated invariant.  This program only uses
- * lock 0, and here's its invariant: memory cell 0 holds a positive number. *)
-Definition incrementer_inv := 
-  (exists n, 0 |-> n * [| n > 0 |])%sep.
+Definition incrementer_inv := emp%sep.
 
 Theorem incrementers_ok :
-    [incrementer_inv] ||- {{emp}} (incrementer || incrementer) {{_ ~> emp}}.
+    [incrementer_inv] ||- {{emp}} incrementer || incrementer {{_ ~> emp}}.
 Proof.
   unfold incrementer, incrementer_inv.
-  (* When we must prove a parallel composition, we manually explain how to split
-   * the precondition into two, one for each new thread.  In this case, there is
-   * no local state to share, so both sides are empty. *)
-  fork (emp%sep) (emp%sep).
+Admitted.
 
-  (* This loop invariant is also trivial, since neither thread has persistent
-   * local state. *)
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
-  cases (r0 ==n 0); ht.
-  cancel.
-  linear_arithmetic.
-  cancel.
-  cancel.
-  cancel.
 
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
-  cases (r0 ==n 0); ht.
-  cancel.
-  linear_arithmetic.
-  cancel.
-  cancel.
-  cancel.
 
-  cancel.
-  cancel.
-Qed.
 
-(* Hm, we used exactly the same proof code for each thread, which makes sense,
- * since they share the same code.  Let's take advantage of this symmetry to
- * prove that any 2^n-way composition of this code remains correct. *)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Fixpoint incrementers (n : nat) :=
   match n with
@@ -560,21 +527,7 @@ Fixpoint incrementers (n : nat) :=
 Theorem any_incrementers_ok : forall n,
     [incrementer_inv] ||- {{emp}} incrementers n {{_ ~> emp}}.
 Proof.
-  induct n; simp.
-
-  unfold incrementer, incrementer_inv.
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
-  cases (r0 ==n 0); ht.
-  cancel.
-  linear_arithmetic.
-  cancel.
-  cancel.
-  cancel.
-
-  fork (emp%sep) (emp%sep); eauto.
-  cancel.
-  cancel.
-Qed.
+Admitted.
 
 
 (** ** Producer-consumer with a linked list *)
@@ -649,50 +602,13 @@ Example consumer :=
         Fail
   done.
 
-(* Invariant of the only lock: cell 0 points to a linked list, whose elements
- * are all even. *)
-Definition producer_consumer_inv :=
-  (exists ls p, 0 |-> p * linkedList p ls * [| forallb isEven ls = true |])%sep.
+Definition producer_consumer_inv := emp%sep.
 
-(* Let's prove that the program is correct (can never [Fail]). *)
 Theorem producer_consumer_ok :
   [producer_consumer_inv] ||- {{emp}} producer || consumer {{_ ~> emp}}.
 Proof.
   unfold producer_consumer_inv, producer, consumer.
-  fork (emp%sep) (emp%sep); ht.
-
-  loop_inv (fun o => [| isEven (valueOf o) = true |]%sep).
-  erewrite (linkedList_nonnull _ f).
-  cancel.
-  simp.
-  rewrite e, e0.
-  simp.
-  simp.
-  cancel.
-  cancel.
-  cancel.
-  
-  loop_inv (fun _ : loop_outcome unit => emp%sep).
-  cases (r0 ==n 0).
-  ht.
-  cancel.
-  setoid_rewrite (linkedList_nonnull _ n).
-  ht.
-  apply andb_true_iff in H.
-  simp.
-  cases (isEven r4); ht.
-  cancel.
-  cancel.
-  simp.
-  rewrite Heq in H0.
-  simp.
-  equality.
-  cancel.
-  cancel.
-  cancel.
-
-  cancel.
-Qed.
+Admitted.
 
 
 (** ** A length-3 producer-consumer chain *)
@@ -773,7 +689,6 @@ Proof.
   simp.
   rewrite e, e0.
   simp.
-  simp.
   cancel.
   cancel.
   cancel.
@@ -823,11 +738,6 @@ Qed.
 
 
 (** * Soundness proof *)
-
-(* We can still prove that the logic is sound.  That is, any state compatible
- * with a proved Hoare triple has the invariant that it never fails.  See the
- * book PDF for a sketch of the important technical devices and lemmas in this
- * proof. *)
 
 Hint Resolve himp_refl.
 
@@ -891,8 +801,6 @@ Proof.
   rewrite H3; eauto.
 Qed.
 
-(* Now that we proved enough basic facts, let's hide the definitions of all
- * these predicates, so that we reason about them only through automation. *)
 Opaque heq himp lift star exis ptsto.
 
 Lemma unit_not_nat : unit = nat -> False.
@@ -987,7 +895,6 @@ Proof.
   cancel.
 Qed.
 
-(* Temporarily transparent again! *)
 Transparent heq himp lift star exis ptsto.
 
 Lemma zeroes_initialize' : forall h a v,
@@ -1014,7 +921,6 @@ Proof.
   cases (a ==n a0); simp.
 Qed.
 
-(* Opaque again! *)
 Opaque heq himp lift star exis ptsto.
 
 Lemma multi_ptsto_app : forall ls2 ls1 a,
@@ -1085,7 +991,6 @@ Proof.
   cancel; auto.
 Qed.
 
-(* Temporarily transparent again! *)
 Transparent heq himp lift star exis ptsto.
 
 Lemma do_deallocate' : forall a Q h,
@@ -1207,10 +1112,8 @@ Proof.
   rewrite <- H4; cancel.
 Qed.
 
-(* Temporarily transparent again! *)
 Transparent heq himp lift star exis ptsto.
 
-(* Guarded predicates *)
 Definition guarded (P : Prop) (p : hprop) : hprop :=
   fun h => IF P then p h else emp%sep h.
 
@@ -1228,7 +1131,6 @@ Proof.
   unfold heq, guarded, IF_then_else; simp.
 Qed.
 
-(* Iterated separating conjunction *)
 Fixpoint bigstar A (P : nat -> A -> hprop) (ls : list A) : hprop :=
   match ls with
   | nil => emp

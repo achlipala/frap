@@ -430,13 +430,18 @@ Module Make(Import S : SEP).
     normalize; repeat cancel1; repeat match goal with
                                       | [ H : _ /\ _ |- _ ] => destruct H
                                       | [ |- _ /\ _ ] => split
-                                      end; eassumption.
+                                      end; eassumption || apply I.
 
-  Ltac cancel := hide_evars; normalize; repeat cancel1; restore_evars;
-                 repeat match goal with
-                        | [ H : True |- _ ] => clear H
-                        | [ H : ?P, H' : ?P |- _ ] => clear H'
-                        end;
+  Ltac beautify := repeat match goal with
+                          | [ H : True |- _ ] => clear H
+                          | [ H : ?P, H' : ?P |- _ ] =>
+                            match type of P with
+                            | Prop => clear H'
+                            end
+                          | [ H : _ /\ _ |- _ ] => destruct H
+                          end.
+
+  Ltac cancel := hide_evars; normalize; repeat cancel1; restore_evars; beautify;
                  try match goal with
                      | [ |- _ ===> ?p * ?q ] =>
                        ((is_evar p; fail 1) || apply star_cancel'')
@@ -478,9 +483,5 @@ Module Make(Import S : SEP).
                                                basic_cancel
                                              end)
                      | [ |- _ ===> _ ] => intuition (try congruence)
-                     end; intuition idtac;
-                 repeat match goal with
-                        | [ H : True |- _ ] => clear H
-                        | [ H : ?P, H' : ?P |- _ ] => clear H'
-                        end.
+                     end; intuition idtac; beautify.
 End Make.

@@ -28,3 +28,5 @@ SepCancel.v
 SeparationLogic_template.v
 SeparationLogic.v
 SharedMemory.v
+ConcurrentSeparationLogic_template.v
+ConcurrentSeparationLogic.v

@@ -329,9 +329,10 @@ Module Make(Import S : SEP).
   Ltac cancel1 :=
     match goal with
       | [ |- ?p ===> ?q ] =>
-        forAllAtoms p ltac:(fun p0 =>
+        (is_var q; fail 2)
+        || forAllAtoms p ltac:(fun p0 =>
           (let H := fresh in assert (H : try_me_first p0) by eauto; clear H);
-          sendToBack p0;
+                                 sendToBack p0;
           forAllAtoms q ltac:(fun q0 =>
             (let H := fresh in assert (H : try_me_first q0) by eauto; clear H);
             sendToBack q0;
@@ -345,7 +346,8 @@ Module Make(Import S : SEP).
         | _ => apply himp_refl
         end
       | [ |- ?p ===> ?q ] =>
-        forAllAtoms p ltac:(fun p0 =>
+        (is_var q; fail 2)
+        || forAllAtoms p ltac:(fun p0 =>
           sendToBack p0;
           forAllAtoms q ltac:(fun q0 =>
             sendToBack q0;
@@ -359,7 +361,7 @@ Module Make(Import S : SEP).
            | [ |- _ ===> ?Q ] => is_evar Q; set Q
            | [ |- context[star ?P _] ] => is_evar P; set P
            | [ |- context[star _ ?Q] ] => is_evar Q; set Q
-           | [ |- _ ===> (exists v, _ * ?R v) ] => is_evar R; set R
+           | [ |- _ ===> exists v, _ * ?R v ] => is_evar R; set R
            end.
 
   Ltac restore_evars :=
@@ -425,11 +427,15 @@ Module Make(Import S : SEP).
         quantifyOverThem vars P k).
 
   Ltac basic_cancel :=
-    normalize; repeat cancel1; intuition eassumption.
+    normalize; repeat cancel1; repeat match goal with
+                                      | [ H : _ /\ _ |- _ ] => destruct H
+                                      | [ |- _ /\ _ ] => split
+                                      end; eassumption.
 
   Ltac cancel := hide_evars; normalize; repeat cancel1; restore_evars;
                  repeat match goal with
                         | [ H : True |- _ ] => clear H
+                        | [ H : ?P, H' : ?P |- _ ] => clear H'
                         end;
                  try match goal with
                      | [ |- _ ===> ?p * ?q ] =>
@@ -472,5 +478,9 @@ Module Make(Import S : SEP).
                                                basic_cancel
                                              end)
                      | [ |- _ ===> _ ] => intuition (try congruence)
-                     end; intuition idtac.
+                     end; intuition idtac;
+                 repeat match goal with
+                        | [ H : True |- _ ] => clear H
+                        | [ H : ?P, H' : ?P |- _ ] => clear H'
+                        end.
 End Make.

@@ -662,12 +662,12 @@ Proof.
   fork (emp%sep) (emp%sep); ht.
 
   loop_inv (fun o => [| isEven (valueOf o) = true |]%sep).
-  erewrite (linkedList_nonnull _ f).
+  match goal with
+  | [ H : r = 0 -> False |- _ ] => erewrite (linkedList_nonnull _ H)
+  end.
   cancel.
   simp.
-  rewrite e, e0.
-  simp.
-  simp.
+  apply andb_true_iff; propositional.
   cancel.
   cancel.
   cancel.
@@ -768,12 +768,12 @@ Proof.
   fork (emp%sep) (emp%sep); ht.
 
   loop_inv (fun o => [| isEven (valueOf o) = true |]%sep).
-  erewrite (linkedList_nonnull _ f).
+  match goal with
+  | [ H : r = 0 -> False |- _ ] => erewrite (linkedList_nonnull _ H)
+  end.
   cancel.
   simp.
-  rewrite e, e0.
-  simp.
-  simp.
+  apply andb_true_iff; propositional.
   cancel.
   cancel.
   cancel.
@@ -1314,7 +1314,7 @@ Proof.
 Qed.
 
 Lemma guarded_impl : forall P Q p,
-    P <-> Q
+    (P <-> Q)
     -> (P ===> p) ===> (Q ===> p).
 Proof.
   simp.
@@ -1333,7 +1333,7 @@ Lemma lockChunks_lock' : forall l I linvs (f : nat -> nat) a,
 Proof.
   induct linvs; simplify.
 
-  cases a; simplify; equality.
+  cases a; simplify; try unfold error in *; equality.
 
   cases a0; simplify.
   invert H0.
@@ -1376,7 +1376,7 @@ Lemma lockChunks_unlock' : forall l I linvs (f : nat -> nat) a,
 Proof.
   induct linvs; simplify.
 
-  cases a; simplify; equality.
+  cases a; simplify; try unfold error in *; equality.
 
   cases a0; simplify.
   invert H0.
@@ -1645,8 +1645,10 @@ Proof.
   simp.
   cases (notAboutToFail c0); auto.
   eapply hoare_triple_notAboutToFail in Heq; eauto.
-  apply use_himp with (Q := [| False |]%sep) in H3.
-  invert H3; propositional.
+  assert ([| False |]%sep f).
+  apply use_himp with (x * lockChunks s linvs)%sep.
   rewrite Heq.
-  cancel.
+  apply False_star.
+  assumption.
+  invert H2; propositional.
 Qed.

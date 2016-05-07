@@ -110,10 +110,6 @@ Inductive lstep : proc -> label -> proc -> Prop :=
 | LStepNewInside : forall chs k l k',
     (forall ch, ~List.In ch chs -> lstep (k ch) l (k' ch))
     -> lstep (NewChannel chs k) l (NewChannel chs k')
-| LStepNewUp1 : forall chs k pr,
-    lstep (Par (NewChannel chs k) pr) Silent (NewChannel chs (fun ch => Par (k ch) pr))
-| LStepNewUp2 : forall chs k pr,
-    lstep (Par pr (NewChannel chs k)) Silent (NewChannel chs (fun ch => Par pr (k ch)))
 | LStepPar1 : forall pr1 pr2 l pr1',
     lstep pr1 l pr1'
     -> lstep (Par pr1 pr2) l (Par pr1' pr2)
@@ -141,15 +137,27 @@ Inductive couldGenerate : proc -> list action -> Prop :=
     -> couldGenerate pr' tr
     -> couldGenerate pr (a :: tr).
 
+Definition lstepSilent (pr1 pr2 : proc) := lstep pr1 Silent pr2.
+
+Definition simulates (R : proc -> proc -> Prop) (pr1 pr2 : proc) :=
+  (forall pr1 pr2, R pr1 pr2
+                   -> forall pr1', lstepSilent pr1 pr1'
+                                   -> exists pr2', lstepSilent^* pr2 pr2'
+                                                   /\ R pr1' pr2')
+  /\ (forall pr1 pr2, R pr1 pr2
+                      -> forall a pr1', lstep pr1 (Action a) pr1'
+                                        -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                              /\ lstep pr2' (Action a) pr2''
+                                                              /\ R pr1' pr2'')
+  /\ R pr1 pr2.
+
 Definition refines (pr1 pr2 : proc) :=
-  forall tr, couldGenerate pr1 tr -> couldGenerate pr2 tr.
+  exists R, simulates R pr1 pr2.
 
 Infix "<|" := refines (no associativity, at level 70).
 
 
 (** * Simulation: a proof method *)
-
-Definition lstepSilent (pr1 pr2 : proc) := lstep pr1 Silent pr2.
 
 Hint Constructors couldGenerate.
 
@@ -163,7 +171,7 @@ Qed.
 
 Hint Resolve lstepSilent_couldGenerate.
 
-Lemma simulates' : forall (R : proc -> proc -> Prop),
+Lemma simulates_couldGenerate' : forall (R : proc -> proc -> Prop),
     (forall pr1 pr2, R pr1 pr2
                      -> forall pr1', lstepSilent pr1 pr1'
                                      -> exists pr2', lstepSilent^* pr2 pr2'
@@ -177,7 +185,6 @@ Lemma simulates' : forall (R : proc -> proc -> Prop),
                       -> forall pr2, R pr1 pr2
                                      -> couldGenerate pr2 tr.
 Proof.
-  unfold refines.
   induct 3; simplify; auto.
 
   eapply H in H1; eauto.
@@ -189,59 +196,15 @@ Proof.
   eauto.
 Qed.
 
-Theorem simulates : forall (R : proc -> proc -> Prop),
-    (forall pr1 pr2, R pr1 pr2
-                     -> forall pr1', lstepSilent pr1 pr1'
-                                     -> exists pr2', lstepSilent^* pr2 pr2'
-                                                     /\ R pr1' pr2')
-    -> (forall pr1 pr2, R pr1 pr2
-                        -> forall a pr1', lstep pr1 (Action a) pr1'
-                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
-                                                                /\ lstep pr2' (Action a) pr2''
-                                                                /\ R pr1' pr2'')
-    -> forall pr1 pr2, R pr1 pr2
-                       -> pr1 <| pr2.
+Theorem simulates_couldGenerate : forall pr1 pr2, pr1 <| pr2
+    -> forall tr, couldGenerate pr1 tr
+                  -> couldGenerate pr2 tr.
 Proof.
-  unfold refines; eauto using simulates'.
+  unfold refines; first_order; eauto using simulates_couldGenerate'.
 Qed.
 
-Definition simple_addN_once (k : nat) (input output : channel) : proc :=
-  ??input(n : nat);
-  !!output(n + k);
-  Done.
 
-Definition add2_once (input output : channel) : proc :=
-  New[input;output](intermediate);
-  (simple_addN_once 1 input intermediate
-   || simple_addN_once 1 intermediate output).
-
-Inductive R_add2 (input output : channel) : proc -> proc -> Prop :=
-| Initial : forall k,
-    (forall ch, ~List.In ch [input; output]
-                -> k ch = ??input(n : nat); !!ch(n + 1); Done || simple_addN_once 1 ch output)
-    -> R_add2 input output
-           (NewChannel [input;output] k)
-           (simple_addN_once 2 input output)
-| GotInput : forall n k,
-    (forall ch, ~List.In ch [input; output]
-                -> k ch = !!ch(n + 1); Done || simple_addN_once 1 ch output)
-    -> R_add2 input output
-              (NewChannel [input;output] k)
-              (!!output(n + 2); Done)
-| HandedOff : forall n k,
-    (forall ch, ~List.In ch [input; output]
-                -> k ch = Done || (!!output(n + 2); Done))
-    -> R_add2 input output
-              (NewChannel [input;output] k)
-              (!!output(n + 2); Done)
-| Finished : forall k,
-    (forall ch, ~List.In ch [input; output]
-                -> k ch = Done || Done)
-    -> R_add2 input output
-              (NewChannel [input;output] k)
-              Done.
-
-Hint Constructors R_add2.
+(** * Tactics for automating refinement proofs *)
 
 Lemma invert_Recv : forall ch (A : Set) (k : A -> proc) (x : A) pr,
     lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
@@ -254,8 +217,6 @@ Ltac inverter :=
   repeat match goal with
          | [ H : lstep _ _ _ |- _ ] => (apply invert_Recv in H; try subst) || invert H
          | [ H : lstepSilent _ _ |- _ ] => invert H
-         (*| [ H : forall ch : channel, lstep _ _ _ |- _ ] =>
-           eapply anystep_somestep with (1 := 0); [ apply H | clear H; simplify ]*)
          end.
 
 Hint Constructors lstep.
@@ -335,29 +296,203 @@ Ltac inferRead :=
       first_order; subst
   end.
 
-Theorem add2_once_refines_simple_addN_once : forall input output,
-    add2_once input output <| simple_addN_once 2 input output.
+
+(** * Examples *)
+
+Module Example1.
+  Definition simple_addN_once (k : nat) (input output : channel) : proc :=
+    ??input(n : nat);
+    !!output(n + k);
+    Done.
+
+  Definition add2_once (input output : channel) : proc :=
+    New[input;output](intermediate);
+    (simple_addN_once 1 input intermediate
+     || simple_addN_once 1 intermediate output).
+
+  Inductive R_add2 (input output : channel) : proc -> proc -> Prop :=
+  | Initial : forall k,
+      (forall ch, ~List.In ch [input; output]
+                  -> k ch = ??input(n : nat); !!ch(n + 1); Done || simple_addN_once 1 ch output)
+      -> R_add2 input output
+             (NewChannel [input;output] k)
+             (simple_addN_once 2 input output)
+  | GotInput : forall n k,
+      (forall ch, ~List.In ch [input; output]
+                  -> k ch = !!ch(n + 1); Done || simple_addN_once 1 ch output)
+      -> R_add2 input output
+                (NewChannel [input;output] k)
+                (!!output(n + 2); Done)
+  | HandedOff : forall n k,
+      (forall ch, ~List.In ch [input; output]
+                  -> k ch = Done || (!!output(n + 2); Done))
+      -> R_add2 input output
+                (NewChannel [input;output] k)
+                (!!output(n + 2); Done)
+  | Finished : forall k,
+      (forall ch, ~List.In ch [input; output]
+                  -> k ch = Done || Done)
+      -> R_add2 input output
+                (NewChannel [input;output] k)
+                Done.
+
+  Hint Constructors R_add2.
+
+  Theorem add2_once_refines_simple_addN_once : forall input output,
+      add2_once input output <| simple_addN_once 2 input output.
+  Proof.
+    simplify.
+    exists (R_add2 input output).
+    unfold simulates; propositional.
+
+    invert H; simplify; inverter.
+    impossible.
+    inferProc.
+    replace (n + 1 + 1) with (n + 2) in * by linear_arithmetic.
+    eauto.
+    impossible.
+    impossible.
+
+    invert H; simplify; inverter.
+    inferRead.
+    inferProc.
+    unfold simple_addN_once; eauto 10.
+    impossible.
+    inferAction.
+    inferProc.
+    eauto 10.
+    impossible.
+
+    unfold add2_once; eauto.
+  Qed.
+End Example1.
+
+
+(** * Compositional reasoning principles *)
+
+(** ** Dup *)
+
+Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
+| RDupLeaf : forall pr1 pr2,
+    R pr1 pr2 
+    -> RDup R pr1 pr2
+| RDupDup : forall pr1 pr2,
+    RDup R pr1 pr2
+    -> RDup R (Dup pr1) (Dup pr2)
+| RDupPar : forall pr1 pr2 pr1' pr2',
+    RDup R pr1 pr1'
+    -> RDup R pr2 pr2'
+    -> RDup R (Par pr1 pr2) (Par pr1' pr2').
+
+Hint Constructors RDup.
+
+Hint Unfold lstepSilent.
+
+Lemma lstepSilent_Par1 : forall pr1 pr1' pr2,
+    lstepSilent^* pr1 pr1'
+    -> lstepSilent^* (Par pr1 pr2) (Par pr1' pr2).
 Proof.
-  simplify.
-  apply simulates with (R := R_add2 input output).
+  induct 1; eauto.
+Qed.
 
-  invert 1; simplify; inverter.
-  impossible.
-  inferProc.
-  replace (n + 1 + 1) with (n + 2) in * by linear_arithmetic.
-  eauto.
-  impossible.
-  impossible.
+Lemma lstepSilent_Par2 : forall pr2 pr2' pr1,
+    lstepSilent^* pr2 pr2'
+    -> lstepSilent^* (Par pr1 pr2) (Par pr1 pr2').
+Proof.
+  induct 1; eauto.
+Qed.
 
-  invert 1; simplify; inverter.
-  inferRead.
-  inferProc.
-  unfold simple_addN_once; eauto 10.
-  impossible.
-  inferAction.
-  inferProc.
+Hint Resolve lstepSilent_Par1 lstepSilent_Par2.
+
+Lemma refines_Dup_Action : forall R : _ -> _ -> Prop,
+    (forall pr1 pr2, R pr1 pr2
+                     -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                     -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                           /\ lstep pr2' (Action a) pr2''
+                                                           /\ R pr1' pr2'')
+    -> forall pr1 pr2, RDup R pr1 pr2
+                       -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                       -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                             /\ lstep pr2' (Action a) pr2''
+                                                             /\ RDup R pr1' pr2''.
+Proof.
+  induct 2; simplify.
+
+  eapply H in H1; eauto.
+  first_order.
+  eauto 6.
+
+  invert H1.
+
+  invert H0.
+  apply IHRDup1 in H5.
+  first_order.
   eauto 10.
-  impossible.
+  apply IHRDup2 in H5.
+  first_order.
+  eauto 10.
+Qed.
 
-  unfold add2_once; eauto.
+Lemma refines_Dup_Silent : forall R : _ -> _ -> Prop,
+    (forall pr1 pr2, R pr1 pr2
+                     -> forall pr1', lstepSilent pr1 pr1'
+                                     -> exists pr2', lstepSilent^* pr2 pr2'
+                                                     /\ R pr1' pr2')
+    -> (forall pr1 pr2, R pr1 pr2
+                        -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R pr1' pr2'')
+    -> forall pr1 pr2, RDup R pr1 pr2
+                       -> forall pr1', lstepSilent pr1 pr1'
+                                       -> exists pr2', lstepSilent^* pr2 pr2' /\ RDup R pr1' pr2'.
+Proof.
+  induct 3; simplify.
+
+  eapply H in H1; eauto.
+  first_order.
+  eauto.
+
+  invert H2.
+  eauto 10.
+
+  invert H1.
+  apply IHRDup1 in H6.
+  first_order.
+  eauto.
+  apply IHRDup2 in H6.
+  first_order.
+  eauto.
+  eapply refines_Dup_Action in H4; eauto.
+  eapply refines_Dup_Action in H5; eauto.
+  first_order.
+  eexists; propositional.
+  apply trc_trans with (x1 || pr2').
+  eauto.
+  apply trc_trans with (x1 || x).
+  eauto.
+  apply trc_one.
+  eauto.
+  eauto.
+  eapply refines_Dup_Action in H4; eauto.
+  eapply refines_Dup_Action in H5; eauto.
+  first_order.
+  eexists; propositional.
+  apply trc_trans with (x1 || pr2').
+  eauto.
+  apply trc_trans with (x1 || x).
+  eauto.
+  apply trc_one.
+  eauto.
+  eauto.
+Qed.
+
+Theorem refines_Dup : forall pr1 pr2,
+    pr1 <| pr2
+    -> Dup pr1 <| Dup pr2.
+Proof.
+  invert 1.
+  exists (RDup x).
+  unfold simulates in *.
+  propositional; eauto using refines_Dup_Silent, refines_Dup_Action.
 Qed.

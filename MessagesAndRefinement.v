@@ -3,42 +3,79 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap.
+Require Import Frap Eqdep FunctionalExtensionality.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+Ltac invert H := (Frap.invert H || (inversion H; clear H));
+                repeat match goal with
+                       | [ x : _ |- _ ] => subst x
+                       | [ H : existT _ _ _ = existT _ _ _ |- _ ] => apply inj_pair2 in H; try subst
+                       end.
 
-Notation channel := nat.
+
+Notation channel := nat (only parsing).
 
 Inductive proc :=
-| NewChannel (k : channel -> proc)
+| NewChannel (notThese : list channel) (k : channel -> proc)
 | Send (ch : channel) {A : Set} (v : A) (k : proc)
 | Recv (ch : channel) {A : Set} (k : A -> proc)
 | Par (pr1 pr2 : proc)
-| Dup (pr : proc).
+| Dup (pr : proc)
+| Done
+| Fail.
 
-Notation pid := nat.
+Notation pid := nat (only parsing).
 Notation procs := (fmap pid proc).
 Notation channels := (set channel).
 
-Inductive step : channels * procs -> channels * procs -> Prop :=
+Notation "'New' ls ( x ) ; k" := (NewChannel ls (fun x => k)) (right associativity, at level 45, ls at level 0).
+Notation "!! ch ( v ) ; k" := (Send ch v k) (right associativity, at level 45, ch at level 0).
+Notation "?? ch ( x : T ) ; k" := (Recv ch (fun x : T => k)) (right associativity, at level 45, ch at level 0, x at level 0).
+Infix "||" := Par.
+
+
+(** * Example *)
+
+Definition simple_addN (k : nat) (input output : channel) : proc :=
+  Dup (??input(n : nat);
+       !!output(n + k);
+       Done).
+
+Definition add2 (input output : channel) : proc :=
+  New[input;output](intermediate);
+  (simple_addN 1 input intermediate
+   || simple_addN 1 intermediate output).
+
+Definition tester (k n : nat) (input output : channel) : proc :=
+  !!input(n);
+  ??output(n' : nat);
+  if n' ==n (n + k) then
+    Done
+  else
+    Fail.
+
+
+(** * Flat semantics *)
+
+Inductive step : procs -> procs -> Prop :=
 | StepNew : forall chs ps i k ch,
-    ps $? i = Some (NewChannel k)
-    -> ~ch \in chs
-    -> step (chs, ps) (chs \cup {ch}, ps $+ (i, k ch))
-| StepSendRecv : forall chs ps i ch {A : Set} (v : A) k1 j k2,
+    ps $? i = Some (NewChannel chs k)
+    -> ~List.In ch chs
+    -> step ps (ps $+ (i, k ch))
+| StepSendRecv : forall ps i ch {A : Set} (v : A) k1 j k2,
     ps $? i = Some (Send ch v k1)
     -> ps $? j = Some (Recv ch k2)
-    -> step (chs, ps) (chs, ps $+ (i, k1) $+ (j, k2 v))
-| StepPar : forall chs ps i pr1 pr2 j,
+    -> step ps (ps $+ (i, k1) $+ (j, k2 v))
+| StepPar : forall ps i pr1 pr2 j,
     ps $? i = Some (Par pr1 pr2)
     -> ps $? j = None
-    -> step (chs, ps) (chs, ps $+ (i, pr1) $+ (j, pr2))
-| StepDup : forall chs ps i pr j,
+    -> step ps (ps $+ (i, pr1) $+ (j, pr2))
+| StepDup : forall ps i pr j,
     ps $? i = Some (Dup pr)
     -> ps $? j = None
-    -> step (chs, ps) (chs, ps $+ (i, Dup pr) $+ (j, pr)).
+    -> step ps (ps $+ (i, Dup pr) $+ (j, pr)).
 
 
 (** * Labeled semantics *)
@@ -70,9 +107,13 @@ Inductive lstep : proc -> label -> proc -> Prop :=
           (k v)
 | LStepDup : forall pr,
     lstep (Dup pr) Silent (Par (Dup pr) pr)
-| LStepNew : forall k l k',
-    (forall ch, lstep (k ch) l (k' ch))
-    -> lstep (NewChannel k) l (NewChannel k')
+| LStepNewInside : forall chs k l k',
+    (forall ch, ~List.In ch chs -> lstep (k ch) l (k' ch))
+    -> lstep (NewChannel chs k) l (NewChannel chs k')
+| LStepNewUp1 : forall chs k pr,
+    lstep (Par (NewChannel chs k) pr) Silent (NewChannel chs (fun ch => Par (k ch) pr))
+| LStepNewUp2 : forall chs k pr,
+    lstep (Par pr (NewChannel chs k)) Silent (NewChannel chs (fun ch => Par pr (k ch)))
 | LStepPar1 : forall pr1 pr2 l pr1',
     lstep pr1 l pr1'
     -> lstep (Par pr1 pr2) l (Par pr1' pr2)
@@ -102,3 +143,221 @@ Inductive couldGenerate : proc -> list action -> Prop :=
 
 Definition refines (pr1 pr2 : proc) :=
   forall tr, couldGenerate pr1 tr -> couldGenerate pr2 tr.
+
+Infix "<|" := refines (no associativity, at level 70).
+
+
+(** * Simulation: a proof method *)
+
+Definition lstepSilent (pr1 pr2 : proc) := lstep pr1 Silent pr2.
+
+Hint Constructors couldGenerate.
+
+Lemma lstepSilent_couldGenerate : forall pr1 pr2,
+  lstepSilent^* pr1 pr2
+  -> forall tr, couldGenerate pr2 tr
+                -> couldGenerate pr1 tr.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Resolve lstepSilent_couldGenerate.
+
+Lemma simulates' : forall (R : proc -> proc -> Prop),
+    (forall pr1 pr2, R pr1 pr2
+                     -> forall pr1', lstepSilent pr1 pr1'
+                                     -> exists pr2', lstepSilent^* pr2 pr2'
+                                                     /\ R pr1' pr2')
+    -> (forall pr1 pr2, R pr1 pr2
+                        -> forall a pr1', lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R pr1' pr2'')
+    -> forall pr1 tr, couldGenerate pr1 tr
+                      -> forall pr2, R pr1 pr2
+                                     -> couldGenerate pr2 tr.
+Proof.
+  unfold refines.
+  induct 3; simplify; auto.
+
+  eapply H in H1; eauto.
+  first_order.
+  eauto.
+
+  eapply H0 in H1; eauto.
+  first_order.
+  eauto.
+Qed.
+
+Theorem simulates : forall (R : proc -> proc -> Prop),
+    (forall pr1 pr2, R pr1 pr2
+                     -> forall pr1', lstepSilent pr1 pr1'
+                                     -> exists pr2', lstepSilent^* pr2 pr2'
+                                                     /\ R pr1' pr2')
+    -> (forall pr1 pr2, R pr1 pr2
+                        -> forall a pr1', lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R pr1' pr2'')
+    -> forall pr1 pr2, R pr1 pr2
+                       -> pr1 <| pr2.
+Proof.
+  unfold refines; eauto using simulates'.
+Qed.
+
+Definition simple_addN_once (k : nat) (input output : channel) : proc :=
+  ??input(n : nat);
+  !!output(n + k);
+  Done.
+
+Definition add2_once (input output : channel) : proc :=
+  New[input;output](intermediate);
+  (simple_addN_once 1 input intermediate
+   || simple_addN_once 1 intermediate output).
+
+Inductive R_add2 (input output : channel) : proc -> proc -> Prop :=
+| Initial : forall k,
+    (forall ch, ~List.In ch [input; output]
+                -> k ch = ??input(n : nat); !!ch(n + 1); Done || simple_addN_once 1 ch output)
+    -> R_add2 input output
+           (NewChannel [input;output] k)
+           (simple_addN_once 2 input output)
+| GotInput : forall n k,
+    (forall ch, ~List.In ch [input; output]
+                -> k ch = !!ch(n + 1); Done || simple_addN_once 1 ch output)
+    -> R_add2 input output
+              (NewChannel [input;output] k)
+              (!!output(n + 2); Done)
+| HandedOff : forall n k,
+    (forall ch, ~List.In ch [input; output]
+                -> k ch = Done || (!!output(n + 2); Done))
+    -> R_add2 input output
+              (NewChannel [input;output] k)
+              (!!output(n + 2); Done)
+| Finished : forall k,
+    (forall ch, ~List.In ch [input; output]
+                -> k ch = Done || Done)
+    -> R_add2 input output
+              (NewChannel [input;output] k)
+              Done.
+
+Hint Constructors R_add2.
+
+Lemma invert_Recv : forall ch (A : Set) (k : A -> proc) (x : A) pr,
+    lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
+    -> pr = k x.
+Proof.
+  invert 1; auto.
+Qed.
+
+Ltac inverter :=
+  repeat match goal with
+         | [ H : lstep _ _ _ |- _ ] => (apply invert_Recv in H; try subst) || invert H
+         | [ H : lstepSilent _ _ |- _ ] => invert H
+         (*| [ H : forall ch : channel, lstep _ _ _ |- _ ] =>
+           eapply anystep_somestep with (1 := 0); [ apply H | clear H; simplify ]*)
+         end.
+
+Hint Constructors lstep.
+
+Definition In' := In.
+Theorem In'_eq : In' = In.
+Proof.
+  auto.
+Qed.
+
+Opaque In.
+
+Ltac instWith n := 
+  match goal with
+  | [ H0 : forall ch, ~In ch ?ls -> _, H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
+    let Hni := fresh "Hni" in let Hni' := fresh "Hni'" in
+    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
+    assert (Hni' : ~In (S n) ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
+      generalize (H0 _ Hni), (H _ Hni), (H0 _ Hni'), (H _ Hni'); simplify;
+      repeat match goal with
+             | [ H : ?k _ = _, H' : lstep (?k _) _ _ |- _ ] => rewrite H in H'
+             end; inverter; try linear_arithmetic
+  | [ H0 : forall ch, ~In ch ?ls -> _, H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
+    let Hni := fresh "Hni" in
+    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
+      generalize (H0 _ Hni), (H _ Hni); simplify;
+      repeat match goal with
+             | [ H : ?k _ = _, H' : lstep (?k _) _ _ |- _ ] => rewrite H in H'
+             end; inverter
+  | [ H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
+    let Hni := fresh "Hni" in
+    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
+      generalize (H _ Hni); simplify; inverter
+  end.
+
+Ltac impossible := 
+  match goal with
+  | [ H : forall ch, ~In ch ?ls -> _ |- _ ] =>
+    instWith (S (fold_left max ls 0))
+  end.
+
+Ltac inferAction :=
+  match goal with
+  | [ H : forall ch, ~In ch ?ls -> lstep _ (Action ?a) _ |- _ ] =>
+    let av := fresh "av" in
+    evar (av : action);
+    let av' := eval unfold av in av in
+    clear av;
+    assert (a = av'); [ instWith (S (fold_left max ls 0));
+                        match goal with
+                        | [ |- ?X = _ ] => instantiate (1 := X)
+                        end; reflexivity | subst ]
+  end.
+
+Ltac inferProc :=
+  match goal with
+  | [ H : forall ch, ~In ch ?ls -> lstep _ _ (?k' ch) |- _ ] =>
+    let k'' := fresh "k''" in
+    evar (k'' : channel -> proc);
+    let k''' := eval unfold k'' in k'' in
+    clear k'';
+    assert (forall ch, ~In ch ls
+                       -> k' ch = k''' ch);
+    [ intro ch; simplify; instWith ch; simplify; inverter;
+      (reflexivity || rewrite <- In'_eq in *; simplify; propositional) | subst; simplify ]
+  end.
+
+Ltac inferRead :=
+  match goal with
+  | [ _ : forall ch, ~In ch ?ls -> lstep _ (Action ?a) _ |- _ ] =>
+    let ch0 := fresh "ch0" in
+    evar (ch0 : channel);
+    let ch0' := eval unfold ch0 in ch0 in
+    clear ch0;
+    assert (exists v : nat, a = Input {| Channel := ch0'; Value := v |})
+           by (instWith (S (fold_left max ls 0)); eauto);
+      first_order; subst
+  end.
+
+Theorem add2_once_refines_simple_addN_once : forall input output,
+    add2_once input output <| simple_addN_once 2 input output.
+Proof.
+  simplify.
+  apply simulates with (R := R_add2 input output).
+
+  invert 1; simplify; inverter.
+  impossible.
+  inferProc.
+  replace (n + 1 + 1) with (n + 2) in * by linear_arithmetic.
+  eauto.
+  impossible.
+  impossible.
+
+  invert 1; simplify; inverter.
+  inferRead.
+  inferProc.
+  unfold simple_addN_once; eauto 10.
+  impossible.
+  inferAction.
+  inferProc.
+  eauto 10.
+  impossible.
+
+  unfold add2_once; eauto.
+Qed.

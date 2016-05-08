@@ -23,14 +23,13 @@ Inductive proc :=
 | Recv (ch : channel) {A : Set} (k : A -> proc)
 | Par (pr1 pr2 : proc)
 | Dup (pr : proc)
-| Done
-| Fail.
+| Done.
 
 Notation pid := nat (only parsing).
 Notation procs := (fmap pid proc).
 Notation channels := (set channel).
 
-Notation "'New' ls ( x ) ; k" := (NewChannel ls (fun x => k)) (right associativity, at level 45, ls at level 0).
+Notation "'New' ls ( x ) ; k" := (NewChannel ls (fun x => k)) (right associativity, at level 51, ls at level 0).
 Notation "!! ch ( v ) ; k" := (Send ch v k) (right associativity, at level 45, ch at level 0).
 Notation "?? ch ( x : T ) ; k" := (Recv ch (fun x : T => k)) (right associativity, at level 45, ch at level 0, x at level 0).
 Infix "||" := Par.
@@ -38,23 +37,25 @@ Infix "||" := Par.
 
 (** * Example *)
 
-Definition simple_addN (k : nat) (input output : channel) : proc :=
-  Dup (??input(n : nat);
-       !!output(n + k);
-       Done).
+Definition addN (k : nat) (input output : channel) : proc :=
+  ??input(n : nat);
+  !!output(n + k);
+  Done.
+
+Definition addNs (k : nat) (input output : channel) : proc :=
+  Dup (addN k input output).
 
 Definition add2 (input output : channel) : proc :=
-  New[input;output](intermediate);
-  (simple_addN 1 input intermediate
-   || simple_addN 1 intermediate output).
+  Dup (New[input;output](intermediate);
+        addN 1 input intermediate
+        || addN 1 intermediate output).
 
-Definition tester (k n : nat) (input output : channel) : proc :=
-  !!input(n);
-  ??output(n' : nat);
-  if n' ==n (n + k) then
-    Done
-  else
-    Fail.
+Definition tester (metaInput input output metaOutput : channel) : proc :=
+  ??metaInput(n : nat);
+  !!input(n * 2);
+  ??output(r : nat);
+  !!metaOutput(r);
+  Done.
 
 
 (** * Flat semantics *)
@@ -300,26 +301,21 @@ Ltac inferRead :=
 (** * Examples *)
 
 Module Example1.
-  Definition simple_addN_once (k : nat) (input output : channel) : proc :=
-    ??input(n : nat);
-    !!output(n + k);
-    Done.
-
   Definition add2_once (input output : channel) : proc :=
     New[input;output](intermediate);
-    (simple_addN_once 1 input intermediate
-     || simple_addN_once 1 intermediate output).
+    (addN 1 input intermediate
+     || addN 1 intermediate output).
 
   Inductive R_add2 (input output : channel) : proc -> proc -> Prop :=
   | Initial : forall k,
       (forall ch, ~List.In ch [input; output]
-                  -> k ch = ??input(n : nat); !!ch(n + 1); Done || simple_addN_once 1 ch output)
+                  -> k ch = ??input(n : nat); !!ch(n + 1); Done || addN 1 ch output)
       -> R_add2 input output
              (NewChannel [input;output] k)
-             (simple_addN_once 2 input output)
+             (addN 2 input output)
   | GotInput : forall n k,
       (forall ch, ~List.In ch [input; output]
-                  -> k ch = !!ch(n + 1); Done || simple_addN_once 1 ch output)
+                  -> k ch = !!ch(n + 1); Done || addN 1 ch output)
       -> R_add2 input output
                 (NewChannel [input;output] k)
                 (!!output(n + 2); Done)
@@ -338,8 +334,8 @@ Module Example1.
 
   Hint Constructors R_add2.
 
-  Theorem add2_once_refines_simple_addN_once : forall input output,
-      add2_once input output <| simple_addN_once 2 input output.
+  Theorem add2_once_refines_addN : forall input output,
+      add2_once input output <| addN 2 input output.
   Proof.
     simplify.
     exists (R_add2 input output).
@@ -356,7 +352,7 @@ Module Example1.
     invert H; simplify; inverter.
     inferRead.
     inferProc.
-    unfold simple_addN_once; eauto 10.
+    unfold addN; eauto 10.
     impossible.
     inferAction.
     inferProc.
@@ -369,6 +365,14 @@ End Example1.
 
 
 (** * Compositional reasoning principles *)
+
+Theorem refines_refl : forall pr,
+    pr <| pr.
+Proof.
+  simplify.
+  exists (fun pr1 pr2 => pr1 = pr2).
+  first_order; subst; eauto.
+Qed.
 
 (** ** Dup *)
 
@@ -598,4 +602,25 @@ Proof.
   exists (RPar x x0).
   unfold simulates in *.
   propositional; eauto using refines_Par_Silent, refines_Par_Action.
+Qed.
+
+
+(** * Example again *)
+
+Theorem refines_add2 : forall input output,
+    add2 input output <| addNs 2 input output.
+Proof.
+  simplify.
+  apply refines_Dup.
+  apply Example1.add2_once_refines_addN.
+Qed.
+
+Theorem refines_add2_with_tester : forall metaInput input output metaOutput,
+    add2 input output || tester metaInput input output metaOutput
+         <| addNs 2 input output || tester metaInput input output metaOutput.
+Proof.
+  simplify.
+  apply refines_Par.
+  apply refines_add2.
+  apply refines_refl.
 Qed.

@@ -374,7 +374,7 @@ End Example1.
 
 Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
 | RDupLeaf : forall pr1 pr2,
-    R pr1 pr2 
+    R pr1 pr2
     -> RDup R pr1 pr2
 | RDupDup : forall pr1 pr2,
     RDup R pr1 pr2
@@ -495,4 +495,107 @@ Proof.
   exists (RDup x).
   unfold simulates in *.
   propositional; eauto using refines_Dup_Silent, refines_Dup_Action.
+Qed.
+
+(** ** Par *)
+
+Inductive RPar (R1 R2 : proc -> proc -> Prop) : proc -> proc -> Prop :=
+| RPar1 : forall pr1 pr2 pr1' pr2',
+    R1 pr1 pr1'
+    -> R2 pr2 pr2'
+    -> RPar R1 R2 (pr1 || pr2) (pr1' || pr2').
+
+Hint Constructors RPar.
+
+Lemma refines_Par_Action : forall R1 R2 : _ -> _ -> Prop,
+    (forall pr1 pr2, R1 pr1 pr2
+                     -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                     -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                           /\ lstep pr2' (Action a) pr2''
+                                                           /\ R1 pr1' pr2'')
+    -> (forall pr1 pr2, R2 pr1 pr2
+                        -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R2 pr1' pr2'')
+    -> forall pr1 pr2, RPar R1 R2 pr1 pr2
+                       -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                       -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                             /\ lstep pr2' (Action a) pr2''
+                                                             /\ RPar R1 R2 pr1' pr2''.
+Proof.
+  invert 3; simplify.
+
+  invert H1.
+  eapply H in H8; eauto.
+  first_order.
+  eauto 10.
+  eapply H0 in H8; eauto.
+  first_order.
+  eauto 10.
+Qed.
+
+Lemma refines_Par_Silent : forall R1 R2 : _ -> _ -> Prop,
+    (forall pr1 pr2, R1 pr1 pr2
+                     -> forall pr1', lstepSilent pr1 pr1'
+                                     -> exists pr2', lstepSilent^* pr2 pr2'
+                                                     /\ R1 pr1' pr2')
+    -> (forall pr1 pr2, R1 pr1 pr2
+                        -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R1 pr1' pr2'')
+    -> (forall pr1 pr2, R2 pr1 pr2
+                     -> forall pr1', lstepSilent pr1 pr1'
+                                     -> exists pr2', lstepSilent^* pr2 pr2'
+                                                     /\ R2 pr1' pr2')
+    -> (forall pr1 pr2, R2 pr1 pr2
+                        -> forall pr1' a, lstep pr1 (Action a) pr1'
+                                          -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                                /\ lstep pr2' (Action a) pr2''
+                                                                /\ R2 pr1' pr2'')
+    -> forall pr1 pr2, RPar R1 R2 pr1 pr2
+                       -> forall pr1', lstepSilent pr1 pr1'
+                                       -> exists pr2', lstepSilent^* pr2 pr2' /\ RPar R1 R2 pr1' pr2'.
+Proof.
+  invert 5; simplify.
+
+  invert H3.
+  eapply H in H10; eauto.
+  first_order; eauto.
+  eapply H1 in H10; eauto.
+  first_order; eauto.
+  eapply H0 in H8; eauto.
+  eapply H2 in H9; eauto.
+  first_order.
+  eexists; propositional.
+  apply trc_trans with (x1 || pr2').
+  eauto.
+  apply trc_trans with (x1 || x).
+  eauto.
+  apply trc_one.
+  eauto.
+  eauto.
+  eapply H0 in H8; eauto.
+  eapply H2 in H9; eauto.
+  first_order.
+  eexists; propositional.
+  apply trc_trans with (x1 || pr2').
+  eauto.
+  apply trc_trans with (x1 || x).
+  eauto.
+  apply trc_one.
+  eauto.
+  eauto.
+Qed.
+
+Theorem refines_Par : forall pr1 pr2 pr1' pr2',
+    pr1 <| pr1'
+    -> pr2 <| pr2'
+    -> pr1 || pr2 <| pr1' || pr2'.
+Proof.
+  invert 1; invert 1.
+  exists (RPar x x0).
+  unfold simulates in *.
+  propositional; eauto using refines_Par_Silent, refines_Par_Action.
 Qed.

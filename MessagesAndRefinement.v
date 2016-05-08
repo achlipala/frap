@@ -374,6 +374,48 @@ Proof.
   first_order; subst; eauto.
 Qed.
 
+Lemma refines_trans' : forall R : _ -> _ -> Prop,
+    (forall pr1 pr2,
+        R pr1 pr2
+        -> forall pr1', lstepSilent pr1 pr1'
+                        -> exists pr2', lstepSilent^* pr2 pr2' /\ R pr1' pr2')
+    -> forall pr1 pr1', lstepSilent^* pr1 pr1'
+    -> forall pr2, R pr1 pr2
+    -> exists pr2', R pr1' pr2' /\ lstepSilent^* pr2 pr2'.
+Proof.
+  induct 2; simplify; eauto.
+
+  eapply H in H0; eauto.
+  first_order.
+  apply IHtrc in H3.
+  first_order.
+  eauto using trc_trans.
+Qed.
+
+Theorem refines_trans : forall pr1 pr2 pr3,
+    pr1 <| pr2
+    -> pr2 <| pr3
+    -> pr1 <| pr3.
+Proof.
+  invert 1; invert 1.
+  exists (fun p q => exists r, x p r /\ x0 r q).
+  first_order.
+
+  eapply H0 in H5; eauto.
+  first_order.
+  eapply refines_trans' in H7; eauto.
+  first_order.
+
+  eapply H3 in H6; eauto.
+  first_order.
+  eapply refines_trans' in H7; eauto.
+  first_order.
+  eapply H1 in H8; eauto.
+  first_order.
+  eauto 8 using trc_trans.
+Qed.
+
+
 (** ** Dup *)
 
 Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
@@ -624,3 +666,356 @@ Proof.
   apply refines_add2.
   apply refines_refl.
 Qed.
+
+
+(** * Tree membership *)
+
+Inductive tree :=
+| Leaf (n : nat)
+| Node (l r : tree).
+
+Fixpoint mem (n : nat) (t : tree) : bool :=
+  match t with
+  | Leaf m => if m ==n n then true else false
+  | Node l r => mem n l || mem n r
+  end%bool.
+
+Definition inTree_seq (t : tree) (input output : channel) :=
+  Dup (??input(n : nat);
+       if mem n t then
+         !!output(tt);
+         Done
+       else
+         Done).
+
+Fixpoint inTree_par' (n : nat) (t : tree) (output : channel) :=
+  match t with
+  | Leaf m =>
+    if m ==n n then
+      !!output(tt);
+      Done
+    else
+      Done
+  | Node l r =>
+    inTree_par' n l output || inTree_par' n r output
+  end.
+
+Definition inTree_par (t : tree) (input output : channel) :=
+  Dup (??input(n : nat);
+       New[input;output](output');
+       inTree_par' n t output'
+       || ??output'(_ : unit);
+          !!output(tt);
+          Done).
+
+Inductive TreeThreads (output' : channel) : bool -> proc -> Prop :=
+| TtDone : forall maySend,
+    TreeThreads output' maySend Done
+| TtSend :
+    TreeThreads output' true (!!output'(tt); Done)
+| TtPar : forall maySend pr1 pr2,
+    TreeThreads output' maySend pr1
+    -> TreeThreads output' maySend pr2
+    -> TreeThreads output' maySend (pr1 || pr2).
+
+Inductive RTree (t : tree) (input output : channel) : proc -> proc -> Prop :=
+| TreeInit :
+    RTree t input output
+          (??input(n : nat);
+           New[input;output](output');
+           inTree_par' n t output'
+           || ??output'(_ : unit);
+           !!output(tt);
+           Done)
+          (??input(n : nat);
+           if mem n t then
+             !!output(tt);
+             Done
+           else
+             Done)
+| TreeSearching : forall n k threads,
+    (forall ch, ~In ch [input; output]
+                -> k ch = threads ch
+                          || ??ch(_ : unit);
+                !!output(tt);
+                Done)
+    -> (forall ch, ~In ch [input; output]
+                   -> TreeThreads ch (mem n t) (threads ch))
+    -> RTree t input output
+          (NewChannel [input;output] k)
+          (if mem n t then
+             !!output(tt);
+             Done
+           else
+             Done)
+| TreeFound : forall n k threads,
+    mem n t = true
+    -> (forall ch, ~In ch [input; output]
+                   -> k ch = threads ch
+                             || !!output(tt);
+                                Done)
+    -> (forall ch, ~In ch [input; output]
+                   -> TreeThreads ch true (threads ch))
+    -> RTree t input output
+          (NewChannel [input;output] k)
+          (!!output(tt);
+           Done)
+| TreeNotified : forall n k threads,
+    mem n t = true
+    -> (forall ch, ~In ch [input; output]
+                   -> k ch = threads ch
+                             || Done)
+    -> (forall ch, ~In ch [input; output]
+                   -> TreeThreads ch true (threads ch))
+    -> RTree t input output
+          (NewChannel [input;output] k)
+          Done.
+
+Hint Constructors TreeThreads RTree.
+
+Lemma TreeThreads_actionIs : forall ch maySend pr,
+    TreeThreads ch maySend pr
+    -> forall a pr', lstep pr (Action a) pr'
+                   -> a = Output {| Channel := ch; Value := tt |}.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Lemma TreeThreads_silent : forall ch maySend pr,
+    TreeThreads ch maySend pr
+    -> forall pr', lstep pr Silent pr'
+                   -> False.
+Proof.
+  induct 1; invert 1; simplify; eauto.
+
+  eapply TreeThreads_actionIs in H4; eauto.
+  equality.
+
+  eapply TreeThreads_actionIs in H5; eauto.
+  equality.
+Qed.
+
+Lemma TreeThreads_maySend : forall ch maySend pr,
+    TreeThreads ch maySend pr
+    -> forall a pr', lstep pr a pr'
+                     -> maySend = true.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Lemma TreeThreads_action : forall ch maySend pr,
+    TreeThreads ch maySend pr
+    -> forall a pr', lstep pr a pr'
+                     -> TreeThreads ch maySend pr'.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Lemma TreeThreads_weaken : forall ch maySend pr,
+    TreeThreads ch maySend pr
+    -> TreeThreads ch true pr.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Resolve TreeThreads_silent TreeThreads_maySend TreeThreads_action TreeThreads_weaken.
+
+Lemma TreeThreads_inTree_par' : forall n ch t,
+    TreeThreads ch (mem n t) (inTree_par' n t ch).
+Proof.
+  induct t; simplify; eauto.
+  cases (n0 ==n n); eauto.
+  cases (mem n t1); simplify; eauto.
+  cases (mem n t2); simplify; eauto.
+Qed.
+
+Hint Resolve TreeThreads_inTree_par'.
+
+Definition firstThread (p : proc) : proc :=
+  match p with
+  | Par p1 _ => p1
+  | _ => Done
+  end.
+
+Theorem refines_inTree_par : forall t input output,
+    inTree_par t input output <| inTree_seq t input output.
+Proof.
+  simplify.
+  apply refines_Dup.
+  exists (RTree t input output).
+  first_order; eauto.
+
+  invert H; inverter.
+
+  assert (mem n t = true).
+  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  specialize (H1 _ H).
+  specialize (H6 _ H).
+  rewrite H1 in H6.
+  invert H6; eauto.
+  invert H5.
+  rewrite H.
+  eexists; propositional; eauto.
+  eapply TreeFound with (threads := fun ch => firstThread (k' ch)); eauto.
+  simplify.
+  specialize (H1 _ H0).
+  specialize (H6 _ H0).
+  specialize (H2 _ H0).
+  rewrite H1 in H6.
+  invert H6.
+  exfalso; eauto.
+  invert H7.
+  specialize (TreeThreads_actionIs H2 H7); invert 1.
+  specialize (TreeThreads_actionIs H2 H7); invert 1.
+  invert H8.
+  reflexivity.
+  simplify.
+  specialize (H1 _ H0).
+  specialize (H6 _ H0).
+  specialize (H2 _ H0).
+  rewrite H1 in H6.
+  invert H6; eauto.
+
+  exfalso.
+  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  specialize (H2 _ H).
+  specialize (H7 _ H).
+  specialize (H3 _ H).
+  rewrite H2 in H7.
+  invert H7; eauto.
+  specialize (TreeThreads_actionIs H3 H6); invert 1.
+  specialize (TreeThreads_actionIs H3 H6); invert 1.
+  invert H8.
+
+  eexists; propositional; eauto.
+  eapply TreeNotified with (threads := fun ch => firstThread (k' ch)); eauto.
+  simplify.
+  specialize (H2 _ H).
+  specialize (H3 _ H).
+  specialize (H7 _ H).
+  rewrite H2 in H7.
+  invert H7; eauto.
+  invert H6.
+  invert H8.
+  invert H8.
+  simplify.
+  specialize (H2 _ H).
+  specialize (H3 _ H).
+  specialize (H7 _ H).
+  rewrite H2 in H7.
+  invert H7; eauto.
+
+  invert H; inverter; eauto 6.
+
+  exfalso.
+  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  generalize (H1 _ H).
+  generalize (H2 _ H).
+  generalize (H6 _ H).
+  simplify.
+  rewrite H4 in H0.
+  invert H0.
+  specialize (TreeThreads_actionIs H3 H9); simplify; subst.
+  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  specialize (H1 _ H0).
+  specialize (H2 _ H0).
+  specialize (H6 _ H0).
+  rewrite H1 in H6.
+  invert H6.
+  specialize (TreeThreads_actionIs H2 H11); invert 1; linear_arithmetic.
+  invert H11.
+  invert H9.
+  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  specialize (H1 _ H0).
+  specialize (H2 _ H0).
+  specialize (H6 _ H0).
+  rewrite H1 in H6.
+  invert H6.
+  specialize (TreeThreads_actionIs H2 H9); invert 1; linear_arithmetic.
+  invert H9; linear_arithmetic.
+
+  assert (a = Output {| Channel := output; Value := tt |}).
+  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
+  generalize (H2 _ H).
+  generalize (H3 _ H).
+  generalize (H7 _ H).
+  simplify.
+  rewrite H5 in H0.
+  invert H0.
+  exfalso.
+  specialize (TreeThreads_actionIs H4 H10); simplify; subst.
+  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
+  generalize (H2 _ H0).
+  generalize (H3 _ H0).
+  generalize (H7 _ H0).
+  simplify.
+  rewrite H9 in H6.
+  invert H6.
+  specialize (TreeThreads_actionIs H8 H15); invert 1; linear_arithmetic.
+  invert H15; linear_arithmetic.
+  invert H10; auto.
+  subst.
+  do 2 eexists; propositional; eauto.
+  eapply TreeNotified with (threads := fun ch => firstThread (k' ch)); eauto.
+  simplify.
+  generalize (H2 _ H).
+  generalize (H3 _ H).
+  generalize (H7 _ H).
+  simplify.
+  rewrite H5 in H0.
+  invert H0.
+  specialize (TreeThreads_actionIs H4 H10); invert 1.
+  rewrite <- In'_eq in *; simplify; propositional.
+  invert H10.
+  reflexivity.
+  simplify.
+  generalize (H2 _ H).
+  generalize (H3 _ H).
+  generalize (H7 _ H).
+  simplify.
+  rewrite H5 in H0.
+  invert H0; eauto.
+
+  exfalso.
+  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
+  generalize (H2 _ H).
+  generalize (H3 _ H).
+  generalize (H7 _ H).
+  simplify.
+  rewrite H5 in H0.
+  invert H0.
+  specialize (TreeThreads_actionIs H4 H10); invert 1.
+  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
+  generalize (H2 _ H0).
+  generalize (H3 _ H0).
+  generalize (H7 _ H0).
+  simplify.
+  rewrite H9 in H6.
+  invert H6.
+  specialize (TreeThreads_actionIs H8 H15); invert 1; linear_arithmetic.
+  invert H15.
+  invert H10.
+Qed.
+
+Theorem gratuitous_composition : forall t ch1 ch2 ch3,
+    add2 ch1 ch2 || inTree_par t ch2 ch3
+    <| addNs 2 ch1 ch2 || inTree_seq t ch2 ch3.
+Proof.
+  simplify.
+  apply refines_Par.
+  apply refines_add2.
+  apply refines_inTree_par.
+Qed.
+
+Theorem gratuitous_composition_expanded : forall n t ch1 ch2 ch3,
+    mem (n + 2) t = true
+    -> (!!ch1(n); Done) || (add2 ch1 ch2 || inTree_par t ch2 ch3)
+       <| (!!ch1(n); Done) || (!!ch2(n+2); Done) || (!!ch3(tt); Done).
+Proof.
+  simplify.
+  eapply refines_trans.
+  apply refines_Par.
+  apply refines_refl.
+  apply gratuitous_composition.
+  unfold addNs, addN, inTree_seq.
+Admitted.

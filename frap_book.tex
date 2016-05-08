@@ -4002,6 +4002,113 @@ We prove the inclusion of new invariant in old by Lemma \ref{cslprogress}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Process Algebra and Refinement}
+
+The last two chapters dealt with the most popular sort of concurrent programming, the threads-and-locks\index{threads and locks} shared-memory\index{shared-memory concurrency} style.
+It's a fundamentally imperative style, with side effects coordinating synchronization across threads.
+Another well-established (and increasingly popular) style is \emph{message passing}\index{message-passing concurrency}, which is closer in spirit to functional programming.
+In that world, there is, in fact, no memory at all, let alone shared memory.
+Instead, state is incorporated into the text of thread code, and information passes from thread to thread by sending \emph{messages} over \emph{channels}\index{channel}.
+There are two main kinds of message passing.
+In the \emph{asynchronous}\index{asynchronous message passing} or \emph{mailbox}\index{mailbox} style, a thread can desposit a message in a channel, even when no one is ready to receive the message immediately.
+Later, a thread can come along and effectively dequeue the message from the channel.
+In the \emph{synchronous}\index{synchronous message passing} or \emph{rendezvous}\index{rendezvous} style, a message send only executes when a matching receive, on the same channel, is available immediately.
+The threads of the two complementary operations \emph{rendezvous} and pass the message in one atomic step.
+
+Packages of semantics and proof techniques for such languages are often called \emph{process algebras}\index{process algebra}, as they support an algebraic style of reasoning about the source code of message-passing programs.
+That is, we prove laws very similar to the familiar equations of algebra, and use those laws to ``rewrite'' inside larger processes, by replacing their subprocesses with others we have shown suitably equivalent.
+It's a powerful technique for highly modular proofs, which we develop in the rest of this chapter for one concrete synchronous language.
+Well-known process algebras include the $\pi$-calculus and the Calculus of Communicating Systems; the one we focus on is idiosyncratic and designed partly to make the Coq proofs manageable.
+
+
+\section{An Object Language with Synchronous Message Passing}
+
+\newcommand{\newp}[3]{\nu[#1](#2); #3}
+\newcommand{\block}[2]{\mt{block}(#1); #2}
+\newcommand{\send}[3]{!#1(#2); #3}
+\newcommand{\recv}[3]{?#1(#2); #3}
+\newcommand{\parl}[2]{#1 || #2}
+\newcommand{\dup}[1]{\mt{dup}(#1)}
+\newcommand{\done}[0]{\mt{done}}
+
+$$\begin{array}{rrcl}
+  \textrm{Channels} & c \\
+  \textrm{Processes} & p &::=& \newp{\vec{c}}{x}{p(x)} \mid \block{c}{p} \mid \; \send{c}{v}{p} \mid \; \recv{c}{x}{p(x)} \mid \parl{p}{p} \mid \dup{p} \mid \done
+\end{array}$$
+
+Here's the intuitive explanation of each syntax construction.
+\begin{itemize}
+  \item \textbf{Fresh channel generation}\index{fresh channel generation} $\newp{\vec{c}}{x}{p(x)}$ creates a new \emph{private} channel to be used by the body process $p(x)$, where we replace $x$ with the channel that is chosen.  Following tradition, we use the Greek letter $\nu$\index{$\nu$}\index{nu} (nu) for this purpose.  Each generation operation takes a parameter $\vec{c}$, which we call the \emph{support}\index{support} of the operation.  It gives a list of channels already in use for other purposes, so that the fresh channel must not equal any of them.  (We assume an infinite domain of channels, so that, for any specific list, it is always possible to find a channel not in that list.)
+
+  \item \textbf{Abstraction boundaries} $\block{c}{p}$ prevent ``the outside world'' from sending $p$ any messages on channel $c$ or receiving any messages from $p$ via $c$.  That is, $c$ is treated as a local channel for $p$.
+
+  \item \textbf{Sends} $\send{c}{v}{p}$ and \textbf{receives} $\recv{c}{x}{p(x)}$, where we use an exclamation mark to suggest ``telling something'' and a question mark to suggest ``asking something.''  Processes of these kinds can rendezvous when they agree on the channel.  When $\send{c}{v}{p_1}$ and $\recv{c}{x}{p_2(x)}$ rendezvous, they respectively evolve to $p_1$ and $p_2(v)$.
+
+  \item \textbf{Parallel compositions}\index{duplication} $\parl{p_1}{p_2}$ work as we're used to by now.
+
+  \item \textbf{Duplications}\index{duplication} $\dup{p}$ act just like infinitely many copies of $p$ composed in parallel.  We use them to implement nonterminating ``server'' processes that are prepared to respond to many requests over particular channels.  In traditional process algebra, duplication fills the role that loops and recursion fill in conventional programming.
+
+  \item \textbf{The inert process}\index{inert process} $\done$ is incapable of doing anything at all.  It stands for a finished program.
+\end{itemize}
+
+\newcommand{\silent}[0]{\epsilon}
+\newcommand{\readl}[2]{?#1(#2)}
+\newcommand{\writel}[2]{!#1(#2)}
+\newcommand{\lts}[3]{#1 \stackrel{#2}{\longrightarrow} #3}
+
+\medskip
+
+We give an operational semantics in the form of a \emph{labelled transition system}\index{labelled transition system}.
+That is, we not only express how a step takes us from one state to another, but we also associate each step with a \emph{label}\index{label} that summarizes what happened.
+Our labels will include the \emph{silent} label $\silent$, read labels $\readl{c}{v}$, and write labels $\writel{c}{v}$.
+The latter two indicate that a thread has read a value from or written a value to channel $c$, respectively, and the parameter $v$ indicates which value was read or written.
+We write $\lts{p_1}{l}{p_2}$ to say that process $p_1$ steps to $p_2$ by performing label $l$.
+We use $\lts{p_1}{}{p_2}$ as an abbreviation for $\lts{p_1}{\silent}{p_2}$.
+
+We start with the rules for sends and receives.
+$$\infer{\lts{\send{c}{v}{p}}{\writel{c}{v}}{p}}{}
+\quad \infer{\lts{\recv{c}{x}{p(x)}}{\readl{c}{v}}{p(v)}}{}$$
+They record the action in the obvious way, but there is already an interesting wrinkle: the rule for receives \emph{picks a value $v$ nondeterministically}.
+This nondeterminism is resolved by the next two rules, the rendezvous rules, which force a read label to match a write label precisely.
+
+$$\infer{\lts{\parl{p_1}{p_2}}{}{\parl{p'_1}{p'_2}}}{
+  \lts{p_1}{\writel{c}{v}}{p'_1}
+  & \lts{p_2}{\readl{c}{v}}{p'_2}
+}
+\quad \infer{\lts{\parl{p_1}{p_2}}{}{\parl{p'_1}{p'_2}}}{
+  \lts{p_1}{\readl{c}{v}}{p'_1}
+  & \lts{p_2}{\writel{c}{v}}{p'_2}
+}$$
+
+A fresh channel generation can step according to any valid choice of channel.
+$$\infer{\lts{\newp{\vec c}{x}{p(x)}}{}{\block{c}{p(c)}}}{
+  c \notin \vec c
+}$$
+
+An abstraction boundary prevents steps with labels that mention the protected channel.
+(We overload notation $c \in l$ to indicate that channel $c$ appears in the send/receive position of label $l$.)
+$$\infer{\lts{\block{c}{p}}{l}{\block{c}{p'}}}{
+  \lts{p}{l}{p'}
+  & c \notin l
+}$$
+
+Any step can be lifted up out of a parallel composition.
+$$\infer{\lts{\parl{p_1}{p_2}}{l}{\parl{p'_1}{p_2}}}{
+  \lts{p_1}{l}{p'_1}
+}
+\quad \infer{\lts{\parl{p_1}{p_2}}{l}{\parl{p_1}{p'_2}}}{
+  \lts{p_2}{l}{p'_2}
+}$$
+
+Finally, a duplication can spawn a new copy (``thread'') at any time.
+$$\infer{\lts{\dup{p}}{}{\parl{\dup{p}}{p}}}{}$$
+
+The labelled transition system approach may seem a bit unwieldy for just explaining the behavior of programs.
+Where it really pays off is in supporting a modular, algebraic reasoning style about processes, which we turn to next.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \appendix
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

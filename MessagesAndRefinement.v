@@ -19,6 +19,7 @@ Notation channel := nat (only parsing).
 
 Inductive proc :=
 | NewChannel (notThese : list channel) (k : channel -> proc)
+| BlockChannel (ch : channel) (pr : proc)
 | Send (ch : channel) {A : Set} (v : A) (k : proc)
 | Recv (ch : channel) {A : Set} (k : A -> proc)
 | Par (pr1 pr2 : proc)
@@ -30,6 +31,7 @@ Notation procs := (fmap pid proc).
 Notation channels := (set channel).
 
 Notation "'New' ls ( x ) ; k" := (NewChannel ls (fun x => k)) (right associativity, at level 51, ls at level 0).
+Notation "'Block' ch ; k" := (BlockChannel ch k) (right associativity, at level 51).
 Notation "!! ch ( v ) ; k" := (Send ch v k) (right associativity, at level 45, ch at level 0).
 Notation "?? ch ( x : T ) ; k" := (Recv ch (fun x : T => k)) (right associativity, at level 45, ch at level 0, x at level 0).
 Infix "||" := Par.
@@ -58,27 +60,6 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
   Done.
 
 
-(** * Flat semantics *)
-
-Inductive step : procs -> procs -> Prop :=
-| StepNew : forall chs ps i k ch,
-    ps $? i = Some (NewChannel chs k)
-    -> ~List.In ch chs
-    -> step ps (ps $+ (i, k ch))
-| StepSendRecv : forall ps i ch {A : Set} (v : A) k1 j k2,
-    ps $? i = Some (Send ch v k1)
-    -> ps $? j = Some (Recv ch k2)
-    -> step ps (ps $+ (i, k1) $+ (j, k2 v))
-| StepPar : forall ps i pr1 pr2 j,
-    ps $? i = Some (Par pr1 pr2)
-    -> ps $? j = None
-    -> step ps (ps $+ (i, pr1) $+ (j, pr2))
-| StepDup : forall ps i pr j,
-    ps $? i = Some (Dup pr)
-    -> ps $? j = None
-    -> step ps (ps $+ (i, Dup pr) $+ (j, pr)).
-
-
 (** * Labeled semantics *)
 
 Record message := {
@@ -97,6 +78,13 @@ Inductive label :=
 
 Coercion Action : action >-> label.
 
+Definition notUse (ch : channel) (l : label) :=
+  match l with
+  | Action (Input r) => r.(Channel) <> ch
+  | Action (Output r) => r.(Channel) <> ch
+  | Silent => True
+  end.
+
 Inductive lstep : proc -> label -> proc -> Prop :=
 | LStepSend : forall ch {A : Set} (v : A) k,
     lstep (Send ch v k)
@@ -108,9 +96,13 @@ Inductive lstep : proc -> label -> proc -> Prop :=
           (k v)
 | LStepDup : forall pr,
     lstep (Dup pr) Silent (Par (Dup pr) pr)
-| LStepNewInside : forall chs k l k',
-    (forall ch, ~List.In ch chs -> lstep (k ch) l (k' ch))
-    -> lstep (NewChannel chs k) l (NewChannel chs k')
+| LStepNew : forall chs ch k,
+    ~In ch chs
+    -> lstep (NewChannel chs k) Silent (BlockChannel ch (k ch))
+| LStepBlock : forall ch k l k',
+    lstep k l k'
+    -> notUse ch l
+    -> lstep (BlockChannel ch k) l (BlockChannel ch k')
 | LStepPar1 : forall pr1 pr2 l pr1',
     lstep pr1 l pr1'
     -> lstep (Par pr1 pr2) l (Par pr1' pr2)
@@ -197,7 +189,7 @@ Proof.
   eauto.
 Qed.
 
-Theorem simulates_couldGenerate : forall pr1 pr2, pr1 <| pr2
+Theorem refines_couldGenerate : forall pr1 pr2, pr1 <| pr2
     -> forall tr, couldGenerate pr1 tr
                   -> couldGenerate pr2 tr.
 Proof.
@@ -221,147 +213,76 @@ Ltac inverter :=
          end.
 
 Hint Constructors lstep.
+Hint Unfold lstepSilent.
 
-Definition In' := In.
-Theorem In'_eq : In' = In.
-Proof.
-  auto.
-Qed.
+Ltac lists' :=
+  repeat match goal with
+         | [ H : NoDup _ |- _ ] => invert H
+         | [ |- NoDup _ ] => constructor
+         end; simplify; propositional; equality || linear_arithmetic.
 
-Opaque In.
+Ltac lists := solve [ lists' ].
 
-Ltac instWith n := 
-  match goal with
-  | [ H0 : forall ch, ~In ch ?ls -> _, H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
-    let Hni := fresh "Hni" in let Hni' := fresh "Hni'" in
-    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
-    assert (Hni' : ~In (S n) ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
-      generalize (H0 _ Hni), (H _ Hni), (H0 _ Hni'), (H _ Hni'); simplify;
-      repeat match goal with
-             | [ H : ?k _ = _, H' : lstep (?k _) _ _ |- _ ] => rewrite H in H'
-             end; inverter; try linear_arithmetic
-  | [ H0 : forall ch, ~In ch ?ls -> _, H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
-    let Hni := fresh "Hni" in
-    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
-      generalize (H0 _ Hni), (H _ Hni); simplify;
-      repeat match goal with
-             | [ H : ?k _ = _, H' : lstep (?k _) _ _ |- _ ] => rewrite H in H'
-             end; inverter
-  | [ H : forall ch, ~In ch ?ls -> lstep _ _ _ |- _ ] =>
-    let Hni := fresh "Hni" in
-    assert (Hni : ~In n ls) by (rewrite <- In'_eq in *; simplify; propositional; linear_arithmetic);
-      generalize (H _ Hni); simplify; inverter
-  end.
-
-Ltac impossible := 
-  match goal with
-  | [ H : forall ch, ~In ch ?ls -> _ |- _ ] =>
-    instWith (S (fold_left max ls 0))
-  end.
-
-Ltac inferAction :=
-  match goal with
-  | [ H : forall ch, ~In ch ?ls -> lstep _ (Action ?a) _ |- _ ] =>
-    let av := fresh "av" in
-    evar (av : action);
-    let av' := eval unfold av in av in
-    clear av;
-    assert (a = av'); [ instWith (S (fold_left max ls 0));
-                        match goal with
-                        | [ |- ?X = _ ] => instantiate (1 := X)
-                        end; reflexivity | subst ]
-  end.
-
-Ltac inferProc :=
-  match goal with
-  | [ H : forall ch, ~In ch ?ls -> lstep _ _ (?k' ch) |- _ ] =>
-    let k'' := fresh "k''" in
-    evar (k'' : channel -> proc);
-    let k''' := eval unfold k'' in k'' in
-    clear k'';
-    assert (forall ch, ~In ch ls
-                       -> k' ch = k''' ch);
-    [ intro ch; simplify; instWith ch; simplify; inverter;
-      (reflexivity || rewrite <- In'_eq in *; simplify; propositional) | subst; simplify ]
-  end.
-
-Ltac inferRead :=
-  match goal with
-  | [ _ : forall ch, ~In ch ?ls -> lstep _ (Action ?a) _ |- _ ] =>
-    let ch0 := fresh "ch0" in
-    evar (ch0 : channel);
-    let ch0' := eval unfold ch0 in ch0 in
-    clear ch0;
-    assert (exists v : nat, a = Input {| Channel := ch0'; Value := v |})
-           by (instWith (S (fold_left max ls 0)); eauto);
-      first_order; subst
-  end.
+Hint Extern 1 (NoDup _) => lists.
 
 
 (** * Examples *)
 
-Module Example1.
-  Definition add2_once (input output : channel) : proc :=
-    New[input;output](intermediate);
-    (addN 1 input intermediate
-     || addN 1 intermediate output).
+Definition add2_once (input output : channel) : proc :=
+  New[input;output](intermediate);
+  (addN 1 input intermediate
+   || addN 1 intermediate output).
 
-  Inductive R_add2 (input output : channel) : proc -> proc -> Prop :=
-  | Initial : forall k,
-      (forall ch, ~List.In ch [input; output]
-                  -> k ch = ??input(n : nat); !!ch(n + 1); Done || addN 1 ch output)
-      -> R_add2 input output
-             (NewChannel [input;output] k)
-             (addN 2 input output)
-  | GotInput : forall n k,
-      (forall ch, ~List.In ch [input; output]
-                  -> k ch = !!ch(n + 1); Done || addN 1 ch output)
-      -> R_add2 input output
-                (NewChannel [input;output] k)
-                (!!output(n + 2); Done)
-  | HandedOff : forall n k,
-      (forall ch, ~List.In ch [input; output]
-                  -> k ch = Done || (!!output(n + 2); Done))
-      -> R_add2 input output
-                (NewChannel [input;output] k)
-                (!!output(n + 2); Done)
-  | Finished : forall k,
-      (forall ch, ~List.In ch [input; output]
-                  -> k ch = Done || Done)
-      -> R_add2 input output
-                (NewChannel [input;output] k)
-                Done.
+Inductive R_add2 : proc -> proc -> Prop :=
+| Initial : forall input output,
+    input <> output
+    -> R_add2
+         (New[input;output](ch); ??input(n : nat); !!ch(n + 1); Done
+                              || ??ch(n : nat); !!output (n + 1); Done)
+         (??input(n : nat); !!output(n + 2); Done)
+| ChoseIntermediate : forall input output intermediate,
+    NoDup [input; output; intermediate]
+    -> R_add2
+         (Block intermediate; ??input(n : nat); !!intermediate(n + 1); Done
+                              || ??intermediate(n : nat); !!output (n + 1); Done)
+         (??input(n : nat); !!output(n + 2); Done)
+| GotInput : forall input output intermediate n,
+    NoDup [input; output; intermediate]
+    -> R_add2
+         (Block intermediate; !!intermediate(n + 1); Done
+                              || ??intermediate(n : nat); !!output (n + 1); Done)
+         (!!output(n + 2); Done)
+| HandedOff : forall input output intermediate n,
+    NoDup [input; output; intermediate]
+    -> R_add2
+         (Block intermediate; Done || (!!output(n + 2); Done))
+         (!!output(n + 2); Done)
+| Finished : forall input output intermediate,
+    NoDup [input; output; intermediate]
+    -> R_add2
+         (Block intermediate; Done || Done)
+         Done.
 
-  Hint Constructors R_add2.
+Hint Constructors R_add2.
 
-  Theorem add2_once_refines_addN : forall input output,
-      add2_once input output <| addN 2 input output.
-  Proof.
-    simplify.
-    exists (R_add2 input output).
-    unfold simulates; propositional.
+Theorem add2_once_refines_addN : forall input output,
+    input <> output
+    -> add2_once input output <| addN 2 input output.
+Proof.
+  simplify.
+  exists R_add2.
+  first_order.
 
-    invert H; simplify; inverter.
-    impossible.
-    inferProc.
-    replace (n + 1 + 1) with (n + 2) in * by linear_arithmetic.
-    eauto.
-    impossible.
-    impossible.
+  clear input output H.
+  invert H0; simplify; inverter; eauto.
+  replace (n + 1 + 1) with (n + 2) by linear_arithmetic.
+  eauto.
 
-    invert H; simplify; inverter.
-    inferRead.
-    inferProc.
-    unfold addN; eauto 10.
-    impossible.
-    inferAction.
-    inferProc.
-    eauto 10.
-    impossible.
+  clear input output H.
+  invert H0; simplify; inverter; eauto 10; simplify; equality.
 
-    unfold add2_once; eauto.
-  Qed.
-End Example1.
+  unfold add2_once, addN; eauto.
+Qed.
 
 
 (** * Compositional reasoning principles *)
@@ -647,23 +568,180 @@ Proof.
 Qed.
 
 
+(** ** Block *)
+
+Inductive RBlock (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
+| RBlock1 : forall pr1 pr2 ch,
+    R pr1 pr2
+    -> RBlock R (Block ch; pr1) (Block ch; pr2).
+
+Hint Constructors RBlock.
+Hint Unfold notUse.
+
+Lemma lstepSilent_Block : forall ch pr1 pr2,
+    lstepSilent^* pr1 pr2
+    -> lstepSilent^* (Block ch; pr1) (Block ch; pr2).
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Resolve lstepSilent_Block.
+
+Theorem refines_Block : forall pr1 pr2 ch,
+    pr1 <| pr2
+    -> Block ch; pr1 <| Block ch; pr2.
+Proof.
+  invert 1.
+  exists (RBlock x).
+  first_order; eauto.
+
+  invert H2.
+  invert H3.
+  eapply H in H6; eauto.
+  first_order.
+  eauto.
+
+  invert H2.
+  invert H3.
+  eapply H0 in H6; eauto.
+  first_order.
+  eauto 10.
+Qed.
+
+Inductive RBlock2 : proc -> proc -> Prop :=
+| RBlock2_1 : forall ch1 ch2 pr,
+    RBlock2 (Block ch1; Block ch2; pr) (Block ch2; Block ch1; pr).
+
+Hint Constructors RBlock2.
+
+Theorem refines_Block2 : forall ch1 ch2 pr,
+    Block ch1; Block ch2; pr <| Block ch2; Block ch1; pr.
+Proof.
+  exists RBlock2.
+  first_order; eauto.
+
+  invert H.
+  invert H0.
+  invert H2.
+  eauto 10.
+
+  invert H.
+  invert H0.
+  invert H2.
+  eauto 10.
+Qed.
+
+Inductive neverUses (ch : channel) : proc -> Prop :=
+| NuRecv : forall ch' (A : Set) (k : A -> _),
+    ch' <> ch
+    -> (forall v, neverUses ch (k v))
+    -> neverUses ch (Recv ch' k)
+| NuSend : forall ch' (A : Set) (v : A) k,
+    ch' <> ch
+    -> neverUses ch k
+    -> neverUses ch (Send ch' v k)
+| NuDup : forall pr,
+    neverUses ch pr
+    -> neverUses ch (Dup pr)
+| NuPar : forall pr1 pr2,
+    neverUses ch pr1
+    -> neverUses ch pr2
+    -> neverUses ch (pr1 || pr2)
+| NuDone :
+    neverUses ch Done.
+
+Hint Constructors neverUses.
+
+Lemma neverUses_step : forall ch pr1,
+    neverUses ch pr1
+    -> forall l pr2, lstep pr1 l pr2
+                     -> neverUses ch pr2.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Hint Resolve neverUses_step.
+
+Inductive RBlockS : proc -> proc -> Prop :=
+| RBlockS1 : forall ch pr1 pr2,
+    neverUses ch pr2
+    -> RBlockS (Block ch; pr1 || pr2) ((Block ch; pr1) || pr2).
+
+Hint Constructors RBlockS.
+
+Lemma neverUses_notUse : forall ch pr l,
+    neverUses ch pr
+    -> forall pr', lstep pr l pr'
+                   -> notUse ch l.
+Proof.
+  induct 1; invert 1; simplify; eauto.
+Qed.
+
+Lemma notUse_Input_Output : forall ch r,
+    notUse ch (Input r)
+    -> notUse ch (Output r).
+Proof.
+  simplify; auto.
+Qed.
+
+Lemma notUse_Output_Input : forall ch r,
+    notUse ch (Output r)
+    -> notUse ch (Input r).
+Proof.
+  simplify; auto.
+Qed.
+
+Hint Resolve neverUses_notUse.
+
+Theorem refines_BlockS : forall ch pr1 pr2,
+    neverUses ch pr2
+    -> Block ch; pr1 || pr2 <| (Block ch; pr1) || pr2.
+Proof.
+  exists RBlockS.
+  first_order; eauto.
+
+  invert H0.
+  invert H1.
+  invert H4; eauto 10.
+  eexists; propositional.
+  apply trc_one.
+  eapply LStepRendezvousLeft; eauto.
+  constructor; eauto.
+  apply notUse_Output_Input; eauto.
+  eauto.
+  eexists; propositional.
+  apply trc_one.
+  eapply LStepRendezvousRight; eauto.
+  constructor; eauto.
+  apply notUse_Input_Output; eauto.
+  eauto.
+
+  invert H0.
+  invert H1.
+  invert H4; eauto 10.
+Qed.
+
+
 (** * Example again *)
 
 Theorem refines_add2 : forall input output,
-    add2 input output <| addNs 2 input output.
+    input <> output
+    -> add2 input output <| addNs 2 input output.
 Proof.
   simplify.
   apply refines_Dup.
-  apply Example1.add2_once_refines_addN.
+  apply add2_once_refines_addN; auto.
 Qed.
 
 Theorem refines_add2_with_tester : forall metaInput input output metaOutput,
-    add2 input output || tester metaInput input output metaOutput
-         <| addNs 2 input output || tester metaInput input output metaOutput.
+    input <> output
+    -> Block input; Block output; add2 input output || tester metaInput input output metaOutput
+       <| Block input; Block output; addNs 2 input output || tester metaInput input output metaOutput.
 Proof.
   simplify.
+  do 2 apply refines_Block.
   apply refines_Par.
-  apply refines_add2.
+  apply refines_add2; auto.
   apply refines_refl.
 Qed.
 
@@ -733,42 +811,45 @@ Inductive RTree (t : tree) (input output : channel) : proc -> proc -> Prop :=
              Done
            else
              Done)
-| TreeSearching : forall n k threads,
-    (forall ch, ~In ch [input; output]
-                -> k ch = threads ch
-                          || ??ch(_ : unit);
-                !!output(tt);
-                Done)
-    -> (forall ch, ~In ch [input; output]
-                   -> TreeThreads ch (mem n t) (threads ch))
-    -> RTree t input output
-          (NewChannel [input;output] k)
+| TreeGotInput : forall n,
+    RTree t input output
+          (New[input;output](output');
+            inTree_par' n t output'
+            || ??output'(_ : unit);
+               !!output(tt);
+               Done)
           (if mem n t then
              !!output(tt);
              Done
            else
              Done)
-| TreeFound : forall n k threads,
-    mem n t = true
-    -> (forall ch, ~In ch [input; output]
-                   -> k ch = threads ch
-                             || !!output(tt);
-                                Done)
-    -> (forall ch, ~In ch [input; output]
-                   -> TreeThreads ch true (threads ch))
+| TreeSearching : forall n output' threads,
+    ~In output' [input; output]
+    -> TreeThreads output' (mem n t) threads
     -> RTree t input output
-          (NewChannel [input;output] k)
-          (!!output(tt);
-           Done)
-| TreeNotified : forall n k threads,
+          (Block output';
+            threads
+            || ??output'(_ : unit);
+               !!output(tt);
+               Done)
+          (if mem n t then
+             !!output(tt);
+             Done
+           else
+             Done)
+| TreeFound : forall n output' threads,
     mem n t = true
-    -> (forall ch, ~In ch [input; output]
-                   -> k ch = threads ch
-                             || Done)
-    -> (forall ch, ~In ch [input; output]
-                   -> TreeThreads ch true (threads ch))
+    -> ~In output' [input; output]
+    -> TreeThreads output' true threads
     -> RTree t input output
-          (NewChannel [input;output] k)
+             (Block output'; threads || !!output(tt); Done)
+             (!!output(tt); Done)
+| TreeNotified : forall n output' threads,
+    mem n t = true
+    -> ~In output' [input; output]
+    -> TreeThreads output' true threads
+    -> RTree t input output
+          (Block output'; threads || Done)
           Done.
 
 Hint Constructors TreeThreads RTree.
@@ -831,12 +912,6 @@ Qed.
 
 Hint Resolve TreeThreads_inTree_par'.
 
-Definition firstThread (p : proc) : proc :=
-  match p with
-  | Par p1 _ => p1
-  | _ => Done
-  end.
-
 Theorem refines_inTree_par : forall t input output,
     inTree_par t input output <| inTree_seq t input output.
 Proof.
@@ -845,177 +920,371 @@ Proof.
   exists (RTree t input output).
   first_order; eauto.
 
-  invert H; inverter.
+  invert H.
 
-  assert (mem n t = true).
-  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  specialize (H1 _ H).
-  specialize (H6 _ H).
-  rewrite H1 in H6.
-  invert H6; eauto.
-  invert H5.
-  rewrite H.
-  eexists; propositional; eauto.
-  eapply TreeFound with (threads := fun ch => firstThread (k' ch)); eauto.
-  simplify.
-  specialize (H1 _ H0).
-  specialize (H6 _ H0).
-  specialize (H2 _ H0).
-  rewrite H1 in H6.
-  invert H6.
-  exfalso; eauto.
-  invert H7.
-  specialize (TreeThreads_actionIs H2 H7); invert 1.
-  specialize (TreeThreads_actionIs H2 H7); invert 1.
-  invert H8.
-  reflexivity.
-  simplify.
-  specialize (H1 _ H0).
-  specialize (H6 _ H0).
-  specialize (H2 _ H0).
-  rewrite H1 in H6.
-  invert H6; eauto.
-
-  exfalso.
-  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  specialize (H2 _ H).
-  specialize (H7 _ H).
-  specialize (H3 _ H).
-  rewrite H2 in H7.
-  invert H7; eauto.
-  specialize (TreeThreads_actionIs H3 H6); invert 1.
-  specialize (TreeThreads_actionIs H3 H6); invert 1.
-  invert H8.
-
-  eexists; propositional; eauto.
-  eapply TreeNotified with (threads := fun ch => firstThread (k' ch)); eauto.
-  simplify.
-  specialize (H2 _ H).
-  specialize (H3 _ H).
-  specialize (H7 _ H).
-  rewrite H2 in H7.
-  invert H7; eauto.
-  invert H6.
-  invert H8.
-  invert H8.
-  simplify.
-  specialize (H2 _ H).
-  specialize (H3 _ H).
-  specialize (H7 _ H).
-  rewrite H2 in H7.
-  invert H7; eauto.
-
-  invert H; inverter; eauto 6.
-
-  exfalso.
-  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  generalize (H1 _ H).
-  generalize (H2 _ H).
-  generalize (H6 _ H).
-  simplify.
-  rewrite H4 in H0.
   invert H0.
-  specialize (TreeThreads_actionIs H3 H9); simplify; subst.
-  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  specialize (H1 _ H0).
-  specialize (H2 _ H0).
-  specialize (H6 _ H0).
-  rewrite H1 in H6.
-  invert H6.
-  specialize (TreeThreads_actionIs H2 H11); invert 1; linear_arithmetic.
-  invert H11.
-  invert H9.
-  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  specialize (H1 _ H0).
-  specialize (H2 _ H0).
-  specialize (H6 _ H0).
-  rewrite H1 in H6.
-  invert H6.
-  specialize (TreeThreads_actionIs H2 H9); invert 1; linear_arithmetic.
-  invert H9; linear_arithmetic.
-
-  assert (a = Output {| Channel := output; Value := tt |}).
-  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
-  generalize (H2 _ H).
-  generalize (H3 _ H).
-  generalize (H7 _ H).
-  simplify.
-  rewrite H5 in H0.
-  invert H0.
-  exfalso.
-  specialize (TreeThreads_actionIs H4 H10); simplify; subst.
-  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).
-  generalize (H2 _ H0).
-  generalize (H3 _ H0).
-  generalize (H7 _ H0).
-  simplify.
-  rewrite H9 in H6.
-  invert H6.
-  specialize (TreeThreads_actionIs H8 H15); invert 1; linear_arithmetic.
-  invert H15; linear_arithmetic.
-  invert H10; auto.
-  subst.
-  do 2 eexists; propositional; eauto.
-  eapply TreeNotified with (threads := fun ch => firstThread (k' ch)); eauto.
-  simplify.
-  generalize (H2 _ H).
-  generalize (H3 _ H).
-  generalize (H7 _ H).
-  simplify.
-  rewrite H5 in H0.
-  invert H0.
-  specialize (TreeThreads_actionIs H4 H10); invert 1.
-  rewrite <- In'_eq in *; simplify; propositional.
-  invert H10.
-  reflexivity.
-  simplify.
-  generalize (H2 _ H).
-  generalize (H3 _ H).
-  generalize (H7 _ H).
-  simplify.
-  rewrite H5 in H0.
   invert H0; eauto.
-
-  exfalso.
-  assert (~In (S (max input output)) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
-  generalize (H2 _ H).
-  generalize (H3 _ H).
-  generalize (H7 _ H).
-  simplify.
-  rewrite H5 in H0.
   invert H0.
-  specialize (TreeThreads_actionIs H4 H10); invert 1.
-  assert (~In (S (S (max input output))) [input; output]) by (rewrite <- In'_eq; simplify; propositional; linear_arithmetic).  
-  generalize (H2 _ H0).
-  generalize (H3 _ H0).
-  generalize (H7 _ H0).
-  simplify.
-  rewrite H9 in H6.
+  invert H4; eauto.
   invert H6.
-  specialize (TreeThreads_actionIs H8 H15); invert 1; linear_arithmetic.
-  invert H15.
-  invert H10.
+  eapply TreeThreads_actionIs in H3; eauto; equality.
+  specialize (TreeThreads_actionIs H2 H3); invert 1.
+  invert H5.
+  assert (mem n t = true) by eauto.
+  rewrite H.
+  eauto 10.
+  invert H0.
+  invert H5.
+  eauto.
+  invert H7.
+  eapply TreeThreads_actionIs in H4; eauto; equality.
+  invert H6.
+  invert H0.
+  invert H5.
+  exfalso; eauto using TreeThreads_silent.
+  invert H7.
+  invert H6.
+  invert H6.
+
+  invert H.
+
+  invert H0; eauto.
+  invert H0.
+  invert H0.
+  invert H4.
+  eapply TreeThreads_actionIs in H6; eauto.
+  subst; simplify; equality.
+  invert H6.
+  simplify; equality.
+  invert H0.
+  invert H5.
+  eapply TreeThreads_actionIs in H7; eauto.
+  subst; simplify; equality.
+  invert H7.
+  eauto 10.
+  invert H0.
+  invert H5.
+  eapply TreeThreads_actionIs in H7; eauto.
+  subst; simplify; equality.
+  invert H7.
 Qed.
 
 Theorem gratuitous_composition : forall t ch1 ch2 ch3,
-    add2 ch1 ch2 || inTree_par t ch2 ch3
-    <| addNs 2 ch1 ch2 || inTree_seq t ch2 ch3.
+    ch1 <> ch2
+    -> Block ch2; add2 ch1 ch2 || inTree_par t ch2 ch3
+       <| Block ch2; addNs 2 ch1 ch2 || inTree_seq t ch2 ch3.
 Proof.
   simplify.
+  apply refines_Block.
   apply refines_Par.
-  apply refines_add2.
+  apply refines_add2; auto.
   apply refines_inTree_par.
 Qed.
 
+
+(** * One more example: handoff lemma *)
+
+Inductive manyOf (this : proc) : proc -> Prop :=
+| MoOne : manyOf this this
+| MoDup : manyOf this (Dup this)
+| MoPar : forall pr1 pr2,
+    manyOf this pr1
+    -> manyOf this pr2
+    -> manyOf this (pr1 || pr2).
+
+Inductive manyOfAndOneOf (common rare : proc) : proc -> Prop :=
+| MooCommon : manyOfAndOneOf common rare common
+| MooRare : manyOfAndOneOf common rare rare
+| MooDup : manyOfAndOneOf common rare (Dup common)
+| MooPar1 : forall pr1 pr2,
+    manyOfAndOneOf common rare pr1
+    -> manyOf common pr2
+    -> manyOfAndOneOf common rare (pr1 || pr2)
+| MooPar2 : forall pr1 pr2,
+    manyOf common pr1
+    -> manyOfAndOneOf common rare pr2
+    -> manyOfAndOneOf common rare (pr1 || pr2).
+
+Inductive Rhandoff (ch : channel) (A : Set) (v : A) (k : A -> proc) : proc -> proc -> Prop :=
+| Rhandoff1 : forall recvs,
+    neverUses ch (k v)
+    -> manyOf (??ch(x : A); k x) recvs
+    -> Rhandoff ch v k (Block ch; !!ch(v); Done || recvs) (k v)
+| Rhandoff2 : forall recvs rest,
+    neverUses ch rest
+    -> manyOfAndOneOf (??ch(x : A); k x) rest recvs
+    -> Rhandoff ch v k (Block ch; Done || recvs) rest
+| Rhandoff3 : forall recvs rest,
+    neverUses ch rest
+    -> manyOf (??ch(x : A); k x) recvs
+    -> Rhandoff ch v k (Block ch; Done || recvs) rest.
+
+Hint Constructors manyOf manyOfAndOneOf Rhandoff.
+
+Lemma manyOf_action : forall this pr,
+    manyOf this pr
+    -> forall a pr', lstep pr (Action a) pr'
+                          -> exists this', lstep this a this'.
+Proof.
+  induct 1; simplify; eauto.
+  invert H.
+  invert H1; eauto.
+Qed.
+
+Lemma manyOf_silent : forall this, (forall this', lstepSilent this this' -> False)
+    -> (forall r this', lstep this (Output r) this' -> False)
+    -> forall pr, manyOf this pr
+      -> forall pr', lstep pr Silent pr'
+                     -> manyOf this pr'.
+Proof.
+  induct 1; simplify; eauto.
+  exfalso; eauto.
+  invert H1; eauto.
+  invert H1; eauto.
+  eapply manyOf_action in H5; eauto; first_order.
+  eapply manyOf_action in H4; eauto; first_order.
+Qed.
+
+Lemma manyOf_rendezvous : forall ch (A : Set) (v : A) (k : A -> _) pr,
+    manyOf (Recv ch k) pr
+    -> forall pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'
+                   -> manyOfAndOneOf (Recv ch k) (k v) pr'.
+Proof.
+  induct 1; simplify; eauto.
+
+  invert H; eauto.
+
+  invert H.
+
+  invert H1; eauto.
+Qed.
+
+Hint Resolve manyOf_silent manyOf_rendezvous.
+
+Lemma manyOfAndOneOf_output : forall ch (A : Set) (k : A -> _) rest ch0 (A0 : Set) (v0 : A0) pr,
+    manyOfAndOneOf (Recv ch k) rest pr
+    -> forall pr', lstep pr (Output {| Channel := ch0; Value := v0 |}) pr'
+                   -> exists rest', lstep rest (Output {| Channel := ch0; Value := v0 |}) rest'
+                                    /\ manyOfAndOneOf (Recv ch k) rest' pr'.
+Proof.
+  induct 1; simplify; eauto.
+
+  invert H.
+
+  invert H.
+
+  invert H1; eauto.
+  apply IHmanyOfAndOneOf in H6; first_order; eauto.
+  eapply manyOf_action in H0; eauto.
+  first_order.
+  invert H0.
+
+  invert H1; eauto.
+  eapply manyOf_action in H; eauto.
+  first_order.
+  invert H.
+  apply IHmanyOfAndOneOf in H6; first_order; eauto.
+Qed.
+
+Lemma manyOf_manyOfAndOneOf : forall this other pr,
+    manyOf this pr
+    -> manyOfAndOneOf this other pr.
+Proof.
+  induct 1; simplify; eauto.
+Qed.
+
+Hint Resolve manyOf_manyOfAndOneOf.
+
+Lemma no_rendezvous : forall ch0 (A0 : Set) (v : A0) pr1 rest (k : A0 -> _),
+    manyOfAndOneOf (??ch0 (x : _); k x) rest pr1
+    -> forall pr1', lstep pr1 (Output {| Channel := ch0; TypeOf := A0; Value := v |}) pr1'
+    -> neverUses ch0 rest
+    -> False.
+Proof.
+  induct 1; simplify.
+
+  invert H.
+
+  invert H.
+  invert H0; equality.
+  invert H0.
+  invert H0.
+  eapply neverUses_notUse in H3; eauto.
+  simplify; equality.
+  invert H0.
+  eapply neverUses_notUse in H4; eauto.
+  simplify; equality.
+
+  invert H.
+
+  invert H1.
+  eauto.
+  eapply manyOf_action in H0; try eassumption.
+  first_order.
+  invert H0.
+
+  invert H1.
+  eapply manyOf_action in H7; try eassumption.
+  first_order.
+  invert H1.
+  eauto.
+Qed.
+
+Lemma manyOfAndOneOf_silent : forall ch (A : Set) (k : A -> _) rest pr,
+    manyOfAndOneOf (Recv ch k) rest pr
+    -> neverUses ch rest
+    -> forall pr', lstep pr Silent pr'
+                   -> exists rest', manyOfAndOneOf (Recv ch k) rest' pr'
+                                    /\ (rest = rest' \/ lstep rest Silent rest').
+Proof.
+  induct 1; simplify; eauto.
+  invert H0.
+  invert H0; eauto.
+  invert H2.
+  apply IHmanyOfAndOneOf in H7; auto.
+  first_order; eauto.
+  eexists; propositional.
+  apply MooPar1.
+  eauto.
+  eapply manyOf_silent; try eassumption; invert 1.
+  eapply manyOf_action in H6; eauto.
+  first_order.
+  invert H2.
+  eapply manyOf_action in H6; eauto.
+  first_order.
+  invert H2.
+  exfalso; eapply no_rendezvous; eassumption.
+  invert H2.
+  eexists; propositional.
+  apply MooPar2; auto.
+  eapply manyOf_silent; try eassumption; invert 1.
+  apply IHmanyOfAndOneOf in H7; first_order; eauto.
+  eapply manyOf_action in H5; eauto.
+  first_order.
+  invert H2.
+  exfalso; eapply no_rendezvous; eassumption.
+  eapply manyOf_action in H; eauto.
+  first_order.
+  invert H.
+Qed.
+
+Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous.
+
+Lemma manyOfAndOneOf_action : forall ch (A : Set) (k : A -> _) rest pr,
+    manyOfAndOneOf (Recv ch k) rest pr
+    -> forall a pr', lstep pr (Action a) pr'
+                     -> (exists v : A, a = Input {| Channel := ch; Value := v |})
+                        \/ exists rest', manyOfAndOneOf (Recv ch k) rest' pr'
+                                         /\ lstep rest a rest'.
+Proof.
+  induct 1; simplify; eauto.
+  invert H; eauto.
+  invert H.
+  invert H1.
+  apply IHmanyOfAndOneOf in H6; first_order; subst; eauto.
+  eapply manyOf_action in H6; eauto.
+  first_order.
+  invert H1; eauto.
+  invert H1.
+  eapply manyOf_action in H6; eauto.
+  first_order.
+  invert H1; eauto.
+  apply IHmanyOfAndOneOf in H6; first_order; subst; eauto.
+Qed.
+
+Theorem handoff : forall ch (A : Set) (v : A) k,
+    neverUses ch (k v)
+    -> Block ch; (!!ch(v); Done) || Dup (Recv ch k)
+       <| k v.
+Proof.
+  simplify.
+  exists (Rhandoff ch v k).
+  first_order; eauto.
+
+  invert H0.
+
+  invert H1.
+  invert H5.
+  invert H7.
+  eexists; propositional; eauto.
+  apply Rhandoff1; auto.
+  eapply manyOf_silent; try eassumption; invert 1.
+  invert H4.
+  invert H4; eauto.
+  invert H1.
+  invert H5.
+  invert H7.
+  eapply manyOfAndOneOf_silent in H7; eauto.
+  first_order; subst; eauto.
+  eauto 6.
+  invert H4.
+  invert H4.
+  invert H1.
+  invert H5.
+  invert H7.
+  exists pr2; propositional; eauto.
+  apply Rhandoff3; auto.
+  eapply manyOf_silent; try eassumption; invert 1.
+  invert H4.
+  invert H4.
+
+  invert H0.
+
+  invert H1.
+  invert H5.
+  invert H7.
+  simplify; equality.
+  eapply manyOf_action in H7; eauto.
+  first_order.
+  invert H0.
+  simplify; equality.
+  invert H1.
+  invert H5.
+  invert H7.
+  eapply manyOfAndOneOf_action in H3; eauto.
+  first_order; subst; eauto 10.
+  simplify; equality.
+  invert H1.
+  invert H5.
+  invert H7.
+  eapply manyOf_action in H7; eauto.
+  first_order.
+  invert H0.
+  simplify; equality.
+Qed.
+
+Ltac neverUses :=
+  repeat match goal with
+         | [ |- context[if ?E then _ else _] ] => cases E
+         | _ => repeat (constructor; simplify)
+         end; lists.
+  
 Theorem gratuitous_composition_expanded : forall n t ch1 ch2 ch3,
     mem (n + 2) t = true
-    -> (!!ch1(n); Done) || (add2 ch1 ch2 || inTree_par t ch2 ch3)
-       <| (!!ch1(n); Done) || (!!ch2(n+2); Done) || (!!ch3(tt); Done).
+    -> NoDup [ch1; ch2; ch3]
+    -> Block ch1; Block ch2; !!ch1(n); Done || add2 ch1 ch2 || inTree_par t ch2 ch3
+       <| !!ch3(tt); Done.
 Proof.
   simplify.
   eapply refines_trans.
+  do 2 eapply refines_Block.
+  apply refines_Par.
   apply refines_Par.
   apply refines_refl.
-  apply gratuitous_composition.
+  apply refines_add2; lists.
+  apply refines_inTree_par.
   unfold addNs, addN, inTree_seq.
-Admitted.
+  eapply refines_trans.
+  eapply refines_Block2.
+  eapply refines_trans.
+  eapply refines_Block.
+  eapply refines_trans.
+  apply refines_BlockS; neverUses.
+  apply refines_Par.
+  apply handoff; neverUses.
+  apply refines_refl.
+  eapply refines_trans.
+  apply handoff; neverUses.
+  rewrite H.
+  apply refines_refl.
+Qed.

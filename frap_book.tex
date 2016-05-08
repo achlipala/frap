@@ -4178,6 +4178,83 @@ The accompanying Coq code includes several examples of verifying moderately comp
 We leave those details to the code, turning now instead to further algebraic properties that allow us to \emph{compose} laborious manual proofs about components, in a black-box way.
 
 
+\section{The Algebra of Refinement}
+
+We finish the chapter with a tour through some algebraic properties of refinement that are proved in the Coq source.
+We usually omit proof details here, though we work out one interesting example in more detail.
+
+Perhaps the greatest pay-off from the refinement approach is that \emph{refinement is a congruence for parallel composition}\index{congruence}.
+\begin{theorem}
+  If $\refines{p_1}{p'_1}$ and $\refines{p_2}{p'_2}$, then $\refines{\parl{p_1}{p_2}}{\parl{p'_1}{p'_2}}$.
+\end{theorem}
+
+\modularity
+This deceptively simple theorem statement packs a strong modularity punch!
+We can verify a component in isolation and then connect to an arbitrary additional component, immediately concluding that the composition behaves properly.
+The secret sauce, implicit in our formulation of the object language and refinement, is the labelled-transition-system style, where processes may generate receive labels nondeterministically.
+In this way, we can reason about a process implicitly in terms of \emph{every value that some other process might send to it when they are composed}, without needing to quantify explicitly over all other eligible processes.
+
+A similar congruence property holds for duplication, and we'll take this opportunity to explain a bit of the proof, in the form of choosing a good simulation relation.
+\begin{theorem}
+  If $\refines{p}{p'}$, then $\refines{\dup{p}}{\dup{p'}}$.
+\end{theorem}
+\begin{proof}
+  The premise implies the existence of a simulation $R$.
+  We define a derived relation $R^D$ with these inference rules.
+  $$\infer{p \; R^D \; p'}{
+    p \; R \; p'
+  }
+  \quad \infer{\dup{p} \; R^D \; \dup{p'}}{
+    p \; R \; p'
+  }
+  \quad \infer{\parl{p_1}{p_2} \; R^D \; \parl{p'_1}{p'_2}}{
+    p_1 \; R^D \; p'_1
+    & p_2 \; R^D \; p'_2
+  }$$
+  $R^D$ is precisely the relation we need to finish the current proof.
+  Intuitively, the challenge is that $\dup{p}$ includes infinitely many copies of $p$, each of which may evolve in a different way.
+  It is even possible for different copies to interact with each other through shared channels.
+  However, comparing intermediate states of $\dup{p}$ and $\dup{p'}$, we expect to see a shared backbone, where corresponding threads are related by the original simulation $R$.
+  The definition of $R^D$ formalizes that intuition of a shared backbone with $R$ connecting corresponding leaves.
+\end{proof}
+
+\newcommand{\neverUses}[2]{\mt{neverUses}(#1, #2)}
+
+We wrap up the chapter with a few more algebraic properties, which the Coq code puts to good use in larger examples.
+We sometimes rely on a predicate $\neverUses{c}{p}$, to express that, no matter how other threads interact with it, process $p$ will never perform a send or receive operation on channel $c$.
+
+\begin{theorem}
+  If $\refines{p}{p'}$, then $\refines{\block{c}{p}}{\block{c}{p'}}$.
+\end{theorem}
+
+\begin{theorem}
+  $\refines{\block{c_1}{\block{c_2}{p}}}{\block{c_2}{\block{c_1}{p}}}$
+\end{theorem}
+
+\begin{theorem}
+  If $\neverUses{c}{p_2}$, then $\refines{(\block{c}{\parl{p_1}{p_2}})}{\parl{(\block{c}{p_1})}{p_2}}$.
+\end{theorem}
+
+\begin{theorem}[Handoff]
+  If $\neverUses{c}{p(v)}$, then $\refines{(\block{c}{\parl{(\send{c}{v}{\done})}{\dup{\recv{c}{x}{p(x)}}}})}{p(v)}$.
+\end{theorem}
+
+That last theorem is notable for how it prunes down the space of possibilities given an infinitely duplicated server, where each thread is trying to receive from a channel.
+If server threads never touch that channel after their initial receives, then most server threads will remain inert.
+The one send $\send{c}{v}{\done}$ is the only possible source of interaction with server threads, thanks to the abstraction barrier on $c$, and that one send can only awaken one server thread.
+Thus, the whole composition behaves just like a single server thread, instantiated with the right input value.
+
+A concrete example of the Handoff theorem in action is a refinement like this one, applying to a kind of forwarding chain between channels:
+$$\begin{array}{l}
+  p = \block{c_1}{\block{c_2}{\parl{\send{c_1}{v}{\done}}{\parl{\dup{\recv{c_1}{x}{\send{c_2}{x}{\done}}}}{\dup{\recv{c_2}{y}{\send{c_3}{y}{\done}}}}}}} \\
+  \refines{p}{\; \send{c_3}{v}{\done}}
+\end{array}$$
+
+Note that, without the abstraction boundaries at the start, this fact would not be derivable.
+We would need to worry about meddlesome threads in our environment interacting directly with $c_1$ or $c_2$, spoiling the protocol, and forcing us to add extra cases to the righthand side of the refinement.
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \appendix

@@ -19,3 +19,4 @@ Just run `make` here to build everything, including the book `frap.pdf` and the 
 * Chapter 12: `SeparationLogic.v`
 * Chapter 13: `SharedMemory.v`
 * Chapter 14: `ConcurrentSeparationLogic.v`
+* Chapter 15: `MessagesAndRefinement.v`

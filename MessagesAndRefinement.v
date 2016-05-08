@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 15: Pi-Calculus and Behavioral Refinement
+  * Chapter 15: Process Algebra and Behavioral Refinement
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
@@ -8,6 +8,8 @@ Require Import Frap Eqdep FunctionalExtensionality.
 Set Implicit Arguments.
 Set Asymmetric Patterns.
 
+(** * First, an unexplained tactic that will come in handy.... *)
+
 Ltac invert H := (Frap.invert H || (inversion H; clear H));
                 repeat match goal with
                        | [ x : _ |- _ ] => subst x
@@ -15,21 +17,43 @@ Ltac invert H := (Frap.invert H || (inversion H; clear H));
                        end.
 
 
+(** * A process algebra: syntax and semantics *)
+
+(* A process algebra defines a set of communicating *processes*, which might
+ * more commonly be called *threads*.  Typically processes communicate not with
+ * locks and shared memory, as they have in the prior two chapters, but instead
+ * with *message passing*.  Messages are passed over synchronous *channels*,
+ * which we will just represent as numbers. *)
 Notation channel := nat (only parsing).
 
+(* Here are the basic syntactic constructions of processes. *)
 Inductive proc :=
 | NewChannel (notThese : list channel) (k : channel -> proc)
+(* Pick a new channel [ch] name not found in [notThese], and continue like
+ * [k ch]. *)
+
 | BlockChannel (ch : channel) (pr : proc)
+(* Act like [pr], but prevent interaction with other processes through channel
+ * [ch].  We effectively force [ch] to be *private*. *)
+
 | Send (ch : channel) {A : Set} (v : A) (k : proc)
 | Recv (ch : channel) {A : Set} (k : A -> proc)
+(* When one process runs a [Send] and the other a [Recv] on the same channel
+ * simultaneously, the [Send] moves on to its [k], while the [Recv] moves on to
+ * its [k v], for [v] the value that was sent. *)
+
 | Par (pr1 pr2 : proc)
+(* This one, at least, is just like it was in the last chapter: parallel
+ * composition of threads. *)
+
 | Dup (pr : proc)
-| Done.
+(* An idiosyncratic convention of process algebra: [Dup pr] acts like an
+ * *infinite* number of *copies* of [pr].  It replaces conventional loops. *)
 
-Notation pid := nat (only parsing).
-Notation procs := (fmap pid proc).
-Notation channels := (set channel).
+| Done
+(* This process can't do anything *).
 
+(* Some nicer notations: *)
 Notation "'New' ls ( x ) ; k" := (NewChannel ls (fun x => k)) (right associativity, at level 51, ls at level 0).
 Notation "'Block' ch ; k" := (BlockChannel ch k) (right associativity, at level 51).
 Notation "!! ch ( v ) ; k" := (Send ch v k) (right associativity, at level 45, ch at level 0).
@@ -39,19 +63,31 @@ Infix "||" := Par.
 
 (** * Example *)
 
+(* Let's build highly exciting processes for adding constants to numbers. *)
+
+(* This one accepts one number [n] on channel [input] and returns [n + k] as the
+ * result, by writing it to [output]. *)
 Definition addN (k : nat) (input output : channel) : proc :=
   ??input(n : nat);
   !!output(n + k);
   Done.
 
+(* We wrap that last one in a [Dup] to turn it into a kind of immortal server,
+ * happy to keep responding to "please add k to this" requests forever. *)
 Definition addNs (k : nat) (input output : channel) : proc :=
   Dup (addN k input output).
 
+(* Chaining together two "+1" boxes is one way to build an alternative "+2"
+ * box! *)
 Definition add2 (input output : channel) : proc :=
   Dup (New[input;output](intermediate);
         addN 1 input intermediate
         || addN 1 intermediate output).
 
+(* However, we implement addition, we might compose with this tester process,
+ * which uses an adder as a subroutine in a larger protocol.  [metaInput] and
+ * [metaOutput] are the input and output of the whole system, while [input] and
+ * [output] are used internally, say to communicate with an adder. *)
 Definition tester (metaInput input output metaOutput : channel) : proc :=
   ??metaInput(n : nat);
   !!input(n * 2);
@@ -61,6 +97,12 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
 
 
 (** * Labeled semantics *)
+
+(* Let's explain how programs run.  We'll give a flavor of operational semantics
+ * called a "labelled transition system," because each step will include a label
+ * that explains what happened.  In this case, the only relevant happenings are
+ * sends or receives on channels.  Crucially, we supress send/receive labels for
+ * operations blocked by [Block]s. *)
 
 Record message := {
   Channel : channel;
@@ -76,8 +118,10 @@ Inductive label :=
 | Silent
 | Action (a : action).
 
+(* This command lets us use [action]s implicitly as [label]s. *)
 Coercion Action : action >-> label.
 
+(* This predicate captures when a label doesn't use a channel. *)
 Definition notUse (ch : channel) (l : label) :=
   match l with
   | Action (Input r) => r.(Channel) <> ch
@@ -85,7 +129,13 @@ Definition notUse (ch : channel) (l : label) :=
   | Silent => True
   end.
 
+(* Now, our labelled transition system: *)
 Inductive lstep : proc -> label -> proc -> Prop :=
+
+(* Sends and receives generate the expected labels.  Note that, for a [Recv],
+ * the value being received is "pulled out of thin air"!  However, it gets
+ * determined concretely by comparing against a matching [Send], in a rule that
+ * we get to shortly. *)
 | LStepSend : forall ch {A : Set} (v : A) k,
     lstep (Send ch v k)
           (Output {| Channel := ch; Value := v |})
@@ -94,21 +144,39 @@ Inductive lstep : proc -> label -> proc -> Prop :=
     lstep (Recv ch k)
           (Input {| Channel := ch; Value := v |})
           (k v)
+
+(* A [Dup] always has the option of replicating itself further. *)
 | LStepDup : forall pr,
     lstep (Dup pr) Silent (Par (Dup pr) pr)
+
+(* A channel allocation operation nondeterministically picks the new channel ID,
+ * only checking that it isn't in the provided blacklist.  We install a [Block]
+ * node to keep this channel truly private. *)
 | LStepNew : forall chs ch k,
     ~In ch chs
     -> lstep (NewChannel chs k) Silent (BlockChannel ch (k ch))
+
+(* [Block] nodes work as expected, disallowing labels that use the channel. *)
 | LStepBlock : forall ch k l k',
     lstep k l k'
     -> notUse ch l
     -> lstep (BlockChannel ch k) l (BlockChannel ch k')
+
+(* When either side of a parallel composition can step, we may bubble that step
+ * up to the top. *)
 | LStepPar1 : forall pr1 pr2 l pr1',
     lstep pr1 l pr1'
     -> lstep (Par pr1 pr2) l (Par pr1' pr2)
 | LStepPar2 : forall pr1 pr2 l pr2',
     lstep pr2 l pr2'
     -> lstep (Par pr1 pr2) l (Par pr1 pr2')
+
+(* These two symmetrical rules are the heart of how communication happens in our
+ * language.  Namely, in a parallel composition, when one side is prepared to
+ * write a value to a channel, and the other side is prepared to read the same
+ * value from the same channel, the two sides *rendezvous*, and the value is
+ * exchanged.  This is the only mechanism to let two transitions happen at
+ * once. *)
 | LStepRendezvousLeft : forall pr1 ch {A : Set} (v : A) pr1' pr2 pr2',
     lstep pr1 (Input {| Channel := ch; Value := v |}) pr1'
     -> lstep pr2 (Output {| Channel := ch; Value := v |}) pr2'
@@ -118,6 +186,49 @@ Inductive lstep : proc -> label -> proc -> Prop :=
     -> lstep pr2 (Input {| Channel := ch; Value := v |}) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2').
 
+(* Here's a shorthand for silent steps. *)
+Definition lstepSilent (pr1 pr2 : proc) := lstep pr1 Silent pr2.
+
+(* Our key proof task will be to prove that one process "acts like" another.
+ * We'll use *simulation* as the precise notion of "acts like." *)
+
+(* We say that a relation [R] is a *simulation* when it satisfies the first two
+ * conditions below.  The [simulates] predicate additionally asserts that a
+ * particular pair of processes belongs to [R]. *)
+Definition simulates (R : proc -> proc -> Prop) (pr1 pr2 : proc) :=
+  (* First, consider a pair of processes related by [R].  When the lefthand
+   * process can take a silent step, the righthand process can take zero or more
+   * silent steps to "catch up," arriving at a new righthand process related to
+   * the new lefthand process. *)
+  (forall pr1 pr2, R pr1 pr2
+                   -> forall pr1', lstepSilent pr1 pr1'
+                                   -> exists pr2', lstepSilent^* pr2 pr2'
+                                                   /\ R pr1' pr2')
+
+  (* Now consider the same scenario where the lefthand process make a nonsilent
+   * step.  We require that the righthand process can "catch up" in a way that
+   * generates the same label that the lefthand process generated. *)
+  /\ (forall pr1 pr2, R pr1 pr2
+                      -> forall a pr1', lstep pr1 (Action a) pr1'
+                                        -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
+                                                              /\ lstep pr2' (Action a) pr2''
+                                                              /\ R pr1' pr2'')
+
+  (* Finally, the provided process pair is in the relation. *)
+  /\ R pr1 pr2.
+
+(* One process *refines* another when there exists some simulation. *)
+Definition refines (pr1 pr2 : proc) :=
+  exists R, simulates R pr1 pr2.
+
+Infix "<|" := refines (no associativity, at level 70).
+
+(* That's a somewhat fancy notion of compatibility!  We can also relate it to
+ * more intuitive conditions that aren't strong enough for many of the proofs we
+ * want to do later. *)
+
+(* This predicate captures all finite traces of actions that a process could
+ * generate. *)
 Inductive couldGenerate : proc -> list action -> Prop :=
 | CgNothing : forall pr,
     couldGenerate pr []
@@ -130,27 +241,8 @@ Inductive couldGenerate : proc -> list action -> Prop :=
     -> couldGenerate pr' tr
     -> couldGenerate pr (a :: tr).
 
-Definition lstepSilent (pr1 pr2 : proc) := lstep pr1 Silent pr2.
-
-Definition simulates (R : proc -> proc -> Prop) (pr1 pr2 : proc) :=
-  (forall pr1 pr2, R pr1 pr2
-                   -> forall pr1', lstepSilent pr1 pr1'
-                                   -> exists pr2', lstepSilent^* pr2 pr2'
-                                                   /\ R pr1' pr2')
-  /\ (forall pr1 pr2, R pr1 pr2
-                      -> forall a pr1', lstep pr1 (Action a) pr1'
-                                        -> exists pr2' pr2'', lstepSilent^* pr2 pr2'
-                                                              /\ lstep pr2' (Action a) pr2''
-                                                              /\ R pr1' pr2'')
-  /\ R pr1 pr2.
-
-Definition refines (pr1 pr2 : proc) :=
-  exists R, simulates R pr1 pr2.
-
-Infix "<|" := refines (no associativity, at level 70).
-
-
-(** * Simulation: a proof method *)
+(* Skip ahead to [refines_couldGenerate] to see the top-level connection from
+ * [refines]. *)
 
 Hint Constructors couldGenerate.
 
@@ -189,6 +281,7 @@ Proof.
   eauto.
 Qed.
 
+(* This theorem says that refinement implies *trace inclusion*. *)
 Theorem refines_couldGenerate : forall pr1 pr2, pr1 <| pr2
     -> forall tr, couldGenerate pr1 tr
                   -> couldGenerate pr2 tr.
@@ -198,6 +291,9 @@ Qed.
 
 
 (** * Tactics for automating refinement proofs *)
+
+(* Well, you're used to unexplained automation tactics by now, so here are some
+ * more. ;-) *)
 
 Lemma invert_Recv : forall ch (A : Set) (k : A -> proc) (x : A) pr,
     lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
@@ -228,11 +324,16 @@ Hint Extern 1 (NoDup _) => lists.
 
 (** * Examples *)
 
+(* OK, let's verify a simplification of the example we started with. *)
 Definition add2_once (input output : channel) : proc :=
   New[input;output](intermediate);
   (addN 1 input intermediate
    || addN 1 intermediate output).
 
+(* Here's our first, painstakingly crafted simulation relation.  It needs to
+ * identify all pairs of processes that should be considered compatible.  Think
+ * of the first process as the fancy *implementation* and the second process as
+ * the simpler *specification*. *)
 Inductive R_add2 : proc -> proc -> Prop :=
 | Initial : forall input output,
     input <> output
@@ -273,19 +374,24 @@ Proof.
   exists R_add2.
   first_order.
 
-  clear input output H.
   invert H0; simplify; inverter; eauto.
   replace (n + 1 + 1) with (n + 2) by linear_arithmetic.
   eauto.
 
-  clear input output H.
   invert H0; simplify; inverter; eauto 10; simplify; equality.
 
   unfold add2_once, addN; eauto.
 Qed.
 
+(* Well, good!  The fancy version doesn't produce any traces that the simple
+ * version couldn't also produce.  (It may, however, fail to produce some traces
+ * that the spec allows.) *)
+
 
 (** * Compositional reasoning principles *)
+
+(* It turns out that refinement has all sorts of convenient algebraic
+ * properties.  To start with, it's a preorder. *)
 
 Theorem refines_refl : forall pr,
     pr <| pr.
@@ -338,6 +444,8 @@ Qed.
 
 
 (** ** Dup *)
+
+(* Refinement can be "pushed inside" a [Dup] operation. *)
 
 Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
 | RDupLeaf : forall pr1 pr2,
@@ -466,6 +574,8 @@ Qed.
 
 (** ** Par *)
 
+(* Refinement can also be "pushed inside" parallel composition. *)
+
 Inductive RPar (R1 R2 : proc -> proc -> Prop) : proc -> proc -> Prop :=
 | RPar1 : forall pr1 pr2 pr1' pr2',
     R1 pr1 pr1'
@@ -570,6 +680,8 @@ Qed.
 
 (** ** Block *)
 
+(* A few similar properties apply to [Block], too. *)
+
 Inductive RBlock (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
 | RBlock1 : forall pr1 pr2 ch,
     R pr1 pr2
@@ -631,6 +743,8 @@ Proof.
   eauto 10.
 Qed.
 
+(* This predicate is handy for side conditions, to enforce that a process never
+ * uses a particular channel for anything. *)
 Inductive neverUses (ch : channel) : proc -> Prop :=
 | NuRecv : forall ch' (A : Set) (k : A -> _),
     ch' <> ch
@@ -722,7 +836,10 @@ Proof.
 Qed.
 
 
-(** * Example again *)
+(** * The first example again *)
+
+(* Those tools will help us lift our earlier adder proof to the immortal-server
+ * case, without writing any new simulation relations ourselves. *)
 
 Theorem refines_add2 : forall input output,
     input <> output
@@ -733,6 +850,8 @@ Proof.
   apply add2_once_refines_addN; auto.
 Qed.
 
+(* We can even check refinement of our different adders when run together with
+ * the tester, carefully marking internal channels as private with [Block]. *)
 Theorem refines_add2_with_tester : forall metaInput input output metaOutput,
     input <> output
     -> Block input; Block output; add2 input output || tester metaInput input output metaOutput
@@ -748,16 +867,23 @@ Qed.
 
 (** * Tree membership *)
 
+(* Here's one more example of a parallel program, which searches a binary tree
+ * in parallel, checking if a value is found at one of the leaves. *)
+
 Inductive tree :=
 | Leaf (n : nat)
 | Node (l r : tree).
 
+(* This function formalizes the membership property that we check. *)
 Fixpoint mem (n : nat) (t : tree) : bool :=
   match t with
   | Leaf m => if m ==n n then true else false
   | Node l r => mem n l || mem n r
   end%bool.
 
+(* Here's the lame (but straightforward) sequential implementation.  Note that
+ * we do nothing if the value is not found, and we send exactly one [tt] value
+ * as output if the value is found. *)
 Definition inTree_seq (t : tree) (input output : channel) :=
   Dup (??input(n : nat);
        if mem n t then
@@ -766,6 +892,8 @@ Definition inTree_seq (t : tree) (input output : channel) :=
        else
          Done).
 
+(* Helper function for a fancier parallel version, creating many threads that
+ * are all allowed to send to a channel [output], if they find the value. *)
 Fixpoint inTree_par' (n : nat) (t : tree) (output : channel) :=
   match t with
   | Leaf m =>
@@ -778,6 +906,7 @@ Fixpoint inTree_par' (n : nat) (t : tree) (output : channel) :=
     inTree_par' n l output || inTree_par' n r output
   end.
 
+(* Top-level wrapper for an immortal-server tree-searcher *)
 Definition inTree_par (t : tree) (input output : channel) :=
   Dup (??input(n : nat);
        New[input;output](output');
@@ -785,6 +914,13 @@ Definition inTree_par (t : tree) (input output : channel) :=
        || ??output'(_ : unit);
           !!output(tt);
           Done).
+(* Note the second part of the parallel composition, which makes sure we send
+ * *at most one* notification to the outside world, though the internal threads
+ * may generate as many notifications as there are tree leaves. *)
+
+(* OK, now we get into the complex part, to prove the simulation.  We will let
+ * the relations and lemmas below "speak for themselves," though admittedly it's
+ * a pretty involved argument. *)
 
 Inductive TreeThreads (output' : channel) : bool -> proc -> Prop :=
 | TtDone : forall maySend,
@@ -796,6 +932,7 @@ Inductive TreeThreads (output' : channel) : bool -> proc -> Prop :=
     -> TreeThreads output' maySend pr2
     -> TreeThreads output' maySend (pr1 || pr2).
 
+(* This is the main simulation relation. *)
 Inductive RTree (t : tree) (input output : channel) : proc -> proc -> Prop :=
 | TreeInit :
     RTree t input output
@@ -912,6 +1049,7 @@ Qed.
 
 Hint Resolve TreeThreads_inTree_par'.
 
+(* Finally, the main theorem: *)
 Theorem refines_inTree_par : forall t input output,
     inTree_par t input output <| inTree_seq t input output.
 Proof.
@@ -969,6 +1107,9 @@ Proof.
   invert H7.
 Qed.
 
+(* Hey, let's reason about plugging together the adder and the tree-searcher,
+ * because we can!  The adder produces a number that is fed into the
+ * tree-searcher as input. *)
 Theorem gratuitous_composition : forall t ch1 ch2 ch3,
     ch1 <> ch2
     -> Block ch2; add2 ch1 ch2 || inTree_par t ch2 ch3
@@ -980,9 +1121,16 @@ Proof.
   apply refines_add2; auto.
   apply refines_inTree_par.
 Qed.
+(* Note how we didn't need to revisit any details of the proofs of the
+ * individual components.  Now that's modularity in action! *)
 
 
 (** * One more example: handoff lemma *)
+
+(* Let's prove an even simpler specification related to the last example proof.
+ * We define some relations and lemmas in service of the key handoff lemma, but
+ * feel free to search for [Theorem] to skip ahead to its (much simpler)
+ * statement. *)
 
 Inductive manyOf (this : proc) : proc -> Prop :=
 | MoOne : manyOf this this
@@ -1192,6 +1340,12 @@ Proof.
   apply IHmanyOfAndOneOf in H6; first_order; subst; eauto.
 Qed.
 
+(* When one thread is ready to send a message, and there is an immortal server
+ * ready to accept that message, the process is equivalent to one that just
+ * skips right to running a single server thread.  It is crucial that the body
+ * of each server thread has nothing more to do with the channel we are using to
+ * send it requests!  Otherwise, we would need to keep some [Dup] present
+ * explicitly in the spec (righthand argument of [<|]). *)
 Theorem handoff : forall ch (A : Set) (v : A) k,
     neverUses ch (k v)
     -> Block ch; (!!ch(v); Done) || Dup (Recv ch k)
@@ -1258,7 +1412,13 @@ Ltac neverUses :=
          | [ |- context[if ?E then _ else _] ] => cases E
          | _ => repeat (constructor; simplify)
          end; lists.
-  
+
+(* OK, let's prove a final and satisfyingly simple spec for a system that
+ * combines an adder and a tree-searcher.  We send some seed value to an adder,
+ * which forwards it to the tree-searcher.  When the value we expect it to send
+ * is indeed present in the tree, the whole contraption is equivalent to just
+ * signalling a "yes" answer!  In our setting, that means sending a message to
+ * the final output channel [ch3]. *)
 Theorem gratuitous_composition_expanded : forall n t ch1 ch2 ch3,
     mem (n + 2) t = true
     -> NoDup [ch1; ch2; ch3]
@@ -1288,3 +1448,5 @@ Proof.
   rewrite H.
   apply refines_refl.
 Qed.
+(* Note how, again, we used the correctness theorems for our components as black
+ * boxes, so that all that's left is algebraic reasoning over [<|]. *)

@@ -428,16 +428,22 @@ Proof.
   exists (fun p q => exists r, x p r /\ x0 r q).
   first_order.
 
-  eapply H0 in H5; eauto.
+  match goal with
+  | [ H : _, H' : x _ _ |- _ ] => eapply H in H'; eauto; []
+  end.
   first_order.
-  eapply refines_trans' in H7; eauto.
+  eapply refines_trans' with (R := x0) in H7; eauto.
   first_order.
 
-  eapply H3 in H6; eauto.
+  match goal with
+  | [ H : _, H' : x _ _ |- _ ] => eapply H in H'; eauto; []
+  end.
   first_order.
-  eapply refines_trans' in H7; eauto.
+  eapply refines_trans' with (R := x0) in H7; eauto.
   first_order.
-  eapply H1 in H8; eauto.
+  match goal with
+  | [ H : _, H' : x0 _ _ |- _ ] => eapply H in H'; eauto; []
+  end.
   first_order.
   eauto 8 using trc_trans.
 Qed.
@@ -542,9 +548,13 @@ Proof.
   eapply refines_Dup_Action in H5; eauto.
   first_order.
   eexists; propositional.
-  apply trc_trans with (x1 || pr2').
+  match goal with
+  | [ _ : lstepSilent^* pr1' ?x |- _ ] => apply trc_trans with (x || pr2')
+  end.
   eauto.
-  apply trc_trans with (x1 || x).
+  match goal with
+  | [ _ : lstepSilent^* pr2' ?x' |- lstepSilent^* (?x || _) _ ] => eapply trc_trans with (x || x')
+  end.
   eauto.
   apply trc_one.
   eauto.
@@ -553,9 +563,13 @@ Proof.
   eapply refines_Dup_Action in H5; eauto.
   first_order.
   eexists; propositional.
-  apply trc_trans with (x1 || pr2').
+  match goal with
+  | [ _ : lstepSilent^* pr1' ?x |- _ ] => apply trc_trans with (x || pr2')
+  end.
   eauto.
-  apply trc_trans with (x1 || x).
+  match goal with
+  | [ _ : lstepSilent^* pr2' ?x' |- lstepSilent^* (?x || _) _ ] => eapply trc_trans with (x || x')
+  end.
   eauto.
   apply trc_one.
   eauto.
@@ -646,9 +660,13 @@ Proof.
   eapply H2 in H9; eauto.
   first_order.
   eexists; propositional.
-  apply trc_trans with (x1 || pr2').
+  match goal with
+  | [ _ : lstepSilent^* pr1' ?x |- _ ] => apply trc_trans with (x || pr2')
+  end.
   eauto.
-  apply trc_trans with (x1 || x).
+  match goal with
+  | [ _ : lstepSilent^* pr2' ?x' |- lstepSilent^* (?x || _) _ ] => eapply trc_trans with (x || x')
+  end.
   eauto.
   apply trc_one.
   eauto.
@@ -657,9 +675,13 @@ Proof.
   eapply H2 in H9; eauto.
   first_order.
   eexists; propositional.
-  apply trc_trans with (x1 || pr2').
+  match goal with
+  | [ _ : lstepSilent^* pr1' ?x |- _ ] => apply trc_trans with (x || pr2')
+  end.
   eauto.
-  apply trc_trans with (x1 || x).
+  match goal with
+  | [ _ : lstepSilent^* pr2' ?x' |- lstepSilent^* (?x || _) _ ] => eapply trc_trans with (x || x')
+  end.
   eauto.
   apply trc_one.
   eauto.
@@ -1189,8 +1211,8 @@ Proof.
   exfalso; eauto.
   invert H1; eauto.
   invert H1; eauto.
-  eapply manyOf_action in H5; eauto; first_order.
-  eapply manyOf_action in H4; eauto; first_order.
+  eapply manyOf_action in H5; eauto; first_order; exfalso; eauto.
+  eapply manyOf_action in H4; eauto; first_order; exfalso; eauto.
 Qed.
 
 Lemma manyOf_rendezvous : forall ch (A : Set) (v : A) (k : A -> _) pr,

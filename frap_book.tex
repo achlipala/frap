@@ -1761,7 +1761,7 @@ As an example, consider this formalization of even-odd analysis, whose proof of 
   \E \; \hat{\times} \; \_ &=& \E \\
   \_ \; \hat{\times} \; \E &=& \E \\
   \O \; \hat{\times} \; \O &=& \O \\
-  \top \; \hat{\times} \; \top &=& \top \\
+  \_ \; \hat{\times} \; \_ &=& \top \\
   \E \join \E &=& \E \\
   \O \join \O &=& \O \\
   \_ \join \_ &=& \top \\
@@ -3099,7 +3099,7 @@ We associate this exception with \emph{program failure}, and the Hoare logic wil
 
 The extension to program syntax is easy:
 \begin{eqnarray*}
-  \mt{Loop} &:& \forall \alpha. \; \mt{cmd} \; \alpha
+  \mt{Fail} &:& \forall \alpha. \; \mt{cmd} \; \alpha
 \end{eqnarray*}
 That is, a failing program can be considered to return any result type, since it will never actually return normally, instead throwing an uncatchable exception.
 

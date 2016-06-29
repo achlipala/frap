@@ -3254,7 +3254,7 @@ We start by matching $\ptsto{p}{q}$ with $\ptsto{p}{?a}$, learning that $?a = q$
 This crucial step relies on the three key properties of $*$, given in the second row of rules above: commutativity, associativity, and cancellativity\index{cancellativity}.
 $$\ptsto{q}{r} * \ptsto{r}{0} \Rightarrow \; \ptsto{?b}{?c} \; * \; \ptsto{q}{?b}$$
 
-We run another cancellation step of $\ptsto{q}{r}$ against $\ptsto{q}{?b}$, learning $?q = r$.
+We run another cancellation step of $\ptsto{q}{r}$ against $\ptsto{q}{?b}$, learning $?b = r$.
 $$\ptsto{r}{0} \Rightarrow \; \ptsto{r}{?c}$$
 
 Now we can finish the proof by reflexivity of $\Rightarrow$, learning $?c = 0$.

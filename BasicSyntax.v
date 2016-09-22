@@ -77,7 +77,7 @@ Module ArithWithConstants.
      *   matches one of the [match] cases in a defining [Fixpoint],
      *   replace with the body of that case, then repeat. *)
     linear_arithmetic.
-    (* [linear_arithemtic]: a complete decision procedure for linear arithmetic.
+    (* [linear_arithmetic]: a complete decision procedure for linear arithmetic.
      *   Relevant formulas are essentially those built up from
      *   variables and constant natural numbers and integers
      *   using only addition, with equality and inequality

@@ -1085,7 +1085,7 @@ There we have $\to^2\ns(S_0)$, $\to^3\ns(S_0)$, and $\to^4\ns(S_0$).
 
 It follows that the set of states reachable after $n$ steps is:
 \begin{eqnarray*}
-  \mathsf{reach}(n) &=& \bigcup_{i < n} \to^i\ns(S_0)
+  \mathsf{reach}(n) &=& \bigcup_{i \leq n} \to^i\ns(S_0)
 \end{eqnarray*}
 
 This iteration process is not obviously executable yet, because, a priori, we seem to need to consider all possible $n$ values, to characterize the state space fully.

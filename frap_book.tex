@@ -2779,7 +2779,7 @@ These rules together are \emph{complete}\index{completeness of Hoare logic}, in 
 Here we only go into detail on a proof of the dual property, \emph{soundness}\index{soundness of Hoare logic}.
 
 \begin{lemma}\label{hoare_while}
-  Assume the following fact: Together, $\bigstep{(h, v, c)}{(h', v')}$, $I(h, v)$, and $\denote{b}(h, s)$ imply $I(h', v')$.
+  Assume the following fact: Together, $\bigstep{(h, v, c)}{(h', v')}$, $I(h, v)$, and $\denote{b}(h, v)$ imply $I(h', v')$.
   Then, given $\bigstep{(h, v, \{I\} \while{b}{c})}{(h', v')}$, it follows that $I(h', v')$ and $\neg \denote{b}(h', v')$.
 \end{lemma}
 \begin{proof}

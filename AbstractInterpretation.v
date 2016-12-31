@@ -15,7 +15,7 @@ Set Implicit Arguments.
  * technique: abstract interpretation. *)
 
 (* Apologies for jumping right into abstract formal details, but that's what the
- * medium of Coq forces us on!  We will apply abstraction interpretation to the
+ * medium of Coq forces us on!  We will apply abstract interpretation to the
  * imperative language that we formalized in the last chapter.  Here's a record
  * capturing the idea of an abstract interpretation for that language. *)
 Record absint := {

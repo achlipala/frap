@@ -73,7 +73,7 @@ The classic engineering disciplines all have their standard mathematical techniq
 The engineers in a discipline more or less agree on what are ``the rules'' to be followed in vetting a design.
 Those rules are specified with a high degree of rigor, so that it isn't a matter of opinion whether a design is safe.
 Why doesn't software engineering have a corresponding agreed-upon standard, whereby programmers convince themselves that their systems are safe, secure, and correct?
-The concepts and tools may not quite be ready yet for broad adoption, but they have been under deveopment for decades.
+The concepts and tools may not quite be ready yet for broad adoption, but they have been under development for decades.
 This book introduces one particular tool and a body of ideas for how to apply it to different tasks in program proof.
 
 As this document is in a very early draft stage, no more will be said here, in favor of jumping right into the technical material.
@@ -826,7 +826,7 @@ Intuitively, an invariant is a property of program state that \emph{starts true 
 
 \invariants
 \begin{definition}
-  An \emph{invariant} of a transition system is a property that is always true, in all reachable states of a transition system.  That is, for transition system $\angled{S, S_0, \to}$, where $R$ is the set of all its reachable states, some $I \subseteq S$ is an invariant iff $R \subseteq I$.
+  An \emph{invariant} of a transition system is a property that is always true, in all of the system's reachable states.  That is, for transition system $\angled{S, S_0, \to}$, where $R$ is the set of all its reachable states, some $I \subseteq S$ is an invariant iff $R \subseteq I$.  (Note that here we adopt the mathematical convention that ``properties'' of states and ``sets'' of states are synonymous, so that in each case we can use what terminology seems most natural.  The ``property'' holds of exactly those states that belong to the ``set.'')
 \end{definition}
 
 At first look, the definition may appear a bit silly.
@@ -960,10 +960,10 @@ $$\infer{((0, \bot), \mathsf{Lock}) \in \mathcal L_0}{}$$
 
 Four inference rules explain the four transitions between program counters that a single thread can make, reading and writing shared state as needed.
 
-$$\infer{((\bot, g), \mathsf{Lock}) \to_{\mathcal L} ((\top, g), \mathsf{Read})}{}
-\quad \infer{((\ell, g), \mathsf{Read}) \to_{\mathcal L} ((\ell, g), \mathsf{Write}(g))}{}$$
-$$\infer{((\ell, g), \mathsf{Write}(n)) \to_{\mathcal L} ((\ell, n+1), \mathsf{Unlock})}{}
-\quad \infer{((\ell, g), \mathsf{Unlock}) \to_{\mathcal L} ((\bot, g), \mathsf{Done})}{}$$
+$$\infer{((g, \bot), \mathsf{Lock}) \to_{\mathcal L} ((g, \top), \mathsf{Read})}{}
+\quad \infer{((g, \ell), \mathsf{Read}) \to_{\mathcal L} ((g, \ell), \mathsf{Write}(g))}{}$$
+$$\infer{((g, \ell), \mathsf{Write}(n)) \to_{\mathcal L} ((n+1, \ell), \mathsf{Unlock})}{}
+\quad \infer{((g, \ell), \mathsf{Unlock}) \to_{\mathcal L} ((g, \bot), \mathsf{Done})}{}$$
 
 \smallskip
 
@@ -997,7 +997,7 @@ Rather than consider all possible runs of the program, we will use an invariant 
 First, we should be clear on what we mean to prove about this program.
 Let's also restrict our attention to the two-thread case for the rest of this section; the $n$-thread case is left as an exercise for the reader!
 \begin{theorem}
-  For any reachable state $((\ell, g), (p^1, p^2))$ of $\mathcal L \mid \mathcal L$, if $p^1 = p^2 = \mathsf{Done}$, then $g = 2$.
+  For any reachable state $((g, \ell), (p^1, p^2))$ of $\mathcal L \mid \mathcal L$, if $p^1 = p^2 = \mathsf{Done}$, then $g = 2$.
 \end{theorem}
 That is, when both threads terminate, \texttt{global} equals 2.
 
@@ -1640,7 +1640,7 @@ $$\begin{array}{rrcl}
   \textrm{Commands} & c &::=& \ldots \mid c || c
 \end{array}$$
 
-To capture that idea that \emph{either} command in a parallel construct is allowed to step next, we extend evaluation contexts like so:
+To capture the idea that \emph{either} command in a parallel construct is allowed to step next, we extend evaluation contexts like so:
 \encoding
 $$\begin{array}{rrcl}
   \textrm{Evaluation contexts} & C &::=& \ldots \mid C || c \mid c || C
@@ -1729,7 +1729,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
   \end{itemize}
 
   For $a, b \in \mathbb D$, define $a \sqsubseteq b$ to mean $\forall n \in \mathbb N. \; (n \sim a) \Rightarrow (n \sim b)$.  That is, $b$ is at least as general as $a$.
-  An abstract interpretation must satsify the following algebraic laws:
+  An abstract interpretation must satisfy the following algebraic laws:
   \begin{itemize}
   \item $\forall a \in \mathbb D. \; a \sqsubseteq \top$
   \item $\forall n \in \mathbb N. \; n \sim \mathcal C(n)$
@@ -1744,10 +1744,10 @@ One example, which we'll formalize in more detail shortly, would be to label eac
   \end{itemize}
 \end{definition}
 
-As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise for the reader.
-
 \newcommand{\E}[0]{\mathsf{E}}
 \renewcommand{\O}[0]{\mathsf{O}}
+
+As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise for the reader.
 \begin{eqnarray*}
   \mathbb D &=& \{\E, \O, \top\} \\
   \mathcal C(n) &=& \textrm{$\E$ or $\O$, depending on parity of $n$} \\
@@ -1843,12 +1843,16 @@ As a preliminary, we define the abstract interpretation of an expression like so
 
 \newcommand{\asgns}[1]{\mathcal A(#1)}
 
-Next, we define the assignments-of function $\mathcal A$ for commands.
+Next, we model the possible effects of commands.
+We already said that our flow-insensitive analysis will forget about control flow in a command, but what does that mean formally?
+States of this language, without control flow taken into account, are just variable valuations, and the only way a command can affect a valuation is through executing assignments.
+Therefore, forgetting the control flow of a command amounts to just \emph{recording which assignments it contains syntactically}, losing all context about which Boolean tests would need to pass to reach each assignment.
+This simple syntactic extraction process can be formalized with an assignments-of function $\mathcal A$ for commands.
 \begin{eqnarray*}
   \asgns{\skipe} &=& \{\} \\
   \asgns{\assign{x}{e}} &=& \{(x, e)\} \\
-  \asgns{c_1; c_2} &=& \asgns{c_1} \join \asgns{c_2} \\
-  \asgns{\ifte{e}{c_1}{c_2}} &=& \asgns{c_1} \join \asgns{c_2} \\
+  \asgns{c_1; c_2} &=& \asgns{c_1} \cup \asgns{c_2} \\
+  \asgns{\ifte{e}{c_1}{c_2}} &=& \asgns{c_1} \cup \asgns{c_2} \\
   \asgns{\while{e}{c_1}} &=& \asgns{c_1}
 \end{eqnarray*}
 
@@ -1877,7 +1881,7 @@ In particular:
 \item Otherwise, assign $s = s'$ and return to \ref{flow_insensitive_loop}.
 \end{enumerate}
 
-Every step in this outline is computable, since the abstract states will, in practice, be finite maps, where all variables not in their domains are assumed to map to $\top$.
+Every step in this outline is computable, since the abstract states will always be finite maps.
 
 \begin{theorem}\label{flow_insensitive_iteration}
   \invariants
@@ -1892,12 +1896,19 @@ Our even-odd example trivially has that property, since it contains only finitel
 It is worth emphasizing that, when those conditions are met, our invariant-finding procedure is guaranteed to terminate, even though the underlying language is Turing-complete, so that most interesting analysis problems are uncomputable!
 The catch is that it is always possible that the invariant found is a trivial one, where the abstract state maps every variable to $\top$.
 
+Here is an example of a program where flow-insensitive even-odd analysis gives the most precise answer.
+$$\assign{n}{10}; \assign{x}{0}; \while{n > 0}{\assign{x}{x + 2 \times n}; \assign{n}{n - 1}}$$
+
+The abstract state we wind up with is $\mupd{\mupd{\mempty}{n}{\top}}{x}{\E}$.
 
 \section{Flow-Sensitive Analysis}
 
 We can only go so far with flow-insensitive invariants, which don't let us record different facts about the variables for different lines of the program code.
 Such an analysis will get tripped up even by straightline code where parities of variables change as we go.
-The solution can be to go to \emph{flow-sensitive}\index{flow-sensitive analysis} analysis, where an abstract state $S$ is a finite map from commands to the abstract states of the previous section.
+Here is a trivial example program where the flow-insensitive analysis returns the useless answer $\mupd{\mempty}{x}{\top}$, when the most precise answer would be $\mupd{\mempty}{x}{\O}$.
+$$\assign{x}{0}; \assign{x}{1}$$
+
+The solution to this problem can be to go to \emph{flow-sensitive}\index{flow-sensitive analysis} analysis, where an abstract state $S$ is a finite map from commands (all the intermediate ``program counters'' of an original command) to the abstract states of the previous section.
 
 \newcommand{\absstep}[3]{\mathcal S(#1, #2, #3)}
 \newcommand{\absstepo}[2]{\mathcal S(#1, #2)}
@@ -1916,6 +1927,7 @@ See how $f$ is modified in the sequencing case below, for something of an intuit
 \end{eqnarray*}
 
 Note that the last two cases, for conditional control flow, ignore the test expression entirely, which is certainly sound, though it may lead to imprecision in the analysis.
+This approximation is known as \emph{path insensitivity}\index{path-insensitive analysis}.
 Define $\absstepo{s}{c}$ as shorthand for $\absstep{s}{c}{\lambda c_1. \; c_1}$.
 
 Now we can define a new abstract step relation.
@@ -2077,7 +2089,7 @@ Since we aim more for broad than deep coverage of the field of formal program re
 With substitution in hand, a big-step semantics\index{big-step semantics} is easy to define.
 We use the syntactic shorthand $v$ for a \emph{value}\index{value}, or term that needs no further evaluation, which in this case includes just the $\lambda$-abstractions.
 \encoding
-$$\infer{\bigstep{\lambda x. \; x}{\lambda x. \; x}}{}
+$$\infer{\bigstep{\lambda x. \; e}{\lambda x. \; e}}{}
 \quad \infer{\bigstep{e_1 \; e_2}{v'}}{
   \bigstep{e_1}{\lambda x. \; e}
   & \bigstep{e_2}{v}
@@ -2529,15 +2541,15 @@ Here we give some highlights.
   If $\rhasty{\Sigma}{\Gamma}{e}{\tau}$ and every mapping in $\Sigma$ is also included in $\Sigma'$, then $\rhasty{\Sigma'}{\Gamma}{e}{\tau}$.
 \end{lemma}
 
-\begin{lemma}\label{preservation0}
+\begin{lemma}
   If $\smallstepo{(h, e)}{(h', e')}$, $\rhasty{\Sigma}{\mempty}{e}{\tau}$, and $\heapty{\Sigma}{h}$, then there exists $\Sigma'$ such that $\rhasty{\Sigma'}{\mempty}{e'}{\tau}$, $\heapty{\Sigma'}{h'}$, and $\Sigma'$ preserves all mappings from $\Sigma$.
 \end{lemma}
 
-\begin{lemma}\label{generalize_plug}
+\begin{lemma}
   If $\rhasty{\Sigma}{\mempty}{\plug{C}{e_1}}{\tau}$, then there exists $\tau_0$ such that $\rhasty{\Sigma}{\mempty}{e_1}{\tau_0}$ and, for all $e_2$ and $\Sigma'$, if $\rhasty{\Sigma'}{\mempty}{e_2}{\tau_0}$ and $\Sigma'$ preserves mappings from $\Sigma$, then $\rhasty{\Sigma'}{\mempty}{\plug{C}{e_2}}{\tau}$.
 \end{lemma}
 
-\begin{lemma}[Preservation]\label{preservation}
+\begin{lemma}[Preservation]
   If $\smallstep{(h, e)}{(h', e')}$, $\rhasty{\Sigma}{\mempty}{e}{\tau}$, and $\heapty{\Sigma}{h}$, then there exists $\Sigma'$ such that $\rhasty{\Sigma'}{\mempty}{e'}{\tau}$ and $\heapty{\Sigma'}{h'}$.
 \end{lemma}
 
@@ -2567,7 +2579,7 @@ To define \emph{unreachable}, we start with a way to compute the \emph{free loca
 \newcommand{\reach}[2]{\mathcal R_{#1}(#2)}
 
 Next, we define a relation to capture \emph{which locations are reachable from some starting expression, relative to a particular heap?}
-For each expression $e$ and heap $e$, we define $\reach{h}{e}$ as the set of locations reachable from $e$ via $h$.
+For each expression $e$ and heap $h$, we define $\reach{h}{e}$ as the set of locations reachable from $e$ via $h$.
 $$\infer{\ell \in \reach{h}{\ell}}{}
 \quad \infer{\ell' \in \reach{h}{\ell}}{
   \msel{h}{\ell} = v
@@ -2605,7 +2617,7 @@ More precisely, the limit on how many times we can run garbage collection in a r
 
 The type-safety proof is fairly straightforward to update.
 We prove progress by \emph{ignoring} the garbage-collection rule, since the existing rule was already enough to find a step for every nonvalue.
-A bit more work is needed to update the proof of preservation; its case for the existing rule follows the same way as before, while we must prove a few lemmas on the way to handling the new rule.
+A bit more work is needed to update the proof of preservation; its case for the existing rules follows the same way as before, while we must prove a few lemmas on the way to handling the new rule.
 
 \begin{lemma}[Transitivity for reachability]
   If $\freeloc{e_1} \subseteq \freeloc{e_2}$, then $\reach{h}{e_1} \subseteq \reach{h}{e_2}$.

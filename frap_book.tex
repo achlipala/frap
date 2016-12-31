@@ -539,7 +539,7 @@ That intuition gives rise to the common notion of a \emph{commuting diagram}\ind
 \end{tikzcd}
 \]
 
-We start at the top left, with a given expresson $e$ and valuation $v$.
+We start at the top left, with a given expression $e$ and valuation $v$.
 The diagram shows the equivalence of \emph{two different paths} to the bottom right.
 Each individual arrow is labeled with some description of the transformation it performs, to get from the term at its source to the term at its destination.
 The right-then-down path is based on substituting and then interpreting, while the down-then-right path is based on extending the valuation and then interpreting.
@@ -562,7 +562,7 @@ We also freely use single instructions to stand for programs, writing just $i$ i
 \newcommand{\push}[2]{#1 \rhd #2}
 
 Each instruction of this language transforms a \emph{stack}\index{stack}, a last-in-first-out list of numbers.
-Rather than spend more words on it, here is an interpreter that makes everythig precise.
+Rather than spend more words on it, here is an interpreter that makes everything precise.
 Here and elsewhere, we overload the Oxford brackets $\denote{\ldots}$ shamelessly, where context makes clear which language or interpreter we are dealing with.
 We write $s$ for stacks, and we write $\push{n}{s}$ for pushing number $n$ onto the top of stack $s$.
 
@@ -732,7 +732,7 @@ However, many important languages don't fall into that category, and for them we
 Nontermination isn't always a bug; for instance, we expect a network server to run indefinitely.
 We still need to be able to talk about the correct behavior of programs that run forever, by design.
 For that reason, in this chapter and in most of the rest of the book, we model programs using relations, in much the same way that may be familiar from automata theory\index{automata theory}.
-An important difference, though, is that, while undergraduate automata-theory classes generally study \emph{finite-state machines}\index{finite-state machines}, for general program reasoning we want to allow infinite sets of states, otherwise referred to as \emph{infinite-state systems}\index{infnite-state systems}.
+An important difference, though, is that, while undergraduate automata-theory classes generally study \emph{finite-state machines}\index{finite-state machines}, for general program reasoning we want to allow infinite sets of states, otherwise referred to as \emph{infinite-state systems}\index{infinite-state systems}.
 
 Let's start with an example that almost seems too mundane to be associated with such terms.
 
@@ -2082,7 +2082,7 @@ Such a problem can only arise when replacing a variable with an open term.
 In this case, that term is $x$, where $\fv{x} = \{x\} \neq \emptyset$.
 
 More general investigations into $\lambda$-calculus will define a more involved notion of \emph{capture-avoiding} substitution\index{capture-avoiding substitution}.
-Instead, in this book, we carefully steer clear of the $\lambda$-calculus applications that require substituting open terms for variables, letting us stick with the simpler definiton.
+Instead, in this book, we carefully steer clear of the $\lambda$-calculus applications that require substituting open terms for variables, letting us stick with the simpler definition.
 When it comes to formal encoding of this style of syntax in proof assistants, surprisingly many complications arise, leading to what is still an active research area in encodings of language syntax with local variable binding\index{variable binding}.
 Since we aim more for broad than deep coverage of the field of formal program reasoning, we are happy to avoid those complexities.
 
@@ -2648,7 +2648,7 @@ It may be an edifying exercise for the reader to extend our proof in a way that 
 \chapter{Hoare Logic: Verifying Imperative Programs}
 
 We now take a step away from the last chapters in two dimensions: we switch back from functional to imperative programs, and we return to proofs of deep correctness properties, rather than mere absence of type-related crashes.
-Nontheless, the essential proof structure winds up being the same, as we once again prove invariants of transition systems!
+Nonetheless, the essential proof structure winds up being the same, as we once again prove invariants of transition systems!
 
 
 \section{An Imperative Language with Memory}
@@ -3879,7 +3879,7 @@ We may keep the simplistic-seeming rule for parallel composition and implicitly 
 The big twist is that we parameterize everything over some finite set $L$ of locks that may be used.
 \invariants
 Furthermore, another parameter is a function $\mathcal I$ that maps locks to invariants, which have the same type as preconditions.
-The idea is this: when no one holds a lock, \emph{the lock owns a chunk of memory that satisifes its invariant}.
+The idea is this: when no one holds a lock, \emph{the lock owns a chunk of memory that satisfies its invariant}.
 When a thread holds the lock, the lock doesn't own any memory; it is waiting for the thread to unlock it and \emph{donate back} a chunk of memory satisfying the invariant.
 We now think of the precondition of a Hoare triple as only describing the \emph{local memory} of a thread, which no other thread may access; while locks and their invariants coordinate the \emph{shared memory} regions of an application.
 The proof rules will coordinate dynamic motion of memory regions between the shared regions and local regions.
@@ -4022,7 +4022,7 @@ Another well-established (and increasingly popular) style is \emph{message passi
 In that world, there is, in fact, no memory at all, let alone shared memory.
 Instead, state is incorporated into the text of thread code, and information passes from thread to thread by sending \emph{messages} over \emph{channels}\index{channel}.
 There are two main kinds of message passing.
-In the \emph{asynchronous}\index{asynchronous message passing} or \emph{mailbox}\index{mailbox} style, a thread can desposit a message in a channel, even when no one is ready to receive the message immediately.
+In the \emph{asynchronous}\index{asynchronous message passing} or \emph{mailbox}\index{mailbox} style, a thread can deposit a message in a channel, even when no one is ready to receive the message immediately.
 Later, a thread can come along and effectively dequeue the message from the channel.
 In the \emph{synchronous}\index{synchronous message passing} or \emph{rendezvous}\index{rendezvous} style, a message send only executes when a matching receive, on the same channel, is available immediately.
 The threads of the two complementary operations \emph{rendezvous} and pass the message in one atomic step.

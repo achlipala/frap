@@ -3625,7 +3625,7 @@ Formally, we define $\pors{h, l, \concat{(c, s)}{S}}$ as follows, recalling that
 \begin{itemize}
 \item There is some $c_0$ where $\na{c} = c_0$.  That is, thread $c$ has some atomic action lined up to run next.
 \item There exist $h'$, $l'$, and $c'$ such that $\smallstep{(h, l, c)}{(h', l', c')}$.  That is, thread $c$ is actually able to take a step, which might not be possible if e.g. trying to take a lock that is already held.
-\item For every $(c_1, s) \in S$, we have $\commu{c_0}{c_1}$.  That is, all actions that other threads might perform commute with $c_0$, the first action of $c$.
+\item For every $(c_1, s) \in S$, we have $\commu{c_0}{s}$.  That is, all actions that other threads might perform commute with $c_0$, the first action of $c$.
 \end{itemize}
 
 \newcommand{\smallstepC}[2]{#1 \to_C #2}

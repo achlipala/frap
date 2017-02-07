@@ -32,7 +32,7 @@ Fixpoint depth (e : arith) : nat :=
   end.
 
 Compute depth ex1.
-Compute size ex2.
+Compute depth ex2.
 
 (* Our first proof!
  * Size is an upper bound on depth. *)

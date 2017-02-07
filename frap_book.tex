@@ -46,7 +46,7 @@ For more information, see the book's home page:
 \mbox{}\vfill
 \begin{center}
 
-Copyright Adam Chlipala 2015-2016.
+Copyright Adam Chlipala 2015-2017.
 
 
 This work is licensed under a
@@ -293,7 +293,7 @@ To derive an $\mathsf{Exp}$ structural induction principle, we produce a new set
   \item For each premise $E \in S$, add a companion premise $P(E)$.  That is, the obligation allows \emph{assuming} that $P$ holds of certain terms.  Each such assumption is called an \emph{inductive hypothesis}\index{inductive hypothesis} (\emph{IH}\index{IH}).
 \end{enumerate}
 
-That mechanical procedure derives the following four proof obligations, associated with an inductive proof that $\forall x \in \mathsf{X}. \; P(x)$.
+That mechanical procedure derives the following four proof obligations, associated with an inductive proof that $\forall x \in \mathsf{Exp}. \; P(x)$.
 $$\infer{P(\mathsf{Const}(n))}{
   n \in \mathbb N
 }
@@ -313,7 +313,7 @@ $$\quad \infer{P(\mathsf{Plus}(e_1, e_2))}{
   & P(e_2)
 }$$
 
-In other words, to establish $\forall x \in \mathsf{X}. \; P(x)$, we need to prove that each of these inference rules is valid.
+In other words, to establish $\forall x \in \mathsf{Exp}. \; P(x)$, we need to prove that each of these inference rules is valid.
 
 To see induction in action, we prove a theorem giving a sanity check on our two recursive definitions from earlier: depth can never exceed size.
 \begin{theorem}

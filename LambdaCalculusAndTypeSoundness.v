@@ -630,25 +630,26 @@ Module Stlc.
     propositional.
 
     right.
-    invert H1; invert H.
-    invert H2; invert H0.
+    (* Some automation is needed here to maintain compatibility with
+     * name generation in different Coq versions. *)
+    match goal with
+    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    end.
+    match goal with
+    | [ H1 : value e2, H2 : hasty $0 e2 _ |- _ ] => invert H1; invert H2
+    end.
     exists (Const (n + n0)).
     eapply StepRule with (C := Hole).
     eauto.
     eauto.
     constructor.
 
-    invert H2.
-    right.
-    invert H3.
-    exists (Plus e1 x).
-    eapply StepRule with (C := Plus2 e1 C).
-    eauto.
-    eauto.
-    assumption.
-
-    invert H1.
-    invert H3.
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
     right.
     exists (Plus x e2).
     eapply StepRule with (C := Plus1 C e2).
@@ -656,8 +657,25 @@ Module Stlc.
     eauto.
     assumption.
 
-    invert H1.
-    invert H3.
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    exists (Plus e1 x).
+    eapply StepRule with (C := Plus2 e1 C).
+    eauto.
+    eauto.
+    assumption.
+
+    match goal with
+    | [ H : exists x, step e1 _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
     right.
     exists (Plus x e2).
     eapply StepRule with (C := Plus1 C e2).
@@ -671,7 +689,9 @@ Module Stlc.
     propositional.
 
     right.
-    invert H1; invert H.
+    match goal with
+    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    end.
     exists (subst e2 x e0).
     eapply StepRule with (C := Hole).
     eauto.
@@ -679,17 +699,12 @@ Module Stlc.
     constructor.
     assumption.
 
-    invert H2.
-    right.
-    invert H3.
-    exists (App e1 x).
-    eapply StepRule with (C := App2 e1 C).
-    eauto.
-    eauto.
-    assumption.
-
-    invert H1.
-    invert H3.
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
     right.
     exists (App x e2).
     eapply StepRule with (C := App1 C e2).
@@ -697,8 +712,25 @@ Module Stlc.
     eauto.
     assumption.
 
-    invert H1.
-    invert H3.
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    exists (App e1 x).
+    eapply StepRule with (C := App2 e1 C).
+    eauto.
+    eauto.
+    assumption.
+
+    match goal with
+    | [ H : exists x, step e1 _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
     right.
     exists (App x e2).
     eapply StepRule with (C := App1 C e2).
@@ -775,10 +807,8 @@ Module Stlc.
     constructor.
 
     constructor.
-    apply IHhasty1.
-    assumption.
-    apply IHhasty2.
-    assumption.
+    eapply IHhasty1; equality.
+    eapply IHhasty2; equality.
 
     cases (x0 ==v x).
 
@@ -800,10 +830,8 @@ Module Stlc.
     assumption.
 
     econstructor.
-    apply IHhasty1.
-    assumption.
-    apply IHhasty2.
-    assumption.
+    eapply IHhasty1; equality.
+    eapply IHhasty2; equality.
   Qed.
 
   (* We're almost ready for the other main property.  Let's prove it first

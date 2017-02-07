@@ -19,7 +19,79 @@ Ltac inductN n :=
       end
   end.
 
-Ltac induct e := inductN e || dependent induction e.
+Ltac same_structure x y :=
+  match x with
+  | ?f ?a1 ?b1 ?c1 ?d1 =>
+    match y with
+    | f ?a2 ?b2 ?c2 ?d2 => same_structure a1 a2; same_structure b1 b2; same_structure c1 c2; same_structure d1 d2
+    | _ => fail 2
+    end
+  | ?f ?a1 ?b1 ?c1 =>
+    match y with
+    | f ?a2 ?b2 ?c2 => same_structure a1 a2; same_structure b1 b2; same_structure c1 c2
+    | _ => fail 2
+    end
+  | ?f ?a1 ?b1 =>
+    match y with
+    | f ?a2 ?b2 => same_structure a1 a2; same_structure b1 b2
+    | _ => fail 2
+    end
+  | ?f ?a1 =>
+    match y with
+    | f ?a2 => same_structure a1 a2
+    | _ => fail 2
+    end
+  | _ =>
+    match y with
+    | ?f ?a1 ?b1 ?c1 ?d1 =>
+      match x with
+      | f ?a2 ?b2 ?c2 ?d2 => same_structure a1 a2; same_structure b1 b2; same_structure c1 c2; same_structure d1 d2
+      | _ => fail 2
+      end
+    | ?f ?a1 ?b1 ?c1 =>
+      match x with
+      | f ?a2 ?b2 ?c2 => same_structure a1 a2; same_structure b1 b2; same_structure c1 c2
+      | _ => fail 2
+      end
+    | ?f ?a1 ?b1 =>
+      match x with
+      | f ?a2 ?b2 => same_structure a1 a2; same_structure b1 b2
+      | _ => fail 2
+      end
+    | ?f ?a1 =>
+      match x with
+      | f ?a2 => same_structure a1 a2
+      | _ => fail 2
+      end
+    | _ => idtac
+    end
+  end.
+
+Ltac instantiate_obvious1 H :=
+  match type of H with
+  | ?x = ?y -> _ =>
+    (same_structure x y; specialize (H eq_refl)) || fail 3
+  | JMeq.JMeq ?x ?y -> _ =>
+    (same_structure x y; specialize (H JMeq.JMeq_refl)) || fail 3
+  | forall x : ?T, _ =>
+    match type of T with
+    | Prop => fail 1
+    | _ =>
+      let x' := fresh x in
+      evar (x' : T);
+      let x'' := eval unfold x' in x' in specialize (H x''); clear x';
+        instantiate_obvious1 H
+    end
+  end.
+
+Ltac instantiate_obvious H := repeat instantiate_obvious1 H.
+
+Ltac instantiate_obviouses :=
+  repeat match goal with
+         | [ H : _ |- _ ] => instantiate_obvious H
+         end.
+
+Ltac induct e := (inductN e || dependent induction e); instantiate_obviouses.
 
 Ltac invert' H := inversion H; clear H; subst.
 
@@ -244,9 +316,9 @@ Ltac total_ordering N M := destruct (totally_ordered N M).
 
 Ltac inList x xs :=
   match xs with
-  | (x, _) => constr:true
+  | (x, _) => true
   | (_, ?xs') => inList x xs'
-  | _ => constr:false
+  | _ => false
   end.
 
 Ltac maybe_simplify_map m found kont :=

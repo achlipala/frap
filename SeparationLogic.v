@@ -854,7 +854,8 @@ Proof.
   cases (x0 $? a); try equality.
   eauto using lookup_Some_dom.
   eauto using lookup_Some_dom.
-  rewrite lookup_join2 in H8; eauto.
+  rewrite lookup_join2 in H8.
+  eapply H2; eassumption.
   eauto using lookup_None_dom.
 Qed.
 

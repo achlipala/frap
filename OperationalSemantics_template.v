@@ -813,6 +813,8 @@ Module Concurrent.
     -> cstep (v, c) (v', c').
   Proof.
     induct 1; repeat match goal with
+                     | [ H : forall a b c d, _ = _ -> _ = _ -> _ |- _ ] =>
+                       specialize (H _ _ _ _ eq_refl eq_refl)
                      | [ H : cstep _ _ |- _ ] => invert H
                      end; eauto.
   Qed.

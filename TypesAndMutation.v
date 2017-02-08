@@ -304,10 +304,10 @@ Module References.
   Proof.
     induct 2; t.
     match goal with
-    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H3 in H8; t
+    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H2 in H1; t
     end.
     match goal with
-    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H3 in H8; t
+    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H2 in H1; t
     end.
   Qed.
 

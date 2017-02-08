@@ -651,11 +651,7 @@ Module Stlc.
     | [ H : step _ _ |- _ ] => invert H
     end.
     right.
-    exists (Plus x e2).
-    eapply StepRule with (C := Plus1 C e2).
     eauto.
-    eauto.
-    assumption.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
@@ -664,11 +660,7 @@ Module Stlc.
     | [ H : step _ _ |- _ ] => invert H
     end.
     right.
-    exists (Plus e1 x).
-    eapply StepRule with (C := Plus2 e1 C).
     eauto.
-    eauto.
-    assumption.
 
     match goal with
     | [ H : exists x, step e1 _ |- _ ] => invert H
@@ -706,11 +698,7 @@ Module Stlc.
     | [ H : step _ _ |- _ ] => invert H
     end.
     right.
-    exists (App x e2).
-    eapply StepRule with (C := App1 C e2).
     eauto.
-    eauto.
-    assumption.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
@@ -719,11 +707,7 @@ Module Stlc.
     | [ H : step _ _ |- _ ] => invert H
     end.
     right.
-    exists (App e1 x).
-    eapply StepRule with (C := App2 e1 C).
     eauto.
-    eauto.
-    assumption.
 
     match goal with
     | [ H : exists x, step e1 _ |- _ ] => invert H

@@ -69,10 +69,13 @@ Ltac same_structure x y :=
 
 Ltac instantiate_obvious1 H :=
   match type of H with
+  | _ ++ _ = _ ++ _ -> _ => fail 1
   | ?x = ?y -> _ =>
-    (same_structure x y; specialize (H eq_refl)) || fail 3
+    (same_structure x y; specialize (H eq_refl))
+    || (has_evar (x, y); fail 3)
   | JMeq.JMeq ?x ?y -> _ =>
-    (same_structure x y; specialize (H JMeq.JMeq_refl)) || fail 3
+    (same_structure x y; specialize (H JMeq.JMeq_refl))
+    || (has_evar (x, y); fail 3)
   | forall x : ?T, _ =>
     match type of T with
     | Prop => fail 1

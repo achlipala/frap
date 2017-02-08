@@ -236,6 +236,7 @@ Module References.
         | [ H : step _ _ |- _ ] => invert H
         end;
     repeat match goal with
+           | [ H : plug _ _ _ |- _ ] => invert1 H
            | [ H : plug _ _ _ |- _ ] => invert H
            | [ H : step0 _ _ |- _ ] => invert1 H
            | [ H : value _ |- _ ] => invert1 H
@@ -302,8 +303,12 @@ Module References.
          \/ exists he', step (h, e) he'.
   Proof.
     induct 2; t.
-    apply H2 in H8; t.
-    apply H1 in H8; t.
+    match goal with
+    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H3 in H8; t
+    end.
+    match goal with
+    | [ H1 : _ = Some _, H2 : forall l : loc, _ |- _ ] => apply H3 in H8; t
+    end.
   Qed.
 
   (* Now, a series of lemmas essentially copied from original type-soundness

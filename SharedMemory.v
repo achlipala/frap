@@ -1496,6 +1496,7 @@ Proof.
   cases r1; simplify; subst.
   right; eexists (_ :: _); simplify; eauto.
   invert H.
+  first_order; subst; eauto.
   apply IHl1 in H2; first_order; subst; eauto.
 Qed.
 
@@ -1550,7 +1551,7 @@ Proof.
 
   cases x3; simplify.
   invert H.
-  eapply nextAction_det in H0; eauto; propositional; subst.
+  eapply nextAction_det in H0; try eapply H5; eauto; propositional; subst.
   eauto 10.
 
   invert H.
@@ -1574,7 +1575,7 @@ Proof.
 
   cases x3; simplify.
   invert H.
-  eapply nextAction_det in H0; eauto; propositional; subst.
+  eapply nextAction_det in H0; try eapply H5; eauto; propositional; subst.
   eauto 10.
 
   invert H.

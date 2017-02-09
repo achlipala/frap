@@ -127,6 +127,10 @@ Fixpoint rev {A} (ls : list A) : list A :=
   | x :: ls' => rev ls' ++ [x]
   end.
 
+Theorem length_app : forall A (ls1 ls2 : list A),
+    length (ls1 ++ ls2) = length ls1 + length ls2.
+Admitted.
+
 (* One of the classic gotchas in functional-programming class is how slow this
  * naive [rev] is.  Each [app] operation requires linear time, so running
  * linearly many [app]s brings us to quadratic time for [rev].  Using a helper
@@ -323,6 +327,90 @@ Proof.
   simplify.
   rewrite unzip_app.
   rewrite IHls.
+  simplify.
+  equality.
+Qed.
+
+
+(** * Binary trees *)
+
+(* Another classic datatype is binary trees, which we can define like so. *)
+Inductive tree (A : Set) : Set :=
+| Leaf
+| Node (l : tree A) (d : A) (r : tree A).
+
+Arguments Leaf [A].
+
+Example tr1 : tree nat := Node (Node Leaf 7 Leaf) 8 (Node Leaf 9 (Node Leaf 10 Leaf)).
+
+(* There is a natural notion of size of a tree. *)
+Fixpoint size {A} (t : tree A) : nat :=
+  match t with
+  | Leaf => 0
+  | Node l _ r => 1 + size l + size r
+  end.
+
+(* There is also a natural sense of reversing a tree, flipping it around its
+ * vertical axis. *)
+Fixpoint reverse {A} (t : tree A) : tree A :=
+  match t with
+  | Leaf => Leaf
+  | Node l d r => Node (reverse r) d (reverse l)
+  end.
+
+(* There is a natural relationship between the two. *)
+Theorem size_reverse : forall A (t : tree A),
+    size (reverse t) = size t.
+Proof.
+  induct t; simplify.
+
+  equality.
+
+  linear_arithmetic.
+Qed.
+
+(* Another classic tree operation is flattening into lists. *)
+Fixpoint flatten {A} (t : tree A) : list A :=
+  match t with
+  | Leaf => []
+  | Node l d r => flatten l ++ d :: flatten r
+  end.
+(* Note here that operators [++] and [::] are right-associative. *)
+
+Theorem length_flatten : forall A (t : tree A),
+    length (flatten t) = size t.
+Proof.
+  induct t; simplify.
+
+  equality.
+
+  rewrite length_app.
+  simplify.
+  linear_arithmetic.
+Qed.
+
+Lemma rev_app : forall A (ls1 ls2 : list A),
+    rev (ls1 ++ ls2) = rev ls2 ++ rev ls1.
+Proof.
+  induct ls1; simplify.
+
+  rewrite app_nil.
+  equality.
+
+  rewrite IHls1.
+  apply app_assoc.
+Qed.
+
+Theorem rev_flatten : forall A (t : tree A),
+    rev (flatten t) = flatten (reverse t).
+Proof.
+  induct t; simplify.
+
+  equality.
+
+  rewrite rev_app.
+  simplify.
+  rewrite app_assoc.
   simplify.
   equality.
 Qed.

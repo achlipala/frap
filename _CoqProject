@@ -10,6 +10,7 @@ AbstractInterpret.v
 Frap.v
 BasicSyntax_template.v
 BasicSyntax.v
+Polymorphism.v
 Interpreters_template.v
 Interpreters.v
 TransitionSystems_template.v

@@ -414,3 +414,191 @@ Proof.
   simplify.
   equality.
 Qed.
+
+
+(** * Syntax trees *)
+
+(* Trees are particularly important to us in studying program proof, since it is
+ * natural to represent programs as *syntax trees*.  Here's a quick example, for
+ * a tiny imperative language. *)
+
+Inductive expression : Set :=
+| Const (n : nat)
+| Var (x : var)
+| Plus (e1 e2 : expression)
+| Minus (e1 e2 : expression)
+| Times (e1 e2 : expression)
+| GreaterThan (e1 e2 : expression)
+| Not (e : expression).
+
+Inductive statement : Set :=
+| Assign (x : var) (e : expression)
+| Sequence (s1 s2 : statement)
+| IfThenElse (e : expression) (s1 s2 : statement)
+| WhileLoop (e : expression) (s : statement).
+
+(* First, here's a quick sample of nifty notations to write
+ * almost-natural-looking embedded programs in Coq. *)
+Coercion Const : nat >-> expression.
+Coercion Var : string >-> expression.
+Infix "+" := Plus : embedded_scope.
+Infix "-" := Minus : embedded_scope.
+Infix "*" := Times : embedded_scope.
+Infix ">" := GreaterThan : embedded_scope.
+Infix "<-" := Assign (at level 75) : embedded_scope.
+Infix ";" := Sequence (at level 76) : embedded_scope.
+Notation "'If' e {{ s1 }} 'else' {{ s2 }}" := (IfThenElse e s1 s2) (at level 75) : embedded_scope.
+Notation "'While' e {{ s }}" := (WhileLoop e s) (at level 75) : embedded_scope.
+Delimit Scope embedded_scope with embedded.
+
+Example factorial :=
+  ("answer" <- 1;
+   While ("input" > 0) {{
+     "answer" <- "answer" * "input";
+     "input" <- "input" - 1
+   }})%embedded.
+
+(* A variety of compiler-style operations can be coded on top of this type.
+ * Here's one to count total variable occurrences. *)
+
+Fixpoint varsInExpression (e : expression) : nat :=
+  match e with
+  | Const _ => 0
+  | Var _ => 1
+  | Plus e1 e2
+  | Minus e1 e2
+  | Times e1 e2
+  | GreaterThan e1 e2 => varsInExpression e1 + varsInExpression e2
+  | Not e1 => varsInExpression e1
+  end.
+
+Fixpoint varsInStatement (s : statement) : nat :=
+  match s with
+  | Assign _ e => 1 + varsInExpression e
+  | Sequence s1 s2 => varsInStatement s1 + varsInStatement s2
+  | IfThenElse e s1 s2 => varsInExpression e + varsInStatement s1 + varsInStatement s2
+  | WhileLoop e s1 => varsInExpression e + varsInStatement s1
+  end.
+
+(* We will need to wait for a few more lectures' worth of conceptual progress
+ * before we can prove that transformations on programs preserve meaning, but we
+ * do already have enough tools that prove that transformations preserve more
+ * basic properties, like number of variables.  Here's one such transformation,
+ * which flips "then" and "else" cases while also negating "if" conditions. *)
+Fixpoint flipper (s : statement) : statement :=
+  match s with
+  | Assign _ _ => s
+  | Sequence s1 s2 => Sequence (flipper s1) (flipper s2)
+  | IfThenElse e s1 s2 => IfThenElse (Not e) (flipper s2) (flipper s1)
+  | WhileLoop e s1 => WhileLoop e (flipper s1)
+  end.
+
+Theorem varsIn_flipper : forall s,
+    varsInStatement (flipper s) = varsInStatement s.
+Proof.
+  induct s; simplify.
+
+  equality.
+
+  equality.
+
+  linear_arithmetic.
+
+  equality.
+Qed.
+
+(* Just for the sheer madcap fun of it, let's write some translations of
+ * programs into our lists from before, with variables as data values. *)
+
+Fixpoint listifyExpression (e : expression) : list var :=
+  match e with
+  | Const _ => []
+  | Var x => [x]
+  | Plus e1 e2
+  | Minus e1 e2
+  | Times e1 e2
+  | GreaterThan e1 e2 => listifyExpression e1 ++ listifyExpression e2
+  | Not e1 => listifyExpression e1
+  end.
+
+Fixpoint listifyStatement (s : statement) : list var :=
+  match s with
+  | Assign x e => x :: listifyExpression e
+  | Sequence s1 s2 => listifyStatement s1 ++ listifyStatement s2
+  | IfThenElse e s1 s2 => listifyExpression e ++ listifyStatement s1 ++ listifyStatement s2
+  | WhileLoop e s1 => listifyExpression e ++ listifyStatement s1
+  end.
+
+Compute listifyStatement factorial.
+
+(* At this point, I can't resist switching to a more automated proof style,
+ * though still a pretty tame one. *)
+
+Hint Rewrite length_app.
+
+Lemma length_listifyExpression : forall e,
+    length (listifyExpression e) = varsInExpression e.
+Proof.
+  induct e; simplify; linear_arithmetic.
+Qed.
+
+Hint Rewrite length_listifyExpression.
+
+Theorem length_listifyStatement : forall s,
+    length (listifyStatement s) = varsInStatement s.
+Proof.
+  induct s; simplify; linear_arithmetic.
+Qed.
+
+(* Other transformations are also possible, like the Swedish-Chef optimization,
+ * that turns every variable into "bork".  It saves many bits when most variable
+ * names are longer than 4 characters. *)
+
+Fixpoint swedishExpression (e : expression) : expression :=
+  match e with
+  | Const _ => e
+  | Var _ => Var "bork"
+  | Plus e1 e2 => Plus (swedishExpression e1) (swedishExpression e2)
+  | Minus e1 e2 => Minus (swedishExpression e1) (swedishExpression e2)
+  | Times e1 e2 => Times (swedishExpression e1) (swedishExpression e2)
+  | GreaterThan e1 e2 => GreaterThan (swedishExpression e1) (swedishExpression e2)
+  | Not e1 => Not (swedishExpression e1)
+  end.
+
+Fixpoint swedishStatement (s : statement) : statement :=
+  match s with
+  | Assign _ e => Assign "bork" (swedishExpression e)
+  | Sequence s1 s2 => Sequence (swedishStatement s1) (swedishStatement s2)
+  | IfThenElse e s1 s2 => IfThenElse (swedishExpression e) (swedishStatement s1) (swedishStatement s2)
+  | WhileLoop e s1 => WhileLoop (swedishExpression e) (swedishStatement s1)
+  end.
+
+Compute swedishStatement factorial.
+
+Fixpoint swedishList (ls : list var) : list var :=
+  match ls with
+  | [] => []
+  | _ :: ls => "bork" :: swedishList ls
+  end.
+
+Lemma swedishList_app : forall ls1 ls2,
+    swedishList (ls1 ++ ls2) = swedishList ls1 ++ swedishList ls2.
+Proof.
+  induct ls1; simplify; equality.
+Qed.
+
+Hint Rewrite swedishList_app.
+
+Lemma listifyExpression_swedishExpression : forall e,
+    listifyExpression (swedishExpression e) = swedishList (listifyExpression e).
+Proof.
+  induct e; simplify; equality.
+Qed.
+
+Hint Rewrite listifyExpression_swedishExpression.
+
+Lemma listifyStatement_swedishStatement : forall s,
+    listifyStatement (swedishStatement s) = swedishList (listifyStatement s).
+Proof.
+  induct s; simplify; equality.
+Qed.

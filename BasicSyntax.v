@@ -168,7 +168,7 @@ Module ArithWithVariables.
     end.
 
   Compute depth ex1.
-  Compute size ex2.
+  Compute depth ex2.
 
   Theorem depth_le_size : forall e, depth e <= size e.
   Proof.

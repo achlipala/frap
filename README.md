@@ -9,7 +9,7 @@ Just run `make` here to build everything, including the book `frap_book.pdf` and
 The main narrative, also present in the book PDF, presents standard program-proof ideas, without rigorous proofs.  Matching Coq files here show how to make it rigorous.  Interleaved with that narrative, there are also other lectures' worth of material, for building up more practical background on Coq itself.  That secondary track appears in this list, too, at a higher level of indentation.
 
 * Chapter 2: `BasicSyntax.v`
-  * `DataStructures.v`: polymorphism and generic data structures
+  * `Polymorphism.v`: polymorphism and generic data structures
 * Chapter 3: `Interpreters.v`
 * Chapter 4: `TransitionSystems.v`
 * Chapter 5: `ModelChecking.v`

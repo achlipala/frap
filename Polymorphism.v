@@ -205,3 +205,124 @@ Proof.
   rewrite rev_append_ok.
   apply app_nil.
 Qed.
+
+(** ** Zipping and unzipping *)
+
+(* Another classic pair of list operations is zipping and unzipping.
+ * These functions convert between pairs of lists and lists of pairs. *)
+
+Fixpoint zip {A1 A2} (ls1 : list A1) (ls2 : list A2) : list (A1 * A2) :=
+  match ls1, ls2 with
+  | x1 :: ls1', x2 :: ls2' => (x1, x2) :: zip ls1' ls2'
+  | _, _ => []
+  end.
+(* Note how, when passed two lengths of different lists, [zip] drops the
+ * mismatched suffix of the longer list. *)
+
+(* An explicit [Set] annotation is needed here, for obscure type-inference
+ * reasons. *)
+Fixpoint unzip {A1 A2 : Set} (ls : list (A1 * A2)) : list A1 * list A2 :=
+  match ls with
+  | [] => ([], [])
+  | (x1, x2) :: ls' =>
+    let (ls1, ls2) := unzip ls' in
+    (x1 :: ls1, x2 :: ls2)
+  end.
+
+(* A few common-sense properties hold of these definitions. *)
+
+Theorem length_zip : forall A1 A2 (ls1 : list A1) (ls2 : list A2),
+    length (zip ls1 ls2) = min (length ls1) (length ls2).
+Proof.
+  induct ls1; simplify.
+
+  linear_arithmetic.
+
+  cases ls2; simplify.
+
+  linear_arithmetic.
+
+  rewrite IHls1.
+  linear_arithmetic.
+Qed.
+
+(* We write [fst] and [snd] for the first and second projection operators on
+ * pairs, respectively. *)
+
+Theorem length_unzip1 : forall (A1 A2 : Set) (ls : list (A1 * A2)),
+    length (fst (unzip ls)) = length ls.
+Proof.
+  induct ls; simplify.
+
+  equality.
+
+  cases hd.
+  (* Note that [cases] allows us to pull apart a pair into its two pieces. *)
+  cases (unzip ls).
+  simplify.
+  equality.
+Qed.
+
+Theorem length_unzip2 : forall (A1 A2 : Set) (ls : list (A1 * A2)),
+    length (snd (unzip ls)) = length ls.
+Proof.
+  induct ls; simplify.
+
+  equality.
+
+  cases hd.
+  cases (unzip ls).
+  simplify.
+  equality.
+Qed.
+
+Theorem zip_unzip : forall (A1 A2 : Set) (ls : list (A1 * A2)),
+    (let (ls1, ls2) := unzip ls in zip ls1 ls2) = ls.
+Proof.
+  induct ls; simplify.
+
+  equality.
+
+  cases hd.
+  cases (unzip ls).
+  simplify.
+  equality.
+Qed.
+
+(* There are also interesting interactions with [app] and [rev]. *)
+
+Theorem unzip_app : forall (A1 A2 : Set) (x y : list (A1 * A2)),
+    unzip (x ++ y)
+    = (let (x1, x2) := unzip x in
+       let (y1, y2) := unzip y in
+       (x1 ++ y1, x2 ++ y2)).
+Proof.
+  induct x; simplify.
+
+  cases (unzip y).
+  equality.
+
+  cases hd.
+  cases (unzip x).
+  simplify.
+  rewrite IHx.
+  cases (unzip y).
+  equality.
+Qed.
+
+Theorem unzip_rev : forall (A1 A2 : Set) (ls : list (A1 * A2)),
+    unzip (rev ls) = (let (ls1, ls2) := unzip ls in
+                      (rev ls1, rev ls2)).
+Proof.
+  induct ls; simplify.
+
+  equality.
+
+  cases hd.
+  cases (unzip ls).
+  simplify.
+  rewrite unzip_app.
+  rewrite IHls.
+  simplify.
+  equality.
+Qed.

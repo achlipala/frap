@@ -982,3 +982,97 @@ Module RepFunction.
     Qed.
   End DelayedSum.
 End RepFunction.
+
+
+Module Type FINITE_SET.
+  Parameter key : Set.
+  Parameter t : Set.
+
+  Parameter empty : t.
+  Parameter insert : t -> key -> t.
+  Parameter member : t -> key -> bool.
+
+  Axiom member_empty : forall k, member empty k = false.
+
+  Axiom member_insert_eq : forall k s,
+      member (insert s k) k = true.
+  Axiom member_insert_noteq : forall k1 k2 s,
+      k1 <> k2
+      -> member (insert s k1) k2 = member s k2.
+End FINITE_SET.
+
+Module Type SET_WITH_EQUALITY.
+  Parameter t : Set.
+  Parameter equal : t -> t -> bool.
+
+  Axiom equal_ok : forall a b, if equal a b then a = b else a <> b.
+End SET_WITH_EQUALITY.
+
+Module ListSet(SE : SET_WITH_EQUALITY) : FINITE_SET with Definition key := SE.t.
+  Definition key := SE.t.
+  Definition t := list SE.t.
+
+  Definition empty : t := [].
+  Definition insert (s : t) (k : key) : t := k :: s.
+  Fixpoint member (s : t) (k : key) : bool :=
+    match s with
+    | [] => false
+    | k' :: s' => SE.equal k' k || member s' k
+    end.
+
+  Theorem member_empty : forall k, member empty k = false.
+  Proof.
+    simplify.
+    equality.
+  Qed.
+
+  Theorem member_insert_eq : forall k s,
+      member (insert s k) k = true.
+  Proof.
+    simplify.
+    pose proof (SE.equal_ok k k).
+    cases (SE.equal k k); simplify.
+    equality.
+    equality.
+  Qed.
+
+  Theorem member_insert_noteq : forall k1 k2 s,
+      k1 <> k2
+      -> member (insert s k1) k2 = member s k2.
+  Proof.
+    simplify.
+    pose proof (SE.equal_ok k1 k2).
+    cases (SE.equal k1 k2); simplify.
+    equality.
+    equality.
+  Qed.
+End ListSet.
+
+Module NatWithEquality : SET_WITH_EQUALITY with Definition t := nat.
+  Definition t := nat.
+
+  Fixpoint equal (a b : nat) : bool :=
+    match a, b with
+    | 0, 0 => true
+    | S a', S b' => equal a' b'
+    | _, _ => false
+    end.
+
+  Theorem equal_ok : forall a b, if equal a b then a = b else a <> b.
+  Proof.
+    induct a; simplify.
+
+    cases b.
+    equality.
+    equality.
+
+    cases b.
+    equality.
+    specialize (IHa b).
+    cases (equal a b).
+    equality.
+    equality.
+  Qed.
+End NatWithEquality.
+
+Module NatSet := ListSet(NatWithEquality).

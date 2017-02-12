@@ -989,16 +989,18 @@ Module Type FINITE_SET.
   Parameter t : Set.
 
   Parameter empty : t.
-  Parameter insert : t -> key -> t.
+  Parameter add : t -> key -> t.
   Parameter member : t -> key -> bool.
 
   Axiom member_empty : forall k, member empty k = false.
 
-  Axiom member_insert_eq : forall k s,
-      member (insert s k) k = true.
-  Axiom member_insert_noteq : forall k1 k2 s,
+  Axiom member_add_eq : forall k s,
+      member (add s k) k = true.
+  Axiom member_add_noteq : forall k1 k2 s,
       k1 <> k2
-      -> member (insert s k1) k2 = member s k2.
+      -> member (add s k1) k2 = member s k2.
+
+  Axiom decidable_equality : forall a b : key, a = b \/ a <> b.
 End FINITE_SET.
 
 Module Type SET_WITH_EQUALITY.
@@ -1008,12 +1010,12 @@ Module Type SET_WITH_EQUALITY.
   Axiom equal_ok : forall a b, if equal a b then a = b else a <> b.
 End SET_WITH_EQUALITY.
 
-Module ListSet(SE : SET_WITH_EQUALITY) : FINITE_SET with Definition key := SE.t.
+Module ListSet(SE : SET_WITH_EQUALITY) <: FINITE_SET with Definition key := SE.t.
   Definition key := SE.t.
   Definition t := list SE.t.
 
   Definition empty : t := [].
-  Definition insert (s : t) (k : key) : t := k :: s.
+  Definition add (s : t) (k : key) : t := k :: s.
   Fixpoint member (s : t) (k : key) : bool :=
     match s with
     | [] => false
@@ -1026,8 +1028,8 @@ Module ListSet(SE : SET_WITH_EQUALITY) : FINITE_SET with Definition key := SE.t.
     equality.
   Qed.
 
-  Theorem member_insert_eq : forall k s,
-      member (insert s k) k = true.
+  Theorem member_add_eq : forall k s,
+      member (add s k) k = true.
   Proof.
     simplify.
     pose proof (SE.equal_ok k k).
@@ -1036,9 +1038,9 @@ Module ListSet(SE : SET_WITH_EQUALITY) : FINITE_SET with Definition key := SE.t.
     equality.
   Qed.
 
-  Theorem member_insert_noteq : forall k1 k2 s,
+  Theorem member_add_noteq : forall k1 k2 s,
       k1 <> k2
-      -> member (insert s k1) k2 = member s k2.
+      -> member (add s k1) k2 = member s k2.
   Proof.
     simplify.
     pose proof (SE.equal_ok k1 k2).
@@ -1046,9 +1048,16 @@ Module ListSet(SE : SET_WITH_EQUALITY) : FINITE_SET with Definition key := SE.t.
     equality.
     equality.
   Qed.
+
+  Theorem decidable_equality : forall a b : key, a = b \/ a <> b.
+  Proof.
+    simplify.
+    pose proof (SE.equal_ok a b).
+    cases (SE.equal a b); propositional.
+  Qed.
 End ListSet.
 
-Module NatWithEquality : SET_WITH_EQUALITY with Definition t := nat.
+Module NatWithEquality <: SET_WITH_EQUALITY with Definition t := nat.
   Definition t := nat.
 
   Fixpoint equal (a b : nat) : bool :=
@@ -1076,3 +1085,144 @@ Module NatWithEquality : SET_WITH_EQUALITY with Definition t := nat.
 End NatWithEquality.
 
 Module NatSet := ListSet(NatWithEquality).
+
+Module FindDuplicates (FS : FINITE_SET).
+  Fixpoint noDuplicates' (ls : list FS.key) (s : FS.t) : bool :=
+    match ls with
+    | [] => true
+    | x :: ls' => negb (FS.member s x) && noDuplicates' ls' (FS.add s x)
+    end.
+
+  Definition noDuplicates (ls : list FS.key) := noDuplicates' ls FS.empty.
+
+  Definition hasDuplicate (ls : list FS.key) :=
+    exists ls1 a ls2 ls3, ls = ls1 ++ a :: ls2 ++ a :: ls3.
+
+  Definition contains (a : FS.key) (ls : list FS.key) :=
+    exists ls1 ls2, ls = ls1 ++ a :: ls2.
+
+  Lemma noDuplicates'_ok : forall ls s, if noDuplicates' ls s
+                                        then ~(hasDuplicate ls
+                                               \/ exists a, FS.member s a = true
+                                                            /\ contains a ls)
+                                        else (hasDuplicate ls
+                                              \/ exists a, FS.member s a = true
+                                                           /\ contains a ls).
+  Proof.
+    induct ls; simplify.
+
+    unfold hasDuplicate, contains.
+    propositional.
+    first_order.
+    cases x; simplify.
+    equality.
+    equality.
+
+    first_order.
+    cases x0; simplify.
+    equality.
+    equality.
+    cases (FS.member s a); simplify.
+    right.
+    exists a.
+    propositional.
+    unfold contains.
+    exists [].
+    exists ls.
+    simplify.
+    equality.
+
+    specialize (IHls (FS.add s a)).
+    cases (noDuplicates' ls (FS.add s a)).
+    propositional.
+
+    apply H1.
+    exists a.
+    propositional.
+    apply FS.member_add_eq.
+    unfold hasDuplicate, contains in *.
+    first_order.
+    cases x; simplify.
+    invert H0.
+    exists x1.
+    exists x2.
+    equality.
+
+    invert H0.
+    exfalso.
+    apply H with (x3 := x).
+    exists x0.
+    exists x1.
+    exists x2.
+    equality.
+
+    first_order.
+    apply H1 with x.
+    propositional.
+    pose proof (FS.decidable_equality a x).
+    propositional.
+    rewrite H4.
+    apply FS.member_add_eq.
+    rewrite FS.member_add_noteq.
+    assumption.
+    assumption.
+    cases x0; simplify.
+    equality.
+    invert H2.
+    exists x0.
+    exists x1.
+    equality.
+
+    first_order.
+    left.
+    exists (a :: x).
+    exists x0.
+    exists x1.
+    exists x2.
+    simplify.
+    equality.
+    cases (FS.member s x).
+
+    right.
+    exists x.
+    propositional.
+    exists (a :: x0).
+    exists x1.
+    simplify.
+    equality.
+
+    left.
+    pose proof (FS.decidable_equality a x).
+    propositional.
+
+    exists nil.
+    exists a.
+    exists x0.
+    exists x1.
+    simplify.
+    equality.
+    rewrite FS.member_add_noteq in H.
+    equality.
+    assumption.
+  Qed.
+
+  Theorem noDuplicates_ok : forall ls, if noDuplicates ls
+                                       then ~hasDuplicate ls 
+                                       else hasDuplicate ls.
+  Proof.
+    simplify.
+    pose proof (noDuplicates'_ok ls FS.empty).
+    unfold noDuplicates.
+    cases (noDuplicates' ls FS.empty); first_order.
+    rewrite FS.member_empty in H.
+    equality.
+  Qed.
+End FindDuplicates.
+
+Module NatDuplicateFinder := FindDuplicates(NatSet).
+
+Compute NatDuplicateFinder.noDuplicates [].
+Compute NatDuplicateFinder.noDuplicates [1].
+Compute NatDuplicateFinder.noDuplicates [1; 2].
+Compute NatDuplicateFinder.noDuplicates [1; 2; 3].
+Compute NatDuplicateFinder.noDuplicates [1; 2; 1; 3].

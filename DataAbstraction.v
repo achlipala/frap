@@ -1226,3 +1226,331 @@ Compute NatDuplicateFinder.noDuplicates [1].
 Compute NatDuplicateFinder.noDuplicates [1; 2].
 Compute NatDuplicateFinder.noDuplicates [1; 2; 3].
 Compute NatDuplicateFinder.noDuplicates [1; 2; 1; 3].
+
+Module NatRangeSet <: FINITE_SET with Definition key := nat.
+  Definition key := nat.
+
+  Inductive rangeSet : Set :=
+  | Empty
+  | Range (from to : nat)
+  | AdHoc (s : NatSet.t).
+
+  Definition t := rangeSet.
+
+  Fixpoint fromRange' (from to : nat) : NatSet.t :=
+    match to with
+    | 0 => NatSet.add NatSet.empty 0
+    | S to' => if NatWithEquality.equal to from
+               then NatSet.add NatSet.empty to
+               else NatSet.add (fromRange' from to') (S to')
+    end.
+
+  Definition fromRange (from to : nat) : NatSet.t :=
+    if Compare_dec.leb from to
+    then fromRange' from to
+    else NatSet.empty.
+
+  Definition empty : t := Empty.
+  Definition add (s : t) (k : key) : t :=
+    match s with
+    | Empty => Range k k
+    | Range from to =>
+      if Compare_dec.leb from k && Compare_dec.leb k to
+      then s
+      else if NatWithEquality.equal k (from - 1) && Compare_dec.leb from to
+           then Range k to
+           else if NatWithEquality.equal k (to + 1) && Compare_dec.leb from to
+                then Range from k
+                else AdHoc (NatSet.add (fromRange from to) k)
+    | AdHoc s' => AdHoc (NatSet.add s' k)
+    end.
+
+  Definition member (s : t) (k : key) : bool :=
+    match s with
+    | Empty => false
+    | Range from to => Compare_dec.leb from to && Compare_dec.leb from k && Compare_dec.leb k to
+    | AdHoc s' => NatSet.member s' k
+    end.
+
+  Theorem member_empty : forall k, member empty k = false.
+  Proof.
+    simplify.
+    equality.
+  Qed.
+
+  Lemma member_fromRange' : forall k from to,
+      from <= to
+      -> NatSet.member (fromRange' from to) k = Compare_dec.leb from k && Compare_dec.leb k to.
+  Proof.
+    induct to; simplify.
+
+    cases k; simplify.
+    rewrite Compare_dec.leb_correct by assumption.
+    equality.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+
+    cases from; simplify.
+    cases k; simplify.
+    apply IHto.
+    linear_arithmetic.
+    pose proof (NatWithEquality.equal_ok to k).
+    cases (NatWithEquality.equal to k); simplify.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    rewrite IHto by linear_arithmetic.
+    cases to.
+    rewrite Compare_dec.leb_correct_conv by linear_arithmetic.
+    equality.
+    cases (Compare_dec.leb k to).
+    apply Compare_dec.leb_complete in Heq0.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    apply Compare_dec.leb_complete_conv in Heq0.
+    rewrite Compare_dec.leb_correct_conv by linear_arithmetic.
+    equality.
+    
+    pose proof (NatWithEquality.equal_ok to from).
+    cases (NatWithEquality.equal to from); simplify.
+
+    cases k; simplify.
+    equality.
+    pose proof (NatWithEquality.equal_ok to k).
+    cases (NatWithEquality.equal to k); simplify.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    cases (Compare_dec.leb from k); simplify.
+    apply Compare_dec.leb_complete in Heq1.
+    rewrite Compare_dec.leb_correct_conv by linear_arithmetic.
+    equality.
+    equality.
+
+    cases k; simplify.
+    apply IHto.
+    linear_arithmetic.
+    rewrite IHto by linear_arithmetic.
+    pose proof (NatWithEquality.equal_ok to k).
+    cases (NatWithEquality.equal to k); simplify.    
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+
+    cases to.
+    rewrite (Compare_dec.leb_correct_conv 0 k) by linear_arithmetic.
+    equality.
+    cases (Compare_dec.leb k to).
+    apply Compare_dec.leb_complete in Heq1.
+    rewrite (Compare_dec.leb_correct k (S to)) by linear_arithmetic.
+    equality.
+    apply Compare_dec.leb_complete_conv in Heq1.
+    rewrite (Compare_dec.leb_correct_conv (S to) k) by linear_arithmetic.
+    equality.
+  Qed.
+
+  Theorem member_add_eq : forall k s,
+      member (add s k) k = true.
+  Proof.
+    unfold member, add; simplify.
+    cases s.
+
+    SearchAbout Compare_dec.leb.
+    rewrite Compare_dec.leb_correct.
+    equality.
+    linear_arithmetic.
+
+    cases (Compare_dec.leb from k); simplify.
+    cases (Compare_dec.leb k to); simplify.
+    rewrite Heq.
+    rewrite Heq0.
+    apply Compare_dec.leb_complete in Heq.
+    apply Compare_dec.leb_complete in Heq0.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+
+    pose proof (NatWithEquality.equal_ok k (from - 1)).
+    cases (NatWithEquality.equal k (from - 1)).
+    apply leb_complete in Heq.
+    apply leb_complete_conv in Heq0.
+    linear_arithmetic.
+    simplify.
+    pose proof (NatWithEquality.equal_ok k (to + 1)).
+    cases (NatWithEquality.equal k (to + 1)); simplify.
+    cases (Compare_dec.leb from to).
+    rewrite Heq.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    apply NatSet.member_add_eq.
+    pose proof (NatWithEquality.equal_ok k k).
+    cases (NatWithEquality.equal k k); simplify.
+    equality.
+    equality.
+
+    pose proof (NatWithEquality.equal_ok k (from - 1)).
+    cases (NatWithEquality.equal k (from - 1)); simplify.
+    cases (Compare_dec.leb from to).
+    apply Compare_dec.leb_complete in Heq1.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    pose proof (NatWithEquality.equal_ok k (to + 1)).
+    cases (NatWithEquality.equal k (to + 1)); simplify.
+    pose proof (NatWithEquality.equal_ok k k).
+    cases (NatWithEquality.equal k k); simplify.
+    equality.
+    equality.
+    pose proof (NatWithEquality.equal_ok k k).
+    cases (NatWithEquality.equal k k); simplify.
+    equality.
+    equality.
+    pose proof (NatWithEquality.equal_ok k (to + 1)).
+    cases (NatWithEquality.equal k (to + 1)); simplify.
+    cases (Compare_dec.leb from to).
+    apply Compare_dec.leb_complete in Heq2.
+    apply Compare_dec.leb_complete_conv in Heq.
+    linear_arithmetic.
+    apply NatSet.member_add_eq.
+    pose proof (NatWithEquality.equal_ok k k).
+    cases (NatWithEquality.equal k k); simplify.
+    equality.
+    equality.    
+
+    apply NatSet.member_add_eq.
+  Qed.
+
+  Theorem member_add_noteq : forall k1 k2 s,
+      k1 <> k2
+      -> member (add s k1) k2 = member s k2.
+  Proof.
+    simplify.
+    unfold member, add.
+    cases s.
+
+    cases (Compare_dec.leb k1 k2); simplify.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    apply Compare_dec.leb_complete in Heq.
+    rewrite Compare_dec.leb_correct_conv.
+    equality.
+    unfold key in *. (* Tricky step!  Coq needs to see that we are really working with numbers. *)
+    linear_arithmetic.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+
+    cases (Compare_dec.leb from k1); simplify.
+    cases (Compare_dec.leb k1 to); simplify.
+    equality.
+
+    pose proof (NatWithEquality.equal_ok k1 (from - 1)).
+    cases (NatWithEquality.equal k1 (from - 1)); simplify.
+    apply leb_complete in Heq.
+    apply leb_complete_conv in Heq0.
+    linear_arithmetic.
+    pose proof (NatWithEquality.equal_ok k1 (to + 1)).
+    cases (NatWithEquality.equal k1 (to + 1)); simplify.
+    cases (Compare_dec.leb from to).
+    rewrite H1.
+    cases (Compare_dec.leb from k2); simplify.
+    cases (Compare_dec.leb k2 to).
+    apply Compare_dec.leb_complete in Heq5.
+    apply Compare_dec.leb_complete in Heq3.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    apply Compare_dec.leb_complete in Heq3.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    apply Compare_dec.leb_complete_conv in Heq5.
+    unfold key in *.
+    rewrite Compare_dec.leb_correct_conv by linear_arithmetic.
+    equality.
+    rewrite andb_false_r.
+    equality.
+    simplify.
+    pose proof (NatWithEquality.equal_ok k1 k2).
+    cases (NatWithEquality.equal k1 k2); simplify.
+    equality.
+    unfold fromRange.
+    rewrite Heq3.
+    apply NatSet.member_empty.
+    pose proof (NatWithEquality.equal_ok k1 k2).
+    cases (NatWithEquality.equal k1 k2); simplify.
+    equality.
+    unfold fromRange.
+    cases (Compare_dec.leb from to); simplify.
+    apply member_fromRange'.
+    apply Compare_dec.leb_complete.
+    assumption.
+    equality.
+
+    pose proof (NatWithEquality.equal_ok k1 (from - 1)).
+    cases (NatWithEquality.equal k1 (from - 1)); simplify.
+    cases (Compare_dec.leb from to).
+    apply Compare_dec.leb_complete in Heq1.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    f_equal.
+    f_equal.
+    cases (Compare_dec.leb k1 k2).
+    apply Compare_dec.leb_complete in Heq2.
+    apply Compare_dec.leb_complete_conv in Heq.
+    unfold key in *.
+    rewrite Compare_dec.leb_correct by linear_arithmetic.
+    equality.
+    apply Compare_dec.leb_complete_conv in Heq2.
+    apply Compare_dec.leb_complete_conv in Heq.
+    unfold key in *.
+    rewrite Compare_dec.leb_correct_conv by linear_arithmetic.
+    equality.
+    pose proof (NatWithEquality.equal_ok k1 (to + 1)).
+    cases (NatWithEquality.equal k1 (to + 1)); simplify.
+    pose proof (NatWithEquality.equal_ok k1 k2).
+    cases (NatWithEquality.equal k1 k2); simplify.
+    unfold key in *; linear_arithmetic.
+    unfold fromRange.
+    rewrite Heq1.
+    apply NatSet.member_empty. 
+    pose proof (NatWithEquality.equal_ok k1 k2).
+    cases (NatWithEquality.equal k1 k2); simplify.
+    equality.
+    unfold fromRange.
+    rewrite Heq1.
+    apply NatSet.member_empty. 
+    pose proof (NatWithEquality.equal_ok k1 (to + 1)).
+    cases (NatWithEquality.equal k1 (to + 1)); simplify.
+    cases (Compare_dec.leb from to).
+    rewrite Heq; simplify.
+    apply Compare_dec.leb_complete in Heq2.
+    apply Compare_dec.leb_complete_conv in Heq.
+    linear_arithmetic.
+    rewrite NatSet.member_add_noteq by assumption; simplify.
+    unfold fromRange.
+    rewrite Heq2.
+    apply NatSet.member_empty. 
+    pose proof (NatWithEquality.equal_ok k1 k2).
+    cases (NatWithEquality.equal k1 k2); simplify.
+    equality.
+    unfold fromRange.
+    cases (Compare_dec.leb from to); simplify.
+    apply member_fromRange'.
+    apply Compare_dec.leb_complete; assumption.
+    equality.
+    apply NatSet.member_add_noteq.
+    assumption.
+  Qed.
+
+  Theorem decidable_equality : forall a b : key, a = b \/ a <> b.
+  Proof.
+    simplify.
+    pose proof (NatWithEquality.equal_ok a b).
+    cases (NatWithEquality.equal a b); propositional.
+  Qed.
+End NatRangeSet.
+
+Module FasterNatDuplicateFinder := FindDuplicates(NatRangeSet).
+
+Fixpoint upto (n : nat) : list nat :=
+  match n with
+  | 0 => []
+  | S n' => n' :: upto n'
+  end.
+
+Compute NatDuplicateFinder.noDuplicates (upto 1000).
+Compute FasterNatDuplicateFinder.noDuplicates (upto 1000).

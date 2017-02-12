@@ -731,3 +731,254 @@ Module AlgebraicWithEquivalenceRelation.
     Qed.
   End DelayedSum.
 End AlgebraicWithEquivalenceRelation.
+
+Module RepFunction.
+  Module Type QUEUE.
+    Parameter t : Set -> Set.
+
+    Parameter empty : forall A, t A.
+    Parameter enqueue : forall A, t A -> A -> t A.
+    Parameter dequeue : forall A, t A -> option (t A * A).
+
+    Parameter rep : forall A, t A -> list A.
+
+    Axiom empty_rep : forall A,
+        rep (empty A) = [].
+
+    Axiom enqueue_rep : forall A (q : t A) x,
+        rep (enqueue q x) = x :: rep q.
+
+    Axiom dequeue_empty : forall A (q : t A),
+        rep q = []
+        -> dequeue q = None.
+
+    Axiom dequeue_nonempty : forall A (q : t A) xs x,
+        rep q = xs ++ [x]
+        -> exists q', dequeue q = Some (q', x) /\ rep q' = xs.
+  End QUEUE.
+
+  Module ListQueue : QUEUE.
+    Definition t : Set -> Set := list.
+
+    Definition empty A : t A := nil.
+    Definition enqueue A (q : t A) (x : A) : t A := x :: q.
+    Fixpoint dequeue A (q : t A) : option (t A * A) :=
+      match q with
+      | [] => None
+      | x :: q' =>
+        match dequeue q' with
+        | None => Some ([], x)
+        | Some (q'', y) => Some (x :: q'', y)
+        end
+      end.
+
+    Definition rep A (q : t A) := q.
+
+    Theorem empty_rep : forall A,
+        rep (empty A) = [].
+    Proof.
+      equality.
+    Qed.
+
+    Theorem enqueue_rep : forall A (q : t A) x,
+        rep (enqueue q x) = x :: rep q.
+    Proof.
+      equality.
+    Qed.
+
+    Theorem dequeue_empty : forall A (q : t A),
+        rep q = []
+        -> dequeue q = None.
+    Proof.
+      unfold rep; simplify.
+      rewrite H.
+      equality.
+    Qed.
+
+    Theorem dequeue_nonempty : forall A (q : t A) xs x,
+        rep q = xs ++ [x]
+        -> exists q', dequeue q = Some (q', x) /\ rep q' = xs.
+    Proof.
+      unfold rep; induct q.
+
+      simplify.
+      cases xs; simplify.
+      equality.
+      equality.
+
+      simplify.
+      cases xs; simplify.
+      invert H; simplify.
+      exists [].
+      equality.
+
+      invert H.
+      assert (exists q' : t A, dequeue (xs ++ [x]) = Some (q', x) /\ q' = xs).
+      apply IHq.
+      equality.
+      first_order.
+      rewrite H.
+      exists (a0 :: x0).
+      equality.
+    Qed.
+  End ListQueue.
+
+  Module TwoStacksQueue : QUEUE.
+    Record stackpair (A : Set) := {
+      EnqueueHere : list A;
+      DequeueHere : list A
+    }.
+
+    Definition t := stackpair.
+
+    Definition empty A : t A := {|
+      EnqueueHere := [];
+      DequeueHere := []
+    |}.
+    Definition enqueue A (q : t A) (x : A) : t A := {|
+      EnqueueHere := x :: q.(EnqueueHere);
+      DequeueHere := q.(DequeueHere)
+    |}.
+    Definition dequeue A (q : t A) : option (t A * A) :=
+      match q.(DequeueHere) with
+      | x :: dq => Some ({| EnqueueHere := q.(EnqueueHere);
+                            DequeueHere := dq |}, x)
+      | [] =>
+        match rev q.(EnqueueHere) with
+        | [] => None
+        | x :: eq => Some ({| EnqueueHere := [];
+                              DequeueHere := eq |}, x)
+        end
+      end.
+
+    Definition rep A (q : t A) : list A :=
+      q.(EnqueueHere) ++ rev q.(DequeueHere).
+
+    Theorem empty_rep : forall A,
+        rep (empty A) = [].
+    Proof.
+      equality.
+    Qed.
+
+    Theorem enqueue_rep : forall A (q : t A) x,
+        rep (enqueue q x) = x :: rep q.
+    Proof.
+      equality.
+    Qed.
+
+    Theorem dequeue_empty : forall A (q : t A),
+        rep q = []
+        -> dequeue q = None.
+    Proof.
+      unfold rep, dequeue; simplify.
+      cases (DequeueHere q); simplify.
+      rewrite app_nil_r in H.
+      rewrite H.
+      simplify.
+      equality.
+      cases (EnqueueHere q); simplify.
+      cases (rev l); simplify.
+      equality.
+      equality.
+      equality.
+    Qed.
+
+    Theorem dequeue_nonempty : forall A (q : t A) xs x,
+        rep q = xs ++ [x]
+        -> exists q', dequeue q = Some (q', x) /\ rep q' = xs.
+    Proof.
+      unfold rep, dequeue; simplify.
+
+      cases (DequeueHere q); simplify.
+
+      rewrite app_nil_r in H.
+      rewrite H.
+      rewrite rev_app_distr; simplify.
+      exists {| EnqueueHere := []; DequeueHere := rev xs |}.
+      simplify.
+      rewrite rev_involutive.
+      equality.
+
+      exists {| EnqueueHere := EnqueueHere q; DequeueHere := l |}.
+      simplify.
+      rewrite app_assoc in H.
+      apply app_inj_tail in H.
+      propositional.
+      rewrite H1.
+      equality.
+    Qed.
+  End TwoStacksQueue.
+
+  Module DelayedSum (Q : QUEUE).
+    Fixpoint makeQueue (n : nat) (q : Q.t nat) : Q.t nat :=
+      match n with
+      | 0 => q
+      | S n' => makeQueue n' (Q.enqueue q n')
+      end.
+
+    Fixpoint computeSum (n : nat) (q : Q.t nat) : nat :=
+      match n with
+      | 0 => 0
+      | S n' => match Q.dequeue q with
+                | None => 0
+                | Some (q', v) => v + computeSum n' q'
+                end
+      end.
+
+    Fixpoint sumUpto (n : nat) : nat :=
+      match n with
+      | 0 => 0
+      | S n' => n' + sumUpto n'
+      end.
+
+    Fixpoint upto (n : nat) : list nat :=
+      match n with
+      | 0 => []
+      | S n' => upto n' ++ [n']
+      end.
+
+    Lemma makeQueue_rep : forall n q,
+        Q.rep (makeQueue n q) = upto n ++ Q.rep q.
+    Proof.
+      induct n.
+
+      simplify.
+      equality.
+
+      simplify.
+      rewrite IHn.
+      rewrite Q.enqueue_rep.
+      rewrite <- app_assoc.
+      simplify.
+      equality.
+    Qed.
+
+    Lemma computeSum_makeQueue' : forall n q,
+        Q.rep q = upto n
+        -> computeSum n q = sumUpto n.
+    Proof.
+      induct n.
+
+      simplify.
+      equality.
+
+      simplify.
+      pose proof (Q.dequeue_nonempty _ _ H).
+      first_order.
+      rewrite H0.
+      rewrite IHn.
+      equality.
+      assumption.
+    Qed.
+
+    Theorem computeSum_ok : forall n,
+        computeSum n (makeQueue n (Q.empty nat)) = sumUpto n.
+    Proof.
+      simplify.
+      apply computeSum_makeQueue'.
+      rewrite makeQueue_rep.
+      rewrite Q.empty_rep.
+      apply app_nil_r.
+    Qed.
+  End DelayedSum.
+End RepFunction.

@@ -189,6 +189,13 @@ Proof.
   equality.
 Qed.
 
+(* IMPORTANT NOTE: the proof above would *not* have worked with the orders of
+ * variables [ls] and [acc] swapped in the lemma statement!  Try the proof that
+ * way to see what goes wrong.  The problem is that the induction hypothesis
+ * would be too weak.  A single [acc] value would be fixed for the whole proof,
+ * while we need [acc] to *vary* throughout the induction, by retaining a
+ * universal quantifier for it in the IH. *)
+
 (* Concatenating the empty list has no effect. *)
 Lemma app_nil : forall A (ls : list A),
     ls ++ [] = ls.

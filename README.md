@@ -10,16 +10,17 @@ The main narrative, also present in the book PDF, presents standard program-proo
 
 * Chapter 2: `BasicSyntax.v`
   * `Polymorphism.v`: polymorphism and generic data structures
-* Chapter 3: `Interpreters.v`
-* Chapter 4: `TransitionSystems.v`
-* Chapter 5: `ModelChecking.v`
-* Chapter 6: `OperationalSemantics.v`
-* Chapter 7: `AbstractInterpretation.v`
-* Chapter 8: `LambdaCalculusAndTypeSoundness.v`
-* Chapter 9: `TypesAndMutation.v`
-* Chapter 10: `HoareLogic.v`
-* Chapter 11: `DeepAndShallowEmbeddings.v`
-* Chapter 12: `SeparationLogic.v`
-* Chapter 13: `SharedMemory.v`
-* Chapter 14: `ConcurrentSeparationLogic.v`
-* Chapter 15: `MessagesAndRefinement.v`
+* Chapter 3: `DataAbstraction.v`
+* Chapter 4: `Interpreters.v`
+* Chapter 5: `TransitionSystems.v`
+* Chapter 6: `ModelChecking.v`
+* Chapter 7: `OperationalSemantics.v`
+* Chapter 8: `AbstractInterpretation.v`
+* Chapter 9: `LambdaCalculusAndTypeSoundness.v`
+* Chapter 10: `TypesAndMutation.v`
+* Chapter 11: `HoareLogic.v`
+* Chapter 12: `DeepAndShallowEmbeddings.v`
+* Chapter 13: `SeparationLogic.v`
+* Chapter 14: `SharedMemory.v`
+* Chapter 15: `ConcurrentSeparationLogic.v`
+* Chapter 16: `MessagesAndRefinement.v`

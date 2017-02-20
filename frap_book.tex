@@ -458,6 +458,94 @@ The general patterns should soon become clear, as they are somehow already famil
 \end{quote}
 The quoted remark could just as well be in Spanish instead of English, in which case we have two languages nested in a nontrivial way.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Data Abstraction}
+
+All of the fully formal proofs in this book are worked out only in associated Coq code.
+Therefore, before proceeding to more topics in program semantics and proof, it is important to develop some basic Coq competence.
+Several heavily commented examples files are associated with this crucial point in the book.
+We won't discuss details of Coq proving in this document, outside Appendix \ref{coqref}.
+However, one of the possibilities shown off in the Coq code is worth drawing attention to, as a celebrated semantics idea in its own right, though we don't yet connect it to formalized syntax of programming languages.
+That idea is \emph{data abstraction}\index{data abstraction}, one of the most central ideas in program structuring.
+Let's consider the mathematical meaning of \emph{encapsulation}\index{encapsulation} in data structures.
+
+\section{Algebraic Interfaces for Abstract Data Types}
+
+\newcommand{\mt}[1]{\mathsf{#1}}
+
+Consider the humble queue\index{queues}, a classic data structure that allows us to enqueue data elements and then dequeue them in the order received.
+Perhaps surprisingly, there is already some complexity in efficient queue implementation.
+So-called \emph{client code}\index{client code} that relies on queues shouldn't need to know about that complexity, though.
+We should be able to formulate ``queue'' as an \emph{abstract data type}\index{abstract data type}, hiding implementation details.
+In the setting of pure functional programming, as in Coq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g. interfaces\index{interface} in Java\index{Java}.
+Type $\mt{t}(\alpha)$ stands for queues holding data values in some type $\alpha$.
+
+\begin{eqnarray*}
+  \mt{t}(\alpha) &:& \mt{Set} \\
+  \mt{empty} &:& \mt{t}(\alpha) \\
+  \mt{enqueue} &:& \mt{t}(\alpha) \times \alpha \to \mt{t}(\alpha) \\
+  \mt{dequeue} &:& \mt{t}(\alpha) \rightharpoonup \mt{t}(\alpha) \times \alpha
+\end{eqnarray*}
+
+A few notational conventions of note:
+We declare that $\mt{t}(\alpha)$ is a type by assigning it the type $\mt{Set}$, which itself contains all the normal types of programming.
+An empty queue exists for any $\alpha$, and enqueue and dequeue operations are also available for any $\alpha$.
+The type of $\mt{dequeue}$ indicates function partiality\index{partial function} by the arrow $\rightharpoonup$: dequeuing yields no answer for an empty queue.
+For partial function $f : A \rightharpoonup B$, we indicate lack of a mapping for $x \in A$ by writing $f(x) = \cdot$.
+
+In normal programming, we stop at this level of detail in defining an abstract data type.
+However, when we're after formal correctness proofs, we must enrich data types with \emph{specifications}\index{specifications} or ``specs.''\index{specs}  
+One prominent spec style is \emph{algebraic}\index{algebraic specifications}: write out a set of \emph{laws}, quantified equalities that use the operations of the data type.
+For queues, here are two reasonable laws.
+
+$$\begin{array}{l}
+  \mt{dequeue}(\mt{empty}) = \cdot \\
+  \forall q. \; \mt{dequeue}(q) = \cdot \Rightarrow q = \mt{empty} \\
+\end{array}$$
+
+Actually, the inference-rule notation from last chapter also makes algebraic laws more readable, so here is a restatement.
+
+$$\infer{\mt{dequeue}(\mt{empty}) = \cdot}{}
+\quad \infer{q = \mt{empty}}{\mt{dequeue}(q) = \cdot}$$
+
+One more rule suffices to give a complete characterization of behavior, with the familiar math notation for piecewise functions\index{piecewise functions}.
+
+$$\infer{\mt{dequeue}(\mt{enqueue}(q, x)) = \begin{cases}
+    (\mt{empty}, x), & \mt{dequeue}(q) = \cdot \\
+    (\mt{enqueue}(q', x), y), & \mt{dequeue}(q) = (q', y)
+  \end{cases}}{}$$
+
+\newcommand{\concat}[2]{#1 \bowtie #2}
+
+Now several implementations of this functionality are possible.
+Here's one of the two ``obvious'' ones, where we enqueue to list fronts and dequeue from list backs.
+We write $\mt{list}(\alpha)$ for the type of lists\index{lists} with data elements from $\alpha$, with $\concat{\ell_1}{\ell_2}$ for concatenation of lists $\ell_1$ and $\ell_2$, and with comma-separated lists inside square brackets for list literals.
+\begin{eqnarray*}
+  \mt{t(\alpha)} &=& \mt{list}(\alpha) \\
+  \mt{empty} &=& [] \\
+  \mt{enqueue}(q, x) &=& \concat{[x]}{q} \\
+  \mt{dequeue}([]) &=& \cdot \\
+  \mt{dequeue}(\concat{[x]}{q}) &=& ([], x)\textrm{, when $\mt{dequeue}(q) = \cdot$.} \\
+  \mt{dequeue}(\concat{[x]}{q}) &=& (\concat{[x]}{q'}, y)\textrm{, when $\mt{dequeue}(q) = (q', y)$.}
+\end{eqnarray*}
+
+There is also a dual implementation where we enqueue to list backs and dequeue from list fronts.
+\begin{eqnarray*}
+  \mt{t(\alpha)} &=& \mt{list}(\alpha) \\
+  \mt{empty} &=& [] \\
+  \mt{enqueue}(q, x) &=& \concat{q}{[x]} \\
+  \mt{dequeue}([]) &=& \cdot \\
+  \mt{dequeue}(\concat{[x]}{q}) &=& (q, x)
+\end{eqnarray*}
+
+Proofs of the algebraic laws, for both implementations, appear in the associated Coq code.
+Both versions actually take quadratic time in practice, assuming concatenation takes time linear in the length of its first argument.
+There is a famous, more clever implementation that achieves amortized\index{amortized time} linear time, but we will need to expand our algebraic style to accommodate it.
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{\label{interpreters}Semantics via Interpreters}
@@ -583,7 +671,6 @@ Let's compile arithmetic expressions into stack programs, which then become easy
 In that sense, with this translation, we make progress toward efficient implementation on commodity hardware.
 
 \newcommand{\compile}[1]{{\left \lfloor #1 \right \rfloor}}
-\newcommand{\concat}[2]{#1 \bowtie #2}
 
 Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggests \emph{moving downward} to a lower abstraction level.
 Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ for concatenation of two stacks $s_1$ and $s_2$.
@@ -2934,7 +3021,6 @@ Instead, we will use notation closer to literal Coq code, and, in fact, more of 
 Recall some terminology introduced in Section \ref{metalanguage}: every formal proof is carried out in some \emph{metalanguage}\index{metalanguage}, which, in our case, is Coq's logic and programming language called Gallina\index{Gallina}.
 A syntactic language that we formalize is called an \emph{object language}\index{object language}.
 Often it is convenient to do reasoning without any particular object language, as in this simple arithmetic function that can be defined directly in Gallina.
-\newcommand{\mt}[1]{\mathsf{#1}}
 \begin{eqnarray*}
   \mt{foo} &=& \lambda(x, y). \; \elet{u}{x + y}{\elet{v}{u \times y}{u + v}}
 \end{eqnarray*}
@@ -4274,7 +4360,7 @@ We would need to worry about meddlesome threads in our environment interacting d
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{The Coq Proof Assistant}
+\chapter{\label{coqref}The Coq Proof Assistant}
 
 Coq\index{Coq} is a proof-assistant software package developed as open source, primarily by Inria\index{Inria}, the French national computer-science lab.
 
@@ -4345,10 +4431,6 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{unfold} $X$] Replace $X$ by its definition.
   \item[\texttt{unfold} $X$ \texttt{in} \texttt{*}] Like the last one, but unfolds in hypotheses as well as conclusion.
 \end{description}
-
-\section{Proof-Automation Basics}
-
-Coming soon!
 
 \section{Further Reading}
 

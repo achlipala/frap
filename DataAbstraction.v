@@ -1747,5 +1747,7 @@ Fixpoint upto (n : nat) : list nat :=
   | S n' => n' :: upto n'
   end.
 
+Compute upto 10.
+
 Compute NatDuplicateFinder.noDuplicates (upto 1000).
 Compute FasterNatDuplicateFinder.noDuplicates (upto 1000).

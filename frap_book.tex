@@ -600,8 +600,9 @@ As a result, client code (and its correctness proofs) can use this fancy code, e
 Why did we need to go through the trouble of introducing custom equivalence relations?
 Consider the following two queues.
 Are they equal?
+(We write $\pi_1$ for the function that projects out the first element of a pair.)
 \begin{eqnarray*}
-  \mt{enqueue}(\mt{empty}, 2) &\stackrel{?}{=}& \mt{dequeue}(\mt{enqueue}(\mt{enqueue}(\mt{empty}, 1), 2))
+  \mt{enqueue}(\mt{empty}, 2) &\stackrel{?}{=}& \pi_1(\mt{dequeue}(\mt{enqueue}(\mt{enqueue}(\mt{empty}, 1), 2)))
 \end{eqnarray*}
 
 No, they aren't equal!  The first expression reduces to $([2], [])$, while the second reduces to $([], [2])$.
@@ -668,7 +669,7 @@ We implement our optimized set type like so, assuming an operation $\mt{fromRang
   \mt{t} &=& \mt{Empty} \mid \mt{Range}(\mathbb N \times \mathbb N) \mid \mt{AdHoc}(\mt{t}_0) \\
   \mt{empty} &=& \mt{Empty} \\
   \mt{add}(\mt{Empty}, k) &=& \mt{Range}(k, k) \\
-  \mt{add}(\mt{Range}(n_1, n_2), k) &=& s\textrm{, when $n_1 \leq k \leq n_2$} \\
+  \mt{add}(\mt{Range}(n_1, n_2), k) &=& \mt{Range}(n_1, n_2)\textrm{, when $n_1 \leq k \leq n_2$} \\
   \mt{add}(\mt{Range}(n_1, n_2), n_1-1) &=& \mt{Range}(n_1-1, n_2)\textrm{, when $n_1 \leq n_2$} \\
   \mt{add}(\mt{Range}(n_1, n_2), n_2+1) &=& \mt{Range}(n_1, n_2+1)\textrm{, when $n_1 \leq n_2$} \\
   \mt{add}(\mt{Range}(n_1, n_2), k) &=& \mt{AdHoc}(\mt{add}_0(\mt{fromRange}(n_1, n_2), k))\textrm{, otherwise} \\

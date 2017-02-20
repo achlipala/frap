@@ -597,6 +597,44 @@ The suitable equivalence relation formalizes this plan.
 We can prove both that this $\approx$ is an equivalence relation and that the other queue laws are satisfied.
 As a result, client code (and its correctness proofs) can use this fancy code, effectively viewing it as a simple queue, with the two-stack nature hidden.
 
+Why did we need to go through the trouble of introducing custom equivalence relations?
+Consider the following two queues.
+Are they equal?
+\begin{eqnarray*}
+  \mt{enqueue}(\mt{empty}, 2) &\stackrel{?}{=}& \mt{dequeue}(\mt{enqueue}(\mt{enqueue}(\mt{empty}, 1), 2))
+\end{eqnarray*}
+
+No, they aren't equal!  The first expression reduces to $([2], [])$, while the second reduces to $([], [2])$.
+This data structure is \emph{noncanonical}\index{noncanonical}, in the sense that the same logical value may have multiple physical representations.
+The equivalence relation lets us indicate which physical representations are equivalent.
+
+\section{Representation Functions}
+
+That last choice of equivalence relations suggests another specification style, based on \emph{representation functions}\index{representation functions}.
+We can force every queue to include a function to convert to a standard, canonical representation.
+Real executable programs shouldn't generally call that function; it's most useful to us in phrasing the algebraic laws.
+Perhaps surprisingly, the mere existence of any compatible function is enough to show correctness of a queue implementation, and the approach generalizes to essentially all other data structures cast as abstract data types.
+
+Here is how we revise our type signature for queues.
+\begin{eqnarray*}
+  \mt{t}(\alpha) &:& \mt{Set} \\
+  \mt{empty} &:& \mt{t}(\alpha) \\
+  \mt{enqueue} &:& \mt{t}(\alpha) \times \alpha \to \mt{t}(\alpha) \\
+  \mt{dequeue} &:& \mt{t}(\alpha) \rightharpoonup \mt{t}(\alpha) \times \alpha \\
+  \mt{rep} &:& \mt{t}(\alpha) \to \mt{list}(\alpha)
+\end{eqnarray*}
+
+And here are the revised axioms.
+
+$$\infer{\mt{rep}(\mt{empty}) = []}{}
+\quad \infer{\mt{rep}(\mt{enqueue}(q, x)) = \concat{[x]}{\mt{rep}(q)}}{}$$
+
+$$\infer{\mt{dequeue}(q) = \cdot}{\mt{rep}(q) = []}
+\quad \infer{\exists q'. \; \mt{dequeue}(q) = (q', x) \land \mt{rep}(q') = \ell}{\mt{rep}(q) = \concat{\ell}{[x]}}$$
+
+Notice that this specification style can also be viewed as \emph{giving a reference implementation\index{reference implementations of data types} of the data type}, where $\mt{rep}$ shows how to convert back to the reference implementation at any point.
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

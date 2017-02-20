@@ -8,30 +8,80 @@ Require Import Frap.
 Set Implicit Arguments.
 
 
+(* Perhaps the essence of effective programming is division of large tasks into
+ * smaller ones, and *data abstraction* is a key technique to that end.
+ * We provide a clear separation between *interfaces* and *implementations*.
+ * The author of a library can take responsibility for making it implement an
+ * interface faithfully, *encapsulating* private state and other implementation
+ * details in a way that client code can't observe.  Then that client code can
+ * mix and match implementations of some well-specified functionality.
+ *
+ * As part of our quick tour through effective Coq programming, we will dwell on
+ * patterns for data abstraction, including how to state it formally, from the
+ * perspectives of both libraries and client code. *)
+
+
+(** * Specification styles for data abstraction *)
+
+(* One of the classic formalisms for data abstraction is the *algebraic* style,
+ * where requirements on implementations are written out as quantified
+ * equalities.  Any implementation must satisfy these equalities, but we grant
+ * implementations freedom in internal details. *)
 Module Algebraic.
+  (* Here's an example of an algebraic interface or *specification* ("spec" for
+   * short).  It's for purely function queues, which follow first-in-first-out
+   * disciplines. *)
   Module Type QUEUE.
     Parameter t : Set -> Set.
+    (* An implementation must include some data type [t].
+     * Actually, it's more of a *type family*, e.g. like [list] and some other
+     * polymorphic container types we looked at last time. *)
 
     Parameter empty : forall A, t A.
+    (* For any type [A] of data, we can build a queue for that element type. *)
     Parameter enqueue : forall A, t A -> A -> t A.
+    (* Enqueue a new element, in the functional style, where we build a new
+     * queue instead of modifying the original. *)
     Parameter dequeue : forall A, t A -> option (t A * A).
+    (* Given a queue, either return [None] if it is empty or [Some (q', v)] for
+     * the result of dequeuing one element, where [q'] is the new queue (now
+     * one element shorter) and [v] is the element we dequeue. *)
 
+    (* Which algebraic properties characterize correct queues? *)
+
+    (* First, [dequeue] returns [None] exactly on empty queues. *)
     Axiom dequeue_empty : forall A,
         dequeue (empty A) = None.
     Axiom empty_dequeue : forall A (q : t A),
         dequeue q = None -> q = empty A.
+
+    (* Second, [dequeue] forms a kind of inverse for [enqueue]. *)
     Axiom dequeue_enqueue : forall A (q : t A) x,
         dequeue (enqueue q x) = Some (match dequeue q with
                                       | None => (empty A, x)
                                       | Some (q', y) => (enqueue q' x, y)
                                       end).
+
+    (* These properties turn out to be enough to prove interesting properties
+     * about client code that uses queues.  Before we get there, we should
+     * define some concrete queue implementations.  (If we don't give an
+     * implementation, we often realize that the spec is *unrealizable*!) *)
   End QUEUE.
 
+  (* First, there is a fairly straightforward implementation with lists. *)
   Module ListQueue : QUEUE.
     Definition t : Set -> Set := list.
+    (* Note that we use identifier [list] alone as a first-class type family,
+     * without specifying a parameter explicitly. *)
 
+    (* We follow the convention of enqueuing onto the front of lists and
+     * dequeuing from the back, so the first two operations are just the first
+     * two constructors of [list]. *)
     Definition empty A : t A := nil.
     Definition enqueue A (q : t A) (x : A) : t A := x :: q.
+
+    (* [dequeue] is a little more work: we use recursion to step down to the
+     * last element of a list. *)
     Fixpoint dequeue A (q : t A) : option (t A * A) :=
       match q with
       | [] => None
@@ -41,6 +91,9 @@ Module Algebraic.
         | Some (q'', y) => Some (x :: q'', y)
         end
       end.
+
+    (* Applying our experience so far with Coq proofs, the algebraic laws are
+     * unremarkable to establish. *)
 
     Theorem dequeue_empty : forall A, dequeue (empty A) = None.
     Proof.
@@ -80,16 +133,32 @@ Module Algebraic.
     Qed.
   End ListQueue.
 
+  (* There are software-engineering benefits to interface-implementation
+   * separation even when one only bothers to build a single implementation.
+   * However, often there are naive and clever optimized versions of a single
+   * interface.  Queues are no exception.  Before we get to a truly clever
+   * version, we'll demonstrate with a less obviously better version:
+   * enqueuing at the back and dequeuing from the front. *)
   Module ReversedListQueue : QUEUE.
     Definition t : Set -> Set := list.
+    (* Still the same internal queue type, but note that Coq's type system
+     * prevents client code from knowing that fact!  [t] appears *opaque*
+     * or *abstract* from the outside, as we'll see shortly. *)
 
+    (* The first two operations are similar, but now we enqueue at the
+     * list end. *)
     Definition empty A : t A := [].
     Definition enqueue A (q : t A) (x : A) : t A := q ++ [x].
+
+    (* [dequeue] is now constant time, with no recursion and just a single
+     * pattern match. *)
     Definition dequeue A (q : t A) : option (t A * A) :=
       match q with
       | [] => None
       | x :: q' => Some (q', x)
       end.
+
+    (* The proofs of the laws are still boring. *)
 
     Theorem dequeue_empty : forall A, dequeue (empty A) = None.
     Proof.
@@ -124,13 +193,27 @@ Module Algebraic.
     Qed.
   End ReversedListQueue.
 
+  (* Let's take a look at some client code that is agnostic to queue
+   * implementation details.  We have been using Coq's *module system*, inspired
+   * by those of the ML programming languages, to encode interfaces and
+   * implementations.  Coq also adopts from ML the idea of *functors*, or
+   * functions from modules to modules. *)
   Module DelayedSum (Q : QUEUE).
+    (* The code in this scope may refer to some unknown implementation [Q] of
+     * the [QUEUE] interface. *)
+
+    (* We will only use a simple example here: enqueue the first [n] natural
+     * numbers and then successively dequeue them, computing the sum as we
+     * go. *)
+
+    (* First, the function to enqueue the first [n] natural numbers. *)
     Fixpoint makeQueue (n : nat) (q : Q.t nat) : Q.t nat :=
       match n with
       | 0 => q
       | S n' => makeQueue n' (Q.enqueue q n')
       end.
 
+    (* Next, the function to dequeue repeatedly, keeping a sum. *)
     Fixpoint computeSum (n : nat) (q : Q.t nat) : nat :=
       match n with
       | 0 => 0
@@ -140,17 +223,25 @@ Module Algebraic.
                 end
       end.
 
+    (* This function gives the expected answer, in a simpler form, of
+     * [computeSum] after [makeQueue]. *)
     Fixpoint sumUpto (n : nat) : nat :=
       match n with
       | 0 => 0
       | S n' => n' + sumUpto n'
       end.
 
+    (* A crucial lemma: what results from dequeuing out of a [makeQueue]
+     * call?  The answer depends on whether the initial queue [q] has anything
+     * to dequeue. *)
     Lemma dequeue_makeQueue : forall n q,
         Q.dequeue (makeQueue n q)
         = match Q.dequeue q with
-          | Some (q', v) => Some (makeQueue n q', v)
+          | Some (q', v) =>
+            (* The queue we started with had content.  We dequeue from it. *)
+            Some (makeQueue n q', v)
           | None =>
+            (* No content in initial queue.  We get [n-1] (unless [n = 0]). *)
             match n with
             | 0 => None
             | S n' => Some (makeQueue n' q, n')
@@ -168,15 +259,18 @@ Module Algebraic.
       simplify.
       rewrite IHn.
       rewrite Q.dequeue_enqueue.
+      (* ^-- Crucial step!  First use of a law from the interface. *)
       cases (Q.dequeue q).
       cases p.
       equality.
 
       rewrite (Q.empty_dequeue (q := q)).
+      (* ^-- Another law! *)
       equality.
       assumption.
     Qed.
 
+    (* Now we can tackle the final property directly by induction. *)
     Theorem computeSum_ok : forall n,
         computeSum n (makeQueue n (Q.empty nat)) = sumUpto n.
     Proof.
@@ -195,26 +289,45 @@ Module Algebraic.
   End DelayedSum.
 End Algebraic.
 
+(* There is a famous implementation of queues with two stacks, achieving
+ * amortized constant time for all operations, in contrast to the worst-case
+ * quadratic time of both queue implementations we just saw.  However, to
+ * justify this fancy implementation, we will need to choose a more permissive
+ * interface, based on the idea of parameterizing over an arbitrary *equivalence
+ * relation* between queues, which need not be simple equality. *)
 Module AlgebraicWithEquivalenceRelation.
   Module Type QUEUE.
+    (* We still have a type family of queues, plus the same three operations. *)
     Parameter t : Set -> Set.
+
 
     Parameter empty : forall A, t A.
     Parameter enqueue : forall A, t A -> A -> t A.
     Parameter dequeue : forall A, t A -> option (t A * A).
 
+    (* What's new?  This equivalence relation.  The type [Prop] stands for
+     * logical truth values, so a function returning it can be seen as a
+     * relation in the usual mathematical sense.  This is a *binary* relation,
+     * in particular, since it takes two arguments. *)
     Parameter equiv : forall A, t A -> t A -> Prop.
 
+    (* Let's declare convenient syntax for the relation. *)
     Infix "~=" := equiv (at level 70).
 
+    (* It really is an equivalence relation, as formalized by the usual three
+     * laws. *)
     Axiom equiv_refl : forall A (a : t A), a ~= a.
     Axiom equiv_sym : forall A (a b : t A), a ~= b -> b ~= a.
     Axiom equiv_trans : forall A (a b c : t A), a ~= b -> b ~= c -> a ~= c.
 
+    (* It must be the case that enqueuing elements preserves the relation. *)
     Axiom equiv_enqueue : forall A (a b : t A) (x : A),
         a ~= b
         -> enqueue a x ~= enqueue b x.
 
+    (* We define a derived relation for results of [dequeue]: either both
+     * [dequeue]s failed to return anything, or both returned the same data
+     * value along with new queues that are themselves related. *)
     Definition dequeue_equiv A (a b : option (t A * A)) :=
       match a, b with
       | None, None => True
@@ -227,6 +340,9 @@ Module AlgebraicWithEquivalenceRelation.
     Axiom equiv_dequeue : forall A (a b : t A),
         a ~= b
         -> dequeue a ~~= dequeue b.
+
+    (* We retain the three axioms from the prior interface, using our fancy
+     * relation instead of equality on queues. *)
 
     Axiom dequeue_empty : forall A,
         dequeue (empty A) = None.
@@ -241,6 +357,8 @@ Module AlgebraicWithEquivalenceRelation.
             end.
   End QUEUE.
 
+  (* It's easy to redo [ListQueue], specifying normal equality for the
+   * equivalence relation. *)
   Module ListQueue : QUEUE.
     Definition t : Set -> Set := list.
 
@@ -347,11 +465,27 @@ Module AlgebraicWithEquivalenceRelation.
     Qed.
   End ListQueue.
 
+  (* However, now we can implement the classic two-stacks optimized queue! *)
   Module TwoStacksQueue : QUEUE.
+    (* Every queue is a pair of stacks: one for enqueuing and one for
+     * dequeuing. *)
     Record stackpair (A : Set) := {
       EnqueueHere : list A;
+      (* This stack has more recently enqueued elements closer to the front,
+       * making enqueuing constant-time. *)
+
       DequeueHere : list A
+      (* This stack has least recently enqueued elements closer to the front,
+       * making dequeuing constant-time. *)
     }.
+    (* What's the catch?  Sometimes we need to reverse [EnqueueHere] and
+     * transfer it to [DequeueHere], or otherwise there would never be anything
+     * to dequeue!  Luckily, the work we do in transfering is bounded
+     * asymptotically by the total number of enqueue/dequeue operations, so
+     * we get *amortized* constant time. *)
+
+    (* By the way, the [Record] feature we used above is similar to e.g. structs
+     * in C. *)
 
     Definition t := stackpair.
 
@@ -368,6 +502,8 @@ Module AlgebraicWithEquivalenceRelation.
       | x :: dq => Some ({| EnqueueHere := q.(EnqueueHere);
                             DequeueHere := dq |}, x)
       | [] =>
+        (* Out of dequeuable elements.  Reverse enqueued elements
+         * and transfer to the other stack. *)
         match rev q.(EnqueueHere) with
         | [] => None
         | x :: eq => Some ({| EnqueueHere := [];
@@ -375,9 +511,12 @@ Module AlgebraicWithEquivalenceRelation.
         end
       end.
 
+    (* This function explains which simple queue representation we have in mind,
+     * for each fancy two-stack representation. *)
     Definition elements A (q : t A) : list A :=
       q.(EnqueueHere) ++ rev q.(DequeueHere).
 
+    (* That function is useful to define our equivalence relation. *)
     Definition equiv A (a b : t A) :=
       elements a = elements b.
     Infix "~=" := equiv (at level 70).
@@ -396,6 +535,9 @@ Module AlgebraicWithEquivalenceRelation.
     Proof.
       equality.
     Qed.
+
+    (* Now it is mostly routine to prove the laws, though a few tricks may
+     * be worth reading through. *)
 
     Theorem equiv_enqueue : forall A (a b : t A) (x : A),
         a ~= b
@@ -543,6 +685,9 @@ Module AlgebraicWithEquivalenceRelation.
       equality.
     Qed.
   End TwoStacksQueue.
+
+  (* The exercise of the generic delayed sum may be repeated with equivalence
+   * relations. *)
 
   Module DelayedSum (Q : QUEUE).
     Fixpoint makeQueue (n : nat) (q : Q.t nat) : Q.t nat :=
@@ -732,6 +877,12 @@ Module AlgebraicWithEquivalenceRelation.
   End DelayedSum.
 End AlgebraicWithEquivalenceRelation.
 
+(* It's worth presenting one final style of data-abstraction formalism: we
+ * introduce *representation functions* in the interface, to map the internal
+ * representation to some standard one that is easy to reason about.  We don't
+ * expect "real code" to call the representation function.  Instead, it's just a
+ * proof device to let us write convincing laws.  Here's the previous example
+ * redone in this manner, without comment. *)
 Module RepFunction.
   Module Type QUEUE.
     Parameter t : Set -> Set.
@@ -984,9 +1135,14 @@ Module RepFunction.
 End RepFunction.
 
 
+(** * Data abstraction with fixed parameter types *)
+
+(* Finite sets are another classic *abstract data type*, another name for what
+ * we have been defining so far with modules.  Here's a generic finite-set
+ * interface, following the first algebraic style we saw above. *)
 Module Type FINITE_SET.
-  Parameter key : Set.
-  Parameter t : Set.
+  Parameter key : Set. (* What type of data may be added to these sets? *)
+  Parameter t : Set.   (* What is the type of sets themselves? *)
 
   Parameter empty : t.
   Parameter add : t -> key -> t.
@@ -1001,8 +1157,17 @@ Module Type FINITE_SET.
       -> member (add s k1) k2 = member s k2.
 
   Axiom decidable_equality : forall a b : key, a = b \/ a <> b.
+  (* This last axiom may be a bit surprising.  Coq is so oriented toward
+   * computation that we don't assume the *law of the excluded middle*, which
+   * says that every proposition is either true or false.  Instead, we prove
+   * specific instances as needed.  But feel free to ignore this point for
+   * the purposes of this class. *)
 End FINITE_SET.
 
+(* We want a generic implementation of finite sets, as found in the standard
+ * libaries of languages like Java.  However, not just any key set will do.
+ * We need enough computable operations.  One sufficient operation is an
+ * equality test. *)
 Module Type SET_WITH_EQUALITY.
   Parameter t : Set.
   Parameter equal : t -> t -> bool.
@@ -1010,6 +1175,11 @@ Module Type SET_WITH_EQUALITY.
   Axiom equal_ok : forall a b, if equal a b then a = b else a <> b.
 End SET_WITH_EQUALITY.
 
+(* Here's a generic implementation of finite sets, parameterized over an
+ * arbitrary set with a correct equality operation.  Note the use of the [with]
+ * operator to *refine* the result signature [FINITE_SET]: we reveal that the
+ * [key] type is actually [SE.T], that is the key type from the parameter module
+ * [SE]. *)
 Module ListSet(SE : SET_WITH_EQUALITY) <: FINITE_SET with Definition key := SE.t.
   Definition key := SE.t.
   Definition t := list SE.t.
@@ -1057,6 +1227,7 @@ Module ListSet(SE : SET_WITH_EQUALITY) <: FINITE_SET with Definition key := SE.t
   Qed.
 End ListSet.
 
+(* Here's an example decidable-equality type for natural numbers. *)
 Module NatWithEquality <: SET_WITH_EQUALITY with Definition t := nat.
   Definition t := nat.
 
@@ -1084,8 +1255,10 @@ Module NatWithEquality <: SET_WITH_EQUALITY with Definition t := nat.
   Qed.
 End NatWithEquality.
 
+(* And here's how to instantiate the generic set for the naturals. *)
 Module NatSet := ListSet(NatWithEquality).
 
+(* Now, some generic client code, for testing duplicate-freeness of lists. *)
 Module FindDuplicates (FS : FINITE_SET).
   Fixpoint noDuplicates' (ls : list FS.key) (s : FS.t) : bool :=
     match ls with
@@ -1095,9 +1268,13 @@ Module FindDuplicates (FS : FINITE_SET).
 
   Definition noDuplicates (ls : list FS.key) := noDuplicates' ls FS.empty.
 
+  (* A characterization of having a duplicate: the list can be partitioned into
+   * pieces revealing the same element [a] at two boundaries. *)
   Definition hasDuplicate (ls : list FS.key) :=
     exists ls1 a ls2 ls3, ls = ls1 ++ a :: ls2 ++ a :: ls3.
 
+  (* A characterization of containing an element [a]: the list can be
+   * partitioned into two pieces, with [a] at the boundary. *)
   Definition contains (a : FS.key) (ls : list FS.key) :=
     exists ls1 ls2, ls = ls1 ++ a :: ls2.
 
@@ -1227,15 +1404,30 @@ Compute NatDuplicateFinder.noDuplicates [1; 2].
 Compute NatDuplicateFinder.noDuplicates [1; 2; 3].
 Compute NatDuplicateFinder.noDuplicates [1; 2; 1; 3].
 
+
+(** * Custom implementations of abstract data types *)
+
+(* Sometimes we want to write custom implementations of polymorphic data types.
+ * Our last example of duplicate detection is a good one: we can make it much
+ * faster when we know something about how the lists will be built.  In
+ * particular, finite sets of natural numbers can be made compact when we know
+ * that the common case is *intervals*, sets of consecutive numbers. *)
 Module NatRangeSet <: FINITE_SET with Definition key := nat.
   Definition key := nat.
 
   Inductive rangeSet : Set :=
   | Empty
+    (* Set has no elements. *)
   | Range (from to : nat)
-  | AdHoc (s : NatSet.t).
+    (* Set contains exactly the numbers from [from] to [to], inclusive. *)
+  | AdHoc (s : NatSet.t)
+    (* Set isn't an interval, so fall back on the list-based version. *).
 
   Definition t := rangeSet.
+
+  (* When we realize that a freshly formed set isn't an interval, we often need
+   * to convert an interval to an ad-hoc set.  These functions accomplish
+   * that. *)
 
   Fixpoint fromRange' (from to : nat) : NatSet.t :=
     match to with
@@ -1543,6 +1735,9 @@ Module NatRangeSet <: FINITE_SET with Definition key := nat.
     cases (NatWithEquality.equal a b); propositional.
   Qed.
 End NatRangeSet.
+
+(* Time for a head-to-head performance contest between our naive and clever
+ * sets! *)
 
 Module FasterNatDuplicateFinder := FindDuplicates(NatRangeSet).
 

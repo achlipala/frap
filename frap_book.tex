@@ -634,6 +634,52 @@ $$\infer{\mt{dequeue}(q) = \cdot}{\mt{rep}(q) = []}
 
 Notice that this specification style can also be viewed as \emph{giving a reference implementation\index{reference implementations of data types} of the data type}, where $\mt{rep}$ shows how to convert back to the reference implementation at any point.
 
+\section{Fixing Parameter Types for Abstract Data Types}
+
+Here's another classic abstract data type: finite sets\index{finite sets}, where we write $\mathbb B$ for the set of Booleans.
+\begin{eqnarray*}
+  \mt{t}(\alpha) &:& \mt{Set} \\
+  \mt{empty} &:& \mt{t}(\alpha) \\
+  \mt{add} &:& \mt{t}(\alpha) \times \alpha \to \mt{t}(\alpha) \\
+  \mt{member} &:& \mt{t}(\alpha) \times \alpha \to \mathbb B
+\end{eqnarray*}
+
+A few laws characterize expected behavior, with $\top$ and $\bot$ the respective elements ``true'' and ``false'' of $\mathbb B$.
+
+$$\infer{\mt{member}(\mt{empty}, k) = \bot}{}
+\quad \infer{\mt{member}(\mt{add}(s, k), k) = \top}{}
+\quad \infer{\mt{member}(\mt{add}(s, k_1), k_2) = \mt{member}(s, k_2)}{k_1 \neq k_2}$$
+
+There is a simple generic implementation of this data type with unsorted lists.
+\begin{eqnarray*}
+  \mt{t} &=& \mt{list} \\
+  \mt{empty} &=& [] \\
+  \mt{add}(s, k) &=& \concat{[k]}{s} \\
+  \mt{member}([], k) &=& \bot \\
+  \mt{member}(\concat{[k']}{s}, k) &=& k = k' \lor \mt{member}(s, k)
+\end{eqnarray*}
+
+However, we can build specialized finite sets for particular element types and usage patterns.
+For instance, assume we are working with sets of natural numbers, where we know that most sets contain consecutive numbers.
+In those cases, it suffices to store just the lowest and highest elements of sets, and all the set operations run in constant time.
+Assume a fallback implementation of finite sets, with type $t_0$ and operations $\mt{empty}_0$, $\mt{add}_0$, and $\mt{member}_0$.
+We implement our optimized set type like so, assuming an operation $\mt{fromRange} : \mathbb N \times \mathbb N \to \mt{t}_0$ to turn a range into an ad-hoc set.
+\begin{eqnarray*}
+  \mt{t} &=& \mt{Empty} \mid \mt{Range}(\mathbb N \times \mathbb N) \mid \mt{AdHoc}(\mt{t}_0) \\
+  \mt{empty} &=& \mt{Empty} \\
+  \mt{add}(\mt{Empty}, k) &=& \mt{Range}(k, k) \\
+  \mt{add}(\mt{Range}(n_1, n_2), k) &=& s\textrm{, when $n_1 \leq k \leq n_2$} \\
+  \mt{add}(\mt{Range}(n_1, n_2), n_1-1) &=& \mt{Range}(n_1-1, n_2)\textrm{, when $n_1 \leq n_2$} \\
+  \mt{add}(\mt{Range}(n_1, n_2), n_2+1) &=& \mt{Range}(n_1, n_2+1)\textrm{, when $n_1 \leq n_2$} \\
+  \mt{add}(\mt{Range}(n_1, n_2), k) &=& \mt{AdHoc}(\mt{add}_0(\mt{fromRange}(n_1, n_2), k))\textrm{, otherwise} \\
+  \mt{add}(\mt{AdHoc}(s), k) &=& \mt{AdHoc}(\mt{add}_0(s, k)) \\
+  \mt{member}(\mt{Empty}, k) &=& \bot \\
+  \mt{member}(\mt{Range}(n_1, n_2), k) &=& n_1 \leq k \leq n_2 \\
+  \mt{member}(\mt{AdHoc}(s), k) &=& \mt{member}_0(s, k)
+\end{eqnarray*}
+
+This implementation can be proven to satisfy the finite-set spec, assuming that the baseline ad-hoc implementation does, too.
+For workloads that only build sets of consecutive numbers, this implementation can be much faster than the generic list-based implementation, converting quadratic-time algorithms into linear-time.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

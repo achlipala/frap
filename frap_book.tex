@@ -545,6 +545,58 @@ Both versions actually take quadratic time in practice, assuming concatenation t
 There is a famous, more clever implementation that achieves amortized\index{amortized time} linear time, but we will need to expand our algebraic style to accommodate it.
 
 
+\section{Algebraic Interfaces with Custom Equivalence Relations}
+
+We find it useful to extend the base interface of queues with a new, mathematical ``operation'':
+\begin{eqnarray*}
+  \mt{t}(\alpha) &:& \mt{Set} \\
+  \mt{empty} &:& \mt{t}(\alpha) \\
+  \mt{enqueue} &:& \mt{t}(\alpha) \times \alpha \to \mt{t}(\alpha) \\
+  \mt{dequeue} &:& \mt{t}(\alpha) \rightharpoonup \mt{t}(\alpha) \times \alpha \\
+  \mt{\approx} &:& \mathcal P(\mt{t}(\alpha) \times \mt{t}(\alpha))
+\end{eqnarray*}
+
+We use the ``powerset''\index{powerset} operation $\mathcal P$ to indicate that $\approx$ is a \emph{binary relation}\index{binary relation} over queues (of the same type).
+Our intention is that $\approx$ be an \emph{equivalence relation}, as formalized by the following laws that we add.
+$$\infer[\mathsf{Reflexivity}]{a \approx a}{}
+\quad \infer[\mathsf{Symmetry}]{a \approx b}{b \approx a}
+\quad \infer[\mathsf{Transitivity}]{a \approx c}{a \approx b & b \approx c}$$
+
+Now we rewrite the original laws to use $\approx$ instead of equality.
+We implicitly lift $\approx$ to apply to results of the partial function $\mt{dequeue}$: nonexistent results $\cdot$ are related, and existent results $(q_1, x_1)$ and $(q_2, x_2)$ are related iff $q_1 \approx q_2$ and $x_1 = x_2$.
+$$\infer{\mt{dequeue}(\mt{empty}) = \cdot}{}
+\quad \infer{q \approx \mt{empty}}{\mt{dequeue}(q) = \cdot}$$
+
+$$\infer{\mt{dequeue}(\mt{enqueue}(q, x)) \approx \begin{cases}
+    (\mt{empty}, x), & \mt{dequeue}(q) = \cdot \\
+    (\mt{enqueue}(q', x), y), & \mt{dequeue}(q) = (q', y)
+  \end{cases}}{}$$
+
+What's the payoff from this reformulation?
+Well, first, it passes the sanity check that the two queue implementations from the last section comply, with $\approx$ instantiated as simple equality.
+However, we may now also handle the classic \emph{two-stack queue}\index{two-stack queue}.
+Here is its implementation, relying on list-reversal function $\mt{rev}$ (which takes linear time).
+\begin{eqnarray*}
+  \mt{t(\alpha)} &=& \mt{list}(\alpha) \times \mt{list}(\alpha) \\
+  \mt{empty} &=& ([], []) \\
+  \mt{enqueue}((\ell_1, \ell_2), x) &=& (\concat{[x]}{\ell_1}, \ell_2) \\
+  \mt{dequeue}(([], [])) &=& \cdot \\
+  \mt{dequeue}((\ell_1, \concat{[x]}{\ell_2})) &=& ((\ell_1, \ell_2), x) \\
+  \mt{dequeue}((\ell_1, [])) &=& (([], q'_1), x)\textrm{, when $\mt{rev}(\ell_1) = \concat{[x]}{q'_1}$.}
+\end{eqnarray*}
+
+The basic trick is to encode a queue as a pair of lists $(\ell_1, \ell_2)$.
+We try to enqueue into $\ell_1$ by adding elements to its front in constant time, and we try to dequeue from $\ell_2$ by removing elements from its front in constant time.
+However, sometimes we run out of elements in $\ell_2$ and need to \emph{reverse} $\ell_1$ and transfer the result into $\ell_2$.
+The suitable equivalence relation formalizes this plan.
+\begin{eqnarray*}
+  \mt{rep}((\ell_1, \ell_2)) &=& \concat{\ell_1}{\mt{rev}(\ell_2)} \\
+  q_1 \approx q_2 &=& \mt{rep}(q_1) = \mt{rep}(q_2)
+\end{eqnarray*}
+
+We can prove both that this $\approx$ is an equivalence relation and that the other queue laws are satisfied.
+As a result, client code (and its correctness proofs) can use this fancy code, effectively viewing it as a simple queue, with the two-stack nature hidden.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

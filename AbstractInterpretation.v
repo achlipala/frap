@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 7: Abstract Interpretation and Dataflow Analysis
+  * Chapter 8: Abstract Interpretation and Dataflow Analysis
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

@@ -300,7 +300,7 @@ Qed.
 (* This inductive state effectively encodes all possible combinations of two
  * kinds of *local*state* in a thread:
  * - program counter
- * - values of local variables that may be ready eventually *)
+ * - values of local variables that may be read eventually *)
 Inductive increment_program :=
 | Lock
 | Read

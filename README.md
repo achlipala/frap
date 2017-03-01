@@ -13,6 +13,7 @@ The main narrative, also present in the book PDF, presents standard program-proo
 * Chapter 3: `DataAbstraction.v`
 * Chapter 4: `Interpreters.v`
 * Chapter 5: `TransitionSystems.v`
+  * `IntroToProofScripting.v`: writing scripts to find proofs in Coq
 * Chapter 6: `ModelChecking.v`
 * Chapter 7: `OperationalSemantics.v`
 * Chapter 8: `AbstractInterpretation.v`

@@ -18,6 +18,7 @@ Interpreters_template.v
 Interpreters.v
 TransitionSystems_template.v
 TransitionSystems.v
+IntroToProofScripting.v
 ModelChecking_template.v
 ModelChecking.v
 OperationalSemantics_template.v

@@ -127,7 +127,7 @@ End properties.
 
 Hint Resolve subseteq_refl subseteq_In.
 
-Hint Rewrite union_constant.
+(*Hint Rewrite union_constant.*)
 
 
 (** * Removing duplicates from constant sets *)
@@ -267,5 +267,322 @@ Ltac unifyTails :=
     match type of x with
     | set ?A => unify x (constant (@nil A))
     | ?A -> Prop => unify x (constant (@nil A))
+    end
+  end.
+
+
+(** * But wait... there's a reflective way to do some of this, too. *)
+
+Require Import Arith.
+Import List ListNotations.
+
+Section setexpr.
+  Variable A : Type.
+
+  Inductive setexpr :=
+  | Literal (vs : list nat)
+  | Constant (s : set A)
+  | Union (e1 e2 : setexpr).
+
+  Fixpoint interp_setexpr (env : list A) (e : setexpr) : set A :=
+    match e with
+    | Literal vs =>
+      match env with
+      | [] => {}
+      | x :: _ => constant (map (nth_default x env) vs)
+      end
+    | Constant s => s
+    | Union e1 e2 => interp_setexpr env e1 \cup interp_setexpr env e2
+    end.
+
+  Record normal_form := {
+    Elements : list nat;
+    Other : option (set A)
+  }.
+
+  Fixpoint member (n : nat) (ls : list nat) : bool :=
+    match ls with
+    | [] => false
+    | m :: ls' => (n =? m) || member n ls'
+    end.
+
+  Fixpoint dedup (ls : list nat) : list nat :=
+    match ls with
+    | [] => []
+    | n :: ls =>
+      let ls' := dedup ls in
+      if member n ls' then ls' else n :: ls'
+    end.
+
+  Fixpoint setmerge (ls1 ls2 : list nat) : list nat :=
+    match ls1 with
+    | [] => ls2
+    | n :: ls1' =>
+      if member n ls2 then setmerge ls1' ls2 else n :: setmerge ls1' ls2
+    end.
+
+  Fixpoint normalize_setexpr (e : setexpr) : normal_form :=
+    match e with
+    | Literal vs => {| Elements := dedup vs; Other := None |}
+    | Constant s => {| Elements := []; Other := Some s |}
+    | Union e1 e2 =>
+      let nf1 := normalize_setexpr e1 in
+      let nf2 := normalize_setexpr e2 in
+        {| Elements := setmerge nf1.(Elements) nf2.(Elements);
+           Other := match nf1.(Other), nf2.(Other) with
+                    | None, None => None
+                    | o, None => o
+                    | None, o => o
+                    | Some s1, Some s2 => Some (s1 \cup s2)
+                    end |}
+    end.
+
+  Definition interp_normal_form (env : list A) (nf : normal_form) : set A :=
+    let cs := match env with
+              | [] => {}
+              | x :: _ => constant (map (nth_default x env) nf.(Elements))
+              end in
+    match nf.(Other) with
+    | None => cs
+    | Some o => cs \cup o
+    end.
+
+  Lemma member_ok : forall n ns,
+      if member n ns then In n ns else ~In n ns.
+  Proof.
+    induction ns; simpl; intuition.
+    case_eq (n =? a); simpl; intros.
+    apply beq_nat_true in H; auto.
+    apply beq_nat_false in H.
+    destruct (member n ns); intuition.
+  Qed.
+
+  Lemma In_dedup_fwd : forall n ns,
+      In n (dedup ns)
+      -> In n ns.
+  Proof.
+    induction ns; simpl; intuition.
+    pose proof (member_ok a (dedup ns)).
+    destruct (member a (dedup ns)); simpl in *; intuition.
+  Qed.
+
+  Lemma In_dedup_bwd : forall n ns,
+      In n ns
+      -> In n (dedup ns).
+  Proof.
+    induction ns; simpl; intuition.
+    pose proof (member_ok a (dedup ns)).
+    destruct (member a (dedup ns)); simpl in *; intuition congruence.
+    pose proof (member_ok a (dedup ns)).
+    destruct (member a (dedup ns)); simpl in *; intuition congruence.
+  Qed.
+
+  Lemma constant_dedup : forall (f : _ -> A) vs,
+      constant (map f (dedup vs)) = constant (map f vs).
+  Proof.
+    induction vs; simpl; intuition.
+    pose proof (member_ok a (dedup vs)).
+    case_eq (member a (dedup vs)); intro.
+    rewrite IHvs.
+    rewrite H0 in H.
+    apply In_dedup_fwd in H.
+    apply sets_equal.
+    unfold constant.
+    simpl.
+    intuition.
+    apply in_map_iff.
+    eauto.
+    simpl.
+    apply sets_equal.
+    simpl.
+    intuition congruence.
+  Qed.
+
+  Lemma constant_map_setmerge : forall (f : _ -> A) ns2 ns1,
+      constant (map f (setmerge ns1 ns2)) = constant (map f ns1) \cup constant (map f ns2).
+  Proof.
+    induction ns1; simpl; intros.
+
+    sets ltac:(simpl in *; intuition).
+
+    pose proof (member_ok a ns2).
+    destruct (member a ns2).
+    rewrite IHns1.
+    sets ltac:(simpl in *; intuition).
+    right.
+    eapply in_map_iff; eauto.
+
+    simpl.
+    sets ltac:(simpl in *; intuition).
+    change (In x (map f (setmerge ns1 ns2))) with ((fun x => In x (map f (setmerge ns1 ns2))) x) in H1.
+    rewrite IHns1 in H1.
+    tauto.
+    change (In x (map f (setmerge ns1 ns2))) with ((fun x => In x (map f (setmerge ns1 ns2))) x).
+    rewrite IHns1.
+    tauto.
+    change (In x (map f (setmerge ns1 ns2))) with ((fun x => In x (map f (setmerge ns1 ns2))) x).
+    rewrite IHns1.
+    tauto.
+  Qed.
+
+  Theorem normalize_setexpr_ok : forall env e,
+      interp_normal_form env (normalize_setexpr e) = interp_setexpr env e.
+  Proof.
+    induction e; simpl; intros.
+
+    unfold interp_normal_form; simpl.
+    destruct env; trivial.
+    apply constant_dedup.
+
+    unfold interp_normal_form; simpl.
+    destruct env; sets ltac:(simpl in *; intuition).
+
+    unfold interp_normal_form in *; simpl in *.
+    destruct (Other (normalize_setexpr e1)), (Other (normalize_setexpr e2)).
+    destruct env.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    rewrite constant_map_setmerge.
+    sets ltac:(simpl in *; intuition).
+    destruct env.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    rewrite constant_map_setmerge.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    destruct env.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    rewrite constant_map_setmerge.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    destruct env.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+    rewrite constant_map_setmerge.
+    rewrite <- IHe1.
+    rewrite <- IHe2.
+    sets ltac:(simpl in *; intuition).
+  Qed.
+
+  Fixpoint included (ns1 ns2 : list nat) : bool :=
+    match ns1 with
+    | [] => true
+    | n :: ns1' => member n ns2 && included ns1' ns2
+    end.
+
+  Lemma included_true : forall ns2 ns1,
+      included ns1 ns2 = true
+      -> (forall x, In x ns1 -> In x ns2).
+  Proof.
+    induction ns1; simpl; intuition subst.
+
+    pose proof (member_ok x ns2).
+    destruct (member x ns2); simpl in *; auto; congruence.
+
+    pose proof (member_ok a ns2).
+    destruct (member a ns2); simpl in *; auto; congruence.
+  Qed.
+
+  Require Import Bool.
+
+  Theorem compare_sets : forall env e1 e2,
+      let nf1 := normalize_setexpr e1 in
+      let nf2 := normalize_setexpr e2 in
+      match Other nf1, Other nf2 with
+      | None, None => included nf1.(Elements) nf2.(Elements)
+                      && included nf2.(Elements) nf1.(Elements) = true
+      | _, _ => False
+      end
+      -> interp_setexpr env e1 = interp_setexpr env e2.
+  Proof.
+    intros.
+    do 2 rewrite <- normalize_setexpr_ok.
+    subst nf1.
+    subst nf2.
+    unfold interp_normal_form.
+    destruct (Other (normalize_setexpr e1)), (Other (normalize_setexpr e2)); intuition.
+    destruct env; trivial.
+    apply andb_true_iff in H; intuition.
+    specialize (included_true _ _ H0).
+    specialize (included_true _ _ H1).
+    clear H0 H1.
+    intros.
+    apply sets_equal.
+    unfold constant; simpl; intuition.
+    apply in_map_iff.
+    apply in_map_iff in H1.
+    firstorder.
+    apply in_map_iff.
+    apply in_map_iff in H1.
+    firstorder.
+  Qed.
+End setexpr.
+
+Ltac quote E env k :=
+  let T := type of E in
+  match eval hnf in T with
+  | ?A -> Prop => 
+    let rec lookup E env k :=
+        match env with
+        | [] => k 0 [E]
+        | E :: _ => k 0 env
+        | ?E' :: ?env' =>
+          lookup E env' ltac:(fun pos env'' => k (S pos) (E' :: env''))
+        end in
+
+    let rec lookups Es env k :=
+        match Es with
+        | [] => k (@nil nat) env
+        | ?E :: ?Es' =>
+          lookup E env ltac:(fun pos env' =>
+              lookups Es' env' ltac:(fun poss env'' =>
+                                       k (pos :: poss) env''))
+        end in
+
+    let rec quote' E env k :=
+        match E with
+        | constant ?Es =>
+          lookups Es env ltac:(fun poss env' => k (Literal A poss) env')
+        | ?E1 \cup ?E2 =>
+          quote' E1 env ltac:(fun e1 env' =>
+            quote' E2 env' ltac:(fun e2 env'' =>
+              k (Union e1 e2) env''))
+        | _ =>
+          (let pf := constr:(eq_refl : E = {}) in
+           k (Literal A []) env)
+          || k (Constant E) env
+        end in
+
+    quote' E env k
+  end.
+
+Ltac normalize_set :=
+  match goal with
+  | [ |- context[@union ?A ?X ?Y] ] =>
+    quote (@union A X Y) (@nil A) ltac:(fun e env =>
+      change (@union A X Y) with (interp_setexpr env e);
+      rewrite <- normalize_setexpr_ok;
+      cbv beta iota zeta delta [interp_normal_form normalize_setexpr nth_default
+                                setmerge Elements Other nth_error map dedup member beq_nat orb])
+  end.
+
+Ltac compare_sets :=
+  match goal with
+  | [ |- @eq ?T ?X ?Y ] =>
+    match eval hnf in T with
+    | ?A -> _ =>
+      quote X (@nil A) ltac:(fun x env =>
+        quote Y env ltac:(fun y env' =>
+          change (interp_setexpr env' x = interp_setexpr env' y);
+          apply compare_sets; reflexivity))
     end
   end.

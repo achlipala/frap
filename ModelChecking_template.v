@@ -125,11 +125,12 @@ Proof.
   simplify.
   propositional.
   
-  left.
   right.
+  left.
   apply H.
   equality.
 
+  right.
   right.
   eapply H2.
   eassumption.
@@ -213,6 +214,7 @@ Theorem singleton_in_other : forall {A} (x : A) (s1 s2 : set A),
 Proof.
   simplify.
   right.
+  right.
   assumption.
 Qed.
 
@@ -222,7 +224,7 @@ Ltac singletoner :=
          | [ |- (_ \cup _) _ ] => apply singleton_in_other
          end.
 
-Ltac model_check_step :=
+Ltac model_check_step0 :=
   eapply MscStep; [
     repeat ((apply oneStepClosure_empty; simplify)
             || (apply oneStepClosure_split; [ simplify;
@@ -231,7 +233,18 @@ Ltac model_check_step :=
                                                      end; solve [ singletoner ] | ]))
   | simplify ].
 
-Ltac model_check_steps1 := model_check_done || model_check_step.
+Ltac model_check_step :=
+  match goal with
+  | [ |- multiStepClosure _ ?inv1 _ ] =>
+    model_check_step0;
+    match goal with
+    | [ |- multiStepClosure _ ?inv2 _ ] =>
+      (assert (inv1 = inv2) by compare_sets; fail 3)
+      || idtac
+    end
+  end.
+
+Ltac model_check_steps1 := model_check_step || model_check_done.
 Ltac model_check_steps := repeat model_check_steps1.
 
 Ltac model_check_finish := simplify; propositional; subst; simplify; equality.

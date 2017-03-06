@@ -174,7 +174,7 @@ Ltac simplify := repeat (unifyTails; pose proof I);
                        | [ H : True |- _ ] => clear H
                        end;
                 repeat progress (simpl in *; intros; try autorewrite with core in *; simpl_maps);
-                                 repeat (removeDups || doSubtract).
+                                 repeat (normalize_set || doSubtract).
 Ltac propositional := intuition idtac.
 
 Ltac linear_arithmetic := intros;
@@ -284,10 +284,21 @@ Ltac closure :=
 Ltac model_check_done :=
   apply MscDone; eapply oneStepClosure_solve; [ closure | simplify; solve [ sets ] ].
 
-Ltac model_check_step :=
+Ltac model_check_step0 :=
   eapply MscStep; [ closure | simplify ].
 
-Ltac model_check_steps1 := model_check_done || model_check_step.
+Ltac model_check_step :=
+  match goal with
+  | [ |- multiStepClosure _ ?inv1 _ _ ] =>
+    model_check_step0;
+    match goal with
+    | [ |- multiStepClosure _ ?inv2 _ _ ] =>
+      (assert (inv1 = inv2) by compare_sets; fail 3)
+      || idtac
+    end
+  end.
+
+Ltac model_check_steps1 := model_check_step || model_check_done.
 Ltac model_check_steps := repeat model_check_steps1.
 
 Ltac model_check_finish := simplify; propositional; subst; simplify; try equality; try linear_arithmetic.

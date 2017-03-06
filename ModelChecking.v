@@ -161,11 +161,12 @@ Proof.
   simplify.
   propositional.
   
-  left.
   right.
+  left.
   apply H.
   equality.
 
+  right.
   right.
   eapply H2.
   eassumption.
@@ -197,6 +198,8 @@ Theorem fact_init_is : forall original_input,
 Proof.
   simplify.
   apply sets_equal; simplify.
+  (* Note the use of a theorem [sets_equal], saying that sets are equal if they
+   * have the same elements. *)
   propositional.
 
   invert H.
@@ -209,7 +212,7 @@ Qed.
 (* Now we will prove that factorial is correct, for the input 2, without needing
  * to write out an inductive invariant ourselves.  Note that it's important that
  * we choose a small, constant input, so that the reachable state space is
- * finite. *)
+ * finite and tractable. *)
 Theorem factorial_ok_2 :
   invariantFor (factorial_sys 2) (fact_correct 2).
 Proof.
@@ -297,17 +300,17 @@ Theorem singleton_in_other : forall {A} (x : A) (s1 s2 : set A),
 Proof.
   simplify.
   right.
+  right.
   assumption.
 Qed.
 
 Ltac singletoner :=
   repeat match goal with
-         (* | _ => apply singleton_in *)
          | [ |- _ ?S ] => idtac S; apply singleton_in
          | [ |- (_ \cup _) _ ] => apply singleton_in_other
          end.
 
-Ltac model_check_step :=
+Ltac model_check_step0 :=
   eapply MscStep; [
     repeat ((apply oneStepClosure_empty; simplify)
             || (apply oneStepClosure_split; [ simplify;
@@ -316,7 +319,18 @@ Ltac model_check_step :=
                                                      end; solve [ singletoner ] | ]))
   | simplify ].
 
-Ltac model_check_steps1 := model_check_done || model_check_step.
+Ltac model_check_step :=
+  match goal with
+  | [ |- multiStepClosure _ ?inv1 _ ] =>
+    model_check_step0;
+    match goal with
+    | [ |- multiStepClosure _ ?inv2 _ ] =>
+      (assert (inv1 = inv2) by compare_sets; fail 3)
+      || idtac
+    end
+  end.
+
+Ltac model_check_steps1 := model_check_step || model_check_done.
 Ltac model_check_steps := repeat model_check_steps1.
 
 Ltac model_check_finish := simplify; propositional; subst; simplify; equality.
@@ -1573,4 +1587,3 @@ Theorem twoadd6_ok :
 Proof.
   twoadd.
 Qed.
-

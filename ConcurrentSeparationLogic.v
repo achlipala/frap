@@ -1329,7 +1329,7 @@ Lemma lockChunks_lock' : forall l I linvs (f : nat -> nat) a,
     ~f a \in l
     -> nth_error linvs a = Some I
     -> (forall x y, f x = f y -> x = y)
-    -> bigstar (fun i I => (~f i \in l) ===> I)%sep linvs ===> I * bigstar (fun i I => (~(f i \in l \cup {f a})) ===> I)%sep linvs.
+    -> bigstar (fun i I => (~f i \in l) ===> I)%sep linvs ===> I * bigstar (fun i I => (~(f i \in {f a} \cup l)) ===> I)%sep linvs.
 Proof.
   induct linvs; simplify.
 
@@ -1362,7 +1362,7 @@ Qed.
 Lemma lockChunks_lock : forall a l I linvs,
     ~a \in l
     -> nth_error linvs a = Some I
-    -> lockChunks l linvs ===> I * lockChunks (l \cup {a}) linvs.
+    -> lockChunks l linvs ===> I * lockChunks ({a} \cup l) linvs.
 Proof.
   simp.
   apply lockChunks_lock' with (f := fun n => n); auto.

@@ -410,6 +410,196 @@ Proof.
 Admitted.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Inductive add2_bthread :=
+| BRead
+| BWrite (local : bool).
+
+Inductive add2_binit : threaded_state bool add2_bthread -> Prop :=
+| Add2BInit : add2_binit {| Shared := true; Private := BRead |}.
+
+Inductive add2_bstep : threaded_state bool add2_bthread -> threaded_state bool add2_bthread -> Prop :=
+| StepBRead : forall global,
+    add2_bstep {| Shared := global; Private := BRead |}
+               {| Shared := global; Private := BWrite global |}
+| StepBWrite : forall global local,
+    add2_bstep {| Shared := global; Private := BWrite local |}
+               {| Shared := local; Private := BRead |}.
+
+Definition add2_bsys1 := {|
+  Initial := add2_binit;
+  Step := add2_bstep
+|}.
+
+Definition add2_bsys := parallel add2_bsys1 add2_bsys1.
+
+(* This invariant formalizes the connection between local states of threads, in
+ * the original and abstracted systems. *)
+Inductive R_private1 : add2_thread -> add2_bthread -> Prop :=
+| RpRead : R_private1 Read BRead
+| RpWrite : forall n b, (b = true <-> isEven n)
+                        -> R_private1 (Write n) (BWrite b).
+
+(* We lift [R_private1] to a relation over whole states. *)
+Inductive add2_R : threaded_state nat (add2_thread * add2_thread)
+                   -> threaded_state bool (add2_bthread * add2_bthread)
+                   -> Prop :=
+| Add2_R : forall n b th1 th2 th1' th2',
+  (b = true <-> isEven n)
+  -> R_private1 th1 th1'
+  -> R_private1 th2 th2'
+  -> add2_R {| Shared := n; Private := (th1, th2) |}
+            {| Shared := b; Private := (th1', th2') |}.
+
+(* Let's also recharacterize the initial states via a singleton set. *)
+Theorem add2_init_is :
+  parallel1 add2_binit add2_binit = { {| Shared := true; Private := (BRead, BRead) |} }.
+Proof.
+  simplify.
+  apply sets_equal; simplify.
+  propositional.
+
+  invert H.
+  invert H2.
+  invert H4.
+  equality.
+
+  invert H0.
+  constructor.
+  constructor.
+  constructor.
+Qed.
+
+(* We ask Coq to remember this lemma as a hint, which will be used by the
+ * model-checking tactics that we refrain from explaining in detail. *)
+Hint Rewrite add2_init_is.
+
+(* Now, let's verify the original system. *)
+(*Theorem add2_ok :
+  invariantFor add2_sys add2_correct.
+Proof.
+  (* First step: strengthen the invariant.  We leave an underscore for the
+   * unknown invariant, to be found by model checking. *)
+  eapply invariant_weaken with (invariant1 := invariantViaSimulation add2_R _).
+
+  (* One way to find an invariant-by-simulation is to find an invariant for the
+   * abstracted system, as this step asks to do. *)
+  apply invariant_simulates with (sys2 := add2_bsys).
+
+  (* Now we must prove that the simulation via [add2_R] is valid, which is
+   * routine. *)
+  constructor; simplify.
+
+  invert H.
+  invert H0.
+  invert H1.
+  exists {| Shared := true; Private := (BRead, BRead) |}; simplify.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  constructor.
+  constructor.
+
+  invert H.
+  invert H0; simplify.
+
+  invert H7.
+
+  invert H2.
+  exists {| Shared := b; Private := (BWrite b, th2') |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  propositional.
+  assumption.
+  constructor.
+  constructor.
+
+  invert H2.
+  exists {| Shared := b0; Private := (BRead, th2') |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  assumption.
+  invert H0.
+  propositional.
+  constructor.
+  assumption.
+  constructor.
+  constructor.
+
+  invert H7.
+
+  invert H3.
+  exists {| Shared := b; Private := (th1', BWrite b) |}.
+  propositional.
+  constructor.
+  propositional.
+  assumption.
+  constructor.
+  propositional.
+  constructor.
+  constructor.
+
+  invert H3.
+  exists {| Shared := b0; Private := (th1', BRead) |}.
+  propositional.
+  constructor.
+  propositional.
+  constructor.
+  assumption.
+  invert H0.
+  propositional.
+  assumption.
+  constructor.
+  constructor.
+  constructor.
+
+  (* OK, we're glad to have that over with!  Such a process could also be
+   * automated, but we won't bother doing so here.  However, we are now in a
+   * good state, where our model checker can find the invariant
+   * automatically. *)
+  model_check_infer.
+  (* It finds exactly four reachable states.  We finish by showing that they all
+   * obey the original invariant. *)
+
+  invert 1.
+  invert H0.
+  simplify.
+  unfold add2_correct.
+  simplify.
+  propositional; subst.
+
+  invert H.
+  propositional.
+
+  invert H1.
+  propositional.
+
+  invert H.
+  propositional.
+
+  invert H1.
+  propositional.
+Qed.*)
+
+
 (** * Another abstraction example *)
 
 Inductive pc :=

@@ -77,7 +77,7 @@ Inductive step : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 (* To take a lock, it must not be held; and vice versa for releasing a lock. *)
 | StepLock : forall h l a,
   ~a \in l
-  -> step (h, l, Lock a) (h, l \cup {a}, Return 0)
+  -> step (h, l, Lock a) (h, {a} \cup l, Return 0)
 | StepUnlock : forall h l a,
   a \in l
   -> step (h, l, Unlock a) (h, l \setminus {a}, Return 0).
@@ -603,13 +603,13 @@ Proof.
   do 2 eexists; propositional.
   constructor.
   sets.
-  replace ((l \cup {a}) \cup {a0}) with ((l \cup {a0}) \cup {a}) by sets.
+  replace ({a0, a} \cup l) with ({a} \cup ({a0} \cup l)) by sets.
   constructor.
   sets.
   do 2 eexists; propositional.
   constructor.
   sets; propositional.
-  replace (l \cup {a} \setminus {a0}) with ((l \setminus {a0}) \cup {a}) by sets.
+  replace ({a} \cup l \setminus {a0}) with ({a} \cup (l \setminus {a0})) by sets.
   constructor.
   sets.
 
@@ -617,7 +617,7 @@ Proof.
   do 2 eexists; propositional.
   constructor.
   sets.
-  replace ((l \setminus {a}) \cup {a0}) with ((l \cup {a0}) \setminus {a}) by sets.
+  replace ({a0} \cup (l \setminus {a})) with (({a0} \cup l) \setminus {a}) by sets.
   constructor.
   sets.
   do 2 eexists; propositional.
@@ -1360,7 +1360,7 @@ Lemma commute_locks : forall c1 c a s h l1' h' l',
   -> a \in Locks s
   -> commutes c s
   -> forall c1', step (h, l1', c1) (h', l', c1')
-  -> step (h, l1' \cup {a}, c1) (h', l' \cup {a}, c1').
+  -> step (h, {a} \cup l1', c1) (h', {a} \cup l', c1').
 Proof.
   induct 1; simplify.
 
@@ -1373,12 +1373,12 @@ Proof.
   invert H1; eauto.
 
   invert H1.
-  replace ((l1' \cup {l}) \cup {a}) with ((l1' \cup {a}) \cup {l}) by sets.
+  replace ({a} \cup ({l} \cup l1')) with ({l} \cup ({a} \cup l1')) by sets.
   constructor.
   sets.
 
   invert H1.
-  replace ((l1' \setminus {l}) \cup {a}) with ((l1' \cup {a}) \setminus {l}) by sets.
+  replace ({a} \cup (l1' \setminus {l})) with (({a} \cup l1') \setminus {l}) by sets.
   constructor.
   sets.
 
@@ -1403,7 +1403,7 @@ Proof.
   invert H1; eauto.
 
   invert H1.
-  replace (l1' \cup {l} \setminus {a}) with ((l1' \setminus {a}) \cup {l}) by sets.
+  replace (({l} \cup l1') \setminus {a}) with ({l} \cup (l1' \setminus {a})) by sets.
   constructor.
   sets.
 

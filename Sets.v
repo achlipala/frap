@@ -565,14 +565,16 @@ Ltac quote E env k :=
     quote' E env k
   end.
 
+Ltac sets_cbv := cbv beta iota zeta delta [interp_normal_form normalize_setexpr nth_default
+                                           setmerge Elements Other nth_error map dedup member beq_nat orb
+                                           andb included].
+                     
 Ltac normalize_set :=
   match goal with
   | [ |- context[@union ?A ?X ?Y] ] =>
     quote (@union A X Y) (@nil A) ltac:(fun e env =>
-      change (@union A X Y) with (interp_setexpr env e);
-      rewrite <- normalize_setexpr_ok;
-      cbv beta iota zeta delta [interp_normal_form normalize_setexpr nth_default
-                                setmerge Elements Other nth_error map dedup member beq_nat orb])
+      change (@union A X Y) with (interp_setexpr env e));
+    rewrite <- normalize_setexpr_ok; sets_cbv
   end.
 
 Ltac compare_sets :=
@@ -582,7 +584,7 @@ Ltac compare_sets :=
     | ?A -> _ =>
       quote X (@nil A) ltac:(fun x env =>
         quote Y env ltac:(fun y env' =>
-          change (interp_setexpr env' x = interp_setexpr env' y);
-          apply compare_sets; reflexivity))
+          change (interp_setexpr env' x = interp_setexpr env' y)));
+      apply compare_sets; sets_cbv; reflexivity
     end
   end.

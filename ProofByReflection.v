@@ -392,6 +392,161 @@ End monoid.
  * [ring] and [field] tactics that come packaged with Coq. *)
 
 
+(** * Set Simplification for Model Checking *)
+
+(* Let's take a closer look at model-checking proofs like from last class. *)
+
+(* Here's a simple transition system, where state is just a [nat], and where
+ * each step subtracts 1 or 2. *)
+
+Inductive subtract_step : nat -> nat -> Prop :=
+| Subtract1 : forall n, subtract_step (S n) n
+| Subtract2 : forall n, subtract_step (S (S n)) n.
+
+Definition subtract_sys (n : nat) : trsys nat := {|
+  Initial := {n};
+  Step := subtract_step
+|}.
+
+Lemma subtract_ok :
+  invariantFor (subtract_sys 5)
+               (fun n => n <= 5).
+Proof.
+  eapply invariant_weaken.
+
+  apply multiStepClosure_ok.
+  simplify.
+  (* Here we'll see that the Frap libary uses slightly different, optimized
+   * versions of the model-checking relations.  For instance, [multiStepClosure]
+   * takes an extra set argument, the _worklist_ recording newly discovered
+   * states.  There is no point in following edges out of states that were
+   * already known at previous steps. *)
+
+  (* Now, some more manual iterations: *)
+  eapply MscStep.
+  closure.
+  (* Ew.  What a big, ugly set expression.  Let's shrink it down to something
+   * more readable, with duplicates removed, etc. *)
+  simplify.
+  (* How does the Frap library do that?  Proof by reflection is a big part of
+   * it!  Let's develop a baby version of that automation.  The full-scale
+   * version is in file Sets.v. *)
+Abort.
+
+(* We'll specialize our representation to unions of set literals, whose elements
+ * are constant [nat]s.  The full-scale version in the library is more
+ * flexible. *)
+Inductive setexpr :=
+| Literal (ns : list nat)
+| Union (e1 e2 : setexpr).
+
+(* Here's what our expressions mean. *)
+Fixpoint setexprDenote (e : setexpr) : set nat :=
+  match e with
+  | Literal ns => constant ns
+  | Union e1 e2 => setexprDenote e1 \cup setexprDenote e2
+  end.
+
+(* Simplification reduces all expressions to flat, duplicate-free set
+ * literals. *)
+Fixpoint normalize (e : setexpr) : list nat :=
+  match e with
+  | Literal ns => dedup ns
+  | Union e1 e2 => setmerge (normalize e1) (normalize e2)
+  end.
+(* Here we use functions [dedup] and [setmerge] from the Sets module, which is
+ * especially handy because that module has proved some key theorems about
+ * them. *)
+
+(* Let's prove that normalization doesn't change meaning. *)
+Theorem normalize_ok : forall e,
+    setexprDenote e = constant (normalize e).
+Proof.
+  induct e; simpl. (* Here we use the more primitive [simpl], because [simplify]
+                    * calls the fancier set automation from the book library,
+                    * which would be "cheating." *)
+
+  pose proof (constant_dedup (fun x => x) ns).
+  repeat rewrite map_id in H.
+  equality.
+
+  rewrite IHe1, IHe2.
+  pose proof (constant_map_setmerge (fun x => x) (normalize e2) (normalize e1)).
+  repeat rewrite map_id in H.
+  equality.
+Qed.
+
+(* Reification works as before, with one twist. *)
+Ltac reify_set E :=
+  match E with
+  | constant ?ns => constr:(Literal ns)
+  | ?E1 \cup ?E2 =>
+    let e1 := reify_set E1 in
+    let e2 := reify_set E2 in
+    constr:(Union e1 e2)
+  | _ => let pf := constr:(eq_refl : E = {}) in constr:(Literal [])
+    (* The twist is in this case: we instantiate all unification variables with
+     * the empty set.  It's a sound proof step, and it so happens that we only
+     * call this tactic in spots where this heuristic makes sense. *)
+  end.
+
+(* Now the usual recipe for a reflective tactic, this time using rewriting
+ * instead of [apply] for the key step, to allow simplification deep within the
+ * structure of a goal. *)
+Ltac simplify_set :=
+  match goal with
+  | [ |- context[?X \cup ?Y] ] =>
+    let e := reify_set (X \cup Y) in
+    change (X \cup Y) with (setexprDenote e);
+    rewrite normalize_ok; simpl
+  end.
+
+(* Back to our example, which we can now finish without calling [simplify] to
+ * reduces trees of union operations. *)
+Lemma subtract_ok :
+  invariantFor (subtract_sys 5)
+               (fun n => n <= 5).
+Proof.
+  eapply invariant_weaken.
+
+  apply multiStepClosure_ok.
+  simplify.
+
+  (* Now, some more manual iterations: *)
+  eapply MscStep.
+  closure.
+  simplify_set.
+  (* Success!  One subexpression shrunk.  Now for the other. *)
+  simplify_set.
+  (* Our automation doesn't handle set difference, so we finish up calling the
+   * library tactic. *)
+  simplify.
+
+  eapply MscStep.
+  closure.
+  simplify_set.
+  simplify_set.
+  simplify.
+
+  eapply MscStep.
+  closure.
+  simplify_set.
+  simplify_set.
+  simplify.
+
+  eapply MscStep.
+  closure.
+  simplify_set.
+  simplify_set.
+  simplify.
+
+  model_check_done.
+
+  simplify.
+  linear_arithmetic.
+Qed.
+
+
 (** * A Smarter Tautology Solver *)
 
 (* Now we are ready to revisit our earlier tautology-solver example.  We want to

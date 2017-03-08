@@ -4,7 +4,7 @@
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
 
-Require Import List Frap.
+Require Import Frap.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -780,6 +780,8 @@ Ltac position x ls :=
     end
   end.
 
+(* Compute a duplicate-free list of all variables in [P], combining it with
+ * [acc]. *)
 Ltac vars_in P acc :=
   match P with
   | True => acc
@@ -801,6 +803,8 @@ Ltac vars_in P acc :=
     end
   end.
 
+(* Reification of formula [P], with a pregenertaed list [vars] of variables it
+ * may mention *)
 Ltac reify_tauto' P vars :=
   match P with
   | True => Truth

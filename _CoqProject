@@ -23,6 +23,7 @@ IntroToProofScripting_template.v
 ModelChecking_template.v
 ModelChecking.v
 ProofByReflection.v
+ProofByReflection_template.v
 OperationalSemantics_template.v
 OperationalSemantics.v
 AbstractInterpretation.v

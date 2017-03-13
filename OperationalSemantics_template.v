@@ -367,7 +367,7 @@ Theorem big_small : forall v c v', eval v c v'
 Proof.
 Admitted.
 
-Theorem small_big_snazzy : forall v c v', step^* (v, c) (v', Skip)
+Theorem small_big : forall v c v', step^* (v, c) (v', Skip)
                                    -> eval v c v'.
 Proof.
 Admitted.
@@ -741,33 +741,8 @@ Module Concurrent.
   Proof.
     eexists; propositional.
     unfold prog.
+  Admitted.
 
-    econstructor.
-    eapply CStep with (C := CPar1 (CSeq Hole _) _); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar2 _ (CSeq Hole _)); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar1 Hole _); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar2 _ Hole); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar1 Hole _); eauto.
-
-    econstructor.
-    eapply CStep with (C := Hole); eauto.
-
-    econstructor.
-    eapply CStep with (C := Hole); eauto.
-
-    econstructor.
-
-    simplify.
-    equality.
-  Qed.
 
   (** Proving equivalence with non-contextual semantics *)
 
@@ -806,49 +781,8 @@ Module Concurrent.
   Hint Constructors step.
 
   (* Now, an automated proof of equivalence.  Actually, it's *exactly* the same
-   * proof we used for the old feature set! *)
-
-  Theorem step_cstep : forall v c v' c',
-    step (v, c) (v', c')
-    -> cstep (v, c) (v', c').
-  Proof.
-    induct 1; repeat match goal with
-                     | [ H : forall a b c d, _ = _ -> _ = _ -> _ |- _ ] =>
-                       specialize (H _ _ _ _ eq_refl eq_refl)
-                     | [ H : cstep _ _ |- _ ] => invert H
-                     end; eauto.
-  Qed.
-
-  Hint Resolve step_cstep.
-
-  Lemma step0_step : forall v c v' c',
-    step0 (v, c) (v', c')
-    -> step (v, c) (v', c').
-  Proof.
-    induct 1; eauto.
-  Qed.
-
-  Hint Resolve step0_step.
-
-  Lemma cstep_step' : forall C c0 c,
-    plug C c0 c
-    -> forall v' c'0 v c', step0 (v, c0) (v', c'0)
-    -> plug C c'0 c'
-    -> step (v, c) (v', c').
-  Proof.
-    induct 1; simplify; repeat match goal with
-                               | [ H : plug _ _ _ |- _ ] => invert1 H
-                               end; eauto.
-  Qed.
-
-  Hint Resolve cstep_step'.
-
-  Theorem cstep_step : forall v c v' c',
-    cstep (v, c) (v', c')
-    -> step (v, c) (v', c').
-  Proof.
-    induct 1; eauto.
-  Qed.
+   * proof we used for the old feature set!  For full dramatic effect, copy and
+   * paste here from above. *)
 End Concurrent.
 
 

@@ -17,6 +17,7 @@ The main narrative, also present in the book PDF, presents standard program-proo
 * Chapter 6: `ModelChecking.v`
   * `ProofByReflection.v`: writing verified proof procedures in Coq
 * Chapter 7: `OperationalSemantics.v`
+  * `LogicProgramming.v`: 'eauto' and friends, to automate proofs via logic programming
 * Chapter 8: `AbstractInterpretation.v`
 * Chapter 9: `LambdaCalculusAndTypeSoundness.v`
 * Chapter 10: `TypesAndMutation.v`

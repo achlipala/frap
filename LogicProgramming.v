@@ -892,6 +892,7 @@ Section autorewrite.
     Hint Rewrite f_g.
 
     Lemma f_f_f' : forall x, f (f (f x)) = f x.
+    Proof.
       intros; autorewrite with core.
     Abort.
 
@@ -919,6 +920,7 @@ Section autorewrite.
     Hint Rewrite f_g.
 
     Lemma f_f_f' : forall x, f (f (f x)) = f x.
+    Proof.
       intros; autorewrite with core.
     Abort.
 

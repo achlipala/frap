@@ -330,8 +330,6 @@ Proof.
         end; eauto.
 Qed.
 
-Hint Resolve cfoldExprs_ok'.
-
 Fixpoint cfoldExprsContext (C : context) : context :=
   match C with
   | Hole => Hole
@@ -358,4 +356,114 @@ Proof.
   apply cfoldExprs_ok' in H3.
   cases vc2; simplify; subst.
   eauto 7.
+Qed.
+
+
+(** * Simulations That Allow Skipping Steps *)
+
+Fixpoint cfold (c : cmd) : cmd :=
+  match c with
+  | Skip => c
+  | Assign x e => Assign x (cfoldArith e)
+  | Sequence c1 c2 => Sequence (cfold c1) (cfold c2)
+  | If e then_ else_ =>
+    let e' := cfoldArith e in
+    match e' with
+    | Const n => if n ==n 0 then cfold else_ else cfold then_
+    | _ => If e' (cfold then_) (cfold else_)
+    end
+  | While e body => While (cfoldArith e) (cfold body)
+  | Output e => Output (cfoldArith e)
+  end.
+
+Section simulation_skipping.
+  Variable R : valuation * cmd -> valuation * cmd -> Prop.
+
+  Hypothesis one_step : forall vc1 vc2, R vc1 vc2
+    -> forall vc1' l, cstep vc1 l vc1'
+                      -> (l = None /\ R vc1' vc2)
+                         \/ exists vc2', cstep vc2 l vc2' /\ R vc1' vc2'.
+
+  Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
+    -> c2 = Skip.
+
+  Lemma simulation_skipping_fwd' : forall vc1 ns, generate vc1 ns
+    -> forall vc2, R vc1 vc2
+      -> generate vc2 ns.
+  Proof.
+    induct 1; simplify; eauto.
+
+    eapply one_step in H; eauto.
+    first_order.
+    eauto.
+
+    eapply one_step in H1; eauto.
+    first_order.
+    equality.
+    eauto.
+  Qed.
+
+  Theorem simulation_skipping_fwd : forall vc1 vc2, R vc1 vc2
+    -> vc1 <| vc2.
+  Proof.
+    unfold traceInclusion; eauto using simulation_skipping_fwd'.
+  Qed.
+End simulation_skipping.
+
+Lemma cfold_ok' : forall v1 c1 l v2 c2,
+    step0 (v1, c1) l (v2, c2)
+    -> step0 (v1, cfold c1) l (v2, cfold c2)
+       \/ (l = None /\ v1 = v2 /\ cfold c1 = cfold c2).
+Proof.
+  invert 1; simplify;
+    try match goal with
+        | [ _ : context[interp ?e ?v] |- _ ] => rewrite <- (cfoldArith_ok v e) in *
+        | [ |- context[interp ?e ?v] ] => rewrite <- (cfoldArith_ok v e)
+        end;
+    repeat match goal with
+           | [ |- context[match ?E with _ => _ end] ] => cases E; subst; simplify
+           end; propositional; eauto.
+Qed.
+
+Fixpoint cfoldContext (C : context) : context :=
+  match C with
+  | Hole => Hole
+  | CSeq C c => CSeq (cfoldContext C) (cfold c)
+  end.
+
+Lemma plug_cfold1 : forall C c1 c2, plug C c1 c2
+  -> plug (cfoldContext C) (cfold c1) (cfold c2).
+Proof.
+  induct 1; simplify; eauto.
+Qed.
+
+Hint Resolve plug_cfold1.
+
+Lemma plug_samefold : forall C c1 c1',
+    plug C c1 c1'
+    -> forall c2 c2', plug C c2 c2'
+    -> cfold c1 = cfold c2
+    -> cfold c1' = cfold c2'.
+Proof.
+  induct 1; invert 1; simplify; propositional.
+  f_equal; eauto.
+Qed.
+
+Hint Resolve plug_samefold.
+
+Lemma cfold_ok : forall v c,
+    (v, c) <| (v, cfold c).
+Proof.
+  simplify.
+  apply simulation_skipping_fwd with (R := fun vc1 vc2 => fst vc1 = fst vc2
+                                                          /\ snd vc2 = cfold (snd vc1));
+    simplify; propositional.
+
+  invert H0; simplify; subst.
+  apply cfold_ok' in H3.
+  propositional.
+  cases vc2; simplify; subst.
+  eauto 8.
+  cases vc2; simplify; subst.
+  eauto.
 Qed.

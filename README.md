@@ -19,11 +19,12 @@ The main narrative, also present in the book PDF, presents standard program-proo
 * Chapter 7: `OperationalSemantics.v`
   * `LogicProgramming.v`: 'eauto' and friends, to automate proofs via logic programming
 * Chapter 8: `AbstractInterpretation.v`
-* Chapter 9: `LambdaCalculusAndTypeSoundness.v`
-* Chapter 10: `TypesAndMutation.v`
-* Chapter 11: `HoareLogic.v`
-* Chapter 12: `DeepAndShallowEmbeddings.v`
-* Chapter 13: `SeparationLogic.v`
-* Chapter 14: `SharedMemory.v`
-* Chapter 15: `ConcurrentSeparationLogic.v`
-* Chapter 16: `MessagesAndRefinement.v`
+* Chapter 9: `CompilerCorrectness.v`
+* Chapter 10: `LambdaCalculusAndTypeSoundness.v`
+* Chapter 11: `TypesAndMutation.v`
+* Chapter 12: `HoareLogic.v`
+* Chapter 13: `DeepAndShallowEmbeddings.v`
+* Chapter 14: `SeparationLogic.v`
+* Chapter 15: `SharedMemory.v`
+* Chapter 16: `ConcurrentSeparationLogic.v`
+* Chapter 17: `MessagesAndRefinement.v`

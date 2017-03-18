@@ -174,6 +174,74 @@ Fixpoint cfoldExprs (c : cmd) : cmd :=
   | Output e => Output (cfoldArith e)
   end.
 
+Theorem skip_or_step : forall v c,
+    c = Skip
+    \/ exists v' l c', cstep (v, c) l (v', c').
+Proof.
+  induct c; simplify; first_order; subst;
+    try match goal with
+        | [ H : cstep _ _ _ |- _ ] => invert H
+        end;
+    try match goal with
+        | [ |- context[cstep (?v, If ?e _ _)] ] => cases (interp e v ==n 0)
+        | [ |- context[cstep (?v, While ?e _)] ] => cases (interp e v ==n 0)
+        end; eauto 10.
+Qed.
+
+Lemma deterministic0 : forall vc l vc',
+  step0 vc l vc'
+  -> forall l' vc'', step0 vc l' vc''
+                     -> l = l' /\ vc'' = vc'.
+Proof.
+  invert 1; invert 1; simplify; propositional.
+Qed.
+
+Theorem plug_function : forall C c1 c2, plug C c1 c2
+  -> forall c2', plug C c1 c2'
+  -> c2 = c2'.
+Proof.
+  induct 1; invert 1; eauto.
+  apply IHplug in H5.
+  equality.
+Qed.
+
+Lemma peel_cseq : forall C1 C2 c (c1 c2 : cmd),
+    C1 = C2 /\ c1 = c2
+    -> CSeq C1 c = CSeq C2 c /\ c1 = c2.
+Proof.
+  equality.
+Qed.
+
+Hint Resolve peel_cseq.
+
+Lemma plug_deterministic : forall v C c1 c2, plug C c1 c2
+  -> forall l vc1, step0 (v, c1) l vc1
+  -> forall C' c1', plug C' c1' c2
+  -> forall l' vc1', step0 (v, c1') l' vc1'
+  -> C' = C /\ c1' = c1.
+Proof.
+  induct 1; invert 1; invert 1; invert 1; auto;
+    try match goal with
+        | [ H : plug _ _ _ |- _ ] => invert1 H
+        end; eauto.
+Qed.
+
+Theorem deterministic : forall vc l vc',
+  cstep vc l vc'
+  -> forall l' vc'', cstep vc l' vc''
+                     -> l = l' /\ vc' = vc''.
+Proof.
+  invert 1; invert 1; simplify.
+  eapply plug_deterministic in H0; eauto.
+  invert H0.
+  eapply deterministic0 in H1; eauto.
+  propositional; subst; auto.
+  invert H0.
+  auto.
+  eapply plug_function in H2; eauto.
+  equality.
+Qed.
+
 Section simulation.
   Variable R : valuation * cmd -> valuation * cmd -> Prop.
 
@@ -181,7 +249,10 @@ Section simulation.
     -> forall vc1' l, cstep vc1 l vc1'
       -> exists vc2', cstep vc2 l vc2' /\ R vc1' vc2'.
 
-  Lemma simulation' : forall vc1 ns, generate vc1 ns
+  Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
+    -> c2 = Skip.
+
+  Lemma simulation_fwd' : forall vc1 ns, generate vc1 ns
     -> forall vc2, R vc1 vc2
       -> generate vc2 ns.
   Proof.
@@ -196,14 +267,59 @@ Section simulation.
     eauto.
   Qed.
 
-  Theorem simulation : forall vc1 vc2, R vc1 vc2
+  Theorem simulation_fwd : forall vc1 vc2, R vc1 vc2
     -> vc1 <| vc2.
   Proof.
-    unfold traceInclusion; eauto using simulation'.
+    unfold traceInclusion; eauto using simulation_fwd'.
+  Qed.
+
+  Lemma simulation_bwd' : forall vc2 ns, generate vc2 ns
+    -> forall vc1, R vc1 vc2
+      -> generate vc1 ns.
+  Proof.
+    induct 1; simplify; eauto.
+
+    cases vc1; cases vc.
+    assert (c = Skip \/ exists v' l c', cstep (v, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    apply agree_on_termination in H1; subst.
+    invert H.
+    invert H3.
+    invert H4.
+    specialize (one_step H1 H2).
+    first_order.
+    eapply deterministic in H; eauto.
+    propositional; subst.
+    eauto.
+
+    cases vc1; cases vc.
+    assert (c = Skip \/ exists v' l c', cstep (v, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    apply agree_on_termination in H1; subst.
+    invert H.
+    invert H3.
+    invert H4.
+    specialize (one_step H1 H2).
+    first_order.
+    eapply deterministic in H; eauto.
+    propositional; subst.
+    eauto.
+  Qed.
+
+  Theorem simulation_bwd : forall vc1 vc2, R vc1 vc2
+    -> vc2 <| vc1.
+  Proof.
+    unfold traceInclusion; eauto using simulation_bwd'.
+  Qed.
+
+  Theorem simulation : forall vc1 vc2, R vc1 vc2
+    -> vc1 =| vc2.
+  Proof.
+    simplify; split; auto using simulation_fwd, simulation_bwd.
   Qed.
 End simulation.
 
-Lemma cfoldExprs_ok1' : forall v1 c1 l v2 c2,
+Lemma cfoldExprs_ok' : forall v1 c1 l v2 c2,
     step0 (v1, c1) l (v2, c2)
     -> step0 (v1, cfoldExprs c1) l (v2, cfoldExprs c2).
 Proof.
@@ -214,7 +330,7 @@ Proof.
         end; eauto.
 Qed.
 
-Hint Resolve cfoldExprs_ok1'.
+Hint Resolve cfoldExprs_ok'.
 
 Fixpoint cfoldExprsContext (C : context) : context :=
   match C with
@@ -230,8 +346,8 @@ Qed.
 
 Hint Resolve plug_cfoldExprs1.
 
-Lemma cfoldExprs_ok1 : forall v c,
-    (v, c) <| (v, cfoldExprs c).
+Lemma cfoldExprs_ok : forall v c,
+    (v, c) =| (v, cfoldExprs c).
 Proof.
   simplify.
   apply simulation with (R := fun vc1 vc2 => fst vc1 = fst vc2
@@ -239,74 +355,7 @@ Proof.
     simplify; propositional.
 
   invert H0; simplify; subst.
-  apply cfoldExprs_ok1' in H3.
+  apply cfoldExprs_ok' in H3.
   cases vc2; simplify; subst.
   eauto 7.
-Qed.
-
-Lemma cfoldExprs_ok2' : forall v1 c1 l v2 c2,
-    step0 (v1, cfoldExprs c1) l (v2, c2)
-    -> exists c2', step0 (v1, c1) l (v2, c2') /\ c2 = cfoldExprs c2'.
-Proof.
-  invert 1;
-  repeat match goal with
-         | [ H : _ = cfoldExprs ?c |- _ ] => cases c; invert H
-         end; repeat rewrite cfoldArith_ok in *; eauto.
-Qed.
-
-Hint Resolve cfoldExprs_ok2'.
-
-Lemma plug_cfoldExprs2 : forall C c1 c2, plug C c1 (cfoldExprs c2)
-  -> exists C' c1', plug C' c1' c2
-                    /\ C = cfoldExprsContext C'
-                    /\ c1 = cfoldExprs c1'.
-Proof.
-  induct 1; simplify; eauto.
-  cases c2; simplify; invert x.
-  specialize (IHplug _ eq_refl).
-  first_order; subst.
-  eauto 7.
-Qed.
-
-Lemma plug_cfoldExprs2' : forall C c1 c2, plug (cfoldExprsContext C) (cfoldExprs c1) c2
-  -> exists c2', plug C c1 c2'
-                 /\ c2 = cfoldExprs c2'.
-Proof.
-  induct 1; simplify; eauto.
-
-  cases C; invert x.
-  eauto.
-
-  cases C; invert x.
-  specialize (IHplug _ _ eq_refl eq_refl).
-  first_order; subst.
-  eauto.
-Qed.
-
-Lemma cfoldExprs_ok2 : forall v c,
-    (v, cfoldExprs c) <| (v, c).
-Proof.
-  simplify.
-  apply simulation with (R := fun vc1 vc2 => fst vc1 = fst vc2
-                                             /\ snd vc1 = cfoldExprs (snd vc2));
-    simplify; propositional.
-
-  invert H0; simplify; subst.
-  eapply plug_cfoldExprs2 in H.
-  first_order; subst.
-  apply cfoldExprs_ok2' in H3.
-  first_order; subst.
-  cases vc2; simplify; subst.
-  apply plug_cfoldExprs2' in H4.
-  first_order; subst.
-  eauto.
-Qed.
-
-Theorem cfoldExprs_ok : forall v c,
-    (v, cfoldExprs c) =| (v, c).
-Proof.
-  simplify.
-  split.
-  apply cfoldExprs_ok2.
-  apply cfoldExprs_ok1.
 Qed.

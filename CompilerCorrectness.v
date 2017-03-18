@@ -377,18 +377,18 @@ Fixpoint cfold (c : cmd) : cmd :=
   end.
 
 Section simulation_skipping.
-  Variable R : valuation * cmd -> valuation * cmd -> Prop.
+  Variable R : nat -> valuation * cmd -> valuation * cmd -> Prop.
 
-  Hypothesis one_step : forall vc1 vc2, R vc1 vc2
+  Hypothesis one_step : forall n vc1 vc2, R n vc1 vc2
     -> forall vc1' l, cstep vc1 l vc1'
-                      -> (l = None /\ R vc1' vc2)
-                         \/ exists vc2', cstep vc2 l vc2' /\ R vc1' vc2'.
+                      -> (exists n', n = S n' /\ l = None /\ R n' vc1' vc2)
+                         \/ exists n' vc2', cstep vc2 l vc2' /\ R n' vc1' vc2'.
 
-  Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
+  Hypothesis agree_on_termination : forall n v1 v2 c2, R n (v1, Skip) (v2, c2)
     -> c2 = Skip.
 
   Lemma simulation_skipping_fwd' : forall vc1 ns, generate vc1 ns
-    -> forall vc2, R vc1 vc2
+    -> forall n vc2, R n vc1 vc2
       -> generate vc2 ns.
   Proof.
     induct 1; simplify; eauto.
@@ -403,17 +403,124 @@ Section simulation_skipping.
     eauto.
   Qed.
 
-  Theorem simulation_skipping_fwd : forall vc1 vc2, R vc1 vc2
+  Theorem simulation_skipping_fwd : forall n vc1 vc2, R n vc1 vc2
     -> vc1 <| vc2.
   Proof.
     unfold traceInclusion; eauto using simulation_skipping_fwd'.
   Qed.
+
+  Lemma generate_Skip : forall v a ns,
+      generate (v, Skip) (a :: ns)
+      -> False.
+  Proof.
+    induct 1; simplify.
+
+    invert H.
+    invert H3.
+    invert H4.
+
+    invert H.
+    invert H3.
+    invert H4.
+  Qed.
+
+  Notation silent_cstep := (fun a b => cstep a None b).
+
+  Lemma match_step : forall n vc2 l vc2' vc1,
+      cstep vc2 l vc2'
+      -> R n vc1 vc2
+      -> exists vc1' vc1'' n', silent_cstep^* vc1 vc1'
+                              /\ cstep vc1' l vc1''
+                              /\ R n' vc1'' vc2'.
+  Proof.
+    induct n; simplify.
+
+    cases vc1; cases vc2.
+    assert (c = Skip \/ exists v' l' c', cstep (v, c) l' (v', c')) by apply skip_or_step.
+    first_order; subst.
+    apply agree_on_termination in H0; subst.
+    invert H.
+    invert H2.
+    invert H3.
+    eapply one_step in H0; eauto.
+    first_order; subst.
+    equality.
+    eapply deterministic in H; eauto.
+    first_order; subst.
+    eauto 6.
+    
+    cases vc1; cases vc2.
+    assert (c = Skip \/ exists v' l' c', cstep (v, c) l' (v', c')) by apply skip_or_step.
+    first_order; subst.
+    apply agree_on_termination in H0; subst.
+    invert H.
+    invert H2.
+    invert H3.
+    eapply one_step in H0; eauto.
+    first_order; subst.
+    invert H0.
+    eapply IHn in H3; eauto.
+    first_order.
+    eauto 8.
+    eapply deterministic in H; eauto.
+    first_order; subst.
+    eauto 6.
+  Qed.
+
+  Lemma silent_generate : forall ns vc vc',
+      silent_cstep^* vc vc'
+      -> generate vc' ns
+      -> generate vc ns.
+  Proof.
+    induct 1; eauto.
+  Qed.
+
+  Hint Resolve silent_generate.
+
+  Lemma simulation_skipping_bwd' : forall ns vc2, generate vc2 ns
+    -> forall n vc1, R n vc1 vc2
+      -> generate vc1 ns.
+  Proof.
+    induct 1; simplify; eauto.
+
+    eapply match_step in H1; eauto.
+    first_order.
+    eauto.
+
+    eapply match_step in H1; eauto.
+    first_order.
+    eauto.
+  Qed.
+
+  Theorem simulation_skipping_bwd : forall n vc1 vc2, R n vc1 vc2
+    -> vc2 <| vc1.
+  Proof.
+    unfold traceInclusion; eauto using simulation_skipping_bwd'.
+  Qed.
+
+  Theorem simulation_skipping : forall n vc1 vc2, R n vc1 vc2
+    -> vc1 =| vc2.
+  Proof.
+    simplify; split; eauto using simulation_skipping_fwd, simulation_skipping_bwd.
+  Qed.
 End simulation_skipping.
+
+Fixpoint countIfs (c : cmd) : nat :=
+  match c with
+  | Skip => 0
+  | Assign _ _ => 0
+  | Sequence c1 c2 => countIfs c1 + countIfs c2
+  | If _ c1 c2 => 1 + countIfs c1 + countIfs c2
+  | While _ c1 => countIfs c1
+  | Output _ => 0
+  end.
+
+Hint Extern 1 (_ < _) => linear_arithmetic.
 
 Lemma cfold_ok' : forall v1 c1 l v2 c2,
     step0 (v1, c1) l (v2, c2)
     -> step0 (v1, cfold c1) l (v2, cfold c2)
-       \/ (l = None /\ v1 = v2 /\ cfold c1 = cfold c2).
+       \/ (l = None /\ v1 = v2 /\ cfold c1 = cfold c2 /\ countIfs c2 < countIfs c1).
 Proof.
   invert 1; simplify;
     try match goal with
@@ -451,19 +558,37 @@ Qed.
 
 Hint Resolve plug_samefold.
 
+Lemma plug_countIfs : forall C c1 c1',
+    plug C c1 c1'
+    -> forall c2 c2', plug C c2 c2'
+    -> countIfs c1 < countIfs c2
+    -> countIfs c1' < countIfs c2'.
+Proof.
+  induct 1; invert 1; simplify; propositional.
+  apply IHplug in H5; linear_arithmetic.
+Qed.
+
+Hint Resolve plug_countIfs.
+
 Lemma cfold_ok : forall v c,
-    (v, c) <| (v, cfold c).
+    (v, c) =| (v, cfold c).
 Proof.
   simplify.
-  apply simulation_skipping_fwd with (R := fun vc1 vc2 => fst vc1 = fst vc2
-                                                          /\ snd vc2 = cfold (snd vc1));
-    simplify; propositional.
+  apply simulation_skipping with (R := fun n vc1 vc2 => fst vc1 = fst vc2
+                                                        /\ snd vc2 = cfold (snd vc1)
+                                                        /\ countIfs (snd vc1) < n)
+                                   (n := S (countIfs c));
+    simplify; propositional; auto.
 
   invert H0; simplify; subst.
-  apply cfold_ok' in H3.
-  propositional.
+  apply cfold_ok' in H4.
+  propositional; subst.
   cases vc2; simplify; subst.
-  eauto 8.
+  eauto 11.
   cases vc2; simplify; subst.
+  cases n; try linear_arithmetic.
+  assert (countIfs c2 < n).
+  eapply plug_countIfs in H2; eauto.
   eauto.
+  eauto 10.
 Qed.

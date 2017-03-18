@@ -27,6 +27,7 @@ ProofByReflection_template.v
 OperationalSemantics_template.v
 OperationalSemantics.v
 LogicProgramming.v
+LogicProgramming_template.v
 AbstractInterpretation.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v

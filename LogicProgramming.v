@@ -693,6 +693,35 @@ Proof.
   induct e; first_order; eauto.
 Qed.
 
+(* Here's a quick tease using a feature that we'll explore fully this time next
+ * week.  Let's use a mysterious construct [sigT] instead of [exists]. *)
+
+Hint Extern 1 (sigT (fun n : nat => _)) => exists 0.
+Hint Extern 1 (sigT (fun n : nat => _)) => exists 1.
+Hint Extern 1 (sigT (fun n : nat => _)) => eexists (_ + _).
+
+Theorem linear_computable : forall e, sigT (fun k => sigT (fun n =>
+  forall var, eval var e (k * var + n))).
+Proof.
+  induct e; first_order; eauto.
+Defined.
+
+(* Essentially the same proof search ahs completed.  This time, though, we ended
+ * the proof with [Defined], which saves it as _transparent_, so details of the
+ * "proof" can be consulted from the outside.  Actually, this "proof" is more
+ * like a recursive program that finds [k] and [n], given [e]!  Let's add a
+ * wrapper to make taht idea more concrete. *)
+
+Definition params (e : exp) : nat * nat :=
+  let '(existT _ k (existT _ n _)) := linear_computable e in
+  (k, n).
+
+(* Now we can actually _run our proof_ to get normalized versions of particular
+ * expressions. *)
+
+Compute params (Plus (Const 7) (Plus Var (Plus (Const 8) Var))).
+
+
 (* With Coq doing so much of the proof-search work for us, we might get
  * complacent and consider that any successful [eauto] invocation is as good as
  * any other.  However, because introduced unification variables may wind up

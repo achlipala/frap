@@ -124,6 +124,66 @@ Definition traceEquivalence (vc1 vc2 : valuation * cmd) :=
   vc1 <| vc2 /\ vc2 <| vc1.
 Infix "=|" := traceEquivalence (at level 70).
 
+Definition daysPerWeek := 7.
+Definition weeksPerMonth := 4.
+Definition daysPerMonth := (daysPerWeek * weeksPerMonth)%arith.
+
+Example month_boundaries_in_days :=
+  "acc" <- 0;;
+  while 1 loop
+    when daysPerMonth then
+      "acc" <- "acc" + daysPerMonth;;
+      Output "acc"
+    else
+      (* Oh no!  We must have calculated it wrong, since we got zero! *)
+      Skip
+    done
+  done.
+
+Hint Extern 1 (interp _ _ = _) => simplify; congruence.
+Hint Extern 1 (interp _ _ <> _) => simplify; congruence.
+
+Theorem first_few_values :
+  generate ($0, month_boundaries_in_days) [28; 56].
+Proof.
+  unfold month_boundaries_in_days.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := Hole); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := Hole); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq (CSeq Hole _) _); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  eapply GenOutput.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  replace 28 with (interp "acc"
+    ($0 $+ ("acc", interp 0 $0)
+      $+ ("acc", interp ("acc" + daysPerMonth)%arith ($0 $+ ("acc", interp 0 $0))))); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := Hole); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := Hole); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq (CSeq Hole _) _); eauto.
+  eapply GenSilent.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  eapply GenOutput.
+  eapply CStep with (C := CSeq Hole _); eauto.
+  replace 56 with (interp "acc"
+    ($0 $+ ("acc", interp 0 $0) $+ ("acc",
+     interp ("acc" + daysPerMonth)%arith ($0 $+ ("acc", interp 0 $0))) $+ ("acc",
+     interp ("acc" + daysPerMonth)%arith
+       ($0 $+ ("acc", interp 0 $0) $+ ("acc",
+        interp ("acc" + daysPerMonth)%arith ($0 $+ ("acc", interp 0 $0))))))); eauto.
+  constructor.
+Qed.
 
 (** * Basic Simulation Arguments and Optimizing Expressions *)
 
@@ -173,6 +233,8 @@ Fixpoint cfoldExprs (c : cmd) : cmd :=
   | While e body => While (cfoldArith e) (cfoldExprs body)
   | Output e => Output (cfoldArith e)
   end.
+
+Compute cfoldExprs month_boundaries_in_days.
 
 Theorem skip_or_step : forall v c,
     c = Skip
@@ -375,6 +437,8 @@ Fixpoint cfold (c : cmd) : cmd :=
   | While e body => While (cfoldArith e) (cfold body)
   | Output e => Output (cfoldArith e)
   end.
+
+Compute cfold month_boundaries_in_days.
 
 Notation silent_cstep := (fun a b => cstep a None b).
 
@@ -722,6 +786,8 @@ Fixpoint noUnderscore (c : cmd) : bool :=
   | Output e => noUnderscoreArith e
   end.
 
+Compute noUnderscore month_boundaries_in_days.
+
 Fixpoint flattenArith (tempCount : nat) (dst : var) (e : arith) : nat * cmd :=
   match e with
   | Const _
@@ -755,6 +821,8 @@ Fixpoint flatten (c : cmd) : cmd :=
   | While e body => While e (flatten body)
   | Output _ => c
   end.
+
+Compute flatten month_boundaries_in_days.
 
 Section simulation_multiple.
   Variable R : valuation * cmd -> valuation * cmd -> Prop.

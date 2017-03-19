@@ -29,6 +29,7 @@ OperationalSemantics.v
 LogicProgramming.v
 LogicProgramming_template.v
 AbstractInterpretation.v
+CompilerCorrectness.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v
 TypesAndMutation.v

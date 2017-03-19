@@ -2253,6 +2253,101 @@ In fact, flow-insensitive and flow-sensitive interval analysis with this widenin
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Compiler Correctness via Simulation Arguments}
+
+A good application of operational semantics is correctness of compiler transformations\index{compilers}.
+A compiler is composed of a series of \emph{phases}\index{compiler phase}, each of which translates programs in some \emph{source} language\index{source language} into some \emph{target} language\index{target language}.
+Usually, in most phases of a compiler, the source and target languages are the same, and such phases are often viewed as \emph{optimizations}\index{optimization}\index{compiler optimization}, which tend to improve performance of most programs in practice.
+The verification problem is plenty hard enough when the source and target languages are the same, so we will confine our attention in this chapter to a single language.
+It's almost the same as the imperative language from the last two chapters, but we add one new syntactic construction, underlined below.
+
+\newcommand{\outp}[1]{\mathsf{out}(#1)}
+
+$$\begin{array}{rrcl}
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e &::=& n \mid x \mid e + e \mid e - e \mid e \times e \\
+  \textrm{Commands} & c &::=& \skipe \mid \assign{x}{e} \mid c; c \mid \ifte{e}{c}{c} \mid \while{e}{c} \mid \underline{\outp{e}}
+\end{array}$$
+
+A command $\outp{e}$ outputs\index{output} the value of expression $e$, say by writing it to a terminal window.
+What's interesting about adding output is that now \emph{different nonterminating\index{nontermination} programs have interestingly different behavior}: they may produce different output sequences, finite or infinite.
+Any compiler phase should leave output behavior intact.
+It's worth noticing that our workhorse technique of invariants can't help us here directly.
+Output equivalence can only be judged by watching full runs of programs.
+A nonterminating program that has behaved itself up to some point, satisfying the invariant of our choice, may still fail to follow through later on.
+While invariants are complete for \emph{safety} properties\index{safety properties}, here we have our first systematic study of a class of \emph{liveness} properties\index{liveness properties}.
+We must also delve into establishing \emph{relational} properties\index{relational properties} of programs, meaning that we reason about connections between executions of two different programs.
+In our case, such a pair will include the program fed as input into a phase, plus the program that the phase generates.
+
+\newcommand{\silent}[0]{\epsilon}
+\newcommand{\smallstepol}[3]{#1 \stackrel{#2}{\to_0} #3}
+\newcommand{\smallstepcl}[3]{#1 \stackrel{#2}{\to_\mathsf{c}} #3}
+
+To get started phrasing the correctness condition formally, we need to modify our operational semantics to track output.
+We do so by adopting a \emph{labelled transition system}\index{labelled transition system}, where step arrows are annotated with \emph{labels} that explain interactions with the world.
+For this language, the only interaction kind is an output, which we will write as a number.
+We also have \emph{silent}\index{silent steps} labels $\silent$, for when no output takes place.
+For completeness, here are the full rules of the extended language, where the definitions of contexts and plugging are inherited unchanged.
+
+$$\infer{\smallstepol{(v, \outp{e})}{\denote{e}v}{(v, \skipe)}}{}$$
+$$\infer{\smallstepol{(v, \assign{x}{e})}{\silent}{(\mupd{v}{x}{\denote{e}v}, \skipe)}}{}
+\quad \infer{\smallstepol{(v, \skipe; c_2)}{\silent}{(v, c_2)}}{}$$
+$$\infer{\smallstepol{(v, \ifte{e}{c_1}{c_2})}{\silent}{(v, c_1)}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstepol{(v, \ifte{e}{c_1}{c_2})}{\silent}{(v, c_2)}}{
+  \denote{e}v = 0
+}$$
+$$\infer{\smallstepol{(v, \while{e}{c_1})}{\silent}{(v, c_1; \while{e}{c_1})}}{
+  \denote{e}v \neq 0
+}
+\quad \infer{\smallstepol{(v, \while{e}{c_1})}{\silent}{(v, \skipe)}}{
+  \denote{e}v = 0
+}$$
+
+$$\infer{\smallstepcl{(v, C[c])}{\ell}{(v', C[c'])}}{
+  \smallstepol{(v, c)}{\ell}{(v', c')}
+}$$
+
+\newcommand{\Tr}[1]{\mathsf{Tr}(#1)}
+
+To reason about infinite executions, we need a new abstraction, compared to what has worked in our invariant-based proofs so far.
+That abstraction will be \emph{traces}\index{traces}, sequences of outputs that a program might be observed to generate.
+We define a command's trace set inductively.
+Recall that $\cdot$ is the empty list, while $\bowtie$ does list concatenation.
+$$\infer{\cdot \in \Tr{s}}{}
+\quad \infer{t \in \Tr{s}}{
+  \smallstepcl{s}{\silent}{s'}
+  & t \in \Tr{s'}
+}
+\quad \infer{\concat{n}{t} \in \Tr{s}}{
+  \smallstepcl{s}{n}{s'}
+  & t \in \Tr{s'}
+}$$
+
+Notice that a trace is allowed to end at any point, even if the program under inspection hasn't terminated yet.
+Also, since our language is deterministic\index{determinism}, for any two traces of one command, one trace is a prefix of the other.
+Many parts of the machinery we develop here will, however, work well for nondeterministic systems, as we will see with labelled transition systems for concurrency in Chapter \ref{process_algebra}.
+
+\newcommand{\trinc}[2]{#1 \preceq #2}
+\newcommand{\treq}[2]{#1 \simeq #2}
+
+\begin{definition}[Trace inclusion]
+  \index{trace inclusion}For commands $c_1$ and $c_2$, let $\trinc{c_1}{c_2}$ iff $\Tr{c_1} \subseteq \Tr{c_2}$.
+\end{definition}
+
+\begin{definition}[Trace equivalence]
+  \index{trace equivalence}For commands $c_1$ and $c_2$, let $\treq{c_1}{c_2}$ iff $\Tr{c_1} = \Tr{c_2}$.
+\end{definition}
+
+We will enforce that a correct compiler phase respects trace equivalence.
+That is, the output program has the same traces as the input program.
+For nondeterministic languages, subtler conditions are called for, but we're happy to stay within the safe confines of determinism for this chapter.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \chapter{Lambda Calculus and Simple Type Safety}
 
 We'll now take a break from the imperative language we've been studying for the last two chapters, instead looking at a classic sort of small language that distills the essence of \emph{functional} programming\index{functional programming}.
@@ -4237,7 +4332,7 @@ We prove the inclusion of new invariant in old by Lemma \ref{cslprogress}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Process Algebra and Refinement}
+\chapter{\label{process_algebra}Process Algebra and Refinement}
 
 The last two chapters dealt with the most popular sort of concurrent programming, the threads-and-locks\index{threads and locks} shared-memory\index{shared-memory concurrency} style.
 It's a fundamentally imperative style, with side effects coordinating synchronization across threads.
@@ -4287,7 +4382,6 @@ Here's the intuitive explanation of each syntax construction.
   \item \textbf{The inert process}\index{inert process} $\done$ is incapable of doing anything at all.  It stands for a finished program.
 \end{itemize}
 
-\newcommand{\silent}[0]{\epsilon}
 \newcommand{\readl}[2]{?#1(#2)}
 \newcommand{\writel}[2]{!#1(#2)}
 \newcommand{\lts}[3]{#1 \stackrel{#2}{\longrightarrow} #3}

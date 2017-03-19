@@ -77,7 +77,7 @@ Inductive plug : context -> cmd -> cmd -> Prop :=
  * _label_ that records which _externally visible effect_ the step has.  For
  * this language, output is the only externally visible effect, so a label
  * records an optional output value.  Including this element makes our semantics
- * a _labeled transition system_. *)
+ * a _labelled transition system_. *)
 
 Inductive step0 : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 | Step0Assign : forall v x e,

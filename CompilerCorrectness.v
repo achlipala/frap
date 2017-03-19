@@ -893,3 +893,376 @@ Section simulation_multiple.
     simplify; split; auto using simulation_multiple_fwd, simulation_multiple_bwd.
   Qed.
 End simulation_multiple.
+
+Definition agree (v v' : valuation) :=
+  forall x,
+    noUnderscoreVar x = true
+    -> v $? x = v' $? x.
+
+Ltac bool :=
+  simplify;
+  repeat match goal with
+         | [ H : _ && _ = true |- _ ] => apply andb_true_iff in H; propositional
+         end.
+
+Lemma interp_agree : forall v v', agree v v'
+  -> forall e, noUnderscoreArith e = true
+  -> interp e v = interp e v'.
+Proof.
+  induct e; bool; try equality.
+
+  unfold agree in H.
+  specialize (H _ H0).
+  rewrite H.
+  equality.
+Qed.
+
+Lemma agree_add : forall v v' x n,
+    agree v v'
+    -> agree (v $+ (x, n)) (v' $+ (x, n)).
+Proof.
+  unfold agree; simplify.
+  apply H in H0.
+  cases (x ==v x0); simplify; auto.
+Qed.
+
+Lemma agree_add_tempVar_fwd : forall v v' n nv,
+    agree v v'
+    -> agree (v $+ (tempVar n, nv)) v'.
+Proof.
+  unfold agree; simplify.
+  cases (x ==v tempVar n); simplify; subst; auto.
+  eapply noUnderscoreVar_tempVar in H0.
+  propositional.
+Qed.
+
+Lemma agree_add_tempVar_bwd : forall v v' n nv,
+    agree (v $+ (tempVar n, nv)) v'
+    -> agree v v'.
+Proof.
+  unfold agree; simplify.
+  specialize (H _ H0).
+  cases (x ==v tempVar n); simplify; subst; auto.
+  eapply noUnderscoreVar_tempVar in H0.
+  propositional.
+Qed.
+
+Lemma agree_refl : forall v,
+    agree v v.
+Proof.
+  first_order.
+Qed.
+
+Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_refl.
+
+Hint Extern 1 (_ >= _) => linear_arithmetic.
+
+Lemma silent_csteps_front : forall c v1 v2 c1 c2,
+    silent_cstep^* (v1, c1) (v2, c2)
+    -> silent_cstep^* (v1, c1;; c) (v2, c2;; c).
+Proof.
+  induct 1; eauto.
+  invert H.
+  eauto 6.
+Qed.
+
+Hint Resolve silent_csteps_front.
+
+Lemma tempVar_contra : forall n1 n2,
+    tempVar n1 = tempVar n2
+    -> n1 <> n2
+    -> False.
+Proof.
+  pose proof tempVar_inj.
+  first_order.
+Qed.
+
+Hint Resolve tempVar_contra.
+
+Hint Extern 1 (_ <> _) => linear_arithmetic.
+
+Lemma flatten_Assign : forall e dst tempCount,
+  noUnderscoreArith e = true
+  -> (forall n, n >= tempCount -> dst <> tempVar n)
+  -> forall v1 v2, agree v1 v2
+  -> exists v c v2',
+    fst (flattenArith tempCount dst e) >= tempCount
+    /\ silent_cstep^* (v2, snd (flattenArith tempCount dst e)) (v, c)
+    /\ cstep (v, c) None (v2', Skip)
+    /\ agree (v1 $+ (dst, interp e v1)) v2'
+    /\ v2' $? dst = Some (interp e v1)
+    /\ (forall n, n < tempCount -> dst <> tempVar n -> v2' $? tempVar n = v2 $? tempVar n).
+Proof.
+  induct e; bool.
+
+  do 3 eexists.
+  split.
+  auto.
+  split.
+  eauto.
+  split.
+  eauto.
+  propositional; auto.
+  simplify; auto.
+  simplify.
+  cases (dst ==v tempVar n0); simplify; subst; auto.
+
+  do 3 eexists.
+  split.
+  auto.
+  split.
+  eauto.
+  split.
+  eauto.
+  propositional; auto.
+  simplify.
+  unfold agree in H1.
+  apply H1 in H.
+  rewrite H.
+  eauto.
+  simplify.
+  unfold agree in H1.
+  apply H1 in H.
+  rewrite H.
+  equality.
+  cases (dst ==v tempVar n); simplify; subst; auto.
+
+  eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
+  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
+  first_order.
+  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
+  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  first_order.
+  eexists; exists (dst <- tempVar tempCount + tempVar n); eexists.
+  split.
+  auto.
+  split.
+  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount + tempVar n)).
+  eauto 7 using trc_trans.
+  eauto 7 using trc_trans.
+  split.
+  eauto.
+  split.
+  simplify.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  eauto.
+  simplify.
+  propositional.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  auto.
+  simplify.
+  rewrite H12 by eauto.
+  eauto.
+
+  eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
+  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
+  first_order.
+  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
+  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  first_order.
+  eexists; exists (dst <- tempVar tempCount - tempVar n); eexists.
+  split.
+  auto.
+  split.
+  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount - tempVar n)).
+  eauto 7 using trc_trans.
+  eauto 7 using trc_trans.
+  split.
+  eauto.
+  split.
+  simplify.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  eauto.
+  simplify.
+  propositional.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  auto.
+  simplify.
+  rewrite H12 by eauto.
+  eauto.
+
+  eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
+  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
+  first_order.
+  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
+  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  first_order.
+  eexists; exists (dst <- tempVar tempCount * tempVar n); eexists.
+  split.
+  auto.
+  split.
+  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount * tempVar n)).
+  eauto 7 using trc_trans.
+  eauto 7 using trc_trans.
+  split.
+  eauto.
+  split.
+  simplify.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  eauto.
+  simplify.
+  propositional.
+  rewrite H11.
+  rewrite H12 by eauto.
+  rewrite H6.
+  erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
+  auto.
+  simplify.
+  rewrite H12 by eauto.
+  eauto.
+Qed.
+
+Lemma flatten_ok' : forall v1 c1 l v2 c2,
+    step0 (v1, c1) l (v2, c2)
+    -> noUnderscore c1 = true
+    -> forall v1', agree v1 v1'
+    -> exists v c v2', silent_cstep^* (v1', flatten c1) (v, c)
+                       /\ cstep (v, c) l (v2', flatten c2)
+                       /\ agree v2 v2'.
+Proof.
+  invert 1; simplify; bool;
+    repeat erewrite interp_agree in * by eassumption; eauto 10.
+
+  assert (Hnu : noUnderscoreArith e = true) by assumption.
+  eapply flatten_Assign with (tempCount := 0) (dst := x) in Hnu; eauto.
+  first_order.
+  do 3 eexists.
+  split.
+  eassumption.
+  split.
+  eassumption.
+  erewrite <- interp_agree; eauto.
+  simplify.
+  eauto using noUnderscoreVar_tempVar.
+Qed.
+
+Lemma noUnderscore_plug : forall C c0 c1,
+    plug C c0 c1
+    -> noUnderscore c1 = true
+    -> noUnderscore c0 = true.
+Proof.
+  induct 1; bool; auto.
+Qed.
+
+Hint Immediate noUnderscore_plug.
+
+Lemma silent_csteps_plug : forall C c1 c1',
+    plug C c1 c1'
+    -> forall v1 v2 c2 c2', plug C c2 c2'
+    -> silent_cstep^* (v1, c1) (v2, c2)
+    -> silent_cstep^* (v1, c1') (v2, c2').
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Hint Resolve silent_csteps_plug.
+
+Fixpoint flattenContext (C : context) : context :=
+  match C with
+  | Hole => Hole
+  | CSeq C c => CSeq (flattenContext C) (flatten c)
+  end.
+
+Lemma plug_flatten : forall C c1 c2, plug C c1 c2
+  -> plug (flattenContext C) (flatten c1) (flatten c2).
+Proof.
+  induct 1; simplify; eauto.
+Qed.
+
+Hint Resolve plug_flatten.
+
+Lemma plug_total : forall c C, exists c', plug C c c'.
+Proof.
+  induct C; first_order; eauto.
+Qed.
+
+Lemma plug_cstep : forall C c1 c1', plug C c1 c1'
+  -> forall c2 c2', plug C c2 c2'
+  -> forall v l v', cstep (v, c1) l (v', c2)
+                    -> cstep (v, c1') l (v', c2').
+Proof.
+  induct 1; invert 1; first_order; eauto.
+  eapply IHplug in H0; eauto.
+  first_order.
+  invert H0.
+  eauto.
+Qed.
+
+Hint Resolve plug_cstep.
+
+Lemma step0_noUnderscore : forall v c l v' c',
+    step0 (v, c) l (v', c')
+    -> noUnderscore c = true
+    -> noUnderscore c' = true.
+Proof.
+  invert 1; bool; auto.
+  rewrite H0, H1.
+  reflexivity.
+Qed.
+
+Hint Resolve step0_noUnderscore.
+
+Fixpoint noUnderscoreContext (C : context) : bool :=
+  match C with
+  | Hole => true
+  | CSeq C' c => noUnderscoreContext C' && noUnderscore c
+  end.
+
+Lemma noUnderscore_plug_context : forall C c0 c1,
+    plug C c0 c1
+    -> noUnderscore c1 = true
+    -> noUnderscoreContext C = true.
+Proof.
+  induct 1; bool; auto.
+  rewrite H0, H2; reflexivity.
+Qed.
+
+Lemma noUnderscore_plug_fwd : forall C c0 c1,
+    plug C c0 c1
+    -> noUnderscoreContext C = true
+    -> noUnderscore c0 = true
+    -> noUnderscore c1 = true.
+Proof.
+  induct 1; bool; auto.
+  rewrite H4, H3; reflexivity.
+Qed.
+
+Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd.
+
+Lemma flatten_ok : forall v c,
+    noUnderscore c = true
+    -> (v, c) =| (v, flatten c).
+Proof.
+  simplify.
+  apply simulation_multiple with (R := fun vc1 vc2 => noUnderscore (snd vc1) = true
+                                                      /\ agree (fst vc1) (fst vc2)
+                                                      /\ snd vc2 = flatten (snd vc1));
+    simplify; propositional; eauto.
+
+  invert H1; simplify; subst.
+  assert (noUnderscore c2 = true) by eauto.
+  eapply flatten_ok' in H5; eauto.
+  first_order.
+  cases vc2; simplify; subst.
+  pose proof (plug_total x0 (flattenContext C)).
+  first_order.
+  do 2 eexists.
+  split.
+  eapply silent_csteps_plug; try apply H4; eauto.
+  eauto 6.
+Qed.

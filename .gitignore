@@ -18,3 +18,4 @@ frap.tgz
 Deep.ml*
 Deeper.ml*
 DeeperWithFail.ml*
+*.dir-locals.el

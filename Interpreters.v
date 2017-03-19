@@ -346,7 +346,7 @@ Definition factorial_body :=
  * Note that here we're careful to put the quantified variable [input] *first*,
  * because the variables coming after it will need to *change* in the course of
  * the induction.  Try switching the order to see what goes wrong if we put
- * [input] later. *)
+e * [input] later. *)
 Lemma factorial_ok' : forall input output v,
   v $? "input" = Some input
   -> v $? "output" = Some output

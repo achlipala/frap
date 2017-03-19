@@ -2507,6 +2507,49 @@ Our bad counterexample fails to satisfy the conditions, because eventually the s
 \end{proof}
 
 
+\section{Simulations That Allow Taking Multiple Matching Steps}
+
+\newcommand{\flatten}[1]{\mathsf{flatten}(#1)}
+\newcommand{\smallstepcls}[3]{#1 \stackrel{#2}{\to_\mathsf{c}}^* #3}
+
+Consider our final example compiler phase: flattening\index{flattening} expressions into sequences of assignments to temporaries, using only noncompound subexpressions, where the arguments to every binary operator are variables or constants.
+Now a single step at the source level must be matched by many steps at the target level.
+We write $\flatten{c}$ for the flattening of command $c$.
+How can we prove that this transformation is correct?
+
+\begin{definition}[Simulation relation with multiple matching steps]
+  We say that a binary relation $R$ over states of our object language is a \emph{simulation relation with multiple matching steps} iff:
+  \begin{enumerate}
+    \item Whenever $(v_1, \skipe) \; R \; (v_2, c_2)$, it follows that $c_2 = \skipe$.
+    \item Whenever $s_1 \; R \; s_2$ and $\smallstepcl{s_1}{\ell}{s'_1}$, there exists $s'_2$ such that $\smallstepcls{s_2}{\ell}{s'_2}$ and $s'_1 \; R \; s'_2$.
+  \end{enumerate}
+\end{definition}
+
+We write $\smallstepcls{s}{\ell}{s'}$ to indicate that $s$ steps to $s'$ via zero or more silent steps and then one step with label $\ell$ (which might also be silent).
+
+\begin{theorem}
+  If there exists a simulation with multiple matching steps $R$ such that $s_1 \; R \; s_2$, then $\treq{s_1}{s_2}$.
+\end{theorem}
+\begin{proof}
+  The backward direction is the interesting part of this proof.
+  The key lemma proceeds by strong induction on the number of steps needed to generate the trace on the right.
+\end{proof}
+
+\begin{theorem}
+  For any $v$ and $c$ where $c$ doesn't use any names that are reserved for temporaries, $\treq{(v, c)}{(v, \flatten{c})}$.
+\end{theorem}
+\begin{proof}
+  By a simulation argument (with multiple matching steps) using this relation:
+  \begin{eqnarray*}
+    (v_1, c_1) \; R \; (v_2, c_2) &=& \textrm{$c_1$ doesn't use any names reserved for temporaries} \\
+    && \land \; v_1 \cong v_2 \land c_2 = \flatten{c_1}
+  \end{eqnarray*}
+  The heart of this relation is a subrelation $\cong$ over valuations, capturing when they agree on all variables that are not reserved for temporaries, since the flattened program will feel free to scribble all over the temporaries.
+  The details of $\cong$ are especially important to the key lemma, showing that flattening of expressions is sound, both taking in a $\cong$ premise and drawing a related $\cong$ conclusion.
+  The overall proof is not short, with quite a few lemmas, found in the Coq code.
+\end{proof}
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Lambda Calculus and Simple Type Safety}

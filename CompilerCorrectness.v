@@ -8,8 +8,14 @@ Require Import Frap.
 Set Implicit Arguments.
 
 
-(* In this chapter, we'll work with a small variation on the imperative language
- * from the previous chapter. *)
+(* Let's look at another example of what we can model with operational
+ * semantics: correctness of compiler transformations.  Our inspiration here is
+ * the seminal project CompCert, which uses Coq to verify a realistic C
+ * compiler.  We will adopt the same *simulation*-based techniques as CompCert,
+ * albeit on a simpler language and with simpler compiler phases.  We'll stick
+ * to transformations from the source language to itself, since that's enough to
+ * illustrate the big ideas.  Here's the object language that we'll use, which
+ * is _almost_ the same as from Chapter 7. *)
 
 Inductive arith : Set :=
 | Const (n : nat)
@@ -30,7 +36,7 @@ Inductive cmd :=
  * interesting differences between the behaviors of different nonterminating
  * programs.  A correct compiler should preserve these differences. *)
 
-(* The next span of notations and definitions is the same as last chapter. *)
+(* The next span of notations and definitions is the same as from Chapter 7. *)
 
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.
@@ -70,7 +76,8 @@ Inductive plug : context -> cmd -> cmd -> Prop :=
 (* Here's our first difference.  We add a new parameter to [step0], giving a
  * _label_ that records which _externally visible effect_ the step has.  For
  * this language, output is the only externally visible effect, so a label
- * records an optional output value. *)
+ * records an optional output value.  Including this element makes our semantics
+ * a _labeled transition system_. *)
 
 Inductive step0 : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 | Step0Assign : forall v x e,
@@ -92,6 +99,7 @@ Inductive step0 : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 | Step0Output : forall v e,
   step0 (v, Output e) (Some (interp e v)) (v, Skip).
 
+(* It's easy to push labels through steps with context. *)
 Inductive cstep : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 | CStep : forall C v c l v' c' c1 c2,
   plug C c c1
@@ -116,17 +124,36 @@ Inductive generate : valuation * cmd -> list nat -> Prop :=
 
 Hint Constructors plug step0 cstep generate.
 
+(* Notice that [generate] is defined so that, for any two of a starting state's
+ * traces, one is a prefix of the other.  The same wouldn't necessarily hold if
+ * our language were nondeterministic. *)
+
+(* We define trace inclusion to capture the notion of
+ * _preserving all behaviors_. *)
 Definition traceInclusion (vc1 vc2 : valuation * cmd) :=
   forall ns, generate vc1 ns -> generate vc2 ns.
 Infix "<|" := traceInclusion (at level 70).
 
+(* And trace equivalence captures _having the same behaviors_. *)
 Definition traceEquivalence (vc1 vc2 : valuation * cmd) :=
   vc1 <| vc2 /\ vc2 <| vc1.
 Infix "=|" := traceEquivalence (at level 70).
 
+(* Trace equivalence is an appropriate notion of correctness, to relate the
+ * "before" and "after" programs of a compiler transformation.  Note that here
+ * we break from our usual modus operandi, as we will not be using invariants to
+ * characterize correctness!  This kind of trace equivalence is one of the other
+ * big concepts that competes with invariants to unify different correctness
+ * notions. *)
+
+(* Here's a simple example program, which outputs how days have elapsed at the
+ * end of each one-month period (with a simplified notion of "month"!). *)
+
 Definition daysPerWeek := 7.
 Definition weeksPerMonth := 4.
 Definition daysPerMonth := (daysPerWeek * weeksPerMonth)%arith.
+(* We are purposely building an expression with arithmetic that can be resolved
+ * at compile time, to give our optimizations something to do. *)
 
 Example month_boundaries_in_days :=
   "acc" <- 0;;
@@ -136,9 +163,16 @@ Example month_boundaries_in_days :=
       Output "acc"
     else
       (* Oh no!  We must have calculated it wrong, since we got zero! *)
+      (* And, yes, we know this spot can never be reached.  Some of our
+       * optimizations will prove it for us! *)
       Skip
     done
   done.
+
+(* Moderately laboriously, we can prove a particular example trace for this
+ * program, including its first two outputs.  Traces of all lengths exist,
+ * because the program does not terminate, generating new output infinitely
+ * often. *)
 
 Hint Extern 1 (interp _ _ = _) => simplify; congruence.
 Hint Extern 1 (interp _ _ <> _) => simplify; congruence.
@@ -185,7 +219,10 @@ Proof.
   constructor.
 Qed.
 
+
 (** * Basic Simulation Arguments and Optimizing Expressions *)
+
+(* Let's define an optimization that just simplifies expressions. *)
 
 Fixpoint cfoldArith (e : arith) : arith :=
   match e with
@@ -234,8 +271,16 @@ Fixpoint cfoldExprs (c : cmd) : cmd :=
   | Output e => Output (cfoldArith e)
   end.
 
+(* Here's what our optimization does to the example program. *)
 Compute cfoldExprs month_boundaries_in_days.
 
+(* It's actually not obvious how to prove trace equivalence for this kind of
+ * optimization, and we should be on the lookout for general principles that
+ * help us avoid rehashing the same argument structure for each optimization.
+ * To let us prove such principles, we first establish a few key properties of
+ * the object language. *)
+
+(* First, any program that isn't a [Skip] can make progress. *)
 Theorem skip_or_step : forall v c,
     c = Skip
     \/ exists v' l c', cstep (v, c) l (v', c').
@@ -250,13 +295,7 @@ Proof.
         end; eauto 10.
 Qed.
 
-Lemma deterministic0 : forall vc l vc',
-  step0 vc l vc'
-  -> forall l' vc'', step0 vc l' vc''
-                     -> l = l' /\ vc'' = vc'.
-Proof.
-  invert 1; invert 1; simplify; propositional.
-Qed.
+(* Now, a set of (boring) lemmas relevant to contexts: *)
 
 Theorem plug_function : forall C c1 c2, plug C c1 c2
   -> forall c2', plug C c1 c2'
@@ -288,6 +327,17 @@ Proof.
         end; eauto.
 Qed.
 
+(* Finally, the big theorem we are after: the [cstep] relation is
+ * deterministic. *)
+
+Lemma deterministic0 : forall vc l vc',
+  step0 vc l vc'
+  -> forall l' vc'', step0 vc l' vc''
+                     -> l = l' /\ vc'' = vc'.
+Proof.
+  invert 1; invert 1; simplify; propositional.
+Qed.
+
 Theorem deterministic : forall vc l vc',
   cstep vc l vc'
   -> forall l' vc'', cstep vc l' vc''
@@ -304,15 +354,30 @@ Proof.
   equality.
 Qed.
 
+(* OK, we are ready for the first variant of today's big proof technique,
+ * _simulation_.  The method is much like with invariants.  Recall that, in our
+ * old workhorse technique, we pick a predicate over states, and we show that
+ * all steps preserve it.  Simulation is very similar, but now we have a
+ * two-argument predicate or _relation_ between states of two systems.  The
+ * relation is a simulation when it is able to track execution in one system by
+ * playing appropriate steps in the other.  For deterministic systems like ours,
+ * the existence of a simulation implies trace equivalence. *)
 Section simulation.
+  (* Here's the kind of relation we assume. *)
   Variable R : valuation * cmd -> valuation * cmd -> Prop.
 
+  (* Starting from two related states, when the lefthand one makes a step, the
+   * righthand one can make a matching step, such that the new states are also
+   * related. *)
   Hypothesis one_step : forall vc1 vc2, R vc1 vc2
     -> forall vc1' l, cstep vc1 l vc1'
       -> exists vc2', cstep vc2 l vc2' /\ R vc1' vc2'.
 
+  (* When a righthand command is related to [Skip], it must be [Skip], too. *)
   Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
     -> c2 = Skip.
+
+  (* First (easy) step: [R] implies left-to-right trace inclusion. *)
 
   Lemma simulation_fwd' : forall vc1 ns, generate vc1 ns
     -> forall vc2, R vc1 vc2
@@ -334,6 +399,9 @@ Section simulation.
   Proof.
     unfold traceInclusion; eauto using simulation_fwd'.
   Qed.
+
+  (* Second (slightly harder) step: [R] implies right-to-left trace
+   * inclusion. *)
 
   Lemma simulation_bwd' : forall vc2 ns, generate vc2 ns
     -> forall vc1, R vc1 vc2
@@ -374,12 +442,17 @@ Section simulation.
     unfold traceInclusion; eauto using simulation_bwd'.
   Qed.
 
+  (* Put them together and we have trace equivalence. *)
+
   Theorem simulation : forall vc1 vc2, R vc1 vc2
     -> vc1 =| vc2.
   Proof.
     simplify; split; auto using simulation_fwd, simulation_bwd.
   Qed.
 End simulation.
+
+(* Now to prove our particular optimization.  First, original steps can be
+ * lifted into optimized steps. *)
 
 Lemma cfoldExprs_ok' : forall v1 c1 l v2 c2,
     step0 (v1, c1) l (v2, c2)
@@ -392,12 +465,14 @@ Proof.
         end; eauto.
 Qed.
 
+(* It helps to add optimization on contexts, as a proof device. *)
 Fixpoint cfoldExprsContext (C : context) : context :=
   match C with
   | Hole => Hole
   | CSeq C c => CSeq (cfoldExprsContext C) (cfoldExprs c)
   end.
 
+(* The optimization can be applied over [plug]. *)
 Lemma plug_cfoldExprs1 : forall C c1 c2, plug C c1 c2
   -> plug (cfoldExprsContext C) (cfoldExprs c1) (cfoldExprs c2).
 Proof.
@@ -406,10 +481,14 @@ Qed.
 
 Hint Resolve plug_cfoldExprs1.
 
-Lemma cfoldExprs_ok : forall v c,
+(* The main correctness property! *)
+Theorem cfoldExprs_ok : forall v c,
     (v, c) =| (v, cfoldExprs c).
 Proof.
   simplify.
+  (* Notice our clever choice of a simulation relation here, much as we often
+   * choose strengthened invariants.  We basically just recast the theorem
+   * statement as a two-state predicate using equality. *)
   apply simulation with (R := fun vc1 vc2 => fst vc1 = fst vc2
                                              /\ snd vc2 = cfoldExprs (snd vc1));
     simplify; propositional.
@@ -423,6 +502,9 @@ Qed.
 
 (** * Simulations That Allow Skipping Steps *)
 
+(* Here's a reasonable variant of the last optimization: when an [If] test
+ * expression reduces to a constant, replace the [If] with whichever branch is
+ * guaranteed to run. *)
 Fixpoint cfold (c : cmd) : cmd :=
   match c with
   | Skip => c
@@ -438,9 +520,15 @@ Fixpoint cfold (c : cmd) : cmd :=
   | Output e => Output (cfoldArith e)
   end.
 
+(* Here's how our running example optimizes further. *)
 Compute cfold month_boundaries_in_days.
 
+(* It will be helpful to have a shorthand for steps that don't generate output.
+ * [Notation] is a useful way to introduce a shorthand so that it looks exactly
+ * the same as its expansion, to all Coq tactics. *)
 Notation silent_cstep := (fun a b => cstep a None b).
+
+(* Silent steps have a few interesting properties, proved here. *)
 
 Lemma silent_generate_fwd : forall ns vc vc',
     silent_cstep^* vc vc'
@@ -483,16 +571,33 @@ Qed.
 
 Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip.
 
+(* You might have noticed that our old notion of simulation doesn't apply to the
+ * new optimization.  The reason is that, because the optimized program skips
+ * some steps, some steps in the source program may not have matching steps in
+ * the optimized program.  Let's extend simulation to allow skipped steps. *)
 Section simulation_skipping.
+  (* Now the relation takes a number as an argument.  The idea is that, for
+   * [R n vc1 vc2], at most [n] steps of [vc1] may go unmatched by [vc2], before
+   * we finally find one that matches.  It is an interesting exercise to work
+   * out why, without tracking such quantities, this notion of simulation
+   * wouldn't imply trace equivalence! *)
   Variable R : nat -> valuation * cmd -> valuation * cmd -> Prop.
 
+  (* Now this key hypothesis has two cases. *)
   Hypothesis one_step : forall n vc1 vc2, R n vc1 vc2
     -> forall vc1' l, cstep vc1 l vc1'
+
+                         (* Case 1: Skipping a (silent!) step, decreasing [n] *)
                       -> (exists n', n = S n' /\ l = None /\ R n' vc1' vc2)
+
+                         (* Case 2: Matching the step like before; note how [n]
+                          * resets to an arbitrary new limit! *)
                          \/ exists n' vc2', cstep vc2 l vc2' /\ R n' vc1' vc2'.
 
   Hypothesis agree_on_termination : forall n v1 v2 c2, R n (v1, Skip) (v2, c2)
     -> c2 = Skip.
+
+  (* The forward direction is just as easy to prove. *)
 
   Lemma simulation_skipping_fwd' : forall vc1 ns, generate vc1 ns
     -> forall n vc2, R n vc1 vc2
@@ -516,6 +621,8 @@ Section simulation_skipping.
     unfold traceInclusion; eauto using simulation_skipping_fwd'.
   Qed.
 
+  (* This one isn't so obvious: a step on the right can now be matched by
+   * _one or more_ steps on the left, preserving [R]. *)
   Lemma match_step : forall n vc2 l vc2' vc1,
       cstep vc2 l vc2'
       -> R n vc1 vc2
@@ -585,6 +692,15 @@ Section simulation_skipping.
   Qed.
 End simulation_skipping.
 
+Hint Extern 1 (_ < _) => linear_arithmetic.
+Hint Extern 1 (_ >= _) => linear_arithmetic.
+Hint Extern 1 (_ <> _) => linear_arithmetic.
+
+(* We will need to do some bookkeeping of [n] values.  This function is the
+ * trick, as we only need to skip steps based on removing [If]s from the code.
+ * That means the number of [If]s in a program is an upper bound on skipped
+ * steps.  (It's not a tight bound, because some [If]s may be in branches that
+ * are themselves removed by the optimization!) *)
 Fixpoint countIfs (c : cmd) : nat :=
   match c with
   | Skip => 0
@@ -595,8 +711,8 @@ Fixpoint countIfs (c : cmd) : nat :=
   | Output _ => 0
   end.
 
-Hint Extern 1 (_ < _) => linear_arithmetic.
-
+(* Our notion of [step0] porting must now allow some skipped steps, also showing
+ * that they decrease [If] count. *)
 Lemma cfold_ok' : forall v1 c1 l v2 c2,
     step0 (v1, c1) l (v2, c2)
     -> step0 (v1, cfold c1) l (v2, cfold c2)
@@ -611,6 +727,8 @@ Proof.
            | [ |- context[match ?E with _ => _ end] ] => cases E; subst; simplify
            end; propositional; eauto.
 Qed.
+
+(* Now some fiddling with contexts: *)
 
 Fixpoint cfoldContext (C : context) : context :=
   match C with
@@ -650,10 +768,12 @@ Qed.
 
 Hint Resolve plug_countIfs.
 
+(* The final proof is fairly straightforward now. *)
 Lemma cfold_ok : forall v c,
     (v, c) =| (v, cfold c).
 Proof.
   simplify.
+  (* Note the use of [countIfs] in the simulation relation. *)
   apply simulation_skipping with (R := fun n vc1 vc2 => fst vc1 = fst vc2
                                                         /\ snd vc2 = cfold (snd vc1)
                                                         /\ countIfs (snd vc1) < n)
@@ -676,11 +796,26 @@ Qed.
 
 (** * Simulations That Allow Taking Multiple Matching Steps *)
 
+(* Some optimizations actually transform code toward lower-level languages.
+ * Let's take the example of breaking compound expressions into step-by-step
+ * computations using new temporary variables. *)
+
+(* We'll use this function to give us an infinite supply of disjoint
+ * temporaries. *)
 Fixpoint tempVar (n : nat) : string :=
   match n with
   | O => "_tmp"
   | S n' => tempVar n' ++ "'"
   end%string.
+
+Compute tempVar 0.
+Compute tempVar 1.
+Compute tempVar 2.
+
+(* With that kind of temporary, we need to watch our for name clashes with
+ * variables that already exist in a program.  These Boolean functions check for
+ * lack of clashes.  We also prove some properties that will come in handy
+ * later. *)
 
 Fixpoint noUnderscoreVar (x : var) : bool :=
   match x with
@@ -786,45 +921,61 @@ Fixpoint noUnderscore (c : cmd) : bool :=
   | Output e => noUnderscoreArith e
   end.
 
+(* It's good to verify that our example program makes the grade. *)
 Compute noUnderscore month_boundaries_in_days.
 
-Fixpoint flattenArith (tempCount : nat) (dst : var) (e : arith) : nat * cmd :=
+(* Now here's the optimization.  First, we flatten expressions.  The idea is
+ * that argument [tempCount] gives us the index of the next temporary we should
+ * use, also guaranteeing that earlier code only uses lower-numbered
+ * temporaries.  Argument [dst] is a variable where we should write the result
+ * of the expression.  A return value is a command that has the
+ * effect of writing the value of [e] into [dst]. *)
+Fixpoint flattenArith (tempCount : nat) (dst : var) (e : arith) : cmd :=
   match e with
   | Const _
-  | Var _ => (tempCount, Assign dst e)
+  | Var _ => Assign dst e
   | Plus e1 e2 =>
     let x1 := tempVar tempCount in
-    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
-    let x2 := tempVar tempCount in
-    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
-    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Plus x1 x2))))
+    let c1 := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar (S tempCount) in
+    let c2 := flattenArith (S (S tempCount)) x2 e2 in
+    Sequence c1 (Sequence c2 (Assign dst (Plus x1 x2)))
   | Minus e1 e2 =>
     let x1 := tempVar tempCount in
-    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
-    let x2 := tempVar tempCount in
-    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
-    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Minus x1 x2))))
+    let c1 := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar (S tempCount) in
+    let c2 := flattenArith (S (S tempCount)) x2 e2 in
+    Sequence c1 (Sequence c2 (Assign dst (Minus x1 x2)))
   | Times e1 e2 =>
     let x1 := tempVar tempCount in
-    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
-    let x2 := tempVar tempCount in
-    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
-    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Times x1 x2))))
+    let c1 := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar (S tempCount) in
+    let c2 := flattenArith (S (S tempCount)) x2 e2 in
+    Sequence c1 (Sequence c2 (Assign dst (Times x1 x2)))
   end.
 
+(* For simplicity, the main optimization only flattens variables in
+ * assignments. *)
 Fixpoint flatten (c : cmd) : cmd :=
   match c with
   | Skip => c
-  | Assign x e => snd (flattenArith 0 x e)
+  | Assign x e => flattenArith 0 x e
   | Sequence c1 c2 => Sequence (flatten c1) (flatten c2)
   | If e then_ else_ => If e (flatten then_) (flatten else_)
   | While e body => While e (flatten body)
   | Output _ => c
   end.
 
+(* Here's what it does on our example. *)
 Compute flatten month_boundaries_in_days.
 
+(* The alert reader may noticed that, yet again, we picked a transformation that
+ * our existing simulation relations can't handle directly, at least if we put
+ * the original system on the left and the compiled version on the right.  Now
+ * we need a single step on the left to be matched by _one or more_ steps on the
+ * right. *)
 Section simulation_multiple.
+  (* At least we can remove that pesky numeric parameter of [R]. *)
   Variable R : valuation * cmd -> valuation * cmd -> Prop.
 
   Hypothesis one_step : forall vc1 vc2, R vc1 vc2
@@ -836,6 +987,8 @@ Section simulation_multiple.
 
   Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
     -> c2 = Skip.
+
+  (* The forward direction is easy, as usual. *)
 
   Lemma simulation_multiple_fwd' : forall vc1 ns, generate vc1 ns
     -> forall vc2, R vc1 vc2
@@ -858,7 +1011,9 @@ Section simulation_multiple.
     unfold traceInclusion; eauto using simulation_multiple_fwd'.
   Qed.
 
-  (* A version of [generate] that counts how many steps run *)
+  (* The backward proof essentially proceeds by strong induction on
+   * _how many steps it took to generate a trace_, which we facilitate by
+   * defining a [generate] variant parameterized by a step count. *)
   Inductive generateN : nat -> valuation * cmd -> list nat -> Prop :=
   | GenDoneN : forall vc,
       generateN 0 vc []
@@ -870,6 +1025,9 @@ Section simulation_multiple.
       cstep vc (Some n) vc'
       -> generateN sc vc' ns
       -> generateN (S sc) vc (n :: ns).
+
+  (* We won't comment on the other proof details, though they could be
+   * interesting reading. *)
 
   Hint Constructors generateN.
 
@@ -962,10 +1120,18 @@ Section simulation_multiple.
   Qed.
 End simulation_multiple.
 
+(* Now, to verify our particular flattening translation.  First, one wrinkle is
+ * that, by writing to new temporary variables, valuations will _not_ be exactly
+ * the same acorss the sides of our relation.  Here is the sense in which we
+ * need the sides to agree: *)
 Definition agree (v v' : valuation) :=
   forall x,
     noUnderscoreVar x = true
     -> v $? x = v' $? x.
+(* That is, they only need to agree on variables that aren't legal
+ * temporaries. *)
+
+(* There no follow a whole bunch of thrilling lemmas about agreement. *)
 
 Ltac bool :=
   simplify;
@@ -1015,15 +1181,24 @@ Proof.
   propositional.
 Qed.
 
+Lemma agree_add_tempVar_bwd_prime : forall v v' n nv,
+    agree (v $+ (tempVar n ++ "'", nv)%string) v'
+    -> agree v v'.
+Proof.
+  simplify.
+  change (tempVar n ++ "'")%string with (tempVar (S n)) in *.
+  eauto using agree_add_tempVar_bwd.
+Qed.
+
 Lemma agree_refl : forall v,
     agree v v.
 Proof.
   first_order.
 Qed.
 
-Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_refl.
+Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_add_tempVar_bwd_prime agree_refl.
 
-Hint Extern 1 (_ >= _) => linear_arithmetic.
+(* And here are two more unremarkable lemmas. *)
 
 Lemma silent_csteps_front : forall c v1 v2 c1 c2,
     silent_cstep^* (v1, c1) (v2, c2)
@@ -1047,19 +1222,51 @@ Qed.
 
 Hint Resolve tempVar_contra.
 
-Hint Extern 1 (_ <> _) => linear_arithmetic.
+Lemma self_prime_contra : forall s,
+    (s ++ "'")%string = s -> False.
+Proof.
+  induct s; simplify; equality.
+Qed.
 
+Hint Resolve self_prime_contra.
+
+(* We've now proved all properties of [tempVar] that we need, so let's ask Coq
+ * not to reduce applications of it anymore, to keep goals simpler. *)
+Opaque tempVar.
+
+(* This is our workhorse lemma, establishing correct compilation of assignments
+ * with [flattenArith]. *)
 Lemma flatten_Assign : forall e dst tempCount,
   noUnderscoreArith e = true
+  (* We compile an expression [e] with no variable clashes. *)
+
   -> (forall n, n >= tempCount -> dst <> tempVar n)
+  (* Our destination variable [dst] is distinct from any temporary that we give
+   * [flattenArith] permission to use. *)
+
   -> forall v1 v2, agree v1 v2
+  (* The valuations on the two sides agree on non-temporaries. *)
+
+  (* THEN we conclude existence of further values, such that *)
   -> exists v c v2',
-    fst (flattenArith tempCount dst e) >= tempCount
-    /\ silent_cstep^* (v2, snd (flattenArith tempCount dst e)) (v, c)
+    silent_cstep^* (v2, flattenArith tempCount dst e) (v, c)
+    (* The compiled program steps silently to an intermediate state. *)
+
     /\ cstep (v, c) None (v2', Skip)
+    (* Next, it runs one final silent step (arithmetic never outputs). *)
+
     /\ agree (v1 $+ (dst, interp e v1)) v2'
+    (* The place we end up agrees with the original lefthand valuation, with the
+     * destination updated with the requested value. *)
+
     /\ v2' $? dst = Some (interp e v1)
-    /\ (forall n, n < tempCount -> dst <> tempVar n -> v2' $? tempVar n = v2 $? tempVar n).
+    (* The destination has had the right value set.  (This isn't redundant with
+     * the last fact because the destination might be a temporary, in which case
+     * [agree] ignores it. *)
+
+    /\ (forall n, n < tempCount -> dst <> tempVar n -> v2' $? tempVar n = v2 $? tempVar n)
+    (* We have not touched any temporaries both less than [tempCount] and not
+     * equal to the destination *).
 Proof.
   induct e; bool.
 
@@ -1092,109 +1299,109 @@ Proof.
   unfold agree in H1.
   apply H1 in H.
   rewrite H.
+  split.
   equality.
-  cases (dst ==v tempVar n); simplify; subst; auto.
+  simplify.
+  equality.
 
   eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
-  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
   first_order.
-  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
-  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  eapply IHe2 with (dst := tempVar (S tempCount)) (tempCount := S (S tempCount)) in H4; eauto; clear IHe2.
   first_order.
-  eexists; exists (dst <- tempVar tempCount + tempVar n); eexists.
+  eexists; exists (dst <- tempVar tempCount + tempVar (S tempCount)); eexists.
   split.
-  auto.
-  split.
-  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount + tempVar n)).
+  apply trc_trans with (y := (x2, x3;; dst <- tempVar tempCount + tempVar (S tempCount))).
+  apply trc_trans with (y := (x1, flattenArith (S (S tempCount)) (tempVar (S tempCount)) e2;; dst <- tempVar tempCount + tempVar (S tempCount))).
+  eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   split.
   eauto.
   split.
   simplify.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   eauto.
   simplify.
   propositional.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   auto.
   simplify.
-  rewrite H12 by eauto.
+  rewrite H10 by eauto.
   eauto.
 
+  (* Apologies for the copy-and-paste between the binary-operator cases! *)
   eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
-  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
   first_order.
-  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
-  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  eapply IHe2 with (dst := tempVar (S tempCount)) (tempCount := S (S tempCount)) in H4; eauto; clear IHe2.
   first_order.
-  eexists; exists (dst <- tempVar tempCount - tempVar n); eexists.
+  eexists; exists (dst <- tempVar tempCount - tempVar (S tempCount)); eexists.
   split.
-  auto.
-  split.
-  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount - tempVar n)).
+  apply trc_trans with (y := (x2, x3;; dst <- tempVar tempCount - tempVar (S tempCount))).
+  apply trc_trans with (y := (x1, flattenArith (S (S tempCount)) (tempVar (S tempCount)) e2;; dst <- tempVar tempCount - tempVar (S tempCount))).
+  eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   split.
   eauto.
   split.
   simplify.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   eauto.
   simplify.
   propositional.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   auto.
   simplify.
-  rewrite H12 by eauto.
+  rewrite H10 by eauto.
   eauto.
 
   eapply IHe1 with (dst := tempVar tempCount) (tempCount := S tempCount) in H1; eauto; clear IHe1.
-  cases (flattenArith (S tempCount) (tempVar tempCount) e1); simplify.
   first_order.
-  eapply IHe2 with (dst := tempVar n) (tempCount := S n) in H5; eauto; clear IHe2.
-  cases (flattenArith (S n) (tempVar n) e2); simplify.
+  eapply IHe2 with (dst := tempVar (S tempCount)) (tempCount := S (S tempCount)) in H4; eauto; clear IHe2.
   first_order.
-  eexists; exists (dst <- tempVar tempCount * tempVar n); eexists.
+  eexists; exists (dst <- tempVar tempCount * tempVar (S tempCount)); eexists.
   split.
-  auto.
-  split.
-  apply trc_trans with (y := (x1, c0;; dst <- tempVar tempCount * tempVar n)).
+  apply trc_trans with (y := (x2, x3;; dst <- tempVar tempCount * tempVar (S tempCount))).
+  apply trc_trans with (y := (x1, flattenArith (S (S tempCount)) (tempVar (S tempCount)) e2;; dst <- tempVar tempCount * tempVar (S tempCount))).
+  eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   eauto 7 using trc_trans.
   split.
   eauto.
   split.
   simplify.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   eauto.
   simplify.
   propositional.
-  rewrite H11.
-  rewrite H12 by eauto.
-  rewrite H6.
+  rewrite H9.
+  rewrite H10 by eauto.
+  rewrite H5.
   erewrite interp_agree with (v := v1 $+ (tempVar tempCount, interp e1 v1)) (v' := v1) by eauto.
   auto.
   simplify.
-  rewrite H12 by eauto.
+  rewrite H10 by eauto.
   eauto.
 Qed.
 
+(* Now that reasoning can be fit within a general theorem about [step0].  Note
+ * how the conclusions use [cstep] instead of [step0], to accommodate steps
+ * within the structure of a term in the [Assign] case. *)
 Lemma flatten_ok' : forall v1 c1 l v2 c2,
     step0 (v1, c1) l (v2, c2)
     -> noUnderscore c1 = true
@@ -1218,6 +1425,8 @@ Proof.
   simplify.
   eauto using noUnderscoreVar_tempVar.
 Qed.
+
+(* Now, some thrilling lemmas about underscores and plugging! *)
 
 Lemma noUnderscore_plug : forall C c0 c1,
     plug C c0 c1
@@ -1312,11 +1521,14 @@ Qed.
 
 Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd.
 
+(* Finally, the main correctness theorem. *)
 Lemma flatten_ok : forall v c,
     noUnderscore c = true
     -> (v, c) =| (v, flatten c).
 Proof.
   simplify.
+  (* Note that our simulation relation remembers lack of underscores, and it
+   * enforces mere agreement between valuations, rather than full equality. *)
   apply simulation_multiple with (R := fun vc1 vc2 => noUnderscore (snd vc1) = true
                                                       /\ agree (fst vc1) (fst vc2)
                                                       /\ snd vc2 = flatten (snd vc1));

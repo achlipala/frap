@@ -376,6 +376,49 @@ Fixpoint cfold (c : cmd) : cmd :=
   | Output e => Output (cfoldArith e)
   end.
 
+Notation silent_cstep := (fun a b => cstep a None b).
+
+Lemma silent_generate_fwd : forall ns vc vc',
+    silent_cstep^* vc vc'
+    -> generate vc ns
+    -> generate vc' ns.
+Proof.
+  induct 1; simplify; eauto.
+  invert H1; auto.
+
+  eapply deterministic in H; eauto.
+  propositional; subst.
+  auto.
+
+  eapply deterministic in H; eauto.
+  equality.
+Qed.
+
+Lemma silent_generate_bwd : forall ns vc vc',
+    silent_cstep^* vc vc'
+    -> generate vc' ns
+    -> generate vc ns.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Lemma generate_Skip : forall v a ns,
+    generate (v, Skip) (a :: ns)
+    -> False.
+Proof.
+  induct 1; simplify.
+
+  invert H.
+  invert H3.
+  invert H4.
+
+  invert H.
+  invert H3.
+  invert H4.
+Qed.
+
+Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip.
+
 Section simulation_skipping.
   Variable R : nat -> valuation * cmd -> valuation * cmd -> Prop.
 
@@ -408,23 +451,6 @@ Section simulation_skipping.
   Proof.
     unfold traceInclusion; eauto using simulation_skipping_fwd'.
   Qed.
-
-  Lemma generate_Skip : forall v a ns,
-      generate (v, Skip) (a :: ns)
-      -> False.
-  Proof.
-    induct 1; simplify.
-
-    invert H.
-    invert H3.
-    invert H4.
-
-    invert H.
-    invert H3.
-    invert H4.
-  Qed.
-
-  Notation silent_cstep := (fun a b => cstep a None b).
 
   Lemma match_step : forall n vc2 l vc2' vc1,
       cstep vc2 l vc2'
@@ -466,16 +492,6 @@ Section simulation_skipping.
     first_order; subst.
     eauto 6.
   Qed.
-
-  Lemma silent_generate : forall ns vc vc',
-      silent_cstep^* vc vc'
-      -> generate vc' ns
-      -> generate vc ns.
-  Proof.
-    induct 1; eauto.
-  Qed.
-
-  Hint Resolve silent_generate.
 
   Lemma simulation_skipping_bwd' : forall ns vc2, generate vc2 ns
     -> forall n vc1, R n vc1 vc2
@@ -592,3 +608,288 @@ Proof.
   eauto.
   eauto 10.
 Qed.
+
+
+(** * Simulations That Allow Taking Multiple Matching Steps *)
+
+Fixpoint tempVar (n : nat) : string :=
+  match n with
+  | O => "_tmp"
+  | S n' => tempVar n' ++ "'"
+  end%string.
+
+Fixpoint noUnderscoreVar (x : var) : bool :=
+  match x with
+  | String "_" _ => false
+  | _ => true
+  end.
+
+Lemma append_assoc : forall a b c,
+    (a ++ (b ++ c) = (a ++ b) ++ c)%string.
+Proof.
+  induct a; simplify; equality.
+Qed.
+
+Lemma append_assoc_String : forall a b,
+    (String a b = String a "" ++ b)%string.
+Proof.
+  induct b; simplify; equality.
+Qed.
+
+Lemma noUnderscoreVar_tempVar' : forall n,
+    exists s, tempVar n = ("_tmp" ++ s)%string.
+Proof.
+  induct n; simplify; first_order.
+
+  exists ""; auto.
+
+  rewrite H.
+  exists (x ++ "'")%string.
+  repeat match goal with
+         | [ |- context[String ?c ?x] ] =>
+           match x with
+           | "" => fail 1
+           | _ => rewrite (append_assoc_String c x)
+           end
+         end.
+  repeat rewrite append_assoc.
+  reflexivity.
+Qed.  
+
+Theorem noUnderscoreVar_tempVar : forall x,
+    noUnderscoreVar x = true
+    -> forall n, x <> tempVar n.
+Proof.
+  unfold not; simplify.
+  subst.
+  pose proof (noUnderscoreVar_tempVar' n).
+  first_order.
+  rewrite H0 in H.
+  simplify.
+  equality.
+Qed.
+
+Lemma tempVar_inj' : forall s1 s2,
+    (s1 ++ "'" = s2 ++ "'")%string
+    -> s1 = s2.
+Proof.
+  induct s1; simplify.
+
+  cases s2; simplify; try equality.
+  invert H.
+  cases s2; simplify; equality.
+
+  cases s2; simplify.
+  invert H.
+  cases s1; simplify; equality.
+  invert H.
+  f_equal; auto.
+Qed.
+
+Theorem tempVar_inj : forall n1 n2,
+    tempVar n1 = tempVar n2
+    -> n1 = n2.
+Proof.
+  induct n1; simplify; cases n2; simplify; try equality.
+
+  repeat match goal with
+         | [ _ : context[(?s ++ "'")%string] |- _ ] => cases s; simplify; try equality
+         end.
+
+  repeat match goal with
+         | [ _ : context[(?s ++ "'")%string] |- _ ] => cases s; simplify; try equality
+         end.
+
+  auto using tempVar_inj'.
+Qed.
+
+Fixpoint noUnderscoreArith (e : arith) : bool :=
+  match e with
+  | Const _ => true
+  | Var x => noUnderscoreVar x
+  | Plus e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
+  | Minus e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
+  | Times e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
+  end.
+
+Fixpoint noUnderscore (c : cmd) : bool :=
+  match c with
+  | Skip => true
+  | Assign x e => noUnderscoreVar x && noUnderscoreArith e
+  | Sequence c1 c2 => noUnderscore c1 && noUnderscore c2
+  | If e then_ else_ => noUnderscoreArith e && noUnderscore then_ && noUnderscore else_
+  | While e body => noUnderscoreArith e && noUnderscore body
+  | Output e => noUnderscoreArith e
+  end.
+
+Fixpoint flattenArith (tempCount : nat) (dst : var) (e : arith) : nat * cmd :=
+  match e with
+  | Const _
+  | Var _ => (tempCount, Assign dst e)
+  | Plus e1 e2 =>
+    let x1 := tempVar tempCount in
+    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar tempCount in
+    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
+    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Plus x1 x2))))
+  | Minus e1 e2 =>
+    let x1 := tempVar tempCount in
+    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar tempCount in
+    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
+    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Minus x1 x2))))
+  | Times e1 e2 =>
+    let x1 := tempVar tempCount in
+    let (tempCount, c1) := flattenArith (S tempCount) x1 e1 in
+    let x2 := tempVar tempCount in
+    let (tempCount, c2) := flattenArith (S tempCount) x2 e2 in
+    (tempCount, Sequence c1 (Sequence c2 (Assign dst (Times x1 x2))))
+  end.
+
+Fixpoint flatten (c : cmd) : cmd :=
+  match c with
+  | Skip => c
+  | Assign x e => snd (flattenArith 0 x e)
+  | Sequence c1 c2 => Sequence (flatten c1) (flatten c2)
+  | If e then_ else_ => If e (flatten then_) (flatten else_)
+  | While e body => While e (flatten body)
+  | Output _ => c
+  end.
+
+Section simulation_multiple.
+  Variable R : valuation * cmd -> valuation * cmd -> Prop.
+
+  Hypothesis one_step : forall vc1 vc2, R vc1 vc2
+    -> forall vc1' l, cstep vc1 l vc1'
+                      -> exists vc2' vc2'',
+                        silent_cstep^* vc2 vc2'
+                        /\ cstep vc2' l vc2''
+                        /\ R vc1' vc2''.
+
+  Hypothesis agree_on_termination : forall v1 v2 c2, R (v1, Skip) (v2, c2)
+    -> c2 = Skip.
+
+  Lemma simulation_multiple_fwd' : forall vc1 ns, generate vc1 ns
+    -> forall vc2, R vc1 vc2
+      -> generate vc2 ns.
+  Proof.
+    induct 1; simplify; eauto.
+
+    eapply one_step in H; eauto.
+    first_order.
+    eauto.
+
+    eapply one_step in H1; eauto.
+    first_order.
+    eauto.
+  Qed.
+
+  Theorem simulation_multiple_fwd : forall vc1 vc2, R vc1 vc2
+    -> vc1 <| vc2.
+  Proof.
+    unfold traceInclusion; eauto using simulation_multiple_fwd'.
+  Qed.
+
+  (* A version of [generate] that counts how many steps run *)
+  Inductive generateN : nat -> valuation * cmd -> list nat -> Prop :=
+  | GenDoneN : forall vc,
+      generateN 0 vc []
+  | GenSilentN : forall sc vc vc' ns,
+      cstep vc None vc'
+      -> generateN sc vc' ns
+      -> generateN (S sc) vc ns
+  | GenOutputN : forall sc vc n vc' ns,
+      cstep vc (Some n) vc'
+      -> generateN sc vc' ns
+      -> generateN (S sc) vc (n :: ns).
+
+  Hint Constructors generateN.
+
+  Lemma generateN_fwd : forall sc vc ns,
+      generateN sc vc ns
+      -> generate vc ns.
+  Proof.
+    induct 1; eauto.
+  Qed.
+
+  Hint Resolve generateN_fwd.
+
+  Lemma generateN_bwd : forall vc ns,
+      generate vc ns
+      -> exists sc, generateN sc vc ns.
+  Proof.
+    induct 1; first_order; eauto.
+  Qed.
+
+  Lemma generateN_silent_cstep : forall sc vc ns,
+      generateN sc vc ns
+      -> forall vc', silent_cstep^* vc vc'
+      -> exists sc', sc' <= sc /\ generateN sc' vc' ns.
+  Proof.
+    clear; induct 1; simplify; eauto.
+
+    invert H1; eauto.
+    eapply deterministic in H; eauto.
+    propositional; subst.
+    apply IHgenerateN in H3.
+    first_order.
+    eauto.
+
+    invert H1; eauto.
+    eapply deterministic in H; eauto.
+    equality.
+  Qed.
+
+  Lemma simulation_multiple_bwd' : forall sc sc', sc' < sc
+    -> forall vc2 ns, generateN sc' vc2 ns
+    -> forall vc1, R vc1 vc2
+    -> generate vc1 ns.
+  Proof.
+    induct sc; simplify.
+
+    linear_arithmetic.
+
+    cases sc'.
+    invert H0.
+    auto.
+    cases vc1; cases vc2.
+    assert (c = Skip \/ exists v' l c', cstep (v, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    apply agree_on_termination in H1; subst.
+    cases ns; auto.
+    exfalso; eauto.
+    eapply one_step in H1; eauto.
+    first_order.
+    eapply generateN_silent_cstep in H0; eauto.
+    first_order.
+    invert H5; auto.
+    eapply deterministic in H3; eauto.
+    propositional; subst.
+    econstructor.
+    eauto.
+    eapply IHsc; try eassumption.
+    linear_arithmetic.
+
+    eapply deterministic in H3; eauto.
+    propositional; subst.
+    eapply GenOutput.
+    eauto.
+    eapply IHsc; try eassumption.
+    linear_arithmetic.
+  Qed.
+
+  Theorem simulation_multiple_bwd : forall vc1 vc2, R vc1 vc2
+    -> vc2 <| vc1.
+  Proof.
+    unfold traceInclusion; simplify.
+    apply generateN_bwd in H0.
+    first_order.
+    eauto using simulation_multiple_bwd'.
+  Qed.
+
+  Theorem simulation_multiple : forall vc1 vc2, R vc1 vc2
+    -> vc1 =| vc2.
+  Proof.
+    simplify; split; auto using simulation_multiple_fwd, simulation_multiple_bwd.
+  Qed.
+End simulation_multiple.

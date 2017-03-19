@@ -87,7 +87,11 @@ Ltac instantiate_obvious1 H :=
     end
   end.
 
-Ltac instantiate_obvious H := repeat instantiate_obvious1 H.
+Ltac instantiate_obvious H :=
+  match type of H with
+    | context[@eq string _  _] => idtac
+    | _ => repeat instantiate_obvious1 H
+  end.
 
 Ltac instantiate_obviouses :=
   repeat match goal with

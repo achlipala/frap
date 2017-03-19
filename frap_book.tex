@@ -2255,14 +2255,13 @@ In fact, flow-insensitive and flow-sensitive interval analysis with this widenin
 
 \chapter{Compiler Correctness via Simulation Arguments}
 
+\newcommand{\outp}[1]{\mathsf{out}(#1)}
+
 A good application of operational semantics is correctness of compiler transformations\index{compilers}.
 A compiler is composed of a series of \emph{phases}\index{compiler phase}, each of which translates programs in some \emph{source} language\index{source language} into some \emph{target} language\index{target language}.
 Usually, in most phases of a compiler, the source and target languages are the same, and such phases are often viewed as \emph{optimizations}\index{optimization}\index{compiler optimization}, which tend to improve performance of most programs in practice.
 The verification problem is plenty hard enough when the source and target languages are the same, so we will confine our attention in this chapter to a single language.
 It's almost the same as the imperative language from the last two chapters, but we add one new syntactic construction, underlined below.
-
-\newcommand{\outp}[1]{\mathsf{out}(#1)}
-
 $$\begin{array}{rrcl}
   \textrm{Numbers} & n &\in& \mathbb N \\
   \textrm{Variables} & x &\in& \mathsf{Strings} \\
@@ -2355,7 +2354,7 @@ For nondeterministic languages, subtler conditions are called for, but we're hap
 As our first example compiler phase, we consider a limited form of \emph{constant folding}\index{constant folding}, where expressions with statically known values are replaced by constants.
 The whole of the optimization is (1) finding all maximal program subexpressions that don't contain variables and (2) replacing each such subexpression with its known constant value.
 We write $\cfold{c}$ for the result of applying this optimization on command $c$.
-(For the optimizations in this chapter, we stick to informal descriptions of how they operate, leaving the details to the accompanying Coq code.)
+(For the program transformations in this chapter, we stick to informal descriptions of how they operate, leaving the details to the accompanying Coq code.)
 
 A program optimized in this way proceeds in a very regular manner, compared to executions of the original, unoptimized program.
 The small steps line up one-to-one.
@@ -2374,7 +2373,7 @@ The crucial second condition can be drawn like this.
 
 \[
 \begin{tikzcd}
-s_1 \arrow{r}{R} \arrow{d}{\forall \to_{\mathsf{c}}} & s_2 \arrow{d}{\exists \to_{\mathsf{c}}} \\
+s_1 \arrow{r}{R} \arrow{d}{\forall \stackrel{\ell}{\to_{\mathsf{c}}}} & s_2 \arrow{d}{\exists \stackrel{\ell}{\to_{\mathsf{c}}}} \\
 s'_1 & s'_2 \arrow{l}{R^{-1}}
 \end{tikzcd}
 \]
@@ -2455,7 +2454,7 @@ Consider a questionable ``optimization'' defined as $\addad{\while{1}{\skipe}} =
 It adds a little extra advertisement into a particular infinite loop.
 Now we define a candidate simulation relation.
 \begin{eqnarray*}
-  (v_1, c_1) \; R \; (v_2, c_2) &=& v_1 = v_2 \land c_1 \in \{\while{1}{\skipe}, (\skipe; \while{1}{\skipe})\}
+  (v_1, c_1) \; R \; (v_2, c_2) &=& c_1 \in \{\while{1}{\skipe}, (\skipe; \while{1}{\skipe})\}
 \end{eqnarray*}
 This suspicious relation records nothing about $c_2$.
 The $\skipe$ condition of simulations is handled trivially, as we can see by inspection that $R$ does not allow $c_1$ to be $\skipe$.

@@ -1328,7 +1328,7 @@ If so, our process of \emph{multi-step closure}\index{multi-step closure} has te
 Again, keep in mind that multi-step closure will not terminate for most transition systems, and there is an art to phrasing a problem in terms of systems where it \emph{will} terminate.
 
 
-\section{Abstracting a Transition System}
+\section{\label{trs_simulation}Abstracting a Transition System}
 
 When analyzing an infinite-state system, it is not necessary to give up hope for model checking.
 For instance, consider this program.
@@ -2344,6 +2344,78 @@ Many parts of the machinery we develop here will, however, work well for nondete
 We will enforce that a correct compiler phase respects trace equivalence.
 That is, the output program has the same traces as the input program.
 For nondeterministic languages, subtler conditions are called for, but we're happy to stay within the safe confines of determinism for this chapter.
+
+
+\section{Basic Simulation Arguments and Optimizing Expressions}
+
+\newcommand{\cfold}[1]{\mathsf{cfold}_1(#1)}
+
+As our first example compiler phase, we consider a limited form of \emph{constant folding}\index{constant folding}, where expressions with statically known values are replaced by constants.
+The whole of the optimization is (1) finding all maximal program subexpressions that don't contain variables and (2) replacing each such subexpression with its known constant value.
+We write $\cfold{c}$ for the result of applying this optimization on command $c$.
+(For the optimizations in this chapter, we stick to informal descriptions of how they operate, leaving the details to the accompanying Coq code.)
+
+A program optimized in this way proceeds in a very regular manner, compared to executions of the original, unoptimized program.
+The small steps line up one-to-one.
+Therefore, a very regular kind of \emph{simulation relation} connects them.
+(This notion is very similar to the one from Section \ref{trs_simulation}, though now it incorporates labels.)
+
+\begin{definition}[Simulation relation]
+  We say that binary relation $R$ over states of our object language is a \emph{simulation relation} iff:
+  \begin{enumerate}
+    \item Whenever $(v_1, \skipe) \; R \; (v_2, c_2)$, it follows that $c_2 = \skipe$.
+    \item Whenever $s_1 \; R \; s_2$ and $\smallstepcl{s_1}{\ell}{s'_1}$, there exists $s'_2$ such that $\smallstepcl{s_2}{\ell}{s'_2}$ and $s'_1 \; R \; s'_2$. 
+  \end{enumerate}
+\end{definition}
+
+The crucial second condition can be drawn like this.
+
+\[
+\begin{tikzcd}
+s_1 \arrow{r}{R} \arrow{d}{\forall \to_{\mathsf{c}}} & s_2 \arrow{d}{\exists \to_{\mathsf{c}}} \\
+s'_1 & s'_2 \arrow{l}{R^{-1}}
+\end{tikzcd}
+\]
+
+\invariants
+As usual, the diagram tells us that when a path along the left exists, a matching roundabout path exists, too.
+That is, any step on the left can be matched by a step on the right.
+Notice the similarity to the invariant-induction principle that we have mostly relied on so far.
+Instead of showing that every step preserves a one-state predicate, we show that every step preserves a two-state predicate in a particular way.
+The simulation approach is as general for relating programs as the invariant approach is for verifying individual programs.
+
+\begin{theorem}
+  If there exists a simulation $R$ such that $s_1 \; R \; s_2$, then $\treq{s_1}{s_2}$.
+\end{theorem}
+\begin{proof}
+  We prove the two trace-inclusion directions separately.
+  The left-to-right direction proceeds by induction over the definition of traces on the left, while the right-to-left direction proceeds by similar induction on the right.
+  While most of the proof is generic in details of the labelled transition system, for the right-to-left direction we do rely on proofs of two important properties of this object language.
+  First, the semantics is \emph{total}, in the sense that any state whose command isn't $\skipe$ can take a step.
+  Second, the semantics is \emph{deterministic}, in that there can be at most one label/state pair reachable in one step from a particular starting state.
+
+  In the inductive step of the right-to-left inclusion proof, we know that the righthand system has taken a step.
+  The lefthand system might already be a $\skipe$, in which case, by the definition of simulations, the righthand system is already a $\skipe$, contradicting the assumption that the righthand side stepped.
+  Otherwise, by totality, the lefthand system can take a step.
+  By the definition of simulation, there exists a matching step on the righthand side.
+  By determinism, the matching step is the same as the one we were already aware of.
+  Therefore, we have a new $R$ relationship to connect to that step and apply the induction hypothesis.
+\end{proof}
+
+We can apply this very general principle to constant folding.
+
+\begin{theorem}
+  For any $v$ and $c$, $\treq{(v, c)}{(v, \cfold{c})}$.
+\end{theorem}
+\begin{proof}
+  By a simulation argument using this relation:
+  \begin{eqnarray*}
+    (v_1, c_1) \; R \; (v_2, c_2) &=& v_1 = v_2 \land c_2 = \cfold{c_1}
+  \end{eqnarray*}
+  What we have done is translate the original theorem statement into the language of binary relations, as this simple case needs no equivalent of strengthening the induction hypothesis.
+  Internally to the proof, we need to define constant folding of evaluation contexts $C$, and we need to prove that primitive steps $\to_0$ may be lifted to apply over constant-folded states, this second proof by case analysis on $\to_0$ derivations.
+  Another more obvious workhorse is a lemma showing that constant folding of expressions preserves interpretation results.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -109,10 +109,14 @@ Inductive cstep : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 
 (* To characterize correct compilation, it is helpful to define a relation to
  * capture which output _traces_ a command might generate.  Note that, for us, a
- * trace is a list of output values, where [None] labels are simply dropped. *)
-Inductive generate : valuation * cmd -> list nat -> Prop :=
+ * trace is a list of output values and/or terminating markers.  We drop silent
+ * labels as we run, and we use [Some n] for outputting of [n] and [None] for
+ * termination. *)
+Inductive generate : valuation * cmd -> list (option nat) -> Prop :=
 | GenDone : forall vc,
   generate vc []
+| GenSkip : forall v,
+  generate (v, Skip) [None]
 | GenSilent : forall vc vc' ns,
   cstep vc None vc'
   -> generate vc' ns
@@ -120,7 +124,7 @@ Inductive generate : valuation * cmd -> list nat -> Prop :=
 | GenOutput : forall vc n vc' ns,
   cstep vc (Some n) vc'
   -> generate vc' ns
-  -> generate vc (n :: ns).
+  -> generate vc (Some n :: ns).
 
 Hint Constructors plug step0 cstep generate.
 
@@ -178,7 +182,7 @@ Hint Extern 1 (interp _ _ = _) => simplify; congruence.
 Hint Extern 1 (interp _ _ <> _) => simplify; congruence.
 
 Theorem first_few_values :
-  generate ($0, month_boundaries_in_days) [28; 56].
+  generate ($0, month_boundaries_in_days) [Some 28; Some 56].
 Proof.
   unfold month_boundaries_in_days.
   eapply GenSilent.
@@ -385,6 +389,10 @@ Section simulation.
   Proof.
     induct 1; simplify; eauto.
 
+    cases vc2.
+    apply agree_on_termination in H; subst.
+    auto.
+
     eapply one_step in H; eauto.
     first_order.
     eauto.
@@ -409,6 +417,16 @@ Section simulation.
   Proof.
     induct 1; simplify; eauto.
 
+    cases vc1.
+    assert (c = Skip \/ exists v' l c', cstep (v0, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    auto.
+    eapply one_step in H; eauto.
+    first_order.
+    invert H.
+    invert H4.
+    invert H5.
+    
     cases vc1; cases vc.
     assert (c = Skip \/ exists v' l c', cstep (v, c) l (v', c')) by apply skip_or_step.
     first_order; subst.
@@ -538,6 +556,10 @@ Proof.
   induct 1; simplify; eauto.
   invert H1; auto.
 
+  invert H.
+  invert H3.
+  invert H4.
+
   eapply deterministic in H; eauto.
   propositional; subst.
   auto.
@@ -555,7 +577,7 @@ Proof.
 Qed.
 
 Lemma generate_Skip : forall v a ns,
-    generate (v, Skip) (a :: ns)
+    generate (v, Skip) (Some a :: ns)
     -> False.
 Proof.
   induct 1; simplify.
@@ -604,6 +626,11 @@ Section simulation_skipping.
       -> generate vc2 ns.
   Proof.
     induct 1; simplify; eauto.
+
+    cases vc2.
+    apply agree_on_termination in H.
+    subst.
+    auto.
 
     eapply one_step in H; eauto.
     first_order.
@@ -664,11 +691,56 @@ Section simulation_skipping.
     eauto 6.
   Qed.
 
+  Lemma step_to_termination : forall vc v,
+      silent_cstep^* vc (v, Skip)
+      -> generate vc [None].
+  Proof.
+    clear; induct 1; eauto.
+  Qed.
+
+  Hint Resolve step_to_termination.
+
+  Lemma R_Skip : forall n vc1 v,
+      R n vc1 (v, Skip)
+      -> exists v', silent_cstep^* vc1 (v', Skip).
+  Proof.
+    induct n; simplify.
+
+    cases vc1.
+    assert (c = Skip \/ exists v' l c', cstep (v0, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    eauto.
+    eapply one_step in H; eauto.
+    first_order.
+    equality.
+    invert H.
+    invert H4.
+    invert H5.
+
+    cases vc1.
+    assert (c = Skip \/ exists v' l c', cstep (v0, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    eauto.
+    eapply one_step in H; eauto.
+    first_order; subst.
+    invert H.
+    apply IHn in H2.
+    first_order.
+    eauto.
+    invert H.
+    invert H4.
+    invert H5.
+  Qed.
+
   Lemma simulation_skipping_bwd' : forall ns vc2, generate vc2 ns
     -> forall n vc1, R n vc1 vc2
       -> generate vc1 ns.
   Proof.
     induct 1; simplify; eauto.
+
+    cases vc1.
+    apply R_Skip in H; first_order.
+    eauto.
 
     eapply match_step in H1; eauto.
     first_order.
@@ -767,6 +839,15 @@ Proof.
 Qed.
 
 Hint Resolve plug_countIfs.
+
+Hint Extern 1 (interp ?e _ = _) =>
+  match goal with
+  | [ H : cfoldArith e = _ |- _ ] => rewrite <- cfoldArith_ok; rewrite H
+  end.
+Hint Extern 1 (interp ?e _ <> _) =>
+  match goal with
+  | [ H : cfoldArith e = _ |- _ ] => rewrite <- cfoldArith_ok; rewrite H
+  end.
 
 (* The final proof is fairly straightforward now. *)
 Lemma cfold_ok : forall v c,
@@ -996,6 +1077,10 @@ Section simulation_multiple.
   Proof.
     induct 1; simplify; eauto.
 
+    cases vc2.
+    apply agree_on_termination in H; subst.
+    auto.
+
     eapply one_step in H; eauto.
     first_order.
     eauto.
@@ -1014,9 +1099,11 @@ Section simulation_multiple.
   (* The backward proof essentially proceeds by strong induction on
    * _how many steps it took to generate a trace_, which we facilitate by
    * defining a [generate] variant parameterized by a step count. *)
-  Inductive generateN : nat -> valuation * cmd -> list nat -> Prop :=
+  Inductive generateN : nat -> valuation * cmd -> list (option nat) -> Prop :=
   | GenDoneN : forall vc,
       generateN 0 vc []
+  | GenSkupN : forall v,
+      generateN 0 (v, Skip) [None]
   | GenSilentN : forall sc vc vc' ns,
       cstep vc None vc'
       -> generateN sc vc' ns
@@ -1024,7 +1111,7 @@ Section simulation_multiple.
   | GenOutputN : forall sc vc n vc' ns,
       cstep vc (Some n) vc'
       -> generateN sc vc' ns
-      -> generateN (S sc) vc (n :: ns).
+      -> generateN (S sc) vc (Some n :: ns).
 
   (* We won't comment on the other proof details, though they could be
    * interesting reading. *)
@@ -1054,6 +1141,11 @@ Section simulation_multiple.
   Proof.
     clear; induct 1; simplify; eauto.
 
+    invert H; eauto.
+    invert H0.
+    invert H3.
+    invert H4.
+
     invert H1; eauto.
     eapply deterministic in H; eauto.
     propositional; subst.
@@ -1064,6 +1156,13 @@ Section simulation_multiple.
     invert H1; eauto.
     eapply deterministic in H; eauto.
     equality.
+  Qed.
+
+  Lemma termination_is_last : forall sc vc ns,
+      generateN sc vc (None :: ns)
+      -> ns = [].
+  Proof.
+    induct 1; eauto.
   Qed.
 
   Lemma simulation_multiple_bwd' : forall sc sc', sc' < sc
@@ -1078,17 +1177,39 @@ Section simulation_multiple.
     cases sc'.
     invert H0.
     auto.
+
+    cases vc1.
+    assert (c = Skip \/ exists v' l c', cstep (v0, c) l (v', c')) by apply skip_or_step.
+    first_order; subst.
+    auto.
+    eapply one_step in H1; eauto.
+    first_order.
+    invert H1.
+    invert H2.
+    invert H5.
+    invert H6.
+    invert H4.
+    invert H7.
+    invert H8.
+
     cases vc1; cases vc2.
     assert (c = Skip \/ exists v' l c', cstep (v, c) l (v', c')) by apply skip_or_step.
     first_order; subst.
     apply agree_on_termination in H1; subst.
     cases ns; auto.
+    cases o.
     exfalso; eauto.
+    eapply termination_is_last in H0; subst.
+    auto.
+
     eapply one_step in H1; eauto.
     first_order.
     eapply generateN_silent_cstep in H0; eauto.
     first_order.
     invert H5; auto.
+    invert H3.
+    invert H7.
+    invert H8.
     eapply deterministic in H3; eauto.
     propositional; subst.
     econstructor.

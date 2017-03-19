@@ -2311,17 +2311,19 @@ $$\infer{\smallstepcl{(v, C[c])}{\ell}{(v', C[c'])}}{
 }$$
 
 \newcommand{\Tr}[1]{\mathsf{Tr}(#1)}
+\newcommand{\terminate}[0]{\mathsf{terminate}}
 
 To reason about infinite executions, we need a new abstraction, compared to what has worked in our invariant-based proofs so far.
-That abstraction will be \emph{traces}\index{traces}, sequences of outputs that a program might be observed to generate.
+That abstraction will be \emph{traces}\index{traces}, sequences of outputs (and termination events) that a program might be observed to generate.
 We define a command's trace set inductively.
 Recall that $\cdot$ is the empty list, while $\bowtie$ does list concatenation.
 $$\infer{\cdot \in \Tr{s}}{}
+\quad \infer{\terminate \in \Tr{(v, \skipe)}}{}
 \quad \infer{t \in \Tr{s}}{
   \smallstepcl{s}{\silent}{s'}
   & t \in \Tr{s'}
 }
-\quad \infer{\concat{n}{t} \in \Tr{s}}{
+\quad \infer{\concat{\outp{n}}{t} \in \Tr{s}}{
   \smallstepcl{s}{n}{s'}
   & t \in \Tr{s'}
 }$$
@@ -2385,7 +2387,7 @@ Instead of showing that every step preserves a one-state predicate, we show that
 The simulation approach is as general for relating programs as the invariant approach is for verifying individual programs.
 
 \begin{theorem}
-  If there exists a simulation $R$ such that $s_1 \; R \; s_2$, then $\treq{s_1}{s_2}$.
+  \label{simulation_ok}If there exists a simulation $R$ such that $s_1 \; R \; s_2$, then $\treq{s_1}{s_2}$.
 \end{theorem}
 \begin{proof}
   We prove the two trace-inclusion directions separately.
@@ -2405,7 +2407,7 @@ The simulation approach is as general for relating programs as the invariant app
 We can apply this very general principle to constant folding.
 
 \begin{theorem}
-  For any $v$ and $c$, $\treq{(v, c)}{(v, \cfold{c})}$.
+  \label{cfold_ok}For any $v$ and $c$, $\treq{(v, c)}{(v, \cfold{c})}$.
 \end{theorem}
 \begin{proof}
   By a simulation argument using this relation:
@@ -2415,6 +2417,93 @@ We can apply this very general principle to constant folding.
   What we have done is translate the original theorem statement into the language of binary relations, as this simple case needs no equivalent of strengthening the induction hypothesis.
   Internally to the proof, we need to define constant folding of evaluation contexts $C$, and we need to prove that primitive steps $\to_0$ may be lifted to apply over constant-folded states, this second proof by case analysis on $\to_0$ derivations.
   Another more obvious workhorse is a lemma showing that constant folding of expressions preserves interpretation results.
+\end{proof}
+
+
+\section{Simulations That Allow Skipping Steps}
+
+\newcommand{\cfoldt}[1]{\mathsf{cfold}_2(#1)}
+
+Consider an evolution of our constant-folding optimization to take advantage of known values of $\mathsf{if}$ test expressions.
+Depending on whether the value is zero, we can replace the whole $\mathsf{if}$ with one of its two cases.
+We will write $\cfoldt{c}$ for this expanded optimization and work up to proving it sound, too.
+However, we can no longer use last section's definition of simulation!
+The reason is that optimizations intentionally cut down on steps that a program needs to execute.
+Some steps of the source program now have no matching steps of the target program, say when we are stepping an $\mathsf{if}$ whose test expression had a known value.
+
+Let's take a first crack at making simulation more flexible.
+
+\begin{definition}[Simulation relation with skipping (\emph{faulty} version!)]
+  We say that binary relation $R$ over states of our object language is a \emph{simulation relation with skipping} iff:
+  \begin{enumerate}
+    \item Whenever $(v_1, \skipe) \; R \; (v_2, c_2)$, it follows that $c_2 = \skipe$.
+    \item Whenever $s_1 \; R \; s_2$ and $\smallstepcl{s_1}{\ell}{s'_1}$, then either:
+      \begin{enumerate}
+        \item there exists $s'_2$ such that $\smallstepcl{s_2}{\ell}{s'_2}$ and $s'_1 \; R \; s'_2$,
+        \item or $\ell = \silent$ and $s'_1 \; R \; s_2$.
+      \end{enumerate}
+  \end{enumerate}
+\end{definition}
+
+In other words, to match a silent step, it suffices to do nothing, so long as $R$ still holds afterward.
+
+\newcommand{\addad}[1]{\mathsf{withAds}(#1)}
+
+We didn't mark the definition as \emph{faulty} for nothing.
+It actually does not imply trace equivalence.
+Consider a questionable ``optimization'' defined as $\addad{\while{1}{\skipe}} = \while{1}{\outp{0}}$, and $\addad{c} = c$ for all other $c$.
+It adds a little extra advertisement into a particular infinite loop.
+Now we define a candidate simulation relation.
+\begin{eqnarray*}
+  (v_1, c_1) \; R \; (v_2, c_2) &=& v_1 = v_2 \land c_1 \in \{\while{1}{\skipe}, (\skipe; \while{1}{\skipe})\}
+\end{eqnarray*}
+This suspicious relation records nothing about $c_2$.
+The $\skipe$ condition of simulations is handled trivially, as we can see by inspection that $R$ does not allow $c_1$ to be $\skipe$.
+Checking the execution-matching condition of simulations, $c_1$ is either $\while{1}{\skipe}$ or $(\skipe; \while{1}{\skipe})$, each of which steps silently to the other.
+We may match either step by keeping $c_2$ in place, as $R$ does not constrain $c_2$ at all.
+Thus, $R$ is a simulation relation with skipping, and, for $c = \while{1}{\skipe}$, it relates $c$ to $\addad{c}$.
+
+From here we expect to conclude trace equivalence.
+However, clearly $\mathsf{withAds}$ can turn a program that never outputs into a program that outputs infinitely often!
+
+Let's patch our definition.
+
+\begin{definition}[Simulation relation with skipping]
+  We say that an $\mathbb N$-indexed family of binary relations $R_n$ over states of our object language is a \emph{simulation relation with skipping} iff:
+  \begin{enumerate}
+    \item Whenever $(v_1, \skipe) \; R_n \; (v_2, c_2)$, it follows that $c_2 = \skipe$.
+    \item Whenever $s_1 \; R_n \; s_2$ and $\smallstepcl{s_1}{\ell}{s'_1}$, then either:
+      \begin{enumerate}
+        \item there exist $n'$ and $s'_2$ such that $\smallstepcl{s_2}{\ell}{s'_2}$ and $s'_1 \; R_{n'} \; s'_2$,
+        \item or $n > 0$, $\ell = \silent$, and $s'_1 \; R_{n-1} \; s_2$.
+      \end{enumerate}
+  \end{enumerate}
+\end{definition}
+
+This new version imposes a finite limit $n$ at any point, on how many times the righthand side may match lefthand steps without stepping itself.
+Our bad counterexample fails to satisfy the conditions, because eventually the starting step count $n$ will be used up, and the incorrect ``optimized'' program will be forced to reveal itself by taking a step that outputs.
+
+\begin{theorem}
+  If there exists a simulation with skipping $R$ such that $s_1 \; R_n \; s_2$, then $\treq{s_1}{s_2}$.
+\end{theorem}
+\begin{proof}
+  The proof is fairly similar to that of Theorem \ref{simulation_ok}.
+  To show termination preservation in the backward direction, we find ourselves proving a lemma by induction on $n$.
+\end{proof}
+
+\newcommand{\countIfs}[1]{\mathsf{countIfs}(#1)}
+
+\begin{theorem}
+  For any $v$ and $c$, $\treq{(v, c)}{(v, \cfoldt{c})}$.
+\end{theorem}
+\begin{proof}
+  By a simulation argument (with skipping) using this relation:
+  \begin{eqnarray*}
+    (v_1, c_1) \; R_n \; (v_2, c_2) &=& v_1 = v_2 \land c_2 = \cfoldt{c_1} \land \countIfs{c_1} < n
+  \end{eqnarray*}
+  We rely on a simple helper function $\countIfs{c}$ to count how many $\mathsf{If}$ nodes appear in the syntax of $c$.
+  This notion turns out to be a conservative upper bound on how many times in a row we will need to let lefthand steps go unmatched on the right.
+  The rest of the proof proceeds essentially the same way as in Theorem \ref{cfold_ok}.
 \end{proof}
 
 

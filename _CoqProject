@@ -7,6 +7,7 @@ Invariant.v
 ModelCheck.v
 Imp.v
 AbstractInterpret.v
+FrapWithoutSets.v
 Frap.v
 BasicSyntax_template.v
 BasicSyntax.v
@@ -31,6 +32,7 @@ LogicProgramming_template.v
 AbstractInterpretation.v
 CompilerCorrectness.v
 CompilerCorrectness_template.v
+SubsetTypes.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v
 TypesAndMutation.v

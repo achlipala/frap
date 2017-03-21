@@ -35,8 +35,6 @@ Section set.
 End set.
 
 Infix "\in" := In (at level 70).
-Notation "{ }" := (constant nil).
-Notation "{ x1 , .. , xN }" := (constant (cons x1 (.. (cons xN nil) ..))).
 Notation "[ P ]" := (check P).
 Infix "\cup" := union (at level 40).
 Infix "\cap" := intersection (at level 40).
@@ -44,6 +42,14 @@ Infix "\setminus" := minus (at level 40).
 Infix "\subseteq" := subseteq (at level 70).
 Infix "\subset" := subset (at level 70).
 Notation "[ x | P ]" := (scomp (fun x => P)).
+
+Module Type EMPTY.
+End EMPTY.
+Module SetNotations(M : EMPTY).
+  Notation "{ }" := (constant nil).
+  Notation "{ x1 , .. , xN }" := (constant (cons x1 (.. (cons xN nil) ..))).
+End SetNotations.
+
 
 Ltac sets' tac :=
   unfold In, constant, universe, check, union, intersection, minus, complement, subseteq, subset, scomp in *;
@@ -288,7 +294,7 @@ Section setexpr.
     match e with
     | Literal vs =>
       match env with
-      | [] => {}
+      | [] => constant []
       | x :: _ => constant (map (nth_default x env) vs)
       end
     | Constant s => s
@@ -339,7 +345,7 @@ Section setexpr.
 
   Definition interp_normal_form (env : list A) (nf : normal_form) : set A :=
     let cs := match env with
-              | [] => {}
+              | [] => constant []
               | x :: _ => constant (map (nth_default x env) nf.(Elements))
               end in
     match nf.(Other) with
@@ -557,7 +563,7 @@ Ltac quote E env k :=
             quote' E2 env' ltac:(fun e2 env'' =>
               k (Union e1 e2) env''))
         | _ =>
-          (let pf := constr:(eq_refl : E = {}) in
+          (let pf := constr:(eq_refl : E = constant []) in
            k (Literal A []) env)
           || k (Constant E) env
         end in

@@ -75,7 +75,7 @@ Qed.
 Theorem oneStepClosure_split : forall state (sys : trsys state) st sts (inv1 inv2 : state -> Prop),
   (forall st', sys.(Step) st st' -> inv1 st')
   -> oneStepClosure sys (constant sts) inv2
-  -> oneStepClosure sys (constant (st :: sts)) ({st} \cup inv1 \cup inv2).
+  -> oneStepClosure sys (constant (st :: sts)) (constant (st :: nil) \cup inv1 \cup inv2).
 Proof.
   unfold oneStepClosure, oneStepClosure_current, oneStepClosure_new; intuition.
 
@@ -89,7 +89,7 @@ Proof.
 Qed.
 
 Theorem singleton_in : forall {A} (x : A) rest,
-  ({x} \cup rest) x.
+  (constant (x :: nil) \cup rest) x.
 Proof.
   unfold union; simpl; auto.
 Qed.

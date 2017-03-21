@@ -10,11 +10,11 @@ Set Asymmetric Patterns.
 
 (** * First, an unexplained tactic that will come in handy.... *)
 
-Ltac invert H := (Frap.invert H || (inversion H; clear H));
-                repeat match goal with
-                       | [ x : _ |- _ ] => subst x
-                       | [ H : existT _ _ _ = existT _ _ _ |- _ ] => apply inj_pair2 in H; try subst
-                       end.
+Ltac invert H := (FrapWithoutSets.invert H || (inversion H; clear H));
+                 repeat match goal with
+                        | [ x : _ |- _ ] => subst x
+                        | [ H : existT _ _ _ = existT _ _ _ |- _ ] => apply inj_pair2 in H; try subst
+                        end.
 
 
 (** * A process algebra: syntax and semantics *)

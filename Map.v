@@ -64,7 +64,7 @@ Module Type S.
     -> (m1 $++ m2) $? k = m2 $? k.
 
   Axiom join_comm : forall A B (m1 m2 : fmap A B),
-    dom m1 \cap dom m2 = {}
+    dom m1 \cap dom m2 = constant nil
     -> m1 $++ m2 = m2 $++ m1.
 
   Axiom join_assoc : forall A B (m1 m2 m3 : fmap A B),
@@ -116,10 +116,10 @@ Module Type S.
 
   Axiom empty_includes : forall A B (m : fmap A B), empty A B $<= m.
 
-  Axiom dom_empty : forall A B, dom (empty A B) = {}.
+  Axiom dom_empty : forall A B, dom (empty A B) = constant nil.
 
   Axiom dom_add : forall A B (m : fmap A B) (k : A) (v : B),
-    dom (add m k v) = {k} \cup dom m.
+    dom (add m k v) = constant (k :: nil) \cup dom m.
 
   Axiom lookup_restrict_true : forall A B (P : A -> Prop) (m : fmap A B) k,
     P k
@@ -390,7 +390,7 @@ Module M : S.
   Qed.
 
   Theorem join_comm : forall A B (m1 m2 : fmap A B),
-    dom m1 \cap dom m2 = {}
+    dom m1 \cap dom m2 = constant nil
     -> join m1 m2 = join m2 m1.
   Proof.
     intros; apply fmap_ext; unfold join, lookup; intros.
@@ -508,13 +508,13 @@ Module M : S.
     unfold includes, empty; intuition congruence.
   Qed.
 
-  Theorem dom_empty : forall A B, dom (empty (A := A) B) = {}.
+  Theorem dom_empty : forall A B, dom (empty (A := A) B) = constant nil.
   Proof.
     unfold dom, empty; intros; sets idtac.
   Qed.
 
   Theorem dom_add : forall A B (m : fmap A B) (k : A) (v : B),
-    dom (add m k v) = {k} \cup dom m.
+    dom (add m k v) = constant (k :: nil) \cup dom m.
   Proof.
     unfold dom, add; simpl; intros.
     sets ltac:(simpl in *; try match goal with

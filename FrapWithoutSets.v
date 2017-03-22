@@ -371,3 +371,19 @@ Ltac simplify_map :=
 
 Require Import Classical.
 Ltac excluded_middle P := destruct (classic P).
+
+Lemma join_idempotent: forall (A B : Type) (m : fmap A B), (m $++ m) = m.
+Proof.
+  simplify; apply fmap_ext; simplify.
+  cases (m $? k).
+  - rewrite lookup_join1; auto.
+    eauto using lookup_Some_dom.
+  - rewrite lookup_join2; auto.
+    eauto using lookup_None_dom.
+Qed.
+  
+Lemma includes_refl: forall  (A B : Type) (m : fmap A B), m $<= m.
+Proof.
+  simplify.
+  apply includes_intro; auto.
+Qed.

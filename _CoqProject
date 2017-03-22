@@ -33,6 +33,7 @@ AbstractInterpretation.v
 CompilerCorrectness.v
 CompilerCorrectness_template.v
 SubsetTypes.v
+SubsetTypes_template.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v
 TypesAndMutation.v

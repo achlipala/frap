@@ -591,7 +591,7 @@ Module Stlc.
   Proof.
   Admitted.
 
-  Theorem safety_snazzy : forall e t, hasty $0 e t
+  Theorem safety : forall e t, hasty $0 e t
     -> invariantFor (trsys_of e) unstuck.
   Proof.
     simplify.

@@ -387,3 +387,10 @@ Proof.
   simplify.
   apply includes_intro; auto.
 Qed.
+
+Ltac dep_cases E :=
+  let x := fresh "x" in
+    remember E as x; simpl in x; dependent destruction x;
+      try match goal with
+            | [ H : _ = E |- _ ] => try rewrite <- H in *; clear H
+          end.

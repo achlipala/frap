@@ -31,4 +31,4 @@ The main narrative, also present in the book PDF, presents standard program-proo
 
 There are also two supplementary files that are independent of the main narrative, for introducing programming with dependent types, a distinctive Coq feature that we neither use nor recommend for the problem sets, but which many students find interesting (and useful in other contexts).
 * `SubsetTypes.v`: a first introduction to dependent types by attaching predicates to normal types (used after `CompilerCorrectness.v` in the last course offering)
-* One more coming soon
+* `DependentInductiveTypes.v`: building type dependency into datatype definitions (used after `LambdaCalculusAndTypeSoundness.v` in the last course offering)

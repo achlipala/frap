@@ -36,6 +36,7 @@ SubsetTypes.v
 SubsetTypes_template.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v
+DependentInductiveTypes.v
 TypesAndMutation.v
 DeepAndShallowEmbeddings_template.v
 DeepAndShallowEmbeddings.v

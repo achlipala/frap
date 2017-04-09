@@ -3138,7 +3138,7 @@ Thus, in any execution state, we can ``kill time'' by running garbage collection
 More precisely, the limit on how many times we can run garbage collection in a row, starting from heap $h$, is $|\dom{h}|$, the number of locations in $h$.
 
 The type-safety proof is fairly straightforward to update.
-We prove progress by \emph{ignoring} the garbage-collection rule, since the existing rule was already enough to find a step for every nonvalue.
+We prove progress by \emph{ignoring} the garbage-collection rule, since the existing rules were already enough to find a step for every nonvalue.
 A bit more work is needed to update the proof of preservation; its case for the existing rules follows the same way as before, while we must prove a few lemmas on the way to handling the new rule.
 
 \begin{lemma}[Transitivity for reachability]

@@ -3277,7 +3277,7 @@ $$\infer{\hoare{P}{\ifte{b}{c_1}{c_2}}{\lambda s. \; Q_1(s) \lor Q_2(s)}}{
   & \hoare{\lambda s. \; P(s) \land \neg \denote{b}(s)}{c_2}{Q_2}
 }$$
 
-Coming to loops, we at least have a purpose for the assertion annotated on each one.
+Coming to loops, we at last have a purpose for the assertion annotated on each one.
 \invariants
 We call those assertions \emph{loop invariants}\index{loop invariants}; one of these is meant to be true every time a loop iteration begins.
 We will try to avoid confusion with the more fundamental concept of invariant for transition systems, though in fact the two are closely related formally, which we will see in the last section of this chapter.

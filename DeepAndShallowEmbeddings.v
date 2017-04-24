@@ -543,7 +543,7 @@ Module Deeper.
     done.
 
   (* Next, we write a single-stepping interpreter for this language.  We can
-   * know longer write a straightforward big-stepping interpeter, as programs of
+   * no longer write a straightforward big-stepping interpeter, as programs of
    * the object language can diverge, while Gallina enforces termination. *)
 
   Inductive stepResult (result : Set) :=

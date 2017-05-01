@@ -125,7 +125,7 @@ Example two_increments := two_increments_thread || two_increments_thread.
 
 (* Next, we do one of our standard boring (and slow; sorry!) model-checking
  * proofs, where tactics explore the finite state space for us. *)
-(*Theorem two_increments_ok :
+Theorem two_increments_ok :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -153,7 +153,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
 
 (* Notice how every step of the process needs to consider all possibilities of
  * threads that could run next, which, in general, gives us state spaces of size
@@ -364,7 +364,7 @@ Qed.
 
 (* Now watch as we verify that last example in fewer steps, with a smaller
  * invariant! *)
-(*Theorem two_increments_ok_again :
+Theorem two_increments_ok_again :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -387,7 +387,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
 
 
 (** * Optimization #2: partial-order reduction *)
@@ -417,7 +417,7 @@ Example independent_threads :=
 
 (* Unfortunately, our existing model-checker does in fact follow the
  * "exponential" strategy to build the state space. *)
-(*Theorem independent_threads_ok :
+Theorem independent_threads_ok :
   invariantFor (trsys_of $0 {} independent_threads)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -437,7 +437,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.*)
+Qed.
 
 (* It turns out that we can actually do model-checking where at each point we
  * only explore the result of running *the first thread that is ready*!  Such a

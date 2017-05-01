@@ -276,7 +276,7 @@ Proof.
   equality.
 Qed.
 
-(* The key correctnss property: when an original step takes place, either it
+(* The key correctness property: when an original step takes place, either it
  * has no effect or can be duplicated when we apply [runLocal] both *before* and
  * *after* the step. *)
 Lemma step_runLocal : forall h l c h' l' c',
@@ -413,7 +413,7 @@ Example independent_threads :=
    else
      Fail)
   || (b <- Read 2;
-       Write 2 (b + 1)).
+      Write 2 (b + 1)).
 
 (* Unfortunately, our existing model-checker does in fact follow the
  * "exponential" strategy to build the state space. *)
@@ -456,7 +456,7 @@ Record summary := {
   Locks : set nat
 }.
 
-(* Here is a relation to check the accuracy of a summary for a single thread. *)
+(* Here is a relation to check the accuracy of a summary. *)
 Inductive summarize : cmd -> summary -> Prop :=
 | SumReturn : forall r s,
     summarize (Return r) s
@@ -465,6 +465,8 @@ Inductive summarize : cmd -> summary -> Prop :=
 | SumBind : forall c1 c2 s,
     summarize c1 s
     -> (forall r, summarize (c2 r) s)
+       (* Note the approximation here: we consider all [r] values, even if some
+        * are semantically impossible. *)
     -> summarize (Bind c1 c2) s
 | SumRead : forall a s,
     a \in s.(Reads)
@@ -477,22 +479,15 @@ Inductive summarize : cmd -> summary -> Prop :=
     -> summarize (Lock a) s
 | SumUnlock : forall a s,
     a \in s.(Locks)
-    -> summarize (Unlock a) s.
-
-(* And here's one to check the accuracy of a summary for a list of threads.
- * Each thread is packaged with its verified summary in the list. *)
-Inductive summarizeThreads : cmd -> list (cmd * summary) -> Prop :=
-| StPar : forall c1 c2 ss1 ss2,
-    summarizeThreads c1 ss1
-    -> summarizeThreads c2 ss2
-    -> summarizeThreads (Par c1 c2) (ss1 ++ ss2)
-| StAtomic : forall c s,
-    summarize c s
-    -> summarizeThreads c [(c, s)].
-(* We will use these expanded lists as the command type in the new semantics. *)
+    -> summarize (Unlock a) s
+| SumPar : forall c1 c2 s,
+    summarize c1 s
+    -> summarize c2 s
+    -> summarize (Par c1 c2) s.
 
 (* To check commutativity, it is helpful to know which atomic command a thread
- * could run next. *)
+ * could run next.  We skip coverage of parallel compositions to make things
+ * simple. *)
 Inductive nextAction : cmd -> cmd -> Prop :=
 | NaReturn : forall r,
     nextAction (Return r) (Return r)
@@ -526,41 +521,42 @@ Definition commutes (c : cmd) (s : summary) : Prop :=
   end.
 
 (* Now the new semantics: *)
-Inductive stepC : heap * locks * list (cmd * summary) -> heap * locks * list (cmd * summary) -> Prop :=
+Inductive stepC (s : summary)  : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 
 (* It is always OK to let the first thread run. *)
-| StepFirst : forall h l c h' l' c' s cs,
-  step (h, l, c) (h', l', c')
-  -> stepC (h, l, (c, s) :: cs) (h', l', (c', s) :: cs)
+| StepFirst : forall h l c1 h' l' c1' c2,
+  step (h, l, c1) (h', l', c1')
+  -> stepC s (h, l, c1 || c2) (h', l', c1' || c2)
 
 (* However, you may only pick another thread to run if it would be unsound to
  * consider just the first thread.  The negation of the soundness condition is
  * expressed in the first premise below. *)
-| StepAny : forall h l c h' l' s cs1 c1 s1 cs2 c1',
-  (forall c0 h'' l'' c'', nextAction c c0
-                          (* The first thread [c] has some atomic action [c0]
-                           * ready to run. *)
-                          -> List.Forall (fun c_s => commutes c0 (snd c_s)) (cs1 ++ (c1, s1) :: cs2)
-                          (* All other threads only contain actiosn that commute
-                           * with [c0]. *)
+| StepAny : forall h l c2 h' l' c2' c1,
+  (forall c0 h'' l'' c1'', nextAction c1 c0
+                           (* The first thread [c] has some atomic action [c0]
+                            * ready to run. *)
+                           -> commutes c0 s
+                           (* All other threads only contain actions that commute
+                            * with [c0]. *)
 
-                          -> step (h, l, c) (h'', l'', c'')
-                          (* Finaly, [c] is actually enabled to run, which might
-                           * not be the case if [c0] is a locking command. *)
+                           -> step (h, l, c1) (h'', l'', c1'')
+                           (* Finaly, [c] is actually enabled to run, which
+                            * might not be the case if [c0] is a locking
+                            * command. *)
 
-                          -> False)
+                           -> False)
 
   (* If we passed that check, then we can step a single thread as expected! *)
-  -> step (h, l, c1) (h', l', c1')
-  -> stepC (h, l, (c, s) :: cs1 ++ (c1, s1) :: cs2) (h', l', (c, s) :: cs1 ++ (c1', s1) :: cs2).
+  -> step (h, l, c2) (h', l', c2')
+  -> stepC s (h, l, c1 || c2) (h', l', c1 || c2').
 
 (* Notice how this definition turns the partial-order-reduction optimization
  * "off and on" during state-space exploration.  We only restrict our attention
  * to the first thread so long as the soundness condition above is true. *)
 
-Definition trsys_ofC (h : heap) (l : locks) (cs : list (cmd * summary)) := {|
-  Initial := {(h, l, cs)};
-  Step := stepC
+Definition trsys_ofC (s : summary) (h : heap) (l : locks) (c : cmd) := {|
+  Initial := {(h, l, c)};
+  Step := stepC s
 |}.
 
 

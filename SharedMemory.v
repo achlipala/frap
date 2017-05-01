@@ -125,7 +125,7 @@ Example two_increments := two_increments_thread || two_increments_thread.
 
 (* Next, we do one of our standard boring (and slow; sorry!) model-checking
  * proofs, where tactics explore the finite state space for us. *)
-Theorem two_increments_ok :
+(*Theorem two_increments_ok :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -153,7 +153,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.
+Qed.*)
 
 (* Notice how every step of the process needs to consider all possibilities of
  * threads that could run next, which, in general, gives us state spaces of size
@@ -364,7 +364,7 @@ Qed.
 
 (* Now watch as we verify that last example in fewer steps, with a smaller
  * invariant! *)
-Theorem two_increments_ok_again :
+(*Theorem two_increments_ok_again :
   invariantFor (trsys_of $0 {} two_increments)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -387,7 +387,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.
+Qed.*)
 
 
 (** * Optimization #2: partial-order reduction *)
@@ -417,7 +417,7 @@ Example independent_threads :=
 
 (* Unfortunately, our existing model-checker does in fact follow the
  * "exponential" strategy to build the state space. *)
-Theorem independent_threads_ok :
+(*Theorem independent_threads_ok :
   invariantFor (trsys_of $0 {} independent_threads)
                (fun p => let '(_, _, c) := p in
                          notAboutToFail c = true).
@@ -437,7 +437,7 @@ Proof.
 
   simplify.
   propositional; subst; equality.
-Qed.
+Qed.*)
 
 (* It turns out that we can actually do model-checking where at each point we
  * only explore the result of running *the first thread that is ready*!  Such a
@@ -592,8 +592,14 @@ Proof.
   eauto.
 
   invert H1.
+  eapply IHstep in H0; clear IHstep; eauto.
+  first_order.
+  eauto 10.
 
   invert H1.
+  eapply IHstep in H0; clear IHstep; eauto.
+  first_order.
+  eauto 10.
 
   invert H1; invert H0; simplify; propositional; eauto.
   do 2 eexists; propositional.
@@ -895,7 +901,6 @@ Qed.
 (* Here we get a bit naughty and begin to depend on *classical logic*, as with
  * the *law of the excluded middle*: [forall P, P \/ ~P].  You may not have
  * noticed that we've never applied that principle explicitly so far! *)
-Require Import Classical.
 
 (* A very useful property: when a command has bounded running time, any
  * execution starting from that command can be *completed* to one ending in a
@@ -947,7 +952,7 @@ Proof.
   eauto.
   invert H.
 
-  destruct (classic (a \in l)).
+  excluded_middle (a \in l).
   do 3 eexists; propositional.
   eauto.
   invert H1.
@@ -957,7 +962,7 @@ Proof.
   eauto.
   invert H1.
 
-  destruct (classic (a \in l)).
+  excluded_middle (a \in l).
   do 3 eexists; propositional.
   apply trc_one.
   eauto.
@@ -1095,163 +1100,10 @@ Proof.
   induct 1; first_order; eauto.
 Qed.
 
-(* Some helper lemmas about Coq's quantification over lists *)
-
-Lemma Exists_app_fwd : forall A (P : A -> Prop) ls1 ls2,
-    Exists P (ls1 ++ ls2)
-    -> Exists P ls1 \/ Exists P ls2.
-Proof.
-  induct ls1; invert 1; simplify; subst; eauto.
-  apply IHls1 in H1; propositional; eauto.
-Qed.
-
-Lemma Exists_app_bwd : forall A (P : A -> Prop) ls1 ls2,
-    Exists P ls1 \/ Exists P ls2
-    -> Exists P (ls1 ++ ls2).
-Proof.
-  induct ls1; simplify; propositional; eauto.
-  invert H0.
-  invert H0; eauto.
-Qed.
-
-Lemma Forall_app_fwd1 : forall A (P : A -> Prop) ls1 ls2,
-    Forall P (ls1 ++ ls2)
-    -> Forall P ls1.
-Proof.
-  induct ls1; invert 1; eauto.
-Qed.
-
-Lemma Forall_app_fwd2 : forall A (P : A -> Prop) ls1 ls2,
-    Forall P (ls1 ++ ls2)
-    -> Forall P ls2.
-Proof.
-  induct ls1; invert 1; simplify; subst; eauto.
-Qed.
-
-Hint Immediate Forall_app_fwd1 Forall_app_fwd2.
-
-Lemma Forall_app_bwd : forall A (P : A -> Prop) ls1 ls2,
-    Forall P ls1
-    -> Forall P ls2
-    -> Forall P (ls1 ++ ls2).
-Proof.
-  induct 1; simplify; eauto.
-Qed.
-
-Hint Resolve Forall_app_bwd.
-
-Lemma Forall2 : forall A (P Q R : A -> Prop) ls,
-    Forall P ls
-    -> Forall Q ls
-    -> (forall x, P x -> Q x -> R x)
-    -> Forall R ls.
-Proof.
-  induct 1; invert 1; eauto.
-Qed.
-
-(* A connection between [notAboutToFail] in the old and new worlds *)
-Lemma summarizeThreads_aboutToFail : forall c cs,
-    summarizeThreads c cs
-    -> notAboutToFail c = false
-    -> Exists (fun c_s => notAboutToFail (fst c_s) = false) cs.
-Proof.
-  induct 1; simplify; eauto.
-
-  apply andb_false_iff in H1; propositional; eauto using Exists_app_bwd.
-Qed.
-
-Hint Resolve summarizeThreads_aboutToFail.
-
-Lemma summarizeThreads_nonempty : forall c,
-    summarizeThreads c []
-    -> False.
-Proof.
-  induct 1.
-  cases ss1; simplify; eauto.
-  equality.
-Qed.
-
-Hint Immediate summarizeThreads_nonempty.
-
-Hint Constructors stepC summarizeThreads.
-
-(* When we step a summarized thread, we can duplicate the step within one of the
- * elements of the summary. *)
-Lemma step_pick : forall h l c h' l' c',
-    step (h, l, c) (h', l', c')
-    -> forall cs, summarizeThreads c cs
-    -> exists cs1 c0 s cs2 c0', cs = cs1 ++ (c0, s) :: cs2
-                                /\ step (h, l, c0) (h', l', c0')
-                                /\ summarizeThreads c' (cs1 ++ (c0', s) :: cs2).
-Proof.
-  induct 1; invert 1.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto 10 using summarize_step.
-
-  apply IHstep in H3; first_order; subst.
-  rewrite <- app_assoc.
-  simplify.
-  do 5 eexists; propositional.
-  eauto.
-  change (x ++ (x3, x1) :: x2 ++ ss2)
-         with (x ++ ((x3, x1) :: x2) ++ ss2).
-  rewrite app_assoc.
-  eauto.
-
-  invert H1.
-
-  apply IHstep in H5; first_order; subst.
-  rewrite app_assoc.
-  do 5 eexists; propositional.
-  eauto.
-  rewrite <- app_assoc.
-  eauto.
-
-  invert H1.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto using summarize_step.
-
-  eexists [], _, _, [], _; simplify; propositional; eauto using summarize_step.
-
-  (* Here's a gnarly bit to make up for simplification in the proof above.
-   * Some existential variables weren't determined, but we can pick their values
-   * here. *)
-  Grab Existential Variables.
-  exact l'.
-  exact h'.
-Qed.
+Hint Constructors stepC.
 
 (* The next few lemmas are quite technical.  Commentary resumes for
  * [translate_trace]. *)
-
-Lemma translate_trace_matching : forall h l c h' l' c',
-    step (h, l, c) (h', l', c')
-    -> forall c0 s cs, summarizeThreads c ((c0, s) :: cs)
-    -> ~(exists c1 h'0 l'0 c'0,
-            nextAction c0 c1
-            /\ Forall (fun c_s => commutes c1 (snd c_s)) cs
-            /\ step (h, l, c0) (h'0, l'0, c'0))
-    -> exists cs', stepC (h, l, (c0, s) :: cs) (h', l', cs')
-                   /\ summarizeThreads c' cs'.
-Proof.
-  simplify.
-  eapply step_pick in H; eauto.
-  first_order; subst.
-
-  cases x; simplify.
-
-  invert H.
-  eauto.
-
-  invert H.
-  eauto 10.
-Qed.
 
 Lemma nextAction_det : forall c c0,
     nextAction c c0
@@ -1267,54 +1119,6 @@ Proof.
   invert H2.
 
   invert H2.
-Qed.
-
-Lemma split_center : forall A (x : A) l1 l2 r1 r2,
-    l1 ++ l2 = r1 ++ x :: r2
-    -> (exists r21, r2 = r21 ++ l2
-                    /\ l1 = r1 ++ x :: r21)
-       \/ (exists r12, r1 = l1 ++ r12
-                       /\ l2 = r12 ++ x :: r2).
-Proof.
-  induct l1; simplify; subst; eauto.
-
-  cases r1; simplify.
-  invert H; eauto.
-  invert H.
-  apply IHl1 in H2; first_order; subst; eauto.
-Qed.
-
-Hint Rewrite app_length.
-
-Lemma step_into_summarizeThreads : forall c0 cs1 c s cs2,
-    summarizeThreads c0 (cs1 ++ (c, s) :: cs2)
-    -> forall h l h' l' c', step (h, l, c) (h', l', c')
-    -> exists c0', step (h, l, c0) (h', l', c0')
-                   /\ summarizeThreads c0' (cs1 ++ (c', s) :: cs2).
-Proof.
-  induct 1; simplify.
-  apply split_center in x; first_order; subst.
-  
-  eapply IHsummarizeThreads1 in H1; eauto.
-  first_order.
-  eexists; propositional.
-  eauto.
-  change (summarizeThreads (x0 || c2) (cs1 ++ ((c', s) :: x) ++ ss2)).
-  rewrite app_assoc.
-  eauto.
-
-  eapply IHsummarizeThreads2 in H1; eauto.
-  first_order.
-  rewrite <- app_assoc.
-  eauto.
-
-  cases cs1; simplify.
-  invert x.
-  eauto using summarize_step.
-
-  invert x.
-  apply (f_equal (@length _)) in H3; simplify.
-  linear_arithmetic.
 Qed.
 
 Lemma commute_writes : forall c1 c a s h l1' h' l' v,
@@ -1432,6 +1236,7 @@ Proof.
   eauto.
   invert H1; eauto.
   invert H1; eauto.
+  invert H2; eauto.
 
   induct 1; simplify; eauto.
 
@@ -1449,6 +1254,7 @@ Proof.
   do 2 eexists.
   constructor.
   sets.
+  invert H3; eauto.
 
   induct 1; simplify; eauto.
   invert H0.
@@ -1464,6 +1270,7 @@ Proof.
   do 2 eexists.
   constructor.
   sets.
+  invert H3; eauto.
 
   induct 1; simplify; eauto.
   invert H1.
@@ -1476,129 +1283,46 @@ Proof.
   do 2 eexists; eapply commute_locks in H2; eauto.
   invert H3.
   do 2 eexists; eapply commute_unlocks in H2; eauto.
+  invert H1; eauto.
 
   eauto.
 Qed.
 
-Lemma split_app : forall A (l1 l2 r1 r2 : list A),
-    l1 ++ l2 = r1 ++ r2
-    -> (exists r12, r1 = l1 ++ r12
-                    /\ l2 = r12 ++ r2)
-       \/ (exists r21, r2 = r21 ++ l2
-                       /\ l1 = r1 ++ r21).
-Proof.
-  induct l1; simplify; subst; eauto.
-
-  cases r1; simplify; subst.
-  right; eexists (_ :: _); simplify; eauto.
-  invert H.
-  first_order; subst; eauto.
-  apply IHl1 in H2; first_order; subst; eauto.
-Qed.
-
-Hint Rewrite app_length.
-
-Lemma step_out_of_summarizeThreads : forall c cs1 c0 s cs2,
-    summarizeThreads c (cs1 ++ (c0, s) :: cs2)
-    -> forall h l c0' s' h' l', step (h, l, c0') (h', l', c0)
-    -> summarize c0' s'
-    -> exists c', summarizeThreads c' (cs1 ++ (c0', s') :: cs2)
-                  /\ step (h, l, c') (h', l', c).
-Proof.
-  induct 1; simplify.
-
-  apply split_center in x; first_order; subst.
-  
-  eapply IHsummarizeThreads1 in H1; try reflexivity; eauto.
-  first_order.
-  change (cs1 ++ (c0', s') :: x ++ ss2) with (cs1 ++ ((c0', s') :: x) ++ ss2).
-  rewrite app_assoc.
-  eauto.
-
-  eapply IHsummarizeThreads2 in H1; try reflexivity; eauto.
-  first_order.
-  rewrite <- app_assoc.
-  eauto.
-
-  cases cs1; simplify.
-  invert x.
-  eauto using summarize_step.
-  invert x.
-  cases cs1; simplify; try equality.
-Qed.
-
-Lemma translate_trace_commute : forall i h l c h' l' c',
-    stepsi (S i) (h, l, c) (h', l', c')
+Lemma translate_trace_commute : forall i h l c1 c2 h' l' c',
+    stepsi (S i) (h, l, c1 || c2) (h', l', c')
     -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
-    -> forall c0 s cs, summarizeThreads c ((c0, s) :: cs)
-    -> forall x, nextAction c0 x
-    -> Forall (fun c_s => summarize (fst c_s) (snd c_s) /\ commutes x (snd c_s)) cs
-    -> forall x0 x1 x2, step (h, l, c0) (x0, x1, x2)
-    -> exists h'' l'' c'', step (h, l, c0) (h'', l'', x2)
-                           /\ summarizeThreads c'' ((x2, s) :: cs)
-                           /\ stepsi i (h'', l'', c'') (h', l', c').
+    -> forall s, summarize c2 s
+    -> forall x, nextAction c1 x
+    -> commutes x s
+    -> forall x0 x1 x2, step (h, l, c1) (x0, x1, x2)
+    -> exists h'' l'', step (h, l, c1) (h'', l'', x2)
+                       /\ stepsi i (h'', l'', x2 || c2) (h', l', c').
 Proof.
   induct 1; simplify.
   invert H0.
-
-  clear IHstepsi.
-  eapply step_pick in H; eauto.
-  first_order; subst.
-
-  cases x3; simplify.
+  
   invert H.
-  eapply nextAction_det in H0; try eapply H5; eauto; propositional; subst.
+
+  eapply nextAction_det in H5; try eapply H6; eauto; propositional; subst.
   eauto 10.
 
-  invert H.
-  change ((c0, s) :: x3 ++ (x4, x5) :: x6)
-  with (((c0, s) :: x3) ++ (x4, x5) :: x6) in H2.
-  eapply step_into_summarizeThreads in H2; eauto.
-  first_order.
-  apply Forall_app_fwd2 in H4.
-  invert H4; simplify; propositional.
   eapply commutes_noblock in H3; eauto.
   first_order.
-  eapply step_into_summarizeThreads with (cs1 := []) in H6; eauto.
-  first_order.
-
-  cases st2.
-  cases p.
-  cases st0.
-  cases p.
-  eapply step_pick in H; eauto.
-  first_order.
-
-  cases x3; simplify.
-  invert H.
-  eapply nextAction_det in H0; try eapply H5; eauto; propositional; subst.
-  eauto 10.
+  exfalso; eauto.
 
   invert H.
-  change ((c0, s) :: x3 ++ (x4, x5) :: x6)
-  with (((c0, s) :: x3) ++ (x4, x5) :: x6) in H2.
-  eapply step_into_summarizeThreads in H2; eauto.
-  first_order.
-  specialize (Forall_app_fwd1 _ _ H4).
-  apply Forall_app_fwd2 in H4.
-  invert H4; simplify; propositional.
-  assert (Hn : nextAction c0 x) by assumption.
-  eapply commutes_noblock in H3; eauto.
-  first_order.
-  eapply IHstepsi in H3; clear IHstepsi; eauto using summarize_step.
-  first_order.
-  eapply commutes_sound with (c1 := c0) (c2 := x4) (c0 := x) in H10; eauto.
-  first_order.
-  eapply step_out_of_summarizeThreads with (cs1 := (x2, s) :: x3) in H11; eauto.
-  simplify; first_order.
-  eauto 10.
-Qed.
 
-Lemma summarizeThreads_Forall : forall c cs,
-    summarizeThreads c cs
-    -> Forall (fun c_s => summarize (fst c_s) (snd c_s)) cs.
-Proof.
-  induct 1; eauto.
+  eapply nextAction_det in H5; try eapply H12; eauto; propositional; subst.
+  eauto 10.
+
+  assert (Hnext : nextAction c1 x) by assumption.
+  eapply commutes_noblock in Hnext; eauto.
+  first_order.
+  eapply IHstepsi in H; clear IHstepsi; eauto using summarize_step.
+  first_order.
+  eapply commutes_sound with (c1 := c1) (c2 := c2) (c0 := x) in H; eauto.
+  first_order.
+  eauto 10.
 Qed.
 
 (* The heart of the soundness proof!  When a length-[i] derivation gets us to a
@@ -1607,68 +1331,58 @@ Qed.
  * that is about to fail.  Thus, if we explore the optimized state space and
  * find no failures, we can conclude lack of reachable failures in the original
  * state space. *)
-Lemma translate_trace : forall i h l c h' l' c',
-    stepsi i (h, l, c) (h', l', c')
+Lemma translate_trace : forall i h l c1 c2 h' l' c',
+    stepsi i (h, l, c1 || c2) (h', l', c')
     -> (forall h'' l'' c'', step (h', l', c') (h'', l'', c'') -> False)
     -> notAboutToFail c' = false
-    -> forall cs, summarizeThreads c cs
-    -> exists h' l' cs', stepC^* (h, l, cs) (h', l', cs')
-                         /\ Exists (fun c_s => notAboutToFail (fst c_s) = false) cs'.
+    -> forall s, summarize c2 s
+    -> exists h' l' c'', (stepC s)^* (h, l, c1 || c2) (h', l', c'')
+                         /\ notAboutToFail c'' = false.
 Proof.
   induct i; simplify.
 
   invert H.
   eauto 10.
 
-  cases cs.
-  exfalso; eauto.
-  cases p.
-  destruct (classic (exists c1 h' l' c', nextAction c0 c1
-                                         /\ Forall (fun c_s => commutes c1 (snd c_s)) cs
-                                         /\ step (h, l, c0) (h', l', c'))).
+  excluded_middle (exists c0 h' l' c', nextAction c1 c0
+                                       /\ commutes c0 s
+                                       /\ step (h, l, c1) (h', l', c')).
 
   first_order.
   eapply translate_trace_commute in H; eauto.
   first_order.
-  eapply IHi in H7; eauto.
-  first_order.
-  do 3 eexists; propositional.
-  eapply TrcFront.
-  eauto.
-  eassumption.
-  assumption.
-  apply summarizeThreads_Forall in H2.
-  invert H2.
-  eauto using Forall2.
-
-  invert H.  
-  cases st2.
-  cases p.
-  eapply translate_trace_matching in H5; eauto.
-  first_order.
   eapply IHi in H6; eauto.
   first_order.
-  eauto 6.
+  eauto 7.
+
+  invert H.
+  invert H5.
+
+  eapply IHi in H6; eauto.
+  first_order.
+  eauto 7.
+
+  eapply IHi in H6; eauto using summarize_step.
+  first_order.
+  do 3 eexists; propositional.
+  2: apply H4.
+  eauto 10.
 Qed.
 
-Lemma Forall_Exists_contra : forall A (f : A -> bool) ls,
-    Exists (fun x => f x = false) ls
-    -> Forall (fun x => f x = true) ls
-    -> False.
-Proof.
-  induct 1; invert 1; equality.
-Qed.
+Require Import Classical.
 
 (* This theorem brings it all together, to reduce one invariant-proof problem to
  * another that uses the optimized semantics. *)
-Theorem step_stepC : forall h l c (cs : list (cmd * summary)) n,
-  summarizeThreads c cs
-  -> boundRunningTime c n
-  -> invariantFor (trsys_ofC h l cs) (fun p => let '(_, _, cs) := p in
-                                               List.Forall (fun c_s => notAboutToFail (fst c_s) = true) cs)
-  -> invariantFor (trsys_of h l c) (fun p =>
-                                      let '(_, _, c) := p in
-                                      notAboutToFail c = true).
+Theorem step_stepC : forall h l c1 c2 s n,
+  summarize c2 s
+  -> boundRunningTime (c1 || c2) n
+  -> invariantFor (trsys_ofC s h l (c1 || c2))
+                  (fun p => let '(_, _, c) := p in
+                            notAboutToFail c = true)
+  -> invariantFor (trsys_of h l (c1 || c2))
+                  (fun p =>
+                     let '(_, _, c) := p in
+                     notAboutToFail c = true).
 Proof.
   simplify.
   apply NNPP; propositional.
@@ -1681,8 +1395,8 @@ Proof.
   cases p.
   subst.
   simplify.
-  cases (notAboutToFail c0); propositional.
-  assert (exists n', boundRunningTime c0 n' /\ n' <= n) by eauto using boundRunningTime_steps.
+  cases (notAboutToFail c); propositional.
+  assert (exists n', boundRunningTime c n' /\ n' <= n) by eauto using boundRunningTime_steps.
   first_order.
   eapply complete_trace in H2; eauto.
   first_order.
@@ -1693,9 +1407,7 @@ Proof.
   eapply translate_trace in H7; eauto.
   first_order.
   apply H1 in H7; auto.
-  eapply Forall_Exists_contra.
-  apply H9.
-  assumption.
+  equality.
 Qed.
 
 (* Now we define some tactics to help us apply this technique automatically for
@@ -1708,16 +1420,10 @@ Ltac analyzer := repeat (match goal with
 
 Ltac por_solve := simplify; repeat econstructor; sets; linear_arithmetic.
 
-Ltac por_lister :=
-  repeat match goal with
-         | [ H : ?ls ++ _ = _ :: _ |- _ ] => cases ls; simplify; invert H
-         | [ H : @eq (list _) _ _ |- _ ] => apply (f_equal (@length _)) in H; simplify; linear_arithmetic
-         end.
-
 Ltac por_invert1 :=
   match goal with
   | [ H : forall (c0 : cmd) (h'' : heap) (l'' : locks) (c'' : cmd), _ -> _ |- _ ] =>
-    (exfalso; eapply H; try por_solve; por_lister; por_solve) || (clear H; por_lister)
+    (exfalso; eapply H; try por_solve; por_solve) || clear H
   | _ => model_check_invert1
   end.
 
@@ -1743,16 +1449,12 @@ Theorem independent_threads_ok_again :
 Proof.
   (* We need to supply the summary when invoking the proof principle, though we
    * could also have used Ltac to compute it automatically. *)
-  eapply step_stepC with (cs := [(_, {| Reads := {0, 1};
-                                        Writes := {1};
-                                        Locks := {} |})]
-                                  ++ [(_, {| Reads := {2};
-                                             Writes := {2};
-                                             Locks := {} |})]).
+  eapply step_stepC with (s := {| Reads := {2};
+                                  Writes := {2};
+                                  Locks := {} |}).
   analyzer.
   analyzer.
 
-  simplify.
   eapply invariant_weaken.
   apply multiStepClosure_ok; simplify.
 

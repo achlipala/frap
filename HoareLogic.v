@@ -182,7 +182,7 @@ Definition set (dst src : exp) : cmd :=
   end.
 Infix "<-" := set (no associativity, at level 70) : cmd_scope.
 Infix ";;" := Seq (right associativity, at level 75) : cmd_scope.
-Notation "'when' b 'then' then_ 'else' else_ 'done'" := (If_ b then_ else_) (at level 75, e at level 0).
+Notation "'when' b 'then' then_ 'else' else_ 'done'" := (If_ b then_ else_) (at level 75, b at level 0).
 Notation "{{ I }} 'while' b 'loop' body 'done'" := (While_ I b body) (at level 75).
 Notation "'assert' {{ I }}" := (Assert I) (at level 75).
 Delimit Scope cmd_scope with cmd.

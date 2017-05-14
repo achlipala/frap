@@ -2253,7 +2253,7 @@ In fact, flow-insensitive and flow-sensitive interval analysis with this widenin
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Compiler Correctness via Simulation Arguments}
+\chapter{\label{compiler_correctness}Compiler Correctness via Simulation Arguments}
 
 \newcommand{\outp}[1]{\mathsf{out}(#1)}
 
@@ -2284,7 +2284,7 @@ In our case, such a pair will include the program fed as input into a phase, plu
 \newcommand{\smallstepcl}[3]{#1 \stackrel{#2}{\to_\mathsf{c}} #3}
 
 To get started phrasing the correctness condition formally, we need to modify our operational semantics to track output.
-We do so by adopting a \emph{labelled transition system}\index{labelled transition system}, where step arrows are annotated with \emph{labels} that explain interactions with the world.
+We do so by adopting a \emph{labeled transition system}\index{labeled transition system}, where step arrows are annotated with \emph{labels} that explain interactions with the world.
 For this language, the only interaction kind is an output, which we will write as a number.
 We also have \emph{silent}\index{silent steps} labels $\silent$, for when no output takes place.
 For completeness, here are the full rules of the extended language, where the definitions of contexts and plugging are inherited unchanged.
@@ -2329,7 +2329,7 @@ $$\infer{\cdot \in \Tr{s}}{}
 
 Notice that a trace is allowed to end at any point, even if the program under inspection hasn't terminated yet.
 Also, since our language is deterministic\index{determinism}, for any two traces of one command, one trace is a prefix of the other.
-Many parts of the machinery we develop here will, however, work well for nondeterministic systems, as we will see with labelled transition systems for concurrency in Chapter \ref{process_algebra}.
+Many parts of the machinery we develop here will, however, work well for nondeterministic systems, as we will see with labeled transition systems for concurrency in Chapter \ref{process_algebra}.
 
 \newcommand{\trinc}[2]{#1 \preceq #2}
 \newcommand{\treq}[2]{#1 \simeq #2}
@@ -2391,7 +2391,7 @@ The simulation approach is as general for relating programs as the invariant app
 \begin{proof}
   We prove the two trace-inclusion directions separately.
   The left-to-right direction proceeds by induction over the definition of traces on the left, while the right-to-left direction proceeds by similar induction on the right.
-  While most of the proof is generic in details of the labelled transition system, for the right-to-left direction we do rely on proofs of two important properties of this object language.
+  While most of the proof is generic in details of the labeled transition system, for the right-to-left direction we do rely on proofs of two important properties of this object language.
   First, the semantics is \emph{total}, in the sense that any state whose command isn't $\skipe$ can take a step.
   Second, the semantics is \emph{deterministic}, in that there can be at most one label/state pair reachable in one step from a particular starting state.
 
@@ -4583,7 +4583,7 @@ Here's the intuitive explanation of each syntax construction.
 
 \medskip
 
-We give an operational semantics in the form of a \emph{labelled transition system}\index{labelled transition system}.
+We give an operational semantics in the form of a \emph{labeled transition system}\index{labeled transition system}, as we did to formalize output instructions for compiler correctness in Chapter \ref{compiler_correctness}.
 That is, we not only express how a step takes us from one state to another, but we also associate each step with a \emph{label}\index{label} that summarizes what happened.
 Our labels will include the \emph{silent} label $\silent$, read labels $\readl{c}{v}$, and write labels $\writel{c}{v}$.
 The latter two indicate that a thread has read a value from or written a value to channel $c$, respectively, and the parameter $v$ indicates which value was read or written.
@@ -4628,7 +4628,7 @@ $$\infer{\lts{\parl{p_1}{p_2}}{l}{\parl{p'_1}{p_2}}}{
 Finally, a duplication can spawn a new copy (``thread'') at any time.
 $$\infer{\lts{\dup{p}}{}{\parl{\dup{p}}{p}}}{}$$
 
-The labelled-transition-system approach may seem a bit unwieldy for just explaining the behavior of programs.
+The labeled-transition-system approach may seem a bit unwieldy for just explaining the behavior of programs.
 Where it really pays off is in supporting a modular, algebraic reasoning style about processes, which we turn to next.
 
 
@@ -4641,8 +4641,9 @@ Intuitively, such a claim means that any trace of labels that $p$ could generate
 Crucially, in building traces of process executions, we ignore silent labels, only collecting the send and receive labels.
 
 This condition is called \emph{trace inclusion}\index{trace inclusion}, and, though it is intuitive, it is not strong enough to support all of the composition properties that we will want.
-Instead, we formalize refinement via \emph{simulation}.
+Instead, we formalize refinement via \emph{simulation}, very similarly to how we formalized compiler correctness in Chapter \ref{compiler_correctness}.
 
+\abstraction
 \begin{definition}
   Binary relation $R$ between processes is a \emph{simulation} when these two conditions hold.
   \begin{itemize}
@@ -4715,7 +4716,7 @@ Perhaps the greatest pay-off from the refinement approach is that \emph{refineme
 \modularity
 This deceptively simple theorem statement packs a strong modularity punch!
 We can verify a component in isolation and then connect to an arbitrary additional component, immediately concluding that the composition behaves properly.
-The secret sauce, implicit in our formulation of the object language and refinement, is the labelled-transition-system style, where processes may generate receive labels nondeterministically.
+The secret sauce, implicit in our formulation of the object language and refinement, is the labeled-transition-system style, where processes may generate receive labels nondeterministically.
 In this way, we can reason about a process implicitly in terms of \emph{every value that some other process might send to it when they are composed}, without needing to quantify explicitly over all other eligible processes.
 
 A similar congruence property holds for duplication, and we'll take this opportunity to explain a bit of the proof, in the form of choosing a good simulation relation.

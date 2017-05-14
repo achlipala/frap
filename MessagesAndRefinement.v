@@ -84,7 +84,7 @@ Definition add2 (input output : channel) : proc :=
         addN 1 input intermediate
         || addN 1 intermediate output).
 
-(* However, we implement addition, we might compose with this tester process,
+(* However we implement addition, we might compose with this tester process,
  * which uses an adder as a subroutine in a larger protocol.  [metaInput] and
  * [metaOutput] are the input and output of the whole system, while [input] and
  * [output] are used internally, say to communicate with an adder. *)
@@ -99,7 +99,7 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
 (** * Labeled semantics *)
 
 (* Let's explain how programs run.  We'll give a flavor of operational semantics
- * called a "labelled transition system," because each step will include a label
+ * called a "labeled transition system," because each step will include a label
  * that explains what happened.  In this case, the only relevant happenings are
  * sends or receives on channels.  Crucially, we supress send/receive labels for
  * operations blocked by [Block]s. *)
@@ -129,7 +129,7 @@ Definition notUse (ch : channel) (l : label) :=
   | Silent => True
   end.
 
-(* Now, our labelled transition system: *)
+(* Now, our labeled transition system: *)
 Inductive lstep : proc -> label -> proc -> Prop :=
 
 (* Sends and receives generate the expected labels.  Note that, for a [Recv],

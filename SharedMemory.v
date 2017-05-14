@@ -748,14 +748,7 @@ Qed.
 
 (* The next technical device will require that we bound how many steps of
  * execution particular commands could run for.  We use a conservative
- * overapproximation that is easy to compute, phrased as a relation.
- * Yes, it is time to get scared, as we must define exponentiation to compute
- * large enough time bounds! *)
-Fixpoint pow2 (n : nat) : nat :=
-  match n with
-  | O => 1
-  | S n' => pow2 n' * 2
-  end.
+ * overapproximation that is easy to compute, phrased as a relation. *)
 
 Inductive boundRunningTime : cmd -> nat -> Prop :=
 | BrtReturn : forall r n,
@@ -777,7 +770,9 @@ Inductive boundRunningTime : cmd -> nat -> Prop :=
 | BrtPar : forall c1 c2 n1 n2,
     boundRunningTime c1 n1
     -> boundRunningTime c2 n2
-    -> boundRunningTime (Par c1 c2) (pow2 (n1 + n2)).
+    -> boundRunningTime (Par c1 c2) (S (n1 + n2)).
+(* The extra [S] here may seem superfluous, but it helps make a certain
+ * induction well-founded. *)
 
 (* Perhaps surprisingly, there exist commands that have no finite time bounds!
  * Mixed-embedding languages often have these counterintuitive properties. *)
@@ -804,61 +799,6 @@ Proof.
   invert H.
   specialize (H4 (S n2)).
   apply scribbly_time in H4.
-  linear_arithmetic.
-Qed.
-
-(* Next, some boring properties of [pow2]. *)
-
-Lemma pow2_pos : forall n,
-    pow2 n > 0.
-Proof.
-  induct n; simplify; auto.
-Qed.
-
-Lemma pow2_mono : forall n m,
-    n < m
-    -> pow2 n < pow2 m.
-Proof.
-  induct 1; simplify; auto.
-  specialize (pow2_pos n); linear_arithmetic.
-Qed.
-
-Hint Resolve pow2_mono.
-
-Lemma pow2_incr : forall n,
-    n < pow2 n.
-Proof.
-  induct n; simplify; auto.
-Qed.
-
-Hint Resolve pow2_incr.
-
-Lemma pow2_inv : forall n m,
-    pow2 n <= m
-    -> n < m.
-Proof.
-  simplify.
-  specialize (pow2_incr n).
-  linear_arithmetic.
-Qed.
-
-Lemma use_pow2 : forall n m k,
-    pow2 m <= S k
-    -> n <= m
-    -> n <= k.
-Proof.
-  simplify.
-  apply pow2_inv in H.
-  linear_arithmetic.
-Qed.
-
-Lemma use_pow2' : forall n m k,
-    pow2 m <= S k
-    -> n < m
-    -> pow2 n <= k.
-Proof.
-  simplify.
-  specialize (@pow2_mono n m).
   linear_arithmetic.
 Qed.
 
@@ -929,8 +869,6 @@ Proof.
   do 3 eexists; propositional.
   eauto.
   invert H.
-  specialize (pow2_pos (n1 + n2)).
-  linear_arithmetic.
 
   invert H.
 
@@ -1022,9 +960,9 @@ Proof.
 
   assert (Hb1 : boundRunningTime c1 n1) by assumption.
   assert (Hb2 : boundRunningTime c2 n2) by assumption.
-  eapply IHk in H1; eauto using use_pow2; first_order.
+  eapply IHk in H1; try linear_arithmetic; first_order.
   invert H.
-  eapply IHk in H2; eauto using use_pow2; first_order.
+  eapply IHk in H2; try linear_arithmetic; first_order.
   invert H.
   do 3 eexists; propositional.
   eauto.
@@ -1032,8 +970,8 @@ Proof.
   cases y.
   cases p.
   specialize (boundRunningTime_step Hb2 H3); first_order.
-  assert (boundRunningTime (Par x1 c) (pow2 (n1 + x3))) by eauto.
-  eapply IHk in H6; eauto using use_pow2'; first_order.
+  assert (boundRunningTime (Par x1 c) (S (n1 + x3))) by eauto.
+  eapply IHk in H6; try linear_arithmetic; first_order.
   do 3 eexists; propositional.
   eapply TrcFront.
   eauto.
@@ -1042,8 +980,8 @@ Proof.
   cases y.
   cases p.
   specialize (boundRunningTime_step Hb1 H3); first_order.
-  assert (boundRunningTime (Par c c2) (pow2 (x2 + n2))) by eauto.
-  eapply IHk in H6; eauto using use_pow2'; first_order.
+  assert (boundRunningTime (Par c c2) (S (x2 + n2))) by eauto.
+  eapply IHk in H6; try linear_arithmetic; first_order.
   do 3 eexists; propositional.
   eapply TrcFront.
   eauto.

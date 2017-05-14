@@ -2548,6 +2548,21 @@ We write $\smallstepcls{s}{\ell}{s'}$ to indicate that $s$ steps to $s'$ via zer
   The overall proof is not short, with quite a few lemmas, found in the Coq code.
 \end{proof}
 
+\medskip
+
+It might not be clear why we bothered to define simulation with multiple matching steps, when we already had simulation with skipping.
+After all, we use simulation to conclude completely symmetric facts about two commands, so why not just verify this section's example by applying simulation with skipping, with the operand order reversed?
+
+Consider the heart of the proof approach that we \emph{did} adopt.
+We need to show that any step of $c$ can be matched suitably by $\flatten{c}$.
+The proof is divided into cases by inversion on a premise $\smallstepcl{(v, c)}{\ell}{(v', c')}$.
+Each case naturally fixes the top-level structure of $c$, from which we can apply straightforward algebraic simplification to find the top-level structure of $\flatten{c}$ and therefore the step rules that apply to it.
+
+Now consider applying simulation with skipping, with the commands passed as operands in the reverse order.
+The crucial inversion is on $\smallstepcl{(v, \flatten{c})}{\ell}{(v', c')}$.
+Unfortunately, the top-level structure of $\flatten{c}$ does not imply the top-level structure of $c$, but we need to show that $c$ can take a matching step.
+We need to prove a whole set of bothersome special-case inversion lemmas by induction, essentially to invert the action of what is, in the general case, an arbitrarily complex compiler.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

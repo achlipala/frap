@@ -235,6 +235,10 @@ Ltac sets0 := Sets.sets ltac:(simpl in *; intuition (subst; auto; try equality; 
 
 Ltac sets := propositional;
   try match goal with
+      | [ |- @eq (?T -> Prop) _ _ ] =>
+        change (T -> Prop) with (set T)
+      end;
+  try match goal with
       | [ |- @eq (set _) _ _ ] =>
         let x := fresh "x" in
         apply sets_equal; intro x;

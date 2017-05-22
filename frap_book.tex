@@ -71,7 +71,7 @@ The license text is available at:
 
 The classic engineering disciplines all have their standard mathematical techniques that are applied to the design of any artifact, before it is deployed, to gain confidence about its safety, suitability for some purpose, and so on.
 The engineers in a discipline more or less agree on what are ``the rules'' to be followed in vetting a design.
-Those rules are specified with a high degree of rigor, so that it isn't a matter of opinion whether a design is safe.
+Those rules are specified with a high degree of rigor, so that it isn't a matter of personal opinion whether a design is safe.
 Why doesn't software engineering have a corresponding agreed-upon standard, whereby programmers convince themselves that their systems are safe, secure, and correct?
 The concepts and tools may not quite be ready yet for broad adoption, but they have been under development for decades.
 This book introduces one particular tool and a body of ideas for how to apply it to different tasks in program proof.
@@ -94,7 +94,7 @@ When we encounter a new challenge, to prove a new kind of property about a new k
 \begin{itemize}
   \item \index{encoding}\textbf{Encoding.}
     Every programming language has both \index{syntax}\emph{syntax}, which defines what programs look like, and \index{semantics}\emph{semantics}, which defines how programs behave when run.
-    Even when these elements seem obvious intuitively, we often find that there are surprisingly subtle choices to be made in defining syntax and semantics at the highest level of rigor.
+    Even when these elements seem intuitively obvious, we often find that there are surprisingly subtle choices to be made in defining syntax and semantics at the highest level of rigor.
     Seemingly minor decisions can have big impacts on how smoothly our proofs go.
 
   \item \textbf{Invariants.}

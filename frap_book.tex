@@ -2954,13 +2954,13 @@ $$\begin{array}{rrcl}
 
 \newcommand{\dom}[1]{\mathsf{dom}(#1)}
 Now we can write the rules for the three reference primitives.
-$$\infer{\smallstep{(h, \newref{v})}{(\mupd{h}{\ell}{v}, \ell)}}{
+$$\infer{\smallstepo{(h, \newref{v})}{(\mupd{h}{\ell}{v}, \ell)}}{
   \ell \notin \dom{h}
 }
-\quad \infer{\smallstep{(h, \readref{\ell})}{(h, v)}}{
+\quad \infer{\smallstepo{(h, \readref{\ell})}{(h, v)}}{
   \msel{h}{\ell} = v
 }
-\quad \infer{\smallstep{(h, \writeref{\ell}{v'})}{(\mupd{h}{\ell}{v'}, v')}}{
+\quad \infer{\smallstepo{(h, \writeref{\ell}{v'})}{(\mupd{h}{\ell}{v'}, v')}}{
   \msel{h}{\ell} = v
 }$$
 

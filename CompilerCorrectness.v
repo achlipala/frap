@@ -351,7 +351,7 @@ Proof.
   eapply plug_deterministic in H0; eauto.
   invert H0.
   match goal with
-  | [ H : step0 _ l' _ |- _ ] => eapply deterministic0 in H; eauto
+  | [ H : step0 _ _ _, H' : step0 _ _ _ |- _ ] => eapply deterministic0 in H; [ | apply H' ]
   end.
   propositional; subst; auto.
   invert H0.

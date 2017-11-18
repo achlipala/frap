@@ -613,7 +613,14 @@ Definition typeCheck' : forall e : exp, {t : type | hasType e t} + {forall t, ~ 
         [||TBool||]
     end); simplify; propositional; subst; eauto;
     match goal with
-    | [ H : hasType _ _ |- _ ] => invert2 H
+    | [ H : hasType ?x _ |- _ ] =>
+      match goal with
+      | [ y : _ |- _ ] =>
+        match y with
+        | x => fail 2
+        end
+      | _ => invert2 H
+      end
     end; eauto.
 Defined.
 

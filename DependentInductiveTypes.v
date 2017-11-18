@@ -1159,7 +1159,7 @@ Section split.
   Defined.
 End split.
 
-Arguments split [P1 P2].
+Implicit Arguments split [P1 P2].
 
 (* And now, a few more boring lemmas.  Rejoin at "BOREDOM VANQUISHED", if you
  * like. *)

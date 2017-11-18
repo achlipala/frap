@@ -350,7 +350,9 @@ Proof.
   invert 1; invert 1; simplify.
   eapply plug_deterministic in H0; eauto.
   invert H0.
-  eapply deterministic0 in H1; eauto.
+  match goal with
+  | [ H : step0 _ l' _ |- _ ] => eapply deterministic0 in H; eauto
+  end.
   propositional; subst; auto.
   invert H0.
   auto.

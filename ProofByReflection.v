@@ -497,7 +497,9 @@ Ltac simplify_set :=
   match goal with
   | [ |- context[?X \cup ?Y] ] =>
     let e := reify_set (X \cup Y) in
-    change (X \cup Y) with (setexprDenote e);
+    let Heq := fresh in
+    assert (Heq : X \cup Y = setexprDenote e) by reflexivity;
+    rewrite Heq; clear Heq;
     rewrite normalize_ok; simpl
   end.
 

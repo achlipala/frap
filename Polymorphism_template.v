@@ -45,8 +45,7 @@ Definition add_optional (po : option (nat * nat)) : option nat :=
 (** * Lists *)
 
 (* For functional programming (as in Coq), the king of all generic data
- * structures is the *list*, which you explored a bit in the first problem set.
- * Let's recap that type definition. *)
+ * structures is the *list*. *)
 Inductive list (A : Set) : Set :=
 | nil
 | cons (hd : A) (tl : list A).
@@ -97,8 +96,7 @@ Fixpoint length {A} (ls : list A) : nat :=
   | _ :: ls' => 1 + length ls'
   end.
 
-(* More familiar operations from Pset1 *)
-
+(* Concatenation: *)
 Fixpoint app {A} (ls1 ls2 : list A) : list A :=
   match ls1 with
   | nil => ls2
@@ -107,6 +105,7 @@ Fixpoint app {A} (ls1 ls2 : list A) : list A :=
 
 Infix "++" := app.
 
+(* Reversal: *)
 Fixpoint rev {A} (ls : list A) : list A :=
   match ls with
   | nil => nil
@@ -115,6 +114,7 @@ Fixpoint rev {A} (ls : list A) : list A :=
 
 Theorem length_app : forall A (ls1 ls2 : list A),
     length (ls1 ++ ls2) = length ls1 + length ls2.
+Proof.
 Admitted.
 
 (* One of the classic gotchas in functional-programming class is how slow this
@@ -143,9 +143,7 @@ Compute rev' [1; 2; 3; 4].
 Compute rev ["hi"; "bye"; "sky"].
 Compute rev' ["hi"; "bye"; "sky"].
 
-(* OK, great.  Now it seems worth investing in a correctness proof.  We'll
- * discover it interactively in class, but here's a worked-out final
- * answer, with the several lemmas that we discover are useful. *)
+(* OK, great.  Now it seems worth investing in a correctness proof. *)
 
 Theorem rev'_ok : forall A (ls : list A),
     rev' ls = rev ls.
@@ -374,16 +372,13 @@ Fixpoint listifyStatement (s : statement) : list var :=
 
 Compute listifyStatement factorial.
 
-(* At this point, I can't resist switching to a more automated proof style,
- * though still a pretty tame one. *)
-
 Theorem length_listifyStatement : forall s,
     length (listifyStatement s) = varsInStatement s.
 Proof.
 Admitted.
 
 (* Other transformations are also possible, like the Swedish-Chef optimization,
- * that turns every variable into "bork".  It saves many bits when most variable
+ * which turns every variable into "bork".  It saves many bits when most variable
  * names are longer than 4 characters. *)
 
 Fixpoint swedishExpression (e : expression) : expression :=

@@ -56,8 +56,7 @@ Definition add_optional (po : option (nat * nat)) : option nat :=
 (** * Lists *)
 
 (* For functional programming (as in Coq), the king of all generic data
- * structures is the *list*, which you explored a bit in the first problem set.
- * Let's recap that type definition. *)
+ * structures is the *list*. *)
 Inductive list (A : Set) : Set :=
 | nil
 | cons (hd : A) (tl : list A).
@@ -98,9 +97,9 @@ Example nats2'' : list nat := [1; 2].
 Example nats3'' : list nat := [1; 2; 3].
 
 (* Here are some classic recursive functions that operate over lists.
- * First, here is how to compute the length of a list.  Recall that we put
- * *implicit* function arguments in curly braces, asking Coq to infer them at
- * call sites. *)
+ * First, here is how to compute the length of a list.  We put *implicit*
+ * function arguments in curly braces, asking Coq to infer them at call
+ * sites. *)
 
 Fixpoint length {A} (ls : list A) : nat :=
   match ls with
@@ -108,11 +107,9 @@ Fixpoint length {A} (ls : list A) : nat :=
   | _ :: ls' => 1 + length ls'
   end.
 
-(* The first problem set involved an exercise with list append and reverse
- * operations.  To avoid spoiling the proofs there about those functions, we
- * will give their definitions here without proving the classic theorems from
- * the problem set. *)
+(* Here are two classic recursive functions on lists. *)
 
+(* First, concatenation: *)
 Fixpoint app {A} (ls1 ls2 : list A) : list A :=
   match ls1 with
   | nil => ls2
@@ -121,6 +118,7 @@ Fixpoint app {A} (ls1 ls2 : list A) : list A :=
 
 Infix "++" := app.
 
+(* Next, reversal: *)
 Fixpoint rev {A} (ls : list A) : list A :=
   match ls with
   | nil => nil
@@ -129,7 +127,9 @@ Fixpoint rev {A} (ls : list A) : list A :=
 
 Theorem length_app : forall A (ls1 ls2 : list A),
     length (ls1 ++ ls2) = length ls1 + length ls2.
-Admitted.
+Proof.
+  induct ls1; simplify; equality.
+Qed.
 
 (* One of the classic gotchas in functional-programming class is how slow this
  * naive [rev] is.  Each [app] operation requires linear time, so running
@@ -558,7 +558,7 @@ Proof.
 Qed.
 
 (* Other transformations are also possible, like the Swedish-Chef optimization,
- * that turns every variable into "bork".  It saves many bits when most variable
+ * which turns every variable into "bork".  It saves many bits when most variable
  * names are longer than 4 characters. *)
 
 Fixpoint swedishExpression (e : expression) : expression :=

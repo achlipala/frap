@@ -17,6 +17,7 @@ DataAbstraction.v
 DataAbstraction_template.v
 Interpreters_template.v
 Interpreters.v
+FirstClassFunctions.v
 TransitionSystems_template.v
 TransitionSystems.v
 IntroToProofScripting.v

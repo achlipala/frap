@@ -6,25 +6,7 @@
 Require Import Frap.
 
 
-(** * Classic list functions *)
-
-Fixpoint map {A B : Set} (f : A -> B) (ls : list A) : list B :=
-  match ls with
-  | nil => nil
-  | x :: ls' => f x :: map f ls'
-  end.
-
-Fixpoint filter {A : Set} (f : A -> bool) (ls : list A) : list A :=
-  match ls with
-  | nil => nil
-  | x :: ls' => if f x then x :: filter f ls' else filter f ls'
-  end.
-
-Fixpoint fold_left {A B : Set} (f : B -> A -> B) (ls : list A) (acc : B) : B :=
-  match ls with
-  | nil => acc
-  | x :: ls' => fold_left f ls' (f acc x)
-  end.
+(** * Some data fodder for us to compute with later *)
 
 Record programming_language := {
   Name : string;
@@ -63,6 +45,27 @@ Definition ocaml := {|
 |}.
 
 Definition languages := [pascal; c; gallina; haskell; ocaml].
+
+
+(** * Classic list functions *)
+
+Fixpoint map {A B : Set} (f : A -> B) (ls : list A) : list B :=
+  match ls with
+  | nil => nil
+  | x :: ls' => f x :: map f ls'
+  end.
+
+Fixpoint filter {A : Set} (f : A -> bool) (ls : list A) : list A :=
+  match ls with
+  | nil => nil
+  | x :: ls' => if f x then x :: filter f ls' else filter f ls'
+  end.
+
+Fixpoint fold_left {A B : Set} (f : B -> A -> B) (ls : list A) (acc : B) : B :=
+  match ls with
+  | nil => acc
+  | x :: ls' => fold_left f ls' (f acc x)
+  end.
 
 Compute map Name languages.
 Compute map Name (filter PurelyFunctional languages).
@@ -247,10 +250,10 @@ Fixpoint filterK {A R : Set} (f : A -> (bool -> R) -> R) (ls : list A) (k : list
   | x :: ls' => f x (fun b => filterK f ls' (fun ls'' => k (if b then x :: ls'' else ls'')))
   end.
 
-Fixpoint fold_lefK {A B R : Set} (f : B -> A -> (B -> R) -> R) (ls : list A) (acc : B) (k : B -> R) : R :=
+Fixpoint fold_leftK {A B R : Set} (f : B -> A -> (B -> R) -> R) (ls : list A) (acc : B) (k : B -> R) : R :=
   match ls with
   | nil => k acc
-  | x :: ls' => f acc x (fun x' => foldl_leftK f ls' x' k)
+  | x :: ls' => f acc x (fun x' => fold_leftK f ls' x' k)
   end.
 
 Definition NameK {R : Set} (l : programming_language) (k : string -> R) : R :=
@@ -264,10 +267,10 @@ Definition maxK {R : Set} (n1 n2 : nat) (k : nat -> R) : R :=
 
 Compute mapK NameK languages (fun ls => ls).
 Compute filterK PurelyFunctionalK languages (fun ls => mapK NameK ls (fun x => x)).
-Compute mapK AppearedInYearK languages (fun ls => foldlK maxK 0 ls (fun x => x)).
+Compute mapK AppearedInYearK languages (fun ls => fold_leftK maxK ls 0 (fun x => x)).
 Compute filterK PurelyFunctionalK languages
         (fun ls1 => mapK AppearedInYearK ls1
-                         (fun ls2 => foldlK maxK 0 ls2 (fun x => x))).
+                         (fun ls2 => fold_leftK maxK ls2 0 (fun x => x))).
 
 Theorem mapK_ok : forall {A B R : Set} (f : A -> (B -> R) -> R) (f_base : A -> B),
     (forall x k, f x k = k (f_base x))
@@ -309,10 +312,10 @@ Proof.
   apply mapK_ok with (f_base := Name); trivial.
 Qed.
 
-Theorem foldlK_ok : forall {A B R : Set} (f : A -> B -> (B -> R) -> R) (f_base : A -> B -> B),
+Theorem fold_leftK_ok : forall {A B R : Set} (f : B -> A -> (B -> R) -> R) (f_base : B -> A -> B),
     (forall x acc k, f x acc k = k (f_base x acc))
     -> forall (ls : list A) (acc : B) (k : B -> R),
-      foldlK f acc ls k = k (foldl f_base acc ls).
+      fold_leftK f ls acc k = k (fold_left f_base ls acc).
 Proof.
   induct ls; simplify; try equality.
 
@@ -321,22 +324,22 @@ Proof.
 Qed.
 
 Theorem latest_ok : forall langs,
-    mapK AppearedInYearK langs (fun ls => foldlK maxK 0 ls (fun x => x))
-    = foldl max 0 (map AppearedInYear langs).
+    mapK AppearedInYearK langs (fun ls => fold_leftK maxK ls 0 (fun x => x))
+    = fold_left max (map AppearedInYear langs) 0.
 Proof.
   simplify.
   rewrite mapK_ok with (f_base := AppearedInYear); trivial.
-  apply foldlK_ok with (f_base := max); trivial.
+  apply fold_leftK_ok with (f_base := max); trivial.
 Qed.
 
 Theorem latestpure_ok : forall langs,
     filterK PurelyFunctionalK langs
             (fun ls1 => mapK AppearedInYearK ls1
-                             (fun ls2 => foldlK maxK 0 ls2 (fun x => x)))
-    = foldl max 0 (map AppearedInYear (filter PurelyFunctional langs)).
+                             (fun ls2 => fold_leftK maxK ls2 0 (fun x => x)))
+    = fold_left max (map AppearedInYear (filter PurelyFunctional langs)) 0.
 Proof.
   simplify.
   rewrite filterK_ok with (f_base := PurelyFunctional); trivial.
   rewrite mapK_ok with (f_base := AppearedInYear); trivial.
-  apply foldlK_ok with (f_base := max); trivial.
+  apply fold_leftK_ok with (f_base := max); trivial.
 Qed.

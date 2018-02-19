@@ -343,3 +343,127 @@ Proof.
   rewrite mapK_ok with (f_base := AppearedInYear); trivial.
   apply fold_leftK_ok with (f_base := max); trivial.
 Qed.
+
+
+(** * Tree traversals *)
+
+Inductive tree {A} :=
+| Leaf
+| Node (l : tree) (d : A) (r : tree).
+Arguments tree : clear implicits.
+
+Fixpoint depth {A} (t : tree A) : nat :=
+  match t with
+  | Leaf => 0
+  | Node l _ r => 2 + depth l + depth r
+  end.
+
+Fixpoint flatten {A} (t : tree A) : list A :=
+  match t with
+  | Leaf => []
+  | Node l d r => flatten l ++ d :: flatten r
+  end.
+
+Fixpoint flattenAcc {A} (t : tree A) (acc : list A) : list A :=
+  match t with
+  | Leaf => acc
+  | Node l d r => flattenAcc l (d :: flattenAcc r acc)
+  end.
+
+Theorem flattenAcc_ok : forall {A} (t : tree A) acc,
+    flattenAcc t acc = flatten t ++ acc.
+Proof.
+  induct t; simplify; try equality.
+
+  rewrite IHt1, IHt2.
+  rewrite <- app_assoc.
+  simplify.
+  equality.
+Qed.
+
+Fixpoint flattenK {A R} (t : tree A) (acc : list A) (k : list A -> R) : R :=
+  match t with
+  | Leaf => k acc
+  | Node l d r => flattenK r acc (fun acc' =>
+                                    flattenK l (d :: acc') k)
+  end.
+
+Theorem flattenK_ok : forall {A R} (t : tree A) acc (k : list A -> R),
+    flattenK t acc k = k (flattenAcc t acc).
+Proof.
+  induct t; simplify; try equality.
+
+  rewrite IHt2, IHt1.
+  equality.
+Qed.
+
+Inductive flatten_continuation {A} :=
+| KDone
+| KMore (l : tree A) (d : A) (k : flatten_continuation).
+Arguments flatten_continuation : clear implicits.
+
+Definition apply_continuation {A} (acc : list A) (k : flatten_continuation A)
+         (flattenKD : tree A -> list A -> flatten_continuation A -> list A)
+         : list A :=
+  match k with
+  | KDone => acc
+  | KMore l d k' => flattenKD l (d :: acc) k'
+  end.
+
+Fixpoint flattenKD {A} (fuel : nat) (t : tree A) (acc : list A)
+         (k : flatten_continuation A) : list A :=
+  match fuel with
+  | O => []
+  | S fuel' =>
+    match t with
+    | Leaf => apply_continuation acc k (flattenKD fuel')
+    | Node l d r => flattenKD fuel' r acc (KMore l d k)
+    end
+  end.
+
+Fixpoint continuation_depth {A} (k : flatten_continuation A) : nat :=
+  match k with
+  | KDone => 0
+  | KMore l d k' => 1 + depth l + continuation_depth k'
+  end.
+
+Fixpoint flatten_cont {A} (k : flatten_continuation A) : list A :=
+  match k with
+  | KDone => []
+  | KMore l d k' => flatten_cont k' ++ flatten l ++ [d]
+  end.
+
+Lemma flattenKD_ok' : forall {A} fuel fuel' (t : tree A) acc k,
+    depth t + continuation_depth k < fuel' < fuel
+    -> flattenKD fuel' t acc k
+       = flatten_cont k ++ flatten t ++ acc.
+Proof.
+  induct fuel; simplify; cases fuel'; simplify; try linear_arithmetic.
+
+  cases t; simplify; trivial.
+
+  cases k; simplify; trivial.
+  rewrite IHfuel; try linear_arithmetic.
+  repeat rewrite <- app_assoc.
+  simplify.
+  equality.
+
+  rewrite IHfuel.
+  simplify.
+  repeat rewrite <- app_assoc.
+  simplify.
+  equality.
+  simplify.
+  linear_arithmetic.
+Qed.
+
+Theorem flattenKD_ok : forall {A} (t : tree A),
+    flattenKD (depth t + 1) t [] KDone = flatten t.
+Proof.
+  simplify.
+  rewrite flattenKD_ok' with (fuel := depth t + 2).
+  simplify.
+  apply app_nil_r.
+  simplify.
+  linear_arithmetic.
+Qed.

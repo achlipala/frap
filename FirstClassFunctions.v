@@ -123,118 +123,6 @@ Definition sublistSummingToK (ns : list nat) (target : nat) : option (list nat) 
 
 Time Compute sublistSummingToK (countingDown 20) 1.
 
-Theorem allSublistsK_ok : forall {A B} (ls : list A) (failed : unit -> B) found,
-    (forall sol, (exists ans, (forall failed', found sol failed' = ans)
-                              /\ ans <> failed tt)
-                 \/ (forall failed', found sol failed' = failed' tt))
-    -> (exists sol ans, In sol (allSublists ls)
-                        /\ (forall failed', found sol failed' = ans)
-                        /\ allSublistsK ls failed found = ans
-                        /\ ans <> failed tt)
-       \/ ((forall sol, In sol (allSublists ls)
-                        -> forall failed', found sol failed' = failed' tt)
-           /\ allSublistsK ls failed found = failed tt).
-Proof.
-  induct ls; simplify.
-
-  specialize (H []).
-  first_order.
-  right.
-  propositional.
-  subst.
-  trivial.
-  trivial.
-
-  assert (let found := (fun (sol : list A) (failed' : unit -> B) =>
-     found sol (fun _ : unit => found (a :: sol) failed')) in
-          (exists (sol : list A) (ans : B),
-              In sol (allSublists ls) /\
-              (forall failed' : unit -> B, found sol failed' = ans) /\
-              allSublistsK ls failed found = ans /\ ans <> failed tt) \/
-          (forall sol : list A,
-              In sol (allSublists ls) -> forall failed' : unit -> B, found sol failed' = failed' tt) /\
-          allSublistsK ls failed found = failed tt).
-  apply IHls.
-  first_order.
-  generalize (H sol).
-  first_order.
-  specialize (H (a :: sol)).
-  first_order.
-  left.
-  exists x; propositional.
-  rewrite H0.
-  trivial.
-  right.
-  simplify.
-  rewrite H0.
-  trivial.
-
-  clear IHls.
-  simplify.
-  first_order.
-
-  generalize (H x); first_order.
-  left; exists x, x1; propositional.
-  apply in_or_app; propositional.
-  specialize (H1 failed).
-  specialize (H4 (fun _ => found (a :: x) failed)).
-  equality.
-  left; exists (a :: x), x0; propositional.
-  apply in_or_app; right; apply in_map_iff.
-  first_order.
-  specialize (H1 failed').
-  rewrite H4 in H1.
-  trivial.
-
-  right; propositional.
-  apply in_app_or in H2; propositional.
-
-  generalize (H sol); first_order.
-  apply H0 with (failed' := failed') in H3.
-  rewrite H2 in H3.
-  equality.
-
-  apply in_map_iff in H3.
-  first_order.
-  subst.
-  generalize (H x); first_order.
-  apply H0 with (failed' := failed) in H3.
-  equality.
-  apply H0 with (failed' := failed') in H3.
-  rewrite H2 in H3; trivial.
-Qed.
-
-Theorem sublistSummingToK_ok : forall ns target,
-    match sublistSummingToK ns target with
-    | None => forall sol, In sol (allSublists ns) -> sum sol <> target
-    | Some sol => In sol (allSublists ns) /\ sum sol = target
-    end.
-Proof.
-  simplify.
-  unfold sublistSummingToK.
-  pose proof (allSublistsK_ok ns (fun _ => None)
-              (fun sol failed => if sum sol ==n target then Some sol else failed tt)).
-  cases H.
-
-  simplify.
-  cases (sum sol ==n target).
-  left; exists (Some sol); equality.
-  propositional.
-
-  first_order.
-  specialize (H0 (fun _ => None)).
-  cases (sum x ==n target); try equality.
-  subst.
-  rewrite H1.
-  propositional.
-
-  first_order.
-  rewrite H0.
-  simplify.
-  apply H with (failed' := fun _ => None) in H1.
-  cases (sum sol ==n target); equality.
-Qed.
-
 
 (** * The classics in continuation-passing style *)
 
@@ -515,4 +403,119 @@ Proof.
   simplify.
   rewrite flattenS_flattenKD.
   apply flattenKD_ok.
+Qed.
+
+
+(** * Proof of our motivating example *)
+
+Theorem allSublistsK_ok : forall {A B} (ls : list A) (failed : unit -> B) found,
+    (forall sol, (exists ans, (forall failed', found sol failed' = ans)
+                              /\ ans <> failed tt)
+                 \/ (forall failed', found sol failed' = failed' tt))
+    -> (exists sol ans, In sol (allSublists ls)
+                        /\ (forall failed', found sol failed' = ans)
+                        /\ allSublistsK ls failed found = ans
+                        /\ ans <> failed tt)
+       \/ ((forall sol, In sol (allSublists ls)
+                        -> forall failed', found sol failed' = failed' tt)
+           /\ allSublistsK ls failed found = failed tt).
+Proof.
+  induct ls; simplify.
+
+  specialize (H []).
+  first_order.
+  right.
+  propositional.
+  subst.
+  trivial.
+  trivial.
+
+  assert (let found := (fun (sol : list A) (failed' : unit -> B) =>
+     found sol (fun _ : unit => found (a :: sol) failed')) in
+          (exists (sol : list A) (ans : B),
+              In sol (allSublists ls) /\
+              (forall failed' : unit -> B, found sol failed' = ans) /\
+              allSublistsK ls failed found = ans /\ ans <> failed tt) \/
+          (forall sol : list A,
+              In sol (allSublists ls) -> forall failed' : unit -> B, found sol failed' = failed' tt) /\
+          allSublistsK ls failed found = failed tt).
+  apply IHls.
+  first_order.
+  generalize (H sol).
+  first_order.
+  specialize (H (a :: sol)).
+  first_order.
+  left.
+  exists x; propositional.
+  rewrite H0.
+  trivial.
+  right.
+  simplify.
+  rewrite H0.
+  trivial.
+
+  clear IHls.
+  simplify.
+  first_order.
+
+  generalize (H x); first_order.
+  left; exists x, x1; propositional.
+  apply in_or_app; propositional.
+  specialize (H1 failed).
+  specialize (H4 (fun _ => found (a :: x) failed)).
+  equality.
+  left; exists (a :: x), x0; propositional.
+  apply in_or_app; right; apply in_map_iff.
+  first_order.
+  specialize (H1 failed').
+  rewrite H4 in H1.
+  trivial.
+
+  right; propositional.
+  apply in_app_or in H2; propositional.
+
+  generalize (H sol); first_order.
+  apply H0 with (failed' := failed') in H3.
+  rewrite H2 in H3.
+  equality.
+
+  apply in_map_iff in H3.
+  first_order.
+  subst.
+  generalize (H x); first_order.
+  apply H0 with (failed' := failed) in H3.
+  equality.
+  apply H0 with (failed' := failed') in H3.
+  rewrite H2 in H3; trivial.
+Qed.
+
+Theorem sublistSummingToK_ok : forall ns target,
+    match sublistSummingToK ns target with
+    | None => forall sol, In sol (allSublists ns) -> sum sol <> target
+    | Some sol => In sol (allSublists ns) /\ sum sol = target
+    end.
+Proof.
+  simplify.
+  unfold sublistSummingToK.
+  pose proof (allSublistsK_ok ns (fun _ => None)
+              (fun sol failed => if sum sol ==n target then Some sol else failed tt)).
+  cases H.
+
+  simplify.
+  cases (sum sol ==n target).
+  left; exists (Some sol); equality.
+  propositional.
+
+  first_order.
+  specialize (H0 (fun _ => None)).
+  cases (sum x ==n target); try equality.
+  subst.
+  rewrite H1.
+  propositional.
+
+  first_order.
+  rewrite H0.
+  simplify.
+  apply H with (failed' := fun _ => None) in H1.
+  cases (sum sol ==n target); equality.
 Qed.

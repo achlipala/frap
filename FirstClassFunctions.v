@@ -77,6 +77,87 @@ Compute fold_left max (map AppearedInYear (filter PurelyFunctional languages)) 0
 Reset map.
 
 
+(** * Sorting, parameterized in a comparison operation *)
+
+Fixpoint insert {A} (le : A -> A -> bool) (new : A) (ls : list A) : list A :=
+  match ls with
+  | [] => [new]
+  | x :: ls' =>
+    if le new x then
+      new :: ls
+    else
+      x :: insert le new ls'
+  end.
+
+Fixpoint insertion_sort {A} (le : A -> A -> bool) (ls : list A) : list A :=
+  match ls with
+  | [] => []
+  | x :: ls' => insert le x (insertion_sort le ls')
+  end.
+
+Fixpoint sorted {A} (le : A -> A -> bool) (ls : list A) : bool :=
+  match ls with
+  | [] => true
+  | x1 :: ls' =>
+    match ls' with
+    | x2 :: _ => le x1 x2 && sorted le ls'
+    | [] => true
+    end
+  end.
+
+Lemma insert_sorted : forall {A} (le : A -> A -> bool) a,
+    (forall x y, le x y = false -> le y x = true)
+    -> forall ls, sorted le ls = true
+                  -> sorted le (insert le a ls) = true.
+Proof.
+  induct ls; simplify; trivial.
+
+  cases (le a a0); simplify.
+
+  rewrite Heq; simplify.
+  trivial.
+
+  cases ls; simplify.
+  rewrite H; trivial.
+  apply andb_true_iff in H0; propositional.
+  cases (le a a1); simplify.
+  apply andb_true_iff in H0; propositional.
+  rewrite H; trivial.
+  simplify.
+  rewrite H3, H4; trivial.
+  rewrite H1; simplify.
+  trivial.
+Qed.  
+
+Theorem insertion_sort_sorted : forall {A} (le : A -> A -> bool),
+    (forall x y, le x y = false -> le y x = true)
+    -> forall ls,
+      sorted le (insertion_sort le ls) = true.
+Proof.
+  induct ls; simplify; trivial.
+  apply insert_sorted; trivial.
+Qed.
+
+Definition not_introduced_later (l1 l2 : programming_language) : bool :=
+  if AppearedInYear l1 <=? AppearedInYear l2 then true else false.
+
+Compute insertion_sort
+        not_introduced_later
+        [gallina; pascal; c; ocaml; haskell].
+
+Corollary insertion_sort_languages : forall langs,
+    sorted not_introduced_later (insertion_sort not_introduced_later langs) = true.
+Proof.
+  simplify.
+  apply insertion_sort_sorted.
+  unfold not_introduced_later.
+  simplify.
+  cases (AppearedInYear x <=? AppearedInYear y); try equality.
+  cases (AppearedInYear y <=? AppearedInYear x); try equality.
+  linear_arithmetic.
+Qed.
+
+
 (** * Motivating continuations with search problems *)
 
 Fixpoint allSublists {A} (ls : list A) : list (list A) :=

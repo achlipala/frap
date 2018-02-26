@@ -11,7 +11,7 @@ Set Implicit Arguments.
  * implementations freedom in internal details. *)
 Module Algebraic.
   (* Here's an example of an algebraic interface or *specification* ("spec" for
-   * short).  It's for purely function queues, which follow first-in-first-out
+   * short).  It's for purely functional queues, which follow first-in-first-out
    * disciplines. *)
   Module Type QUEUE.
     Parameter t : Set -> Set.
@@ -463,7 +463,8 @@ Module AlgebraicWithEquivalenceRelation.
       simplify.
       rewrite app_nil_r in H.
       rewrite <- H in Heq1.
-      rewrite rev_app_distr in Heq1.      rewrite rev_app_distr in Heq1.
+      rewrite rev_app_distr in Heq1.
+      rewrite rev_app_distr in Heq1.
       simplify.
       invert Heq1.
       rewrite rev_involutive.
@@ -1557,5 +1558,5 @@ Fixpoint upto (n : nat) : list nat :=
 
 Compute upto 10.
 
-Compute NatDuplicateFinder.noDuplicates (upto 1000).
-Compute FasterNatDuplicateFinder.noDuplicates (upto 1000).*)
+Time Compute NatDuplicateFinder.noDuplicates (upto 1000).
+Time Compute FasterNatDuplicateFinder.noDuplicates (upto 1000).*)

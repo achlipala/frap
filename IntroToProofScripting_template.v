@@ -545,12 +545,9 @@ Qed.
 
 (* A way that plays better with automation: *)
 
-Ltac equate x y :=
-  let dummy := constr:(eq_refl x : x = y) in idtac.
-
 Theorem t9 : exists p : nat * nat, fst p = 3.
 Proof.
   econstructor; match goal with
-                  | [ |- fst ?x = 3 ] => equate x (3, 2)
+                  | [ |- fst ?x = 3 ] => unify x (3, 2)
                 end; equality.
 Qed.

@@ -373,7 +373,7 @@ Ltac completer :=
            | [ |- _ /\ _ ] => constructor
            | [ |- forall x, _ ] => intro
            | [ |- _ -> _ ] => intro
-             (* Interestingly, these last two rules are redundant.
+             (* Interestingly, the last rule is redundant with the second-last.
               * See CPDT for details.... *)
          end.
 
@@ -859,21 +859,23 @@ Section t7'.
   Qed.
 End t7'.
 
+(* One more example of working with existentials: *)
+
 Theorem t8 : exists p : nat * nat, fst p = 3.
 Proof.
   econstructor.
   instantiate (1 := (3, 2)).
+  (* ^-- We use [instantiate] to plug in a value for one of the "question-mark
+   * variables" in the conclusion.  The [1 :=] part says "first such variable
+   * mentioned in the conclusion, counting from right to left." *)
   equality.
 Qed.
 
 (* A way that plays better with automation: *)
 
-Ltac equate x y :=
-  let dummy := constr:(eq_refl x : x = y) in idtac.
-
 Theorem t9 : exists p : nat * nat, fst p = 3.
 Proof.
   econstructor; match goal with
-                  | [ |- fst ?x = 3 ] => equate x (3, 2)
+                  | [ |- fst ?x = 3 ] => unify x (3, 2)
                 end; equality.
 Qed.

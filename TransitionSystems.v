@@ -368,16 +368,16 @@ Definition increment_sys := {|
  * system the type of shared state remains the same, we take the Cartesian
  * product of the sets of private state. *)
 
-Inductive parallel1 shared private1 private2
+Inductive parallel_init shared private1 private2
   (init1 : threaded_state shared private1 -> Prop)
   (init2 : threaded_state shared private2 -> Prop)
   : threaded_state shared (private1 * private2) -> Prop :=
 | Pinit : forall sh pr1 pr2,
   init1 {| Shared := sh; Private := pr1 |}
   -> init2 {| Shared := sh; Private := pr2 |}
-  -> parallel1 init1 init2 {| Shared := sh; Private := (pr1, pr2) |}.
+  -> parallel_init init1 init2 {| Shared := sh; Private := (pr1, pr2) |}.
 
-Inductive parallel2 shared private1 private2
+Inductive parallel_step shared private1 private2
           (step1 : threaded_state shared private1 -> threaded_state shared private1 -> Prop)
           (step2 : threaded_state shared private2 -> threaded_state shared private2 -> Prop)
           : threaded_state shared (private1 * private2)
@@ -385,19 +385,19 @@ Inductive parallel2 shared private1 private2
 | Pstep1 : forall sh pr1 pr2 sh' pr1',
   (* First thread gets to run. *)
   step1 {| Shared := sh; Private := pr1 |} {| Shared := sh'; Private := pr1' |}
-  -> parallel2 step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
+  -> parallel_step step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
                {| Shared := sh'; Private := (pr1', pr2) |}
 | Pstep2 : forall sh pr1 pr2 sh' pr2',
   (* Second thread gets to run. *)
   step2 {| Shared := sh; Private := pr2 |} {| Shared := sh'; Private := pr2' |}
-  -> parallel2 step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
+  -> parallel_step step1 step2 {| Shared := sh; Private := (pr1, pr2) |}
                {| Shared := sh'; Private := (pr1, pr2') |}.
 
 Definition parallel shared private1 private2
            (sys1 : trsys (threaded_state shared private1))
            (sys2 : trsys (threaded_state shared private2)) := {|
-  Initial := parallel1 sys1.(Initial) sys2.(Initial);
-  Step := parallel2 sys1.(Step) sys2.(Step)
+  Initial := parallel_init sys1.(Initial) sys2.(Initial);
+  Step := parallel_step sys1.(Step) sys2.(Step)
 |}.
 
 (* Example: composing two threads of the kind we formalized earlier *)
@@ -630,9 +630,9 @@ Proof.
   apply invariant_induction; simplify;
   repeat match goal with
          | [ H : increment2_invariant _ |- _ ] => invert H
-         | [ H : parallel1 _ _ _ |- _ ] => invert H
+         | [ H : parallel_init _ _ _ |- _ ] => invert H
          | [ H : increment_init _ |- _ ] => invert H
-         | [ H : parallel2 _ _ _ _ |- _ ] => invert H
+         | [ H : parallel_step _ _ _ _ |- _ ] => invert H
          | [ H : increment_step _ _ |- _ ] => invert H
          | [ pr : increment_program |- _ ] => cases pr; simplify
          end; try equality;

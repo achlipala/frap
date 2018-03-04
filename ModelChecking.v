@@ -582,7 +582,7 @@ Inductive add2_R : threaded_state nat (add2_thread * add2_thread)
 
 (* Let's also recharacterize the initial states via a singleton set. *)
 Theorem add2_init_is :
-  parallel1 add2_binit add2_binit = { {| Shared := true; Private := (BRead, BRead) |} }.
+  parallel_init add2_binit add2_binit = { {| Shared := true; Private := (BRead, BRead) |} }.
 Proof.
   simplify.
   apply sets_equal; simplify.
@@ -1054,7 +1054,7 @@ Qed.
  * intimidating statement and a much more interesting proof, whose details we
  * nonetheless won't comment on in text.  It may make sense to skip past the
  * next two lemma statements to the main theorem [withInterference_parallel]. *)
-Lemma withInterference_parallel1 : forall shared private1 private2
+Lemma withInterference_parallel_init : forall shared private1 private2
                                           (invs : shared -> Prop)
                                           (sys1 : trsys (threaded_state shared private1))
                                           (sys2 : trsys (threaded_state shared private2))
@@ -1149,11 +1149,11 @@ Proof.
   constructor.
 Qed.
 
-Lemma withInterference_parallel2 : forall shared private1 private2
-                                          (invs : shared -> Prop)
-                                          (sys1 : trsys (threaded_state shared private1))
-                                          (sys2 : trsys (threaded_state shared private2))
-                                          st st',
+Lemma withInterference_parallel_step : forall shared private1 private2
+                                              (invs : shared -> Prop)
+                                              (sys1 : trsys (threaded_state shared private1))
+                                              (sys2 : trsys (threaded_state shared private2))
+                                              st st',
   (withInterference invs (parallel sys1 sys2)).(Step)^* st st'
   -> forall st1 st2,
       (forall st1', (withInterference invs sys1).(Step)^* st1 st1' -> invs st1'.(Shared))
@@ -1268,9 +1268,9 @@ Proof.
   assert ((withInterference invs sys1).(Step)^*
              {| Shared := sh; Private := pr1 |}
              {| Shared := s'.(Shared); Private := fst s'.(Private) |}).
-  apply withInterference_parallel1 with (sys2 := sys2)
-                                          (st := {| Shared := sh; Private := (pr1, pr2) |})
-                                          (st2 := {| Shared := sh; Private := pr2 |});
+  apply withInterference_parallel_init with (sys2 := sys2)
+                                            (st := {| Shared := sh; Private := (pr1, pr2) |})
+                                            (st2 := {| Shared := sh; Private := pr2 |});
     simplify; propositional.
   apply H in H1; propositional.
   apply H0 in H1; propositional.
@@ -1280,9 +1280,9 @@ Proof.
   assert ((withInterference invs sys2).(Step)^*
              {| Shared := sh; Private := pr2 |}
              {| Shared := s'.(Shared); Private := snd s'.(Private) |}).
-  apply withInterference_parallel2 with (sys1 := sys1)
-                                          (st := {| Shared := sh; Private := (pr1, pr2) |})
-                                          (st1 := {| Shared := sh; Private := pr1 |});
+  apply withInterference_parallel_step with (sys1 := sys1)
+                                            (st := {| Shared := sh; Private := (pr1, pr2) |})
+                                            (st1 := {| Shared := sh; Private := pr1 |});
     simplify; propositional.
   apply H in H5; propositional.
   apply H0 in H5; propositional.

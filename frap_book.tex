@@ -1398,7 +1398,7 @@ For our purposes, the key pay-off from this connection is that we may translate 
   If $\angled{S, S_0, \to} \simulate_R \angled{S', S'_0, \to'}$, and if $I$ is an invariant of $\angled{S', S'_0, \to'}$, then $R^{-1}(I)$ is an invariant of $\angled{S, S_0, \to}$.
 \end{theorem}
 
-We can apply this theorem to the two example programs from earlier in the section.
+We can apply this theorem to the two example programs from earlier in the section, now imagining that we run two parallel-thread copies of each program, using last chapter's approach to modeling threads with transition systems.
 The concrete system can be represented with thread-local states $\{\mathsf{Read}\} \cup \{\mathsf{Write}(n) \mid n \in \mathbb N\}$ and the abstract system with $\{\mathsf{BRead}\} \cup \{\mathsf{BWrite}(b) \mid b \in \mathbb B\}$, for the Booleans $\mathbb B$.
 We define compatibility between local states.
 

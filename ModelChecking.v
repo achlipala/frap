@@ -173,7 +173,9 @@ Proof.
   assumption.
 Qed.
 
-(* A trivial fact about union and singleton sets. *)
+(* A trivial fact about union and singleton sets.
+ * Note that we model sets as functions that are passed elements, deciding in
+ * each case whether that element belongs to the set. *)
 Theorem singleton_in : forall {A} (x : A) rest,
   ({x} \cup rest) x.
 Proof.
@@ -264,7 +266,7 @@ Proof.
   apply oneStepClosure_empty.
   simplify.
 
-  (* Now the candidate invariatn is closed under single steps.  Let's prove
+  (* Now the candidate invariant is closed under single steps.  Let's prove
    * it. *)
   apply MscDone.
   apply prove_oneStepClosure; simplify.
@@ -346,7 +348,9 @@ Ltac model_check := model_check_find_invariant; model_check_finish.
 (* END CODE THAT WILL NOT BE EXPLAINED IN DETAIL! *)
 
 (* Now watch this.  We can check various instances of factorial
- * automatically. *)
+ * automatically.  Notice that reachable states are printed as we encounter them
+ * in exploration, using [idtac] invocations above.  This printing is for the
+ * user's understanding and has no logical meaning. *)
 
 Theorem factorial_ok_2_snazzy :
   invariantFor (factorial_sys 2) (fact_correct 2).
@@ -695,7 +699,8 @@ Proof.
   (* It finds exactly four reachable states.  We finish by showing that they all
    * obey the original invariant. *)
 
-  invert 1.
+  invert 1. (* Note that this [1] means "first premise below the double
+             * line." *)
   invert H0.
   simplify.
   unfold add2_correct.
@@ -960,8 +965,7 @@ Proof.
   (* We get 7 neat little states, one per program counter.  Next, we prove that
    * each of them implies the original invariant. *)
 
-  invert 1. (* Note that this [1] means "first premise below the double
-             * line." *)
+  invert 1.
   invert H0.
   unfold loopy_correct.
   simplify.

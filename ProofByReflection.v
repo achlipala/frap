@@ -163,7 +163,7 @@ Print true_galore.
  *
  * To write a reflective procedure for this class of goals, we will need to get
  * into the actual "reflection" part of "proof by reflection."  It is impossible
- * to case-analyze a [Prop] in any way in Gallina.  We must_reify_ [Prop] into
+ * to case-analyze a [Prop] in any way in Gallina.  We must _reify_ [Prop] into
  * some type that we _can_ analyze.  This inductive type is a good candidate: *)
 
 (* begin thide *)
@@ -484,7 +484,7 @@ Ltac reify_set E :=
     let e1 := reify_set E1 in
     let e2 := reify_set E2 in
     constr:(Union e1 e2)
-  | _ => let pf := constr:(eq_refl : E = {}) in constr:(Literal [])
+  | _ => let pf := constr:(E = {}) in constr:(Literal [])
     (* The twist is in this case: we instantiate all unification variables with
      * the empty set.  It's a sound proof step, and it so happens that we only
      * call this tactic in spots where this heuristic makes sense. *)
@@ -596,10 +596,10 @@ Section my_tauto.
   Require Import ListSet.
 
   (* The [eq_nat_dec] below is a richly typed equality test on [nat]s.  We'll
-   * get to the ideas behind it next week. *)
+   * get to the ideas behind it in a later class. *)
   Definition add (s : set propvar) (v : propvar) := set_add eq_nat_dec v s.
 
-  (* We define what it means for all members of an variable set to represent
+  (* We define what it means for all members of a variable set to represent
    * true propositions, and we prove some lemmas about this notion. *)
 
   Fixpoint allTrue (s : set propvar) : Prop :=

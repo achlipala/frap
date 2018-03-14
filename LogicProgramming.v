@@ -380,7 +380,7 @@ Proof.
 
   (* Coq leaves for us two subgoals to prove... [nat]?!  We are being asked to
    * show that natural numbers exists.  Why?  Some unification variables of that
-   * type were left undetermiend, by the end of the proof.  Specifically, these
+   * type were left undetermined, by the end of the proof.  Specifically, these
    * variables stand for the 2 elements of the list we find.  Of course it makes
    * sense that the list length follows without knowing the data values.  In Coq
    * 8.6, the [Unshelve] command brings these goals to the forefront, where we
@@ -394,7 +394,7 @@ Proof.
   Show Proof.
 Abort.
 
-(* Paradoxically, we can make the proof search process easier by constraining
+(* Paradoxically, we can make the proof-search process easier by constraining
  * the list further, so that proof search naturally locates appropriate data
  * elements by unification.  The library predicate [Forall] will be helpful. *)
 
@@ -410,9 +410,8 @@ Qed.
 
 Print length_is_2.
 
-(* Let us try one more, fancier example.  First, we use a standard higher
- * order function to define a function for summing all data elements of a
- * list. *)
+(* Let us try one more, fancier example.  First, we use a standard higher-order
+ * function to define a function for summing all data elements of a list. *)
 
 Definition sum := fold_right plus O.
 
@@ -693,8 +692,8 @@ Proof.
   induct e; first_order; eauto.
 Qed.
 
-(* Here's a quick tease using a feature that we'll explore fully this time next
- * week.  Let's use a mysterious construct [sigT] instead of [exists]. *)
+(* Here's a quick tease using a feature that we'll explore fully in a later
+ * class.  Let's use a mysterious construct [sigT] instead of [exists]. *)
 
 Hint Extern 1 (sigT (fun n : nat => _)) => exists 0.
 Hint Extern 1 (sigT (fun n : nat => _)) => exists 1.
@@ -706,11 +705,11 @@ Proof.
   induct e; first_order; eauto.
 Defined.
 
-(* Essentially the same proof search ahs completed.  This time, though, we ended
+(* Essentially the same proof search has completed.  This time, though, we ended
  * the proof with [Defined], which saves it as _transparent_, so details of the
  * "proof" can be consulted from the outside.  Actually, this "proof" is more
  * like a recursive program that finds [k] and [n], given [e]!  Let's add a
- * wrapper to make taht idea more concrete. *)
+ * wrapper to make that idea more concrete. *)
 
 Definition params (e : exp) : nat * nat :=
   let '(existT _ k (existT _ n _)) := linear_computable e in
@@ -885,7 +884,7 @@ Hint Extern 1 =>
 (** * Rewrite Hints *)
 
 (* Another dimension of extensibility with hints is rewriting with quantified
- * equalities.  We have used the associated command %[Hint Rewrite] in several
+ * equalities.  We have used the associated command [Hint Rewrite] in several
  * examples so far.  The [simplify] tactic uses these hints by calling the
  * built-in tactic [autorewrite].  Our rewrite hints have taken the form
  * [Hint Rewrite lemma], which by default adds them to the default hint database

@@ -258,8 +258,16 @@ Ltac fancy_neq :=
 
 Ltac doSubtract :=
   match goal with
-  | [ |- context[constant ?ls \setminus constant ?ls0] ] =>
-    erewrite (@doSubtract_ok _ ls ls0)
+  | [ |- context[@minus ?A (@constant ?A1 ?ls) (@constant ?A2 ?ls0)] ] =>
+    match A with
+    | A1 => idtac
+    | _ => change (@constant A1 ls) with (@constant A ls)
+    end;
+    match A with
+    | A2 => idtac
+    | _ => change (@constant A2 ls0) with (@constant A ls0)
+    end;
+    erewrite (@doSubtract_ok A ls ls0)
       by repeat (apply DsNil
                  || (apply DsKeep; [ simpl; intuition (congruence || fancy_neq) | ])
                  || (apply DsDrop; [ simpl; intuition congruence | ]))

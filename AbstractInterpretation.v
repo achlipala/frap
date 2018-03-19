@@ -359,11 +359,11 @@ Qed.
 Definition astate (a : absint) := fmap var a.
 
 (* An abstract state maps variables to abstract elements.  The idea is that each
- * variable should take on a concrete valuable represented by its associated
+ * variable should take on a concrete value represented by its associated
  * abstract value.  These are only finite maps, so missing variables are allowed
  * to take arbitrary values. *)
 
-(* An easy think to do with an [astate] is evaluate an expression into another
+(* An easy thing to do with an [astate] is evaluate an expression into another
  * abstract element. *)
 Fixpoint absint_interp (e : arith) a (s : astate a) : a :=
   match e with
@@ -460,7 +460,7 @@ Definition insensitive_compatible a (s : astate a) (v : valuation) : Prop :=
                -> (exists n, v $? x = Some n
                              /\ a.(Represents) n xa)
                   \/ (forall n, a.(Represents) n xa).
-(* That is, when a variable is mapped to some abstract element, either thhat
+(* That is, when a variable is mapped to some abstract element, either that
  * variable has a compatible concrete value, or the variable has no value and
  * that element actually accepts all values (i.e., is probably [Top]). *)
 
@@ -1198,7 +1198,7 @@ Qed.
  * Note the arguments to this predicate, called like
  * [interpret ss worklist ss'].  [ss] is the state we're starting from, and
  * [ss'] is the final invariatn we calculcate.  [worklist] includes only those
- * command/[astate] paris that we didn't already explore outward from.  It would
+ * command/[astate] pairs that we didn't already explore outward from.  It would
  * be pointless to continually explore from all the points we already
  * processed! *)
 Inductive interpret a : astates a -> astates a -> astates a -> Prop :=
@@ -1325,7 +1325,7 @@ Proof.
   invert H6; propositional; eauto.
 Qed.
 
-(* Let's skip descriving this lemma, to move to the main event below. *)
+(* Let's skip describing this lemma, to move to the main event below. *)
 Lemma interpret_sound' : forall c a, absint_sound a
   -> forall ss worklist ss' : astates a, interpret ss worklist ss'
     -> ss $? c = Some $0

@@ -187,6 +187,7 @@ Definition parity_add (x y : parity) :=
 Definition parity_subtract (x y : parity) :=
   match x, y with
   | Even, Even => Even
+  | Odd, Odd => Even
   | _, _ => Either
   end.
 (* Note subtleties with [Either]s above, to deal with underflow at zero! *)
@@ -304,12 +305,14 @@ Proof.
   exists (x0 + x); ring.
   exists (x0 + x + 1); ring.
   exists (x - x0); linear_arithmetic.
+  exists (x - x0); linear_arithmetic.
   exists (x * x0 * 2); ring.
   exists ((x * 2 + 1) * x0); ring.
   exists (n * x); ring.
   exists ((x * 2 + 1) * x0); ring.
   exists (2 * x * x0 + x + x0); ring.
   exists (x * m); ring.
+  exists x; ring.
   exists x; ring.
   exists x; ring.
   exists x; ring.

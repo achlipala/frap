@@ -150,8 +150,8 @@ Infix "=|" := traceEquivalence (at level 70).
  * big concepts that competes with invariants to unify different correctness
  * notions. *)
 
-(* Here's a simple example program, which outputs how days have elapsed at the
- * end of each one-month period (with a simplified notion of "month"!). *)
+(* Here's a simple example program, which outputs how many days have elapsed at
+ * the end of each one-month period (with a simplified notion of "month"!). *)
 
 Definition daysPerWeek := 7.
 Definition weeksPerMonth := 4.
@@ -989,8 +989,8 @@ Fixpoint noUnderscoreArith (e : arith) : bool :=
   match e with
   | Const _ => true
   | Var x => noUnderscoreVar x
-  | Plus e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
-  | Minus e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
+  | Plus e1 e2
+  | Minus e1 e2
   | Times e1 e2 => noUnderscoreArith e1 && noUnderscoreArith e2
   end.
 
@@ -1245,7 +1245,7 @@ End simulation_multiple.
 
 (* Now, to verify our particular flattening translation.  First, one wrinkle is
  * that, by writing to new temporary variables, valuations will _not_ be exactly
- * the same acorss the sides of our relation.  Here is the sense in which we
+ * the same across the sides of our relation.  Here is the sense in which we
  * need the sides to agree: *)
 Definition agree (v v' : valuation) :=
   forall x,
@@ -1254,7 +1254,7 @@ Definition agree (v v' : valuation) :=
 (* That is, they only need to agree on variables that aren't legal
  * temporaries. *)
 
-(* There no follow a whole bunch of thrilling lemmas about agreement. *)
+(* There now follow a whole bunch of thrilling lemmas about agreement. *)
 
 Ltac bool :=
   simplify;
@@ -1385,7 +1385,7 @@ Lemma flatten_Assign : forall e dst tempCount,
     /\ v2' $? dst = Some (interp e v1)
     (* The destination has had the right value set.  (This isn't redundant with
      * the last fact because the destination might be a temporary, in which case
-     * [agree] ignores it. *)
+     * [agree] ignores it.) *)
 
     /\ (forall n, n < tempCount -> dst <> tempVar n -> v2' $? tempVar n = v2 $? tempVar n)
     (* We have not touched any temporaries both less than [tempCount] and not
@@ -1522,7 +1522,7 @@ Proof.
   eauto.
 Qed.
 
-(* Now that reasoning can be fit within a general theorem about [step0].  Note
+(* Now our reasoning can be fit within a general theorem about [step0].  Note
  * how the conclusions use [cstep] instead of [step0], to accommodate steps
  * within the structure of a term in the [Assign] case. *)
 Lemma flatten_ok' : forall v1 c1 l v2 c2,

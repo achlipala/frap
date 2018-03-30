@@ -448,7 +448,7 @@ Qed.
  * shared state identically.  In such a case, we may always pick our favorite
  * thread to step next. *)
 
-(* To make all that formal, we will do some static program analyze to summarize
+(* To make all that formal, we will do some static program analysis to summarize
  * which atomic actions a thread might take. *)
 Record summary := {
   Reads : set nat;

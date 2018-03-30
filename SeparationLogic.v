@@ -93,7 +93,7 @@ Definition trsys_of (h : heap) {result} (c : cmd result) := {|
 |}.
 
 (* Now let's get into the first distinctive feature of separation logic: an
- * assertion language that takes advantage of *pariality* of heaps.  We give our
+ * assertion language that takes advantage of *partiality* of heaps.  We give our
  * definitions inside a module, which will shortly be used as a parameter to
  * another module (from the book library), to get some free automation for
  * implications between these assertions. *)

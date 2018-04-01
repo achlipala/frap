@@ -27,7 +27,7 @@ Module Ulc.
    * discussion. *)
   Fixpoint subst (rep : exp) (x : var) (e : exp) : exp :=
     match e with
-    | Var y => if string_dec y x then rep else Var y
+    | Var y => if y ==v x then rep else Var y
     | Abs y e1 => Abs y (if y ==v x then e1 else subst rep x e1)
     | App e1 e2 => App (subst rep x e1) (subst rep x e2)
     end.
@@ -49,10 +49,10 @@ Module Ulc.
   (* Note that we omit a [Var] case, since variable terms can't be *closed*,
    * and therefore they aren't meaningful as top-level programs. *)
 
-  (** Which terms are values, that is, final results of execution? *)
+  (* Which terms are values, that is, final results of execution? *)
   Inductive value : exp -> Prop :=
   | Value : forall x e, value (Abs x e).
-  (** We're cheating a bit here, *assuming* that the term is also closed. *)
+  (* We're cheating a bit here, *assuming* that the term is also closed. *)
 
   Hint Constructors eval value.
 
@@ -66,7 +66,7 @@ Module Ulc.
 
   Hint Resolve value_eval.
 
-  (** Conversely, let's prove that [eval] only produces values. *)
+  (* Conversely, let's prove that [eval] only produces values. *)
   Theorem eval_value : forall e v,
     eval e v
     -> value v.
@@ -467,7 +467,8 @@ End Ulc.
 
 (** * Now we turn to a variant of lambda calculus with static type-checking.
     * This variant is called *simply typed* lambda calculus, and *simple* has a
-    * technical meaning, which we will explore relaxing in a problem set. *)
+    * technical meaning, basically meaning "no polymorphism" in the sense of
+    * example file Polymorphism.v from this book. *)
 Module Stlc.
   (* We add expression forms for numeric constants and addition. *)
   Inductive exp : Set :=

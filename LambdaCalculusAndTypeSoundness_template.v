@@ -17,7 +17,7 @@ Module Ulc.
 
   Fixpoint subst (rep : exp) (x : var) (e : exp) : exp :=
     match e with
-    | Var y => if string_dec y x then rep else Var y
+    | Var y => if y ==v x then rep else Var y
     | Abs y e1 => Abs y (if y ==v x then e1 else subst rep x e1)
     | App e1 e2 => App (subst rep x e1) (subst rep x e2)
     end.
@@ -548,23 +548,6 @@ Module Stlc.
   Definition unstuck e := value e
     \/ (exists e' : exp, step e e').
 
-  (* For class, we'll stick with this magic tactic, to save proving time. *)
-
-  Ltac t0 := match goal with
-             | [ H : ex _ |- _ ] => invert H
-             | [ H : _ /\ _ |- _ ] => invert H
-             | [ |- context[?x ==v ?y] ] => cases (x ==v y)
-             | [ H : Some _ = Some _ |- _ ] => invert H
-
-             | [ H : step _ _ |- _ ] => invert H
-             | [ H : step0 _ _ |- _ ] => invert1 H
-             | [ H : hasty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
-             | [ H : hasty _ _ _ |- _ ] => invert1 H
-             | [ H : plug _ _ _ |- _ ] => invert1 H
-             end; subst.
-
-  Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 6.
-
   Lemma progress : forall e t,
     hasty $0 e t
     -> value e
@@ -579,8 +562,7 @@ Module Stlc.
     -> forall G', G' = G
       -> hasty G' e t.
   Proof.
-    t.
-  Qed.
+  Admitted.
 
   Hint Resolve hasty_change.
 

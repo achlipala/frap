@@ -123,7 +123,7 @@ Extraction pred_strong1.
  * systematically.
  *
  * We can reimplement our dependently typed [pred] based on _subset types_,
- * defined in the standard library with the type family %[sig]. *)
+ * defined in the standard library with the type family [sig]. *)
 
 Print sig.
 
@@ -146,7 +146,7 @@ Definition pred_strong2 (s : {n : nat | n > 0} ) : nat :=
  * [P] for [sig]) are not mentioned in pattern matching, but _are_ mentioned in
  * construction of terms (if they are not marked as implicit arguments).
  * (Actually, this behavior changed between Coq versions 8.4 and 8.5, hence the
- * near at the top of the file to revert to the old behavior.) *)
+ * command at the top of the file to revert to the old behavior.) *)
 
 Compute pred_strong2 (exist _ 2 two_gt0).
 
@@ -172,7 +172,7 @@ Definition pred_strong3 (s : {n : nat | n > 0}) : {m : nat | proj1_sig s = S m} 
 Compute pred_strong3 (exist _ 2 two_gt0).
 
 (* A value in a subset type can be thought of as a _dependent pair_ (or
- * _sigma type_ of a base value and a proof about it.  The function [proj1_sig]
+ * _sigma type_) of a base value and a proof about it.  The function [proj1_sig]
  * extracts the first component of the pair.  It turns out that we need to
  * include an explicit [return] clause here, since Coq's heuristics are not
  * smart enough to propagate the result type that we wrote earlier.
@@ -243,7 +243,7 @@ Print pred_strong4.
 Compute pred_strong4 two_gt0.
 
 (* We are almost done with the ideal implementation of dependent predecessor.
- * We can use Coq's syntax extension facility to arrive at code with almost no
+ * We can use Coq's syntax-extension facility to arrive at code with almost no
  * complexity beyond a Haskell or ML program with a complete specification in a
  * comment.  In this book, we will not dwell on the details of syntax
  * extensions; the Coq manual gives a straightforward introduction to them. *)
@@ -268,7 +268,7 @@ Compute pred_strong5 two_gt0.
 (** * Decidable Proposition Types *)
 
 (* There is another type in the standard library that captures the idea of
- * program values that indicate which of two propositions is true. *)
+ * a program value indicating which of two propositions is true. *)
 
 Print sumbool.
 
@@ -353,8 +353,8 @@ Section In_dec.
   Defined.
 End In_dec.
 
-Compute In_dec eq_nat_dec 2 (1 :: 2 :: nil).
-Compute In_dec eq_nat_dec 3 (1 :: 2 :: nil).
+Compute In_dec eq_nat_dec 2 [1; 2].
+Compute In_dec eq_nat_dec 3 [1; 2].
 
 (* The [In_dec] function has a reasonable extraction to OCaml. *)
 
@@ -439,9 +439,9 @@ Compute pred_strong8 0.
  * a literal monad, but a "bind"-like notation will still be helpful. *)
 
 Notation "x <- e1 ; e2" := (match e1 with
-                             | Unknown => ??
-                             | Found x _ => e2
-                           end)
+                            | Unknown => ??
+                            | Found x _ => e2
+                            end)
 (right associativity, at level 60).
 
 (* The meaning of [x <- e1; e2] is: First run [e1].  If it fails to find an

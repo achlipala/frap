@@ -51,8 +51,8 @@ Section ilist.
    * predicates directly into our normal programming.
    *
    * The [nat] argument to [ilist] tells us the length of the list.  The types
-   * of [ilist]'s constructors tell us that a [Nil] list has length [O] and tha
-   *  a [Cons] list has length one greater than the length of its tail.  We may
+   * of [ilist]'s constructors tell us that a [Nil] list has length [O] and that
+   * a [Cons] list has length one greater than the length of its tail.  We may
    * apply [ilist] to any natural number, even natural numbers that are only
    * known at runtime.  It is this breaking of the _phase distinction_ that
    * characterizes [ilist] as _dependently typed_.
@@ -244,7 +244,7 @@ End ilist.
  * [U] with the following two substitutions applied: we replace [y] (the [as]
  * clause variable) with [C z1 ... zm], and we replace each [xi] (the [in]
  * clause variables) with [xi'].  In other words, we specialize the result type
- * based on what we learn based on which pattern has matched the discriminee.
+ * based on what we learn from which pattern has matched the discriminee.
  *
  * This is an exhaustive description of the ways to specify how to take
  * advantage of which pattern has matched!  No other mechanisms come into play.
@@ -258,7 +258,7 @@ End ilist.
  * will not be mentioned again or to indicate positions where we would like type
  * inference to infer the appropriate terms.)  Furthermore, recent Coq versions
  * are adding more and more heuristics to infer dependent [match] annotations in
- * certain conditions.  The general annotation inference problem is undecidable,
+ * certain conditions.  The general annotation-inference problem is undecidable,
  * so there will always be serious limitations on how much work these heuristics
  * can do.  When in doubt about why a particular dependent [match] is failing to
  * type-check, add an explicit [return] annotation!  At that point, the
@@ -306,7 +306,7 @@ Inductive exp : type -> Set :=
  * expressions simultaneously with the syntax.
  *
  * We can give types and expressions semantics in a new style, based critically
-8 on the chance for _type-level computation_. *)
+ * on the chance for _type-level computation_. *)
 
 Fixpoint typeDenote (t : type) : Set :=
   match t with
@@ -756,7 +756,7 @@ Section insert.
    * recursively on a locally bound variable.  The termination checker is not
    * smart enough to trace the dataflow into that variable, so the checker does
    * not know that this recursive argument is smaller than the original
-   * argument.  We make this fact clearer by applying the convoy pattern on _theorem
+   * argument.  We make this fact clearer by applying the convoy pattern on _the
    * result of a recursive call_, rather than just on that call's argument.
    *
    * Finally, we are in the home stretch of our effort to define [insert].  We
@@ -849,9 +849,7 @@ Section insert.
      * a tree, followed by finding case-analysis opportunities on expressions we
      * see being analyzed in [if] or [match] expressions.  After that, we
      * pattern-match to find opportunities to use the theorems we proved about
-     * balancing.  Finally, we identify two variables that are asserted by some
-     * hypothesis to be equal, and we use that hypothesis to replace one
-     * variable with the other everywhere. *)
+     * balancing. *)
 
     Theorem present_ins : forall c n (t : rbtree c n),
       present_insResult t (ins t).
@@ -884,7 +882,7 @@ Section insert.
 
     (* The hard work is done.  The most readable way to state correctness of
      * [insert] involves splitting the property into two color-specific
-     * theorems.  We write a tactic to encapsulate the reasoning steps that workhorse
+     * theorems.  We write a tactic to encapsulate the reasoning steps that work
      * to establish both facts. *)
 
     Ltac present_insert :=
@@ -976,7 +974,7 @@ Fail Inductive regexp : (string -> Prop) -> Set :=
  * the failed definition also has type [Type].
  *
  * It turns out that allowing large inductive types in [Set] leads to
- * contradictions when combined with certain kinds of classical logic reasoning.
+ * contradictions when combined with certain kinds of classical-logic reasoning.
  * Thus, by default, such types are ruled out.  There is a simple fix for our
  * [regexp] definition, which is to place our new type in [Type].  While fixing
  * the problem, we also expand the list of constructors to cover the remaining
@@ -1276,9 +1274,9 @@ Section dec_star.
   Variable P : string -> Prop.
   Variable P_dec : forall s, {P s} + {~ P s}.
 
-  (* Some new lemmas and hints about the [star] type family are useful. *)
+  (* Some new lemmas and hints about the [star] type family are useful.  Rejoin
+   * at BOREDOM DEMOLISHED to skip the details. *)
 
-  (* begin hide *)
   Hint Constructors star.
 
   Lemma star_empty : forall s,
@@ -1342,6 +1340,8 @@ Section dec_star.
                                      first_order; simplify; eauto
       end.
   Qed.
+
+  (* BOREDOM DEMOLISHED! *)
 
   (* The function [dec_star''] implements a single iteration of the star.  That
    * is, it tries to find a string prefix matching [P], and it calls a parameter

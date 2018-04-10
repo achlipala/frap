@@ -492,6 +492,66 @@ Qed.
  * adapt automatically to changes in function definitions. *)
 
 
+(** * Interlude: The Convoy Pattern *)
+
+(* Here are some examples, contemplation of which may provoke enlightenment.
+ * See more discussion later of the idea behind the examples. *)
+
+Fail Definition firstElements n A B (ls1 : ilist A n) (ls2 : ilist B n) : option (A * B) :=
+  match ls1 with
+  | Cons _ v1 _ =>
+    Some (v1,
+          match ls2 in ilist _ N return match N with O => unit | S _ => B end with
+          | Cons _ v2 _ => v2
+          | Nil => tt
+          end)
+  | Nil => None
+  end.
+
+Definition firstElements n A B (ls1 : ilist A n) (ls2 : ilist B n) : option (A * B) :=
+  match ls1 in ilist _ N return ilist B N -> option (A * B) with
+  | Cons _ v1 _ => fun ls2 =>
+    Some (v1,
+          match ls2 in ilist _ N return match N with O => unit | S _ => B end with
+          | Cons _ v2 _ => v2
+          | Nil => tt
+          end)
+  | Nil => fun _ => None
+  end ls2.
+
+(* Note use of a [struct] annotation to tell Coq which argument should decrease
+ * across recursive calls.  It's an artificial choice here, since usually those
+ * annotations are inferred.  Here we are making an effort to demonstrate a
+ * decently common problem! *)
+Fail Fixpoint zip n A B (ls1 : ilist A n) (ls2 : ilist B n) {struct ls1} : ilist (A * B) n :=
+  match ls1 in ilist _ N return ilist B N -> ilist (A * B) N with
+  | Cons _ v1 ls1' => 
+    fun ls2 =>
+      match ls2 in ilist _ N return match N with
+                                    | O => unit
+                                    | S N' => ilist A N' -> ilist (A * B) N
+                                    end with
+      | Cons _ v2 ls2' => fun ls1' => Cons (v1, v2) (zip ls1' ls2')
+      | Nll => tt
+      end ls1'
+  | Nil => fun _ => Nil _
+  end ls2.
+
+Fixpoint zip n A B (ls1 : ilist A n) (ls2 : ilist B n) {struct ls1} : ilist (A * B) n :=
+  match ls1 in ilist _ N return ilist B N -> ilist (A * B) N with
+  | Cons _ v1 ls1' => 
+    fun ls2 =>
+      match ls2 in ilist _ N return match N with
+                                    | O => unit
+                                    | S N' => (ilist B N' -> ilist (A * B) N') -> ilist (A * B) N
+                                    end with
+      | Cons _ v2 ls2' => fun zip_ls1' => Cons (v1, v2) (zip_ls1' ls2')
+      | Nll => tt
+      end (zip ls1')
+  | Nil => fun _ => Nil _
+  end ls2.
+
+
 (** * Dependently Typed Red-Black Trees *)
 
 (* Red-black trees are a favorite purely functional data structure with an

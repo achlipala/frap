@@ -41,6 +41,8 @@ LambdaCalculusAndTypeSoundness.v
 DependentInductiveTypes_template.v
 DependentInductiveTypes.v
 TypesAndMutation.v
+HoareLogic_template.v
+HoareLogic.v
 DeepAndShallowEmbeddings_template.v
 DeepAndShallowEmbeddings.v
 SepCancel.v

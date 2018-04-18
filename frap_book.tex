@@ -3191,7 +3191,7 @@ Nonetheless, the essential proof structure winds up being the same, as we once a
 \section{An Imperative Language with Memory}
 
 \newcommand{\assert}[1]{\mathsf{assert}(#1)}
-\newcommand{\readfrom}[1]{*[#1]}
+\newcommand{\readfrom}[1]{{*}[#1]}
 \newcommand{\writeto}[2]{\readfrom{#1} \leftarrow #2}
 
 To provide us with an interesting enough playground for program verification, let's begin by defining an imperative language with an infinite mutable heap.
@@ -3436,10 +3436,10 @@ In fact, we can prove that any other state is unstuck, though we won't bother he
   By induction on the derivation of $\hoare{P}{c}{Q}$, appealing to Lemma \ref{hoare_skip} in one case.  Note how we conclude a very specific precondition, forcing exact state equality with the one we have stepped to.
 \end{proof}
 
+\begin{theorem}[Invariant Safety]
 \invariants
-\begin{lemma}[Invariant Safety]
   If $\hoare{P}{c}{Q}$ and $P(h, v)$, then unstuckness is an invariant for the small-step transition system starting at $(h, v, c)$.
-\end{lemma}
+\end{theorem}
 \begin{proof}
   First we weaken the invariant to $I(h, v, c) = \hoare{\lambda s. \; s = (h, v)}{c}{\lambda \_. \; \top}$.
   That is, we focus in on the most specific applicable precondition, and we forget everything that the postcondition was recording for us.

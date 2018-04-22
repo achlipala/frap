@@ -127,12 +127,12 @@ Module Import S <: SEP.
   Qed.
 
   Local Ltac t := (unfold himp, heq, lift, star, exis; propositional; subst);
-                 repeat (match goal with
-                         | [ H : forall x, _ <-> _ |- _  ] =>
-                           apply iff_two in H
-                         | [ H : ex _ |- _ ] => destruct H
-                         | [ H : split _ _ $0 |- _ ] => apply split_empty_fwd in H
-                         end; propositional; subst); eauto 15.
+                  repeat (match goal with
+                          | [ H : forall x, _ <-> _ |- _  ] =>
+                            apply iff_two in H
+                          | [ H : ex _ |- _ ] => destruct H
+                          | [ H : split _ _ $0 |- _ ] => apply split_empty_fwd in H
+                          end; propositional; subst); eauto 15.
 
   Theorem himp_heq : forall p q, p === q
     <-> (p ===> q /\ q ===> p).

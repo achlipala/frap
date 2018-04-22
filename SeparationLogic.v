@@ -143,12 +143,12 @@ Module Import S <: SEP.
   Qed.
 
   Local Ltac t := (unfold himp, heq, lift, star, exis; propositional; subst);
-                 repeat (match goal with
-                         | [ H : forall x, _ <-> _ |- _  ] =>
-                           apply iff_two in H
-                         | [ H : ex _ |- _ ] => destruct H
-                         | [ H : split _ _ $0 |- _ ] => apply split_empty_fwd in H
-                         end; propositional; subst); eauto 15.
+                  repeat (match goal with
+                          | [ H : forall x, _ <-> _ |- _  ] =>
+                            apply iff_two in H
+                          | [ H : ex _ |- _ ] => destruct H
+                          | [ H : split _ _ $0 |- _ ] => apply split_empty_fwd in H
+                          end; propositional; subst); eauto 15.
 
   Theorem himp_heq : forall p q, p === q
     <-> (p ===> q /\ q ===> p).
@@ -327,11 +327,11 @@ Inductive hoare_triple : forall {result}, hprop -> cmd result -> (result -> hpro
 | HtFrame : forall {result} (c : cmd result) P Q R,
     hoare_triple P c Q
     -> hoare_triple (P * R)%sep c (fun r => Q r * R)%sep.
-(* The *frame rule* is the other big idea of separation.  We can extend any
- * Hoare triple by starring an arbitrary assertion [R] into both precondition
- * and postcondition.  Note that rule [HtRead] built in a variant of the frame
- * rule, where the frame predicate [R] may depend on the value [v] being read.
- * The other operations can use this generic frame rule instead. *)
+(* The *frame rule* is the other big idea of separation logic.  We can extend
+ * any Hoare triple by starring an arbitrary assertion [R] into both
+ * precondition and postcondition.  Note that rule [HtRead] built in a variant
+ * of the frame rule, where the frame predicate [R] may depend on the value [v]
+ * being read.  The other operations can use this generic frame rule instead. *)
 
 
 Notation "{{ P }} c {{ r ~> Q }}" :=
@@ -1266,7 +1266,7 @@ Qed.
 Fixpoint linkedListSegment (p : nat) (ls : list nat) (q : nat) :=
   match ls with
     | nil => [| p = q |]
-    | x :: ls' => [| p <> 0 |] * exists p', p |-> x * (p+1) |-> p' * linkedListSegment p' ls' q
+    | x :: ls' => [| p <> 0 |] * exists p', p |--> [x; p'] * linkedListSegment p' ls' q
   end%sep.
 
 (* Next, two [linkedListSegment] lemmas analogous to those for [linkedList]
@@ -1280,7 +1280,7 @@ Qed.
 
 Lemma linkedListSegment_append : forall q r x ls p,
   q <> 0
-  -> linkedListSegment p ls q * q |-> x * (q+1) |-> r ===> linkedListSegment p (ls ++ x :: nil) r.
+  -> linkedListSegment p ls q * q |--> [x; r] ===> linkedListSegment p (ls ++ x :: nil) r.
 Proof.
   induct ls; cancel; auto.
   subst; cancel.

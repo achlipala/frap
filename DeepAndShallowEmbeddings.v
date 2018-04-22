@@ -22,9 +22,9 @@ Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 Hint Rewrite max_l max_r using linear_arithmetic.
 
 Ltac simp := repeat (simplify; subst; propositional;
-                    try match goal with
-                        | [ H : ex _ |- _ ] => invert H
-                        end); try linear_arithmetic.
+                     try match goal with
+                         | [ H : ex _ |- _ ] => invert H
+                         end); try linear_arithmetic.
 
 
 (** * Basic concepts of shallow, deep, and mixed embeddings *)
@@ -510,7 +510,7 @@ End Deep.
 Module Deeper.
   (* All programs in the last embedding must terminate, but let's add loops with
    * the potential to run forever, which takes us beyond what is representable
-   * in the shallow embedding, since Gallina enforces terminating of all
+   * in the shallow embedding, since Gallina enforces termination for all
    * programs. *)
 
   (* We use this type to represent the outcome of a single loop iteration.

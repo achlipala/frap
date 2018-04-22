@@ -17,9 +17,9 @@ Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 Hint Rewrite max_l max_r using linear_arithmetic.
 
 Ltac simp := repeat (simplify; subst; propositional;
-                    try match goal with
-                        | [ H : ex _ |- _ ] => invert H
-                        end); try linear_arithmetic.
+                     try match goal with
+                         | [ H : ex _ |- _ ] => invert H
+                         end); try linear_arithmetic.
 
 
 (** * Basic concepts of shallow, deep, and mixed embeddings *)

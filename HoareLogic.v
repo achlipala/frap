@@ -6,6 +6,8 @@
 Require Import Frap.
 
 
+
+
 (** * Syntax and semantics of a simple imperative language *)
 
 (* Here's some appropriate syntax for expressions (side-effect-free) of a simple
@@ -188,7 +190,7 @@ Notation "'assert' {{ I }}" := (Assert I) (at level 75).
 Delimit Scope cmd_scope with cmd.
 
 Infix "+" := plus : reset_scope.
-Infix "-" := minus : reset_scope.
+Infix "-" := Init.Nat.sub : reset_scope.
 Infix "*" := mult : reset_scope.
 Infix "=" := eq : reset_scope.
 Infix "<" := lt : reset_scope.

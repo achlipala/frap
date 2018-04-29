@@ -738,8 +738,8 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
 
   Lemma hoare_triple_sound' : forall P {result} (c : cmd result) Q,
       hoare_triple P c Q
-      -> P $0
-      -> invariantFor (trsys_of $0 c)
+      -> forall h, P h
+      -> invariantFor (trsys_of h c)
                       (fun p =>
                          hoare_triple (fun h' => h' = fst p)
                                       (snd p)
@@ -761,8 +761,8 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
 
   Theorem hoare_triple_sound : forall P {result} (c : cmd result) Q,
       hoare_triple P c Q
-      -> P $0
-      -> invariantFor (trsys_of $0 c)
+      -> forall h, P h
+      -> invariantFor (trsys_of h c)
                       (fun p => (exists r, snd p = Return r)
                                 \/ (exists p', step p p')).
   Proof.
@@ -1205,9 +1205,17 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Definition adder_compiled := Eval simpl in proj1_sig translate_adder.
 
+  Record heaps_compat (H : DE.heap) (h : ME.heap) : Prop := {
+    DeepToMixedHd : forall a v1 v2, H $? a = Some (v1, v2) -> h $? a = Some v1;
+    DeepToMixedTl : forall a v1 v2, H $? a = Some (v1, v2) -> h $? (a ^+ ^1) = Some v2;
+    MixedToDeep : forall a v1 v2, h $? a = Some v1 -> h $? (a ^+ ^1) = Some v2
+                                  -> H $? a = Some (v1, v2)
+  }.
+
   Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
   | Translated : forall A H h V s (c : cmd A),
       translate "result" V c s
+      -> heaps_compat H h
       -> translated (H, V, s) (h, c).
 
   Lemma eval_translate : forall H V e v,
@@ -1243,19 +1251,22 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       DE.step (H, V, s) (H', V', s')
       -> forall h (c : cmd wrd) out,
         translate out V c s
-        -> exists c', ME.step^* (h, c) (h, c')
-                      /\ translate out V' c' s'.
+        -> heaps_compat H h
+        -> exists c' h', ME.step^* (h, c) (h', c')
+                         /\ translate out V' c' s'
+                         /\ heaps_compat H' h'.
   Proof.
     induct 1; invert 1; simplify.
 
     apply inj_pair2 in H1; subst.
     eapply eval_translate in H5; eauto; subst.
-    eexists; propositional.
+    do 2 eexists; propositional.
     eauto.
     apply TrReturned; simplify; auto.
+    assumption.
 
     apply inj_pair2 in H0; subst.
-    eexists; propositional.
+    do 2 eexists; propositional.
     eapply TrcFront.
     eauto.
     eauto.
@@ -1263,10 +1274,11 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     assumption.
     maps_equal.
     symmetry; assumption.
+    assumption.
 
     apply inj_pair2 in H2; subst.
     invert H0.
-    eexists; propositional.
+    do 2 eexists; propositional.
     eauto.
     eapply TrAssigned with (x := x).
     eapply eval_translate in H7; eauto.
@@ -1277,12 +1289,14 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate _ ?V' _ _ ] => replace V' with (V $+ (x, v)) by (maps_equal; equality)
     end.
     eauto.
+    assumption.
 
     invert H0.
   Qed.
 
   Theorem translated_simulates : forall H V c h s,
       translate "result" V c s
+      -> heaps_compat H h
       -> simulates (translated (A := wrd)) (DE.trsys_of H V s) (ME.multistep_trsys_of h c).
   Proof.
     constructor; simplify.
@@ -1292,16 +1306,18 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
     eassumption.
     eauto.
+    auto.
 
-    invert H1.
-    apply inj_pair2 in H4; subst.
+    invert H2.
+    apply inj_pair2 in H5; subst.
     cases st1'.
     cases p.
-    eapply step_translate in H2; eauto.
-    first_order.
+    eapply step_translate in H6; eauto.
+    simp.
     eexists; split; [ | eassumption ].
     econstructor.
     assumption.
+    eauto.
   Qed.
 
   Hint Constructors eval DE.step.
@@ -1339,12 +1355,13 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
   Qed.
 
-  Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s,
+  Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s h H,
       hoare_triple P c Q
-      -> P $0
+      -> P h
+      -> heaps_compat H h
       -> translate "result" V c s
       -> V $? "result" = None
-      -> invariantFor (DE.trsys_of $0 V s)
+      -> invariantFor (DE.trsys_of H V s)
                       (fun p => snd p = Skip
                                 \/ exists p', DE.step p p').
   Proof.
@@ -1353,23 +1370,24 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply invariant_simulates.
     apply translated_simulates.
     eassumption.
-    apply invariant_multistepify with (sys := trsys_of $0 c).
+    eassumption.
+    apply invariant_multistepify with (sys := trsys_of h c).
     eauto using hoare_triple_sound.
-    invert 1; first_order.
+    invert 1; simp.
 
     cases st2; simplify; subst.
-    invert H4; simplify.
-    apply inj_pair2 in H9; subst.
-    invert H8.
-    apply inj_pair2 in H4; subst.
+    invert H6; simplify.
+    apply inj_pair2 in H8; subst.
+    invert H11.
+    apply inj_pair2 in H6; subst.
     right; eexists.
     econstructor; eauto.
     auto.
 
-    invert H4.
-    apply inj_pair2 in H6; subst; simplify.
+    invert H6; simp.
+    apply inj_pair2 in H8; subst; simplify.
     cases x.
-    eapply not_stuck in H3; eauto.
+    eapply not_stuck in H7; eauto.
   Qed.
 
   Theorem adder_ok : forall a b c,
@@ -1398,6 +1416,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply hoare_triple_sound.
     apply adder_ok.
     constructor; auto.
+    constructor; simplify; equality.
     apply (proj2_sig translate_adder).
     simplify; equality.
   Qed.

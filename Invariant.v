@@ -80,3 +80,21 @@ Definition parallel shared private1 private2
   Initial := parallel1 sys1.(Initial) sys2.(Initial);
   Step := parallel2 sys1.(Step) sys2.(Step)
 |}.
+
+
+(** * Switching to multistep versions of systems *)
+
+Lemma trc_idem : forall A (R : A -> A -> Prop) x1 x2,
+    R^*^* x1 x2
+    -> R^* x1 x2.
+Proof.
+  induction 1; eauto using trc_trans.
+Qed.
+
+Theorem invariant_multistepify : forall {state} (sys : trsys state)
+  (invariant : state -> Prop),
+  invariantFor sys invariant
+  -> invariantFor {| Initial := Initial sys; Step := (Step sys)^* |} invariant.
+Proof.
+  unfold invariantFor; simpl; intuition eauto using trc_idem.
+Qed.

@@ -503,12 +503,12 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
       -> hoare_triple Q s2 R
       -> hoare_triple P (Seq s1 s2) R
   | HtIfThenElse : forall P e s1 s2 Q R,
-      hoare_triple_exp P e Q
+      hoare_triple_exp P e (fun r V => Q r V * exists n, [| r = VScalar n |])%sep
       -> hoare_triple (fun V => exists n, Q (VScalar n) V * [| n <> ^0 |])%sep s1 R
       -> hoare_triple (fun V => Q (VScalar (^0)) V)%sep s2 R
       -> hoare_triple P (IfThenElse e s1 s2) R
   | HtWhileLoop : forall I e s1 Q,
-      hoare_triple_exp I e Q
+      hoare_triple_exp I e (fun r V => Q r V * exists n, [| r = VScalar n |])%sep
       -> hoare_triple (fun V => exists n, Q (VScalar n) V * [| n <> ^0 |])%sep s1 I
       -> hoare_triple I (WhileLoop e s1) (Q (VScalar (^0)))
   | HtConsequence : forall P s Q P' Q',
@@ -863,7 +863,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
 
   Lemma invert_IfThenElse : forall P e s1 s2 Q,
     hoare_triple P (IfThenElse e s1 s2) Q
-    -> exists R, hoare_triple_exp P e R
+    -> exists R, hoare_triple_exp P e (fun r V => R r V * exists n, [| r = VScalar n |])%sep
                  /\ hoare_triple (fun V => exists n, R (VScalar n) V * [| n <> ^0 |])%sep s1 Q
                  /\ hoare_triple (fun V => R (VScalar (^0)) V)%sep s2 Q.
   Proof.
@@ -873,6 +873,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     eapply HtExpConsequence.
     eassumption.
     assumption.
+    simplify.
     reflexivity.
     eapply HtStrengthen.
     eassumption.
@@ -882,6 +883,13 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     assumption.
 
     exists (fun r V => x r V * R V)%sep; propositional.
+    eapply HtExpConsequence.
+    eapply HtExpFrame.
+    eauto.
+    simplify.
+    reflexivity.
+    simplify.
+    cancel.
     eauto.
     eapply HtWeaken.
     eapply HtFrame.
@@ -903,7 +911,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   Lemma invert_WhileLoop : forall P e s1 Q,
     hoare_triple P (WhileLoop e s1) Q
     -> exists I R, (forall V, P V ===> I V)
-                   /\ hoare_triple_exp I e R
+                   /\ hoare_triple_exp I e (fun r V => R r V * exists n, [| r = VScalar n |])%sep
                    /\ hoare_triple (fun V => exists n, R (VScalar n) V * [| n <> ^0 |])%sep s1 I
                    /\ (forall V, R (VScalar (^0)) V ===> Q V).
   Proof.
@@ -917,6 +925,13 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
 
     exists (fun V => x V * R V)%sep, (fun r V => x0 r V * R V)%sep; propositional.
     rewrite H1; reflexivity.
+    eapply HtExpConsequence.
+    eapply HtExpFrame.
+    eauto.
+    simplify.
+    reflexivity.
+    simplify.
+    cancel.
     eauto.
     eapply HtWeaken.
     eauto.
@@ -1055,6 +1070,11 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     unfold himp; propositional; subst.
     eapply preservation_exp in H0; eauto.
     exists n, H', $0; propositional; eauto.
+    invert H0; simp.
+    invert H7.
+    invert H6.
+    apply split_empty_fwd in H4; subst.
+    auto.
     constructor; auto.
     simplify; auto.
 
@@ -1063,6 +1083,19 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     simplify.
     unfold himp; propositional; subst.
     eapply preservation_exp in H0; eauto.
+    eapply HtExpConsequence.
+    eauto.
+    simplify.
+    instantiate (1 := fun V H'0 => H'0 = H' /\ V = V').
+    simplify.
+    reflexivity.
+    simplify.
+    unfold himp; simplify.
+    invert H3; simp.
+    invert H7.
+    invert H6.
+    apply split_empty_fwd in H4; subst.
+    auto.
     simplify; auto.
 
     apply invert_WhileLoop in H; first_order.
@@ -1072,6 +1105,11 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     unfold himp; propositional; subst.
     eapply preservation_exp in H0; eauto.
     exists n, H', $0; propositional; eauto.
+    invert H0; simp.
+    invert H8.
+    invert H7.
+    apply split_empty_fwd in H5; subst.
+    auto.
     constructor; auto.
     apply H; simplify; auto.
     eapply HtStrengthen.
@@ -1084,6 +1122,12 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     unfold himp; propositional; subst.
     eapply preservation_exp in H0; eauto.
     apply H3; auto.
+    simplify.
+    invert H0; simp.
+    invert H7.
+    invert H6.
+    apply split_empty_fwd in H4; subst.
+    auto.
     apply H; simplify; auto.
   Qed.
 
@@ -1112,6 +1156,200 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     eapply preservation; eauto.
   Qed.
 
+  Lemma progress_exp : forall P e Q,
+      hoare_triple_exp P e Q
+      -> forall V H H1 H2, split H H1 H2
+                           -> disjoint H1 H2
+                           -> P V H1
+                           -> exists v, eval H V e v.
+  Proof.
+    induct 1; simplify; eauto.
+
+    invert H4.
+    invert H5.
+    eauto.
+
+    invert H4.
+    invert H5.
+    eexists.
+    econstructor.
+    eauto.
+
+    invert H4.
+    invert H5; simp.
+    invert H6.
+    apply split_empty_fwd' in H4; subst.
+    invert H8.
+    invert H1; simp.
+    invert H6.
+    cases x1.
+    eexists.
+    econstructor.
+    eauto.
+    unfold heap1, split in *; subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    simplify.
+    eauto.
+    eapply lookup_Some_dom; simplify; sets.
+    eapply lookup_Some_dom; simplify.
+    rewrite lookup_join1.
+    simplify; eauto.
+    eapply lookup_Some_dom; simplify; sets.
+
+    invert H4.
+    invert H5; simp.
+    invert H6.
+    apply split_empty_fwd' in H4; subst.
+    invert H8.
+    invert H1; simp.
+    invert H6.
+    cases x1.
+    eexists.
+    econstructor.
+    eauto.
+    unfold heap1, split in *; subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    simplify.
+    eauto.
+    eapply lookup_Some_dom; simplify; sets.
+    eapply lookup_Some_dom; simplify.
+    rewrite lookup_join1.
+    simplify; eauto.
+    eapply lookup_Some_dom; simplify; sets.
+
+    invert H4.
+    invert H5.
+    eauto.
+
+    eapply IHhoare_triple_exp; eauto.
+    apply H0; auto.
+
+    invert H5; simp.
+    eapply IHhoare_triple_exp in H7; eauto.
+  Qed.
+
+  Lemma progress : forall P s Q,
+      hoare_triple P s Q
+      -> forall V H H1 H2, split H H1 H2
+                           -> disjoint H1 H2
+                           -> P V H1
+                           -> s = Skip \/ (exists H' V' s', step (H, V, s) (H', V', s')).
+  Proof.
+    induct 1; simplify; eauto.
+
+    eapply (progress_exp _ _ _ H) in H5; eauto.
+    simp.
+    right; do 3 eexists.
+    econstructor.
+    eauto.
+
+    pose proof (progress_exp _ _ _ H _ _ _ _ H3 H4 H5) as Hprog.
+    invert Hprog.
+    assert (Hdropped : eval H1 V e x0).
+    eapply drop_cells; eauto.
+    unfold split in H3; subst.
+    simplify.
+    rewrite lookup_join1; auto.
+    eapply lookup_Some_dom; eauto.
+    pose proof (preservation_exp _ _ _ H _ _ _ H5 Hdropped) as Hpres.
+    simplify.
+    invert Hpres.
+    invert H7; simp.
+    invert H9.
+    apply split_empty_fwd' in H8; subst.
+    invert H11.
+    invert H1.
+    invert H8; simp.
+    invert H9.
+    right; do 3 eexists.
+    econstructor.
+    eauto.
+    eauto.
+    unfold heap1, split in *; subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    simplify.
+    eauto.
+    eapply lookup_Some_dom; simplify; sets.
+    eapply lookup_Some_dom; simplify.
+    rewrite lookup_join1.
+    simplify; eauto.
+    eapply lookup_Some_dom; simplify; sets.
+
+    pose proof (progress_exp _ _ _ H _ _ _ _ H3 H4 H5) as Hprog.
+    invert Hprog.
+    assert (Hdropped : eval H1 V e x0).
+    eapply drop_cells; eauto.
+    unfold split in H3; subst.
+    simplify.
+    rewrite lookup_join1; auto.
+    eapply lookup_Some_dom; eauto.
+    pose proof (preservation_exp _ _ _ H _ _ _ H5 Hdropped) as Hpres.
+    simplify.
+    invert Hpres.
+    invert H7; simp.
+    invert H9.
+    apply split_empty_fwd' in H8; subst.
+    invert H11.
+    invert H1.
+    invert H8; simp.
+    invert H9.
+    right; do 3 eexists.
+    econstructor.
+    eauto.
+    eauto.
+    unfold heap1, split in *; subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    simplify.
+    eauto.
+    eapply lookup_Some_dom; simplify; sets.
+    eapply lookup_Some_dom; simplify.
+    rewrite lookup_join1.
+    simplify; eauto.
+    eapply lookup_Some_dom; simplify; sets.
+
+    specialize (IHhoare_triple1 _ _ _ _ H4 H5 H6); simp; eauto 6.
+
+    pose proof (progress_exp _ _ _ H _ _ _ _ H5 H6 H7) as Hprog.
+    invert Hprog.
+    assert (Hdropped : eval H3 V e x).
+    eapply drop_cells; eauto.
+    unfold split in H5; subst.
+    simplify.
+    rewrite lookup_join1; auto.
+    eapply lookup_Some_dom; eauto.
+    pose proof (preservation_exp _ _ _ H _ _ _ H7 Hdropped) as Hpres.
+    simplify.
+    invert Hpres; simp.
+    invert H13.
+    invert H12.
+    cases (weq x2 (^0)); subst; eauto 10.
+
+    pose proof (progress_exp _ _ _ H _ _ _ _ H4 H5 H6) as Hprog.
+    invert Hprog.
+    assert (Hdropped : eval H2 V e x).
+    eapply drop_cells; eauto.
+    unfold split in H4; subst.
+    simplify.
+    rewrite lookup_join1; auto.
+    eapply lookup_Some_dom; eauto.
+    pose proof (preservation_exp _ _ _ H _ _ _ H6 Hdropped) as Hpres.
+    simplify.
+    invert Hpres; simp.
+    invert H12.
+    invert H11.
+    cases (weq x2 (^0)); subst; eauto 10.
+
+    apply H0 in H7.
+    eapply IHhoare_triple in H7; eauto.
+
+    invert H6; simp.
+    eapply IHhoare_triple in H8; eauto.
+  Qed.
+
   Theorem hoare_triple_sound : forall P s Q,
       hoare_triple P s Q
       -> forall H V, P V H
@@ -1123,6 +1361,17 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     eapply invariant_weaken.
     eapply hoare_triple_sound'; eauto.
     simplify.
-  Admitted.
+
+    cases s0.
+    cases p.
+    simplify.
+    pose proof (progress _ _ _ H2 v h h $0) as Hprog; simplify.
+    cases Hprog; eauto.
+    subst.
+    eapply invert_Skip in H2.
+    left; propositional.
+    apply H2; auto.
+    first_order.
+  Qed.
 
 End DeeplyEmbedded.

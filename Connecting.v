@@ -1270,7 +1270,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate _ ?V (Bind (Write _ _) _) _ ] =>
       eapply TrWrite
     | [ |- translate _ ?V (Bind (Loop _ _) _) _ ] =>
-      eapply TrLoop; [ | intros | intros ]
+      eapply TrLoop; [ simplify; equality | simplify; equality | | intros | intros ]
     end.
 
   Example adder (a b c : wrd) :=
@@ -1324,7 +1324,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
                                     Return (Again next_data)))
          (fun pr => Return (snd pr)).
 
-  (*Lemma translate_summer : sig (fun s =>
+  Lemma translate_summer : sig (fun s =>
         forall p, translate (rt := OneWord) translate_result ($0 $+ ("p", p)) (summer p) s).
   Proof.
     eexists; simplify.
@@ -1332,7 +1332,32 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     repeat translate.
   Defined.
 
-  Definition summer_compiled := Eval simpl in proj1_sig translate_summer.*)
+  Definition summer_compiled := Eval simpl in proj1_sig translate_summer.
+
+  (* We restate the program to accommodate limitations in the tactics! *)
+  Definition reverse_alt p :=
+    pr <- for pr := (p, ^0) loop
+      let (p, r) := pr in
+      if weq p (^0) then
+        Return (Done pr)
+      else
+        pr' <- (tmp <- Read (p ^+ ^1);
+                _ <- Write (p ^+ ^1) r;
+                copy <- Return p;
+                Return (tmp, copy));
+        Return (Again pr')
+    done;
+    Return (snd pr).
+
+  Lemma translate_reverse_alt : sig (fun s =>
+        forall p, translate (rt := OneWord) translate_result ($0 $+ ("p", p)) (reverse_alt p) s).
+  Proof.
+    eexists; simplify.
+    unfold reverse_alt.
+    repeat translate.
+  Defined.
+
+  Definition reverse_alt_compiled := Eval simpl in proj1_sig translate_reverse_alt.
 
   Lemma eval_translate : forall H V V' e v,
       eval H (V $++ V') e v

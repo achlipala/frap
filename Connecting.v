@@ -1481,8 +1481,6 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
                                \/ exists x v, V'' = V $++ V' $+ (x, v)
                                  /\ translate (rt := OneWord) translate_result (V $+ (x, v)) c' s').
   Proof.
-  Admitted.
-  (*
     induct 1.
 
     invert H; invert 1; simplify.
@@ -1768,8 +1766,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     2: eapply TrLoop4; eauto.
     2: simplify; equality.
     2: simplify; equality.
-    admit.
-    (*maps_equal.
+    maps_equal.
     cases (V $? k).
     rewrite lookup_join1.
     rewrite lookup_join1.
@@ -1790,27 +1787,106 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply lookup_Some_dom.
     rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
     eassumption.
-    cases (k ==s i).
+    cases (k ==v "i"); subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; assumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (k ==v "acc"); subst.
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; assumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     cases (V' $? k).
     rewrite lookup_join1.
     rewrite lookup_join1.
-    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join2.
     rewrite lookup_join1.
-    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).    
     equality.
     eapply lookup_Some_dom.
     rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
     eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
     eapply lookup_Some_dom.
-    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
     eassumption.
     eapply lookup_Some_dom.
     rewrite lookup_join1.
-    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
     eassumption.
     eapply lookup_Some_dom.
-    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
-    eassumption.*)
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    repeat rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    assumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    assumption.
 
     replace (V $++ V' $++ V'' $++ V'0) with ((V $++ V') $++ (V'' $++ V'0)) in H7.
     eapply step_translate_loop in H7; eauto.
@@ -1821,12 +1897,158 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply multistep_bind.
     eassumption.
     left; propositional.
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     do 2 eexists; split.
     2: eapply TrLoop6; eauto.
     instantiate (2 := V'').
     instantiate (1 := V'0).
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
 
     eexists; split.
     eapply multistep_bind.
@@ -1836,14 +2058,136 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     right; do 2 eexists; split.
     instantiate (2 := "i").
     instantiate (1 := x1).
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     replace (V $++ V' $++ V'' $+ ("i", x1)) with (V $++ (V' $+ ("i", x1)) $++ V'').
     eapply TrLoop6; eauto.
     replace (V $++ (V' $+ ("i", x1))) with (V $++ V' $+ ("i", x1)).
     assumption.
-    admit.
-    admit.
-
+    maps_equal.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    maps_equal.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eauto.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    repeat rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; assumption.
     eexists; split.
     eapply multistep_bind.
     eapply multistep_bind.
@@ -1852,13 +2196,136 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     right; do 2 eexists; split.
     instantiate (2 := "acc").
     instantiate (1 := x1).
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     replace (V $++ V' $++ V'' $+ ("acc", x1)) with (V $++ (V' $+ ("acc", x1)) $++ V'').
     eapply TrLoop6; eauto.
     replace (V $++ (V' $+ ("acc", x1))) with (V $++ V' $+ ("acc", x1)).
     assumption.
-    admit.
-    admit.
+    maps_equal.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    maps_equal.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).    
+    simplify; equality.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    repeat rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; assumption.
 
     eexists; split.
     eapply multistep_bind.
@@ -1868,16 +2335,247 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     right; do 2 eexists; split.
     instantiate (2 := x0).
     instantiate (1 := x1).
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     replace (V $++ V' $++ V'' $+ (x0, x1)) with (V $++ (V' $+ (x0, x1)) $++ V'').
     eapply TrLoop6; eauto.
     replace (V $++ (V' $+ (x0, x1))) with (V $++ V' $+ (x0, x1)).
     assumption.
-    admit.
-    admit.
+    maps_equal.
+    rewrite lookup_join2.
+    simplify.
+    equality.
+    eapply lookup_None_dom.
+    cases (V $? k); auto.
+    rewrite lookup_join1 in H5.
+    equality.
+    eapply lookup_Some_dom; eassumption.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    maps_equal.
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    simplify.
+    equality.
+    eapply lookup_None_dom.
+    cases (V $? k); auto.
+    rewrite lookup_join1 in H5.
+    equality.
+    eapply lookup_Some_dom; eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    simplify; equality.
+    eapply lookup_None_dom.
+    cases (V $? k); auto.
+    rewrite lookup_join1 in H5.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    repeat rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; eassumption.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.    
 
-    admit.
-  Qed.*)
+    Unshelve.
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+  Qed.
 
   Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
   | Translated : forall A H V V' s (c : cmd A),
@@ -2112,7 +2810,80 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
     replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
     eassumption.
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
 
     apply inj_pair2 in H12; subst.
     specialize (invert_Return _ _ _ _ H1); invert 1.
@@ -2120,14 +2891,160 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     repeat econstructor.
     replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
     eauto.
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     eexists.
     repeat econstructor.
     eexists.
     repeat econstructor.
     replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
     eauto.
-    admit.
+    maps_equal.
+    cases (V $? k).
+    repeat rewrite lookup_join1.
+    equality.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V'' $? k).
+    rewrite lookup_join2.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    rewrite lookup_join2.
+    equality.
+    eapply lookup_None_dom.
+    rewrite lookup_join2.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_None_dom.
+    eassumption.
+    eapply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
     eexists.
     repeat econstructor.
 
@@ -2157,7 +3074,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
-  Admitted.
+  Qed.
 
   Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s H,
       hoare_triple P c Q

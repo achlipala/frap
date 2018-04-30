@@ -1054,39 +1054,193 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | WhileLoop _ s1 => couldWrite x s1
     end.
 
-  Inductive translate_result (out : var) (V : valuation) (v : wrd) : stmt -> Prop :=
+  Inductive translate_result (V : valuation) (v : wrd) : stmt -> Prop :=
   | TrReturn : forall e,
       translate_exp V v e
-      -> translate_result out V v (Assign out e)
+      -> translate_result V v (Assign "result" e)
   | TrReturned :
-      V $? out = Some v
-      -> translate_result out V v Skip.
+      V $? "result" = Some v
+      -> translate_result V v Skip.
 
-  Inductive translate {RT : Set} (translate_return : valuation -> RT -> stmt -> Prop)
-    : valuation -> forall {A}, cmd A -> stmt -> Prop :=
-  | TrDone : forall V (v : RT) s,
+  Inductive translate_loop_body (V : valuation) (v1_v2 : wrd * wrd) : stmt -> Prop :=
+  | TrlReturn : forall e1 e2,
+      translate_exp V (fst v1_v2) e1
+      -> translate_exp (V $+ ("i", fst v1_v2)) (snd v1_v2) e2
+      -> translate_loop_body V v1_v2 (Seq (Assign "i" e1) (Assign "acc" e2))
+  | TrlReturned1 : forall e2,
+      V $? "i" = Some (fst v1_v2)
+      -> translate_exp V (snd v1_v2) e2
+      -> translate_loop_body V v1_v2 (Seq Skip (Assign "acc" e2))
+  | TrlReturned2 : forall e2,
+      V $? "i" = Some (fst v1_v2)
+      -> translate_exp V (snd v1_v2) e2
+      -> translate_loop_body V v1_v2 (Assign "acc" e2)
+  | TrlReturned3 :
+      V $? "i" = Some (fst v1_v2)
+      -> V $? "acc" = Some (snd v1_v2)
+      -> translate_loop_body V v1_v2 Skip.
+
+  Inductive return_type := OneWord | TwoWords.
+
+  Definition rtt (rt : return_type) :=
+    match rt with
+    | OneWord => wrd
+    | TwoWords => wrd * wrd
+    end%type.
+
+  Inductive translate 
+    : forall {rt}, (valuation -> rtt rt -> stmt -> Prop)
+                 -> valuation -> forall {A}, cmd A -> stmt -> Prop :=
+  | TrDone : forall {rt} (translate_return : valuation -> rtt rt -> stmt -> Prop) V (v : rtt rt) s,
       translate_return V v s
       -> translate translate_return V (Return v) s
-  | TrAssign : forall V B (v : wrd) (c : wrd -> cmd B) e x s1,
-      translate_exp V v e
+  | TrAssign : forall {rt} (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (v : wrd) (c : wrd -> cmd B) e x s1,
+      V $? x = None
+      -> x <> "i"
+      -> x <> "acc"
+      -> translate_exp V v e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
       -> translate translate_return V (Bind (Return v) c) (Seq (Assign x e) s1)
-  | TrAssigned : forall V B (v : wrd) (c : wrd -> cmd B) x s1,
+  | TrAssigned : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (v : wrd) (c : wrd -> cmd B) x s1,
       V $? x = Some v
       -> translate translate_return V (c v) s1
       -> translate translate_return V (Bind (Return v) c) (Seq Skip s1)
-  | TrRead : forall V B (a : wrd) (c : wrd -> cmd B) e x s1,
-      translate_exp V a e
+  | TrRead : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (a : wrd) (c : wrd -> cmd B) e x s1,
+      V $? x = None
+      -> x <> "i"
+      -> x <> "acc"
+      -> translate_exp V a e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
       -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (DE.Read e)) s1)
-  | TrWrite : forall V B a v (c : unit -> cmd B) ae ve s1,
+  | TrWrite : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B a v (c : unit -> cmd B) ae ve s1,
       translate_exp V a ae
       -> translate_exp V v ve
       -> translate translate_return V (c tt) s1
       -> translate translate_return V (Bind (Write a v) c) (Seq (DE.Write ae ve) s1)
-  | TrAssignedUnit : forall V B (c : unit -> cmd B) s1,
+  | TrAssignedUnit : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (c : unit -> cmd B) s1,
       translate translate_return V (c tt) s1
-      -> translate translate_return V (Bind (Return tt) c) (Seq Skip s1).
+      -> translate translate_return V (Bind (Return tt) c) (Seq Skip s1)
+  | TrLoop : forall V (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) ea s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> translate_exp V initA ea
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result V
+                   (Bind (Loop (initA, initB)
+                               (fun pr =>
+                                  let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    p' <- body p r;
+                                    Return (Again p'))) c)
+                   (Seq (Assign "i" ea)
+                        (Seq (Assign "acc" (Const initB))
+                             (Seq (WhileLoop (Var "i") s1)
+                                  s2)))
+  | TrLoop1 : forall V (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $+ ("i", initA))
+                   (Bind (Loop (initA, initB)
+                               (fun pr =>
+                                  let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    p' <- body p r;
+                                    Return (Again p'))) c)
+                   (Seq Skip
+                        (Seq (Assign "acc" (Const initB))
+                             (Seq (WhileLoop (Var "i") s1)
+                                  s2)))
+  | TrLoop2 : forall V (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $+ ("i", initA))
+                   (Bind (Loop (initA, initB)
+                               (fun pr =>
+                                  let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    p' <- body p r;
+                                    Return (Again p'))) c)
+                   (Seq (Assign "acc" (Const initB))
+                        (Seq (WhileLoop (Var "i") s1)
+                             s2))
+  | TrLoop3 : forall V (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $+ ("i", initA) $+ ("acc", initB))
+                   (Bind (Loop (initA, initB)
+                               (fun pr =>
+                                  let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    p' <- body p r;
+                                    Return (Again p'))) c)
+                   (Seq Skip
+                        (Seq (WhileLoop (Var "i") s1)
+                             s2))
+  | TrLoop4 : forall V V' (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> V' $? "i" = Some initA
+      -> V' $? "acc" = Some initB
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $++ V')
+                   (Bind (Loop (initA, initB)
+                               (fun pr =>
+                                  let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    p' <- body p r;
+                                    Return (Again p'))) c)
+                   (Seq (WhileLoop (Var "i") s1)
+                        s2)
+  | TrLoop5 : forall V V' (initA initB : wrd) {A} (c : wrd * wrd -> cmd A) s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> V' $? "i" = Some initA
+      -> V' $? "acc" = Some initB
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $++ V')
+                   (Bind (Return (initA, initB)) c)
+                   (Seq Skip s2)
+  | TrLoop6 : forall V V' V'' body' body {A} (c : wrd * wrd -> cmd A) s' s1 s2,
+      V $? "i" = None
+      -> V $? "acc" = None
+      -> translate (rt := TwoWords) translate_loop_body (V $++ V') body' s'
+      -> (forall w1 w2, translate (rt := TwoWords) translate_loop_body (V $+ ("i", w1) $+ ("acc", w2)) (body w1 w2) s1)
+      -> (forall w1 w2, translate (rt := OneWord) translate_result (V $+ ("i", w1) $+ ("acc", w2)) (c (w1, w2)) s2)
+      -> translate (rt := OneWord) translate_result (V $++ V' $++ V'')
+                   (Bind (Bind (Bind body' (fun p' => Return (Again p')))
+                               (fun o =>
+                                  match o with
+                                  | Done a => Return a
+                                  | Again a =>
+                                    Loop a
+                                         (fun pr : wrd * wrd =>
+                                            let (p, r) := pr in
+                                            if weq p (^0) then
+                                              Return (Done pr)
+                                            else
+                                              p' <- body p r;
+                                              Return (Again p'))
+                                  end))
+                         c)
+                   (Seq (Seq s' (WhileLoop (Var "i") s1)) s2).
 
   Ltac freshFor vm k :=
     let rec keepTrying x :=
@@ -1096,7 +1250,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
         || let x' := eval simpl in (x ++ "'")%string in keepTrying x' in
     keepTrying "tmp".
 
-  Ltac translate :=
+  Ltac translate := simpl;
     match goal with
     | [ |- translate_exp _ (_ ^+ _) _ ] => eapply TrAdd
     | [ |- translate_exp ?V ?v _ ] =>
@@ -1105,22 +1259,25 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       end
     | [ |- translate_exp _ _ _ ] => eapply TrConst
 
-    | [ |- translate _ _ (Return _) _ ] => apply TrDone; apply TrReturn
+    | [ |- translate _ _ (Return _) _ ] => (apply (@TrDone OneWord); apply TrReturn)
+                                           || (apply (@TrDone TwoWords); apply TrlReturn)
     | [ |- translate _ ?V (Bind (Return _) _) _ ] =>
       freshFor V ltac:(fun y =>
-                         eapply TrAssign with (x := y); [ | intro ])
+                         eapply TrAssign with (x := y); [ simplify; equality | equality | equality | | intro ])
     | [ |- translate _ ?V (Bind (Read _) _) _ ] =>
       freshFor V ltac:(fun y =>
-                         eapply TrRead with (x := y); [ | intro ])
+                         eapply TrRead with (x := y); [ simplify; equality | equality | equality | | intro ])
     | [ |- translate _ ?V (Bind (Write _ _) _) _ ] =>
       eapply TrWrite
+    | [ |- translate _ ?V (Bind (Loop _ _) _) _ ] =>
+      eapply TrLoop; [ | intros | intros ]
     end.
 
   Example adder (a b c : wrd) :=
     Bind (Return (a ^+ b)) (fun ab => Return (ab ^+ c)).
 
   Lemma translate_adder : sig (fun s =>
-        forall a b c, translate (translate_result "result") ($0 $+ ("a", a) $+ ("b", b) $+ ("c", c)) (adder a b c) s).
+        forall a b c, translate (rt := OneWord) translate_result ($0 $+ ("a", a) $+ ("b", b) $+ ("c", c)) (adder a b c) s).
   Proof.
     eexists; simplify.
     unfold adder.
@@ -1133,7 +1290,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     Bind (Read p1) (fun v1 => Bind (Read p2) (fun v2 => Return (v1 ^+ v2))).
 
   Lemma translate_reader : sig (fun s =>
-        forall p1 p2, translate (translate_result "result") ($0 $+ ("p1", p1) $+ ("p2", p2)) (reader p1 p2) s).
+        forall p1 p2, translate (rt := OneWord) translate_result ($0 $+ ("p1", p1) $+ ("p2", p2)) (reader p1 p2) s).
   Proof.
     eexists; simplify.
     unfold reader.
@@ -1146,7 +1303,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     Bind (Read p) (fun v => Bind (Write p (v ^+ ^1)) (fun _ => Return v)).
 
   Lemma translate_incrementer : sig (fun s =>
-        forall p, translate (translate_result "result") ($0 $+ ("p", p)) (incrementer p) s).
+        forall p, translate (rt := OneWord) translate_result ($0 $+ ("p", p)) (incrementer p) s).
   Proof.
     eexists; simplify.
     unfold incrementer.
@@ -1155,19 +1312,37 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Definition incrementer_compiled := Eval simpl in proj1_sig translate_incrementer.
 
-  Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
-  | Translated : forall A H V s (c : cmd A),
-      translate (translate_result "result") V c s
-      -> translated (H, V, s) (H, c).
+  Example summer (p : wrd) :=
+    Bind (Loop (p, ^0) (fun pr => let (p, r) := pr in
+                                  if weq p (^0) then
+                                    Return (Done pr)
+                                  else
+                                    next_data <-
+                                              (data <- Read p;
+                                               next <- Read (p ^+ ^1);
+                                               Return (next, data));
+                                    Return (Again next_data)))
+         (fun pr => Return (snd pr)).
 
-  Lemma eval_translate : forall H V e v,
-      eval H V e v
+  (*Lemma translate_summer : sig (fun s =>
+        forall p, translate (rt := OneWord) translate_result ($0 $+ ("p", p)) (summer p) s).
+  Proof.
+    eexists; simplify.
+    unfold summer.
+    repeat translate.
+  Defined.
+
+  Definition summer_compiled := Eval simpl in proj1_sig translate_summer.*)
+
+  Lemma eval_translate : forall H V V' e v,
+      eval H (V $++ V') e v
       -> forall (v' : wrd), translate_exp V v' e
       -> v = v'.
   Proof.
     induct 1; invert 1; simplify.
 
     apply inj_pair2 in H2; subst.
+    rewrite lookup_join1 in H0 by (eapply lookup_Some_dom; eauto).
     equality.
 
     apply inj_pair2 in H1; subst.
@@ -1189,80 +1364,537 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eauto.
   Qed.
 
-  Lemma step_translate : forall out V (c : cmd wrd) s,
-      translate (translate_result out) V c s
-      -> forall H H' V' s',
-        DE.step (H, V, s) (H', V', s')
-        -> exists c', ME.step^* (H, c) (H', c')
-                      /\ translate (translate_result out) V' c' s'.
+  Lemma eq_merge_zero : forall A B (m : fmap A B),
+      m $++ $0 = m.
   Proof.
+    simplify.
+    maps_equal.
+    cases (m $? k).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    assumption.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+  Qed.
+
+  Lemma step_translate_loop : forall V (c : cmd (wrd * wrd)) s,
+      translate (rt := TwoWords) translate_loop_body V c s
+      -> forall H H' V' V'' s',
+        DE.step (H, V $++ V', s) (H', V'', s')
+        -> exists c', ME.step^* (H, c) (H', c')
+                      /\ ((V'' = V $++ V'
+                           /\ translate (rt := TwoWords) translate_loop_body V c' s')
+                          \/ exists x v, V'' = V $++ V' $+ (x, v)
+                               /\ (x = "i" \/ x = "acc" \/ V $? x = None)
+                               /\ translate (rt := TwoWords) translate_loop_body (V $+ (x, v)) c' s').
+  Proof.
+    induct 1.
+
+    cases v; invert H; invert 1; simplify.
+
+    invert H5.
+    eapply eval_translate in H4; eauto; subst.
+    eexists; split.
+    eauto.
+    right; do 2 eexists; split.
+    eauto.
+    propositional.
+    apply (@TrDone TwoWords); apply TrlReturned1; simplify; auto.
+
+    eexists; propositional.
+    eauto.
+    left; propositional.
+    apply (@TrDone TwoWords); apply TrlReturned2; simplify; eauto.
+    invert H5.
+
+    eapply eval_translate in H5; eauto; subst.
+    eexists; propositional.
+    eauto.
+    right; do 2 eexists; split.
+    eauto.
+    propositional.
+    apply (@TrDone TwoWords); apply TrlReturned3; simplify; auto.
+
+    invert 1; simplify.
+    invert H9.
+    eapply eval_translate in H8; eauto; subst.
+    eexists; propositional.
+    eauto.
+    right; do 2 eexists; propositional.
+    econstructor.
+    instantiate (1 := x).
+    simplify; equality.
+    eauto.
+
+    invert 1; simplify.
+    eauto 10.
+    invert H5.
+
+    invert 1.
+    invert H9.
+    invert H8.
+    eapply eval_translate in H7; eauto; subst.
+    eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    eauto.
+    right; do 2 eexists; propositional.
+    econstructor.
+    instantiate (1 := x); simplify; equality.
+    eauto.
+
+    invert 1.
+    invert H6.
+    eapply eval_translate in H8; eauto; subst.
+    eapply eval_translate in H13; eauto; subst.
+    do 2 eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    eauto.
+    left; propositional.
+    eapply TrAssignedUnit.
+    assumption.
+    
+    invert 1.
+    eauto 7.
+    invert H4.
+  Qed.
+
+  Lemma translate_Skip : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop)
+                                (V : valuation) (c : cmd (rtt rt)),
+      translate translate_return V c Skip
+      -> exists v, c = Return v /\ translate_return V v Skip.
+  Proof.
+    invert 1.
+    apply inj_pair2 in H0; subst.
+    apply inj_pair2 in H2; subst.
+    eauto.
+  Qed.
+
+  Lemma step_translate : forall V (c : cmd wrd) s,
+      translate (rt := OneWord) translate_result V c s
+      -> forall H H' V' V'' s',
+        DE.step (H, V $++ V', s) (H', V'', s')
+        -> exists c', ME.step^* (H, c) (H', c')
+                           /\ ((V'' = V $++ V'
+                                /\ exists V''' V'''', V'' = V''' $++ V''''
+                                /\ translate (rt := OneWord) translate_result V''' c' s')
+                               \/ exists x v, V'' = V $++ V' $+ (x, v)
+                                 /\ translate (rt := OneWord) translate_result (V $+ (x, v)) c' s').
+  Proof.
+  Admitted.
+  (*
     induct 1.
 
     invert H; invert 1; simplify.
 
-    eapply eval_translate in H0; eauto; subst.
-    do 2 eexists; propositional.
+    eapply eval_translate in H4; eauto; subst.
+    eexists; propositional.
     eauto.
-    apply TrDone; apply TrReturned; simplify; auto.
+    right; do 2 eexists; propositional.
+    apply (@TrDone OneWord); apply TrReturned; simplify; auto.
 
     invert 1; simplify.
-    invert H6.
-    eapply eval_translate in H5; eauto; subst.
-    do 2 eexists; propositional.
+    invert H9.
+    eapply eval_translate in H8; eauto; subst.
+    eexists; propositional.
     eauto.
+    right; do 2 eexists; propositional.
     econstructor.
-    instantiate (1 := x); simplify.
-    reflexivity.
+    instantiate (1 := x); simplify; reflexivity.
     eauto.
 
     invert 1; simplify.
-    do 2 eexists; propositional.
+    eexists; propositional.
     eapply TrcFront.
     eauto.
     eauto.
-    assumption.
+    eauto 6.
     invert H5.
 
     invert 1.
-    invert H6.
-    invert H5.
-    eapply eval_translate in H4; eauto; subst.
-    simplify.
-    do 2 eexists; propositional.
+    invert H9.
+    invert H8.
+    eapply eval_translate in H7; eauto; subst.
+    eexists; propositional.
     eapply TrcFront.
     eauto.
     eauto.
+    right; do 2 eexists; propositional.
     econstructor.
     instantiate (1 := x); simplify; reflexivity.
     eauto.
 
     invert 1.
     invert H6.
-    eapply eval_translate in H0; eauto; subst.
-    eapply eval_translate in H; eauto; subst.
-    do 2 eexists; propositional.
+    eapply eval_translate in H8; eauto; subst.
+    eapply eval_translate in H13; eauto; subst.
+    eexists; propositional.
     eapply TrcFront.
     eauto.
     eauto.
+    left; propositional.
+    do 2 eexists; propositional.
     eapply TrAssignedUnit.
     assumption.
     
     invert 1.
-    eauto.
+    eauto 9.
     invert H4.
-  Qed.
+
+    invert 1.
+    invert H10.
+    eapply eval_translate in H9; eauto; subst.
+    eexists; propositional.
+    eauto.
+    right; do 2 eexists; propositional.
+    eapply TrLoop1; eauto.
+
+    invert 1.
+    eexists; propositional.
+    eauto.
+    left; propositional.
+    do 2 eexists; propositional.
+    eapply TrLoop2; eauto.
+    invert H9.
+
+    invert 1.
+    invert H9.
+    invert H8.
+    eexists; propositional.
+    eauto.
+    right; do 2 eexists; propositional.
+    eapply TrLoop3; eauto.
+
+    invert 1.
+
+    eexists; propositional.
+    eauto.
+    left; propositional.
+    do 2 eexists; propositional.
+    replace (V $+ ("i", initA) $+ ("acc", initB)) with (V $++ ($0 $+ ("i", initA) $+ ("acc", initB))).
+    eapply TrLoop4; eauto.
+    simplify; equality.
+    simplify; equality.
+    maps_equal.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (V $? k).
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    invert H9.
+
+    invert 1.
+    inversion_clear H11; subst.
+    invert H9.
+    rewrite lookup_join1 in H14.
+    rewrite lookup_join2 in H14 by (eapply lookup_None_dom; simplify; eauto).
+    match goal with
+    | [ H1 : _ $? "i" = _, H2 : _ $? "i" = _ |- _ ] =>
+      match type of H1 with
+      | ?E1 = _ =>
+        match type of H2 with
+        | ?E2 = _ =>
+          replace E2 with E1 in * by reflexivity
+        end
+      end
+    end.
+    rewrite H1 in H14; invert H14.
+    eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    simplify.
+    cases (weq n (^0 : wrd)).
+    equality.
+    eauto.
+    left; propositional.
+    do 2 eexists; propositional.
+    replace (V $++ V') with (V $++ ($0 $+ ("i", n) $+ ("acc", initB)) $++ V').
+    apply TrLoop6; eauto.
+    replace (V $++ ($0 $+ ("i", n) $+ ("acc", initB))) with (V $+ ("i", n) $+ ("acc", initB)).
+    eauto.
+    maps_equal.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (V $? k).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    maps_equal.
+    cases (V $? k).
+    rewrite lookup_join1.
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (k ==v "i"); subst.
+    rewrite lookup_join1.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify.
+    etransitivity; [ | symmetry; eassumption ].
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    cases (k ==v "acc"); subst.
+    rewrite lookup_join1.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify.
+    etransitivity; [ | symmetry; eassumption ].
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    rewrite lookup_join2.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    apply lookup_None_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).    
+    eassumption.
+    
+    invert H9.
+    rewrite lookup_join1 in H13.
+    rewrite lookup_join2 in H13 by (eapply lookup_None_dom; simplify; eauto).
+    match goal with
+    | [ H1 : _ $? "i" = _, H2 : _ $? "i" = _ |- _ ] =>
+      match type of H1 with
+      | ?E1 = _ =>
+        match type of H2 with
+        | ?E2 = _ =>
+          replace E2 with E1 in * by reflexivity
+        end
+      end
+    end.
+    rewrite H1 in H13; invert H13.
+    eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    simplify.
+    cases (weq (^0 : wrd) (^0 : wrd)).
+    eapply TrcFront.
+    eauto.
+    eauto.
+    exfalso; apply n; reflexivity.
+    left; propositional.
+    do 2 eexists; propositional.
+    apply TrLoop5; auto.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+
+    clear H4.
+    invert 1.
+    eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    eauto.
+    left; propositional.
+    do 2 eexists; split.
+    2: eauto.
+    instantiate (1 := V' $++ V'0).
+    maps_equal.
+    cases (V $? k).
+    rewrite lookup_join1.
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom; simplify; eauto.
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (k ==v "i"); subst.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom; simplify; eauto.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (k ==v "acc"); subst.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    simplify; equality.
+    eapply lookup_Some_dom; simplify; eauto.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom; simplify; eauto.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    rewrite lookup_join2.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
+    eapply lookup_None_dom; simplify; eauto.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    assumption.
+    invert H8.
+
+    clear H3 H5 IHtranslate.
+    invert 1.
+    invert H8.
+
+    apply translate_Skip in H1.
+    invert H1.
+    invert H3.
+    invert H5.
+    cases x; simplify.
+    rewrite lookup_join2 in H1 by (eapply lookup_None_dom; simplify; eauto).
+    rewrite lookup_join2 in H3 by (eapply lookup_None_dom; simplify; eauto).
+    eexists; split.
+    eapply TrcFront.
+    eapply StepBindRecur.
+    eapply StepBindRecur.
+    eauto.
+    eapply TrcFront.
+    eauto.
+    eauto.
+    left; propositional.
+    exists (V $++ ($0 $+ ("i", w) $+ ("acc", w0))), (V' $++ V'' $++ V'0).
+    split.
+    2: eapply TrLoop4; eauto.
+    2: simplify; equality.
+    2: simplify; equality.
+    admit.
+    (*maps_equal.
+    cases (V $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    cases (k ==s i).
+    cases (V' $? k).
+    rewrite lookup_join1.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    equality.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    eassumption.*)
+
+    replace (V $++ V' $++ V'' $++ V'0) with ((V $++ V') $++ (V'' $++ V'0)) in H7.
+    eapply step_translate_loop in H7; eauto.
+    simp.
+    eexists; split.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eassumption.
+    left; propositional.
+    admit.
+    do 2 eexists; split.
+    2: eapply TrLoop6; eauto.
+    instantiate (2 := V'').
+    instantiate (1 := V'0).
+    admit.
+
+    eexists; split.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eassumption.
+    right; do 2 eexists; split.
+    instantiate (2 := "i").
+    instantiate (1 := x1).
+    admit.
+    replace (V $++ V' $++ V'' $+ ("i", x1)) with (V $++ (V' $+ ("i", x1)) $++ V'').
+    eapply TrLoop6; eauto.
+    replace (V $++ (V' $+ ("i", x1))) with (V $++ V' $+ ("i", x1)).
+    assumption.
+    admit.
+    admit.
+
+    eexists; split.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eassumption.
+    right; do 2 eexists; split.
+    instantiate (2 := "acc").
+    instantiate (1 := x1).
+    admit.
+    replace (V $++ V' $++ V'' $+ ("acc", x1)) with (V $++ (V' $+ ("acc", x1)) $++ V'').
+    eapply TrLoop6; eauto.
+    replace (V $++ (V' $+ ("acc", x1))) with (V $++ V' $+ ("acc", x1)).
+    assumption.
+    admit.
+    admit.
+
+    eexists; split.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eapply multistep_bind.
+    eassumption.
+    right; do 2 eexists; split.
+    instantiate (2 := x0).
+    instantiate (1 := x1).
+    admit.
+    replace (V $++ V' $++ V'' $+ (x0, x1)) with (V $++ (V' $+ (x0, x1)) $++ V'').
+    eapply TrLoop6; eauto.
+    replace (V $++ (V' $+ (x0, x1))) with (V $++ V' $+ (x0, x1)).
+    assumption.
+    admit.
+    admit.
+
+    admit.
+  Qed.*)
+
+  Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
+  | Translated : forall A H V V' s (c : cmd A),
+      translate (rt := OneWord) translate_result V c s
+      -> translated (H, V $++ V', s) (H, c).
 
   Theorem translated_simulates : forall H V c s,
-      translate (translate_result "result") V c s
+      translate (rt := OneWord) translate_result V c s
       -> simulates (translated (A := wrd)) (DE.trsys_of H V s) (ME.multistep_trsys_of H c).
   Proof.
     constructor; simplify.
 
     propositional; subst.
     eexists; split.
+    replace V with (V $++ $0) by apply eq_merge_zero.
     econstructor.
     eassumption.
-    eauto.
     auto.
 
     invert H1.
@@ -1271,12 +1903,37 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     cases p.
     eapply step_translate in H7; eauto.
     simp.
+
     eexists; split; [ | eassumption ].
+    rewrite H1.
     econstructor.
     assumption.
+
+    eexists; split; [ | eassumption ].
+    replace (V0 $++ V' $+ (x0, x1)) with ((V0 $+ (x0, x1)) $++ V').
+    econstructor.
+    assumption.
+    maps_equal.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    simplify; equality.
+    cases (V0 $? k).
+    repeat rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    simplify; equality.
+    repeat rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    equality.
   Qed.
 
   Hint Constructors eval DE.step.
+
+  Lemma translate_exp_sound' : forall V v e,
+      translate_exp V v e
+      -> forall H V', eval H (V $++ V') e v.
+  Proof.
+    induct 1; simplify; eauto.
+    constructor.
+    rewrite lookup_join1 by (eapply lookup_Some_dom; simplify; eauto).
+    assumption.
+  Qed.
 
   Lemma translate_exp_sound : forall V v e,
       translate_exp V v e
@@ -1285,13 +1942,13 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     induct 1; simplify; eauto.
   Qed.
 
-  Hint Resolve translate_exp_sound.
+  Hint Resolve translate_exp_sound translate_exp_sound'.
 
-  Lemma not_stuck : forall out V (c : cmd wrd) s,
-      translate (translate_result out) V c s
+  Lemma not_stuck_loop : forall V (c : cmd (wrd * wrd)) s,
+      translate (rt := TwoWords) translate_loop_body V c s
       -> forall H H' c',
         step (H, c) (H', c')
-        -> exists p', DE.step (H, V, s) p'.
+        -> forall V', exists p', DE.step (H, V $++ V', s) p'.
   Proof.
     induct 1; invert 1; simplify.
 
@@ -1310,8 +1967,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
     eauto.
 
-    apply inj_pair2 in H8; subst.
-    invert H6.
+    apply inj_pair2 in H11; subst.
+    invert H9.
     eexists.
     econstructor.
     econstructor.
@@ -1334,10 +1991,178 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eauto.
   Qed.
 
+  Lemma invert_Return : forall {rt} (translate_return : valuation -> rtt rt -> stmt -> Prop) V (v : rtt rt) s,
+      translate translate_return V (Return v) s
+      -> translate_return V v s.
+  Proof.
+    invert 1.
+    apply inj_pair2 in H0; subst.
+    apply inj_pair2 in H2; subst.
+    assumption.
+  Qed.
+
+  Lemma not_stuck : forall V (c : cmd wrd) s,
+      translate (rt := OneWord) translate_result V c s
+      -> forall H H' c',
+        step (H, c) (H', c')
+        -> forall V', exists p', DE.step (H, V $++ V', s) p'.
+  Proof.
+    induct 1; invert 1; simplify.
+
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+
+    apply inj_pair2 in H11; subst.
+    invert H9.
+    eexists.
+    econstructor.
+    econstructor.
+    econstructor.
+    eauto.
+    eauto.
+
+    apply inj_pair2 in H8; subst.
+    invert H6.
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+    eauto.
+    eauto.
+
+    apply inj_pair2 in H6; subst.
+    invert H4.
+
+    eauto.
+
+    apply inj_pair2 in H12; subst.
+    invert H10.
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+
+    apply inj_pair2 in H11; subst.
+    invert H9.
+    eexists.
+    econstructor.
+
+    apply inj_pair2 in H11; subst.
+    invert H9.
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+
+    eauto.
+
+    apply inj_pair2 in H13; subst.
+    invert H11.
+    cases (weq initA (^0)); subst.
+    eexists.
+    econstructor.
+    apply StWhileFalse.
+    econstructor.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    assumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eexists.
+    econstructor.
+    eapply StWhileTrue.
+    econstructor.
+    rewrite lookup_join1.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    eapply lookup_Some_dom.
+    rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
+    eassumption.
+    assumption.
+
+    apply inj_pair2 in H11; subst.
+    invert H9.
+
+    eauto.
+
+    apply inj_pair2 in H12; subst.
+    invert H10.
+    apply inj_pair2 in H12; subst.
+    invert H9.
+    apply inj_pair2 in H12; subst.
+    eapply not_stuck_loop in H1; eauto.
+    simp.
+    cases x.
+    cases p.
+    eexists.
+    econstructor.
+    econstructor.
+    replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
+    eassumption.
+    admit.
+
+    apply inj_pair2 in H12; subst.
+    specialize (invert_Return _ _ _ _ H1); invert 1.
+    eexists.
+    repeat econstructor.
+    replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
+    eauto.
+    admit.
+    eexists.
+    repeat econstructor.
+    eexists.
+    repeat econstructor.
+    replace (V $++ V' $++ V'' $++ V'0) with (V $++ V' $++ (V'' $++ V'0)).
+    eauto.
+    admit.
+    eexists.
+    repeat econstructor.
+
+    Unshelve.
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+    exact (^0) || exact (Return (^0)).
+  Admitted.
+
   Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s H,
       hoare_triple P c Q
       -> P H
-      -> translate (translate_result "result") V c s
+      -> translate (rt := OneWord) translate_result V c s
       -> V $? "result" = None
       -> invariantFor (DE.trsys_of H V s)
                       (fun p => snd p = Skip
@@ -1355,9 +2180,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     cases st2; simplify; subst.
     invert H5; simplify.
     apply inj_pair2 in H10; subst.
-    invert H9.
-    apply inj_pair2 in H4; subst.
-    invert H6.
+    specialize (invert_Return _ _ _ _ H9); invert 1.
     right; eexists.
     econstructor; eauto.
     auto.
@@ -1365,7 +2188,10 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     invert H5; simp.
     apply inj_pair2 in H7; subst; simplify.
     cases x.
-    eapply not_stuck in H10; eauto.
+    eapply not_stuck in H10.
+    simp.
+    eauto.
+    eauto.
   Qed.
 
   Theorem adder_ok : forall a b c,

@@ -964,15 +964,13 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | Var (x : var)
   | Const (n : wrd)
   | Add (e1 e2 : exp)
-  | Head (e : exp)
-  | Tail (e : exp)
+  | Read (e : exp)
   | NotNull (e : exp).
 
   Inductive stmt :=
   | Skip
   | Assign (x : var) (e : exp)
-  | WriteHead (x : var) (e : exp)
-  | WriteTail (x : var) (e : exp)
+  | Write (x : var) (e : exp)
   | Seq (s1 s2 : stmt)
   | IfThenElse (e : exp) (s1 s2 : stmt)
   | WhileLoop (e : exp) (s1 : stmt).
@@ -984,81 +982,6 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   Definition type_eq : forall t1 t2 : type, sumbool (t1 = t2) (t1 <> t2).
     decide equality.
   Defined.
-
-  Record function := {
-    Params : list (var * type);
-    Locals : list (var * type);
-    Return : type;
-    Body : stmt
-  }.
-
-  Section fn.
-    Variable fn : function.
-
-    Definition vars := Params fn ++ Locals fn ++ [("result", Return fn)].
-
-    Fixpoint varType (x : var) (vs : list (var * type)) : option type :=
-      match vs with
-      | nil => None
-      | (y, t) :: vs' => if y ==v x then Some t else varType x vs'
-      end.
-
-    Fixpoint expType (e : exp) : option type :=
-      match e with
-      | Var x => varType x vars
-      | Const _ => Some Scalar
-      | Add e1 e2 => match expType e1, expType e2 with
-                     | Some Scalar, Some Scalar => Some Scalar
-                     | _, _ => None
-                     end
-      | Head x => match expType x with
-                  | Some (ListPointer t) => Some t
-                  | _ => None
-                  end
-      | Tail x => match expType x with
-                  | Some (ListPointer t) => Some (ListPointer t)
-                  | _ => None
-                  end
-      | NotNull e1 => match expType e1 with
-                      | Some (ListPointer _) => Some Scalar
-                      | _ => None
-                      end
-      end.
-
-    Fixpoint stmtWf (s : stmt) : bool :=
-      match s with
-      | Skip => true
-      | Assign x e => match varType x vars, expType e with
-                      | Some t1, Some t2 =>
-                        if type_eq t1 t2 then true else false
-                      | _, _ => false
-                      end
-      | WriteHead x e => match varType x vars, expType e with
-                         | Some (ListPointer t1), Some t2 =>
-                           if type_eq t1 t2 then true else false
-                         | _, _ => false
-                         end
-      | WriteTail x e => match varType x vars, expType e with
-                         | Some (ListPointer t1), Some (ListPointer t2) =>
-                           if type_eq t1 t2 then true else false
-                         | _, _ => false
-                         end
-      | Seq s1 s2 => stmtWf s1 && stmtWf s2
-      | IfThenElse e s1 s2 => match expType e with
-                              | Some Scalar => stmtWf s1 && stmtWf s2
-                              | _ => false
-                              end
-      | WhileLoop e s1 => match expType e with
-                          | Some Scalar => stmtWf s1
-                          | _ => false
-                          end
-      end.
-
-    Record functionWf : Prop := {
-      VarsOk : NoDup (map fst (Params fn ++ Locals fn));
-      BodyOk : stmtWf (Body fn) = true
-    }.
-  End fn.
 
   Definition heap := fmap wrd wrd.
   Definition valuation := fmap var wrd.
@@ -1073,14 +996,10 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
       eval H V e1 n1
       -> eval H V e2 n2
       -> eval H V (Add e1 e2) (n1 ^+ n2)
-  | VHead : forall H V e1 p ph,
+  | VRead : forall H V e1 p v,
       eval H V e1 p
-      -> H $? p = Some ph
-      -> eval H V (Head e1) ph
-  | VTail : forall H V e1 p pt,
-      eval H V e1 p
-      -> H $? (p ^+ ^1) = Some pt
-      -> eval H V (Tail e1) pt
+      -> H $? p = Some v
+      -> eval H V (Read e1) v
   | VNotNull : forall H V e1 p,
       eval H V e1 p
       -> eval H V (NotNull e1) (if weq p (^0) then ^1 else ^0).
@@ -1089,16 +1008,11 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | StAssign : forall H V x e v,
       eval H V e v
       -> step (H, V, Assign x e) (H, V $+ (x, v), Skip)
-  | StWriteHead : forall H V x e a v hv,
+  | StWrite : forall H V x e a v hv,
       V $? x = Some a
       -> eval H V e v
       -> H $? a = Some hv
-      -> step (H, V, WriteHead x e) (H $+ (a, v), V, Skip)
-  | StWriteTail : forall H V x e a v tv,
-      V $? x = Some a
-      -> eval H V e v
-      -> H $? a = Some tv
-      -> step (H, V, WriteTail x e) (H $+ (a, v), V, Skip)
+      -> step (H, V, Write x e) (H $+ (a, v), V, Skip)
   | StSeq1 : forall H V s2,
       step (H, V, Seq Skip s2) (H, V, s2)
   | StSeq2 : forall H V s1 s2 H' V' s1',
@@ -1147,8 +1061,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     match s with
     | Assign y _ => if x ==v y then true else false
     | Skip
-    | WriteHead _ _
-    | WriteTail _ _ => false
+    | DE.Write _ _ => false
     | Seq s1 s2
     | IfThenElse _ s1 s2 => couldWrite x s1 || couldWrite x s2
     | WhileLoop _ s1 => couldWrite x s1
@@ -1175,10 +1088,10 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       V $? x = Some v
       -> translate translate_return V (c v) s1
       -> translate translate_return V (Bind (Return v) c) (Seq Skip s1)
-  | TrReadHead : forall V B (a : wrd) (c : wrd -> cmd B) e x s1,
+  | TrRead : forall V B (a : wrd) (c : wrd -> cmd B) e x s1,
       translate_exp V a e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
-      -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (Head e)) s1).
+      -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (DE.Read e)) s1).
 
   Ltac freshFor vm k :=
     let rec keepTrying x :=
@@ -1202,7 +1115,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
                          eapply TrAssign with (x := y); [ | intro ])
     | [ |- translate _ ?V (Bind (Read _) _) _ ] =>
       freshFor V ltac:(fun y =>
-                         eapply TrReadHead with (x := y); [ | intro ])
+                         eapply TrRead with (x := y); [ | intro ])
     end.
 
   Example adder (a b c : wrd) :=

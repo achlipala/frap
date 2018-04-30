@@ -1060,7 +1060,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     }.
   End fn.
 
-  Definition heap := fmap (wrd) (wrd * wrd).
+  Definition heap := fmap wrd wrd.
   Definition valuation := fmap var wrd.
 
   Inductive eval : heap -> valuation -> exp -> wrd -> Prop :=
@@ -1073,13 +1073,13 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
       eval H V e1 n1
       -> eval H V e2 n2
       -> eval H V (Add e1 e2) (n1 ^+ n2)
-  | VHead : forall H V e1 p ph pt,
+  | VHead : forall H V e1 p ph,
       eval H V e1 p
-      -> H $? p = Some (ph, pt)
+      -> H $? p = Some ph
       -> eval H V (Head e1) ph
-  | VTail : forall H V e1 p ph pt,
+  | VTail : forall H V e1 p pt,
       eval H V e1 p
-      -> H $? p = Some (ph, pt)
+      -> H $? (p ^+ ^1) = Some pt
       -> eval H V (Tail e1) pt
   | VNotNull : forall H V e1 p,
       eval H V e1 p
@@ -1089,16 +1089,16 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | StAssign : forall H V x e v,
       eval H V e v
       -> step (H, V, Assign x e) (H, V $+ (x, v), Skip)
-  | StWriteHead : forall H V x e a v hv tv,
+  | StWriteHead : forall H V x e a v hv,
       V $? x = Some a
       -> eval H V e v
-      -> H $? a = Some (hv, tv)
-      -> step (H, V, WriteHead x e) (H $+ (a, (v, tv)), V, Skip)
-  | StWriteTail : forall H V x e a v hv tv,
+      -> H $? a = Some hv
+      -> step (H, V, WriteHead x e) (H $+ (a, v), V, Skip)
+  | StWriteTail : forall H V x e a v tv,
       V $? x = Some a
       -> eval H V e v
-      -> H $? a = Some (hv, tv)
-      -> step (H, V, WriteTail x e) (H $+ (a, (hv, v)), V, Skip)
+      -> H $? a = Some tv
+      -> step (H, V, WriteTail x e) (H $+ (a, v), V, Skip)
   | StSeq1 : forall H V s2,
       step (H, V, Seq Skip s2) (H, V, s2)
   | StSeq2 : forall H V s1 s2 H' V' s1',
@@ -1167,17 +1167,18 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
   | TrDone : forall V (v : RT) s,
       translate_return V v s
       -> translate translate_return V (Return v) s
-  | TrAssign : forall V (B : Set) (v : wrd) (c : wrd -> cmd B) e x s1,
+  | TrAssign : forall V B (v : wrd) (c : wrd -> cmd B) e x s1,
       translate_exp V v e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
       -> translate translate_return V (Bind (Return v) c) (Seq (Assign x e) s1)
-  | TrAssigned : forall V (B : Set) (v : wrd) (c : wrd -> cmd B) x s1,
+  | TrAssigned : forall V B (v : wrd) (c : wrd -> cmd B) x s1,
       V $? x = Some v
-      -> translate translate_return (V $+ (x, v)) (c v) s1
-      -> translate translate_return V (Bind (Return v) c) (Seq Skip s1).
-
-  Example adder (a b c : wrd) :=
-    Bind (Return (a ^+ b)) (fun ab => Return (ab ^+ c)).
+      -> translate translate_return V (c v) s1
+      -> translate translate_return V (Bind (Return v) c) (Seq Skip s1)
+  | TrReadHead : forall V B (a : wrd) (c : wrd -> cmd B) e x s1,
+      translate_exp V a e
+      -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
+      -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (Head e)) s1).
 
   Ltac freshFor vm k :=
     let rec keepTrying x :=
@@ -1199,7 +1200,13 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate _ ?V (Bind (Return _) _) _ ] =>
       freshFor V ltac:(fun y =>
                          eapply TrAssign with (x := y); [ | intro ])
+    | [ |- translate _ ?V (Bind (Read _) _) _ ] =>
+      freshFor V ltac:(fun y =>
+                         eapply TrReadHead with (x := y); [ | intro ])
     end.
+
+  Example adder (a b c : wrd) :=
+    Bind (Return (a ^+ b)) (fun ab => Return (ab ^+ c)).
 
   Lemma translate_adder : sig (fun s =>
         forall a b c, translate (translate_result "result") ($0 $+ ("a", a) $+ ("b", b) $+ ("c", c)) (adder a b c) s).
@@ -1211,18 +1218,23 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Definition adder_compiled := Eval simpl in proj1_sig translate_adder.
 
-  Record heaps_compat (H : DE.heap) (h : ME.heap) : Prop := {
-    DeepToMixedHd : forall a v1 v2, H $? a = Some (v1, v2) -> h $? a = Some v1;
-    DeepToMixedTl : forall a v1 v2, H $? a = Some (v1, v2) -> h $? (a ^+ ^1) = Some v2;
-    MixedToDeep : forall a v1 v2, h $? a = Some v1 -> h $? (a ^+ ^1) = Some v2
-                                  -> H $? a = Some (v1, v2)
-  }.
+  Example reader (p1 p2 : wrd) :=
+    Bind (Read p1) (fun v1 => Bind (Read p2) (fun v2 => Return (v1 ^+ v2))).
+
+  Lemma translate_reader : sig (fun s =>
+        forall p1 p2, translate (translate_result "result") ($0 $+ ("p1", p1) $+ ("p2", p2)) (reader p1 p2) s).
+  Proof.
+    eexists; simplify.
+    unfold reader.
+    repeat translate.
+  Defined.
+
+  Definition reader_compiled := Eval simpl in proj1_sig translate_reader.
 
   Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
-  | Translated : forall A H h V s (c : cmd A),
+  | Translated : forall A H V s (c : cmd A),
       translate (translate_result "result") V c s
-      -> heaps_compat H h
-      -> translated (H, V, s) (h, c).
+      -> translated (H, V, s) (H, c).
 
   Lemma eval_translate : forall H V e v,
       eval H V e v
@@ -1253,75 +1265,57 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eauto.
   Qed.
 
-  Lemma step_translate : forall H V s H' V' s',
-      DE.step (H, V, s) (H', V', s')
-      -> forall h (c : cmd wrd) out,
-        translate (translate_result out) V c s
-        -> heaps_compat H h
-        -> exists c' h', ME.step^* (h, c) (h', c')
-                         /\ translate (translate_result out) V' c' s'
-                         /\ heaps_compat H' h'.
+  Lemma step_translate : forall out V (c : cmd wrd) s,
+      translate (translate_result out) V c s
+      -> forall H H' V' s',
+        DE.step (H, V, s) (H', V', s')
+        -> exists c', ME.step^* (H, c) (H', c')
+                      /\ translate (translate_result out) V' c' s'.
   Proof.
-    induct 1; invert 1; simplify.
+    induct 1.
 
-    invert H3.
-    apply inj_pair2 in H1; subst.
-    eapply eval_translate in H4; eauto; subst.
+    invert H; invert 1; simplify.
+
+    eapply eval_translate in H0; eauto; subst.
     do 2 eexists; propositional.
     eauto.
     apply TrDone; apply TrReturned; simplify; auto.
-    assumption.
 
+    invert 1; simplify.
     invert H6.
+    eapply eval_translate in H5; eauto; subst.
+    do 2 eexists; propositional.
+    eauto.
+    econstructor.
+    instantiate (1 := x); simplify.
+    reflexivity.
+    eauto.
 
-    invert H6.
-
-    invert H2.
-
-    apply inj_pair2 in H0; subst.
+    invert 1; simplify.
     do 2 eexists; propositional.
     eapply TrcFront.
     eauto.
     eauto.
-    replace V' with (V' $+ (x, v)).
     assumption.
-    maps_equal.
-    symmetry; assumption.
-    assumption.
+    invert H5.
 
-    invert H4.
-
-    apply inj_pair2 in H2; subst.
-    invert H0.
-    do 2 eexists; propositional.
-    eauto.
-    eapply TrAssigned.
-    instantiate (1 := x).
+    invert 1.
+    invert H6.
+    invert H5.
+    eapply eval_translate in H4; eauto; subst.
     simplify.
-    eapply eval_translate in H7; eauto.
-    subst.
-    reflexivity.
-    match goal with
-    | [ |- translate _ ?V' _ _ ] => replace V' with (V $+ (x, v)) by (maps_equal; equality)
-    end.
+    do 2 eexists; propositional.
+    eapply TrcFront.
     eauto.
-    assumption.
-
-    invert H0.
-
-    invert H4.
-
-    invert H3.
-
-    invert H4.
-
-    invert H3.
+    eauto.
+    econstructor.
+    instantiate (1 := x); simplify; reflexivity.
+    eauto.
   Qed.
 
-  Theorem translated_simulates : forall H V c h s,
+  Theorem translated_simulates : forall H V c s,
       translate (translate_result "result") V c s
-      -> heaps_compat H h
-      -> simulates (translated (A := wrd)) (DE.trsys_of H V s) (ME.multistep_trsys_of h c).
+      -> simulates (translated (A := wrd)) (DE.trsys_of H V s) (ME.multistep_trsys_of H c).
   Proof.
     constructor; simplify.
 
@@ -1332,16 +1326,15 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eauto.
     auto.
 
-    invert H2.
-    apply inj_pair2 in H5; subst.
+    invert H1.
+    apply inj_pair2 in H4; subst.
     cases st1'.
     cases p.
-    eapply step_translate in H6; eauto.
+    eapply step_translate in H7; eauto.
     simp.
     eexists; split; [ | eassumption ].
     econstructor.
     assumption.
-    eauto.
   Qed.
 
   Hint Constructors eval DE.step.
@@ -1355,10 +1348,11 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Hint Resolve translate_exp_sound.
 
-  Lemma not_stuck : forall A h (c : cmd A) h' c',
-      step (h, c) (h', c')
-      -> forall out V s, translate (translate_result out) V c s
-                         -> forall H, exists p', DE.step (H, V, s) p'.
+  Lemma not_stuck : forall out V (c : cmd wrd) s,
+      translate (translate_result out) V c s
+      -> forall H H' c',
+        step (H, c) (H', c')
+        -> exists p', DE.step (H, V, s) p'.
   Proof.
     induct 1; invert 1; simplify.
 
@@ -1369,20 +1363,27 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
     eexists.
     econstructor.
+    econstructor.
+    eauto.
 
     eexists.
     econstructor.
     econstructor.
     eauto.
 
+    apply inj_pair2 in H8; subst.
+    invert H6.
     eexists.
     econstructor.
+    econstructor.
+    econstructor.
+    eauto.
+    eauto.
   Qed.
 
-  Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s h H,
+  Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s H,
       hoare_triple P c Q
-      -> P h
-      -> heaps_compat H h
+      -> P H
       -> translate (translate_result "result") V c s
       -> V $? "result" = None
       -> invariantFor (DE.trsys_of H V s)
@@ -1394,25 +1395,24 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply invariant_simulates.
     apply translated_simulates.
     eassumption.
-    eassumption.
-    apply invariant_multistepify with (sys := trsys_of h c).
+    apply invariant_multistepify with (sys := trsys_of H c).
     eauto using hoare_triple_sound.
     invert 1; simp.
 
     cases st2; simplify; subst.
-    invert H6; simplify.
-    apply inj_pair2 in H8; subst.
-    invert H11.
-    apply inj_pair2 in H6; subst.
-    invert H8.
+    invert H5; simplify.
+    apply inj_pair2 in H10; subst.
+    invert H9.
+    apply inj_pair2 in H4; subst.
+    invert H6.
     right; eexists.
     econstructor; eauto.
     auto.
 
-    invert H6; simp.
-    apply inj_pair2 in H8; subst; simplify.
+    invert H5; simp.
+    apply inj_pair2 in H7; subst; simplify.
     cases x.
-    eapply not_stuck in H7; eauto.
+    eapply not_stuck in H10; eauto.
   Qed.
 
   Theorem adder_ok : forall a b c,
@@ -1441,8 +1441,48 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eapply hoare_triple_sound.
     apply adder_ok.
     constructor; auto.
-    constructor; simplify; equality.
     apply (proj2_sig translate_adder).
+    simplify; equality.
+  Qed.
+
+  Theorem reader_ok : forall p1 p2 v1 v2,
+      {{p1 |-> v1 * p2 |-> v2}}
+        reader p1 p2
+      {{r ~> [| r = v1 ^+ v2 |] * p1 |-> v1 * p2 |-> v2}}.
+  Proof.
+    unfold reader.
+    simplify.
+    step.
+    step.
+    simp.
+    step.
+    step.
+    simp.
+    step.
+    cancel.
+    equality.
+  Qed.
+
+  Theorem reader_compiled_ok : forall p1 p2 v1 v2,
+      p1 <> p2
+      -> invariantFor (DE.trsys_of ($0 $+ (p1, v1) $+ (p2, v2)) ($0 $+ ("p1", p1) $+ ("p2", p2)) reader_compiled)
+                      (fun p => snd p = Skip
+                                \/ exists p', DE.step p p').
+  Proof.
+    simplify.
+    eapply hoare_triple_sound.
+    apply reader_ok.
+    exists ($0 $+ (p1, v1)), ($0 $+ (p2, v2)); propositional.
+    unfold split.
+    maps_equal.
+    rewrite lookup_join2; simplify; auto; sets.
+    rewrite lookup_join1; simplify; auto; sets.
+    rewrite lookup_join2; simplify; auto; sets.
+    unfold disjoint; simplify.
+    cases (weq a p1); simplify; propositional.
+    constructor.
+    constructor.
+    apply (proj2_sig translate_reader).
     simplify; equality.
   Qed.
 End MixedToDeep.

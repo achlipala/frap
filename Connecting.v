@@ -970,7 +970,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   Inductive stmt :=
   | Skip
   | Assign (x : var) (e : exp)
-  | Write (x : var) (e : exp)
+  | Write (ae ve : exp)
   | Seq (s1 s2 : stmt)
   | IfThenElse (e : exp) (s1 s2 : stmt)
   | WhileLoop (e : exp) (s1 : stmt).
@@ -1008,11 +1008,11 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | StAssign : forall H V x e v,
       eval H V e v
       -> step (H, V, Assign x e) (H, V $+ (x, v), Skip)
-  | StWrite : forall H V x e a v hv,
-      V $? x = Some a
-      -> eval H V e v
+  | StWrite : forall H V ae ve a v hv,
+      eval H V ae a
+      -> eval H V ve v
       -> H $? a = Some hv
-      -> step (H, V, Write x e) (H $+ (a, v), V, Skip)
+      -> step (H, V, Write ae ve) (H $+ (a, v), V, Skip)
   | StSeq1 : forall H V s2,
       step (H, V, Seq Skip s2) (H, V, s2)
   | StSeq2 : forall H V s1 s2 H' V' s1',
@@ -1091,7 +1091,15 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
   | TrRead : forall V B (a : wrd) (c : wrd -> cmd B) e x s1,
       translate_exp V a e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
-      -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (DE.Read e)) s1).
+      -> translate translate_return V (Bind (Read a) c) (Seq (Assign x (DE.Read e)) s1)
+  | TrWrite : forall V B a v (c : unit -> cmd B) ae ve s1,
+      translate_exp V a ae
+      -> translate_exp V v ve
+      -> translate translate_return V (c tt) s1
+      -> translate translate_return V (Bind (Write a v) c) (Seq (DE.Write ae ve) s1)
+  | TrAssignedUnit : forall V B (c : unit -> cmd B) s1,
+      translate translate_return V (c tt) s1
+      -> translate translate_return V (Bind (Return tt) c) (Seq Skip s1).
 
   Ltac freshFor vm k :=
     let rec keepTrying x :=
@@ -1108,6 +1116,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       match V with
       | context[add _ ?y v] => apply TrVar with (x := y); simplify; equality
       end
+    | [ |- translate_exp _ _ _ ] => eapply TrConst
 
     | [ |- translate _ _ (Return _) _ ] => apply TrDone; apply TrReturn
     | [ |- translate _ ?V (Bind (Return _) _) _ ] =>
@@ -1116,6 +1125,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate _ ?V (Bind (Read _) _) _ ] =>
       freshFor V ltac:(fun y =>
                          eapply TrRead with (x := y); [ | intro ])
+    | [ |- translate _ ?V (Bind (Write _ _) _) _ ] =>
+      eapply TrWrite
     end.
 
   Example adder (a b c : wrd) :=
@@ -1143,6 +1154,19 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
   Defined.
 
   Definition reader_compiled := Eval simpl in proj1_sig translate_reader.
+
+  Example incrementer (p : wrd) :=
+    Bind (Read p) (fun v => Bind (Write p (v ^+ ^1)) (fun _ => Return v)).
+
+  Lemma translate_incrementer : sig (fun s =>
+        forall p, translate (translate_result "result") ($0 $+ ("p", p)) (incrementer p) s).
+  Proof.
+    eexists; simplify.
+    unfold incrementer.
+    repeat translate.
+  Defined.
+
+  Definition incrementer_compiled := Eval simpl in proj1_sig translate_incrementer.
 
   Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
   | Translated : forall A H V s (c : cmd A),
@@ -1224,6 +1248,21 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
     instantiate (1 := x); simplify; reflexivity.
     eauto.
+
+    invert 1.
+    invert H6.
+    eapply eval_translate in H0; eauto; subst.
+    eapply eval_translate in H; eauto; subst.
+    do 2 eexists; propositional.
+    eapply TrcFront.
+    eauto.
+    eauto.
+    eapply TrAssignedUnit.
+    assumption.
+    
+    invert 1.
+    eauto.
+    invert H4.
   Qed.
 
   Theorem translated_simulates : forall H V c s,
@@ -1291,6 +1330,20 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     econstructor.
     econstructor.
     eauto.
+    eauto.
+
+    apply inj_pair2 in H8; subst.
+    invert H6.
+    eexists.
+    econstructor.
+    econstructor.
+    eauto.
+    eauto.
+    eauto.
+
+    apply inj_pair2 in H6; subst.
+    invert H4.
+
     eauto.
   Qed.
 
@@ -1396,6 +1449,38 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     constructor.
     constructor.
     apply (proj2_sig translate_reader).
+    simplify; equality.
+  Qed.
+
+  Theorem incrementer_ok : forall p v,
+      {{p |-> v}}
+        incrementer p
+      {{r ~> [| r = v |] * p |-> (v ^+ ^1)}}.
+  Proof.
+    unfold incrementer.
+    simplify.
+    step.
+    step.
+    simp.
+    step.
+    step.
+    simp.
+    step.
+    cancel.
+    subst.
+    cancel.
+  Qed.
+
+  Theorem incrementer_compiled_ok : forall p v,
+      invariantFor (DE.trsys_of ($0 $+ (p, v)) ($0 $+ ("p", p)) incrementer_compiled)
+                      (fun p => snd p = Skip
+                                \/ exists p', DE.step p p').
+  Proof.
+    simplify.
+    eapply hoare_triple_sound.
+    apply incrementer_ok.
+    constructor.
+    apply (proj2_sig translate_incrementer).
     simplify; equality.
   Qed.
 End MixedToDeep.

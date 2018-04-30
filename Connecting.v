@@ -962,14 +962,6 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | IfThenElse (e : exp) (s1 s2 : stmt)
   | WhileLoop (e : exp) (s1 : stmt).
 
-  Inductive type :=
-  | Scalar
-  | ListPointer (t : type).
-
-  Definition type_eq : forall t1 t2 : type, sumbool (t1 = t2) (t1 <> t2).
-    decide equality.
-  Defined.
-
   Definition heap := fmap wrd wrd.
   Definition valuation := fmap var wrd.
 
@@ -1024,6 +1016,48 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     Initial := {(H, V, s)};
     Step := step
   |}.
+
+  (** ** Printing as C code *)
+
+  Fixpoint wordS {sz} (w : word sz) : string :=
+    match w with
+    | WO => ""
+    | WS false w' => wordS w' ++ "0"
+    | WS true w' => wordS w' ++ "1"
+    end.
+
+  Definition binS {sz} (w : word sz) : string :=
+    "0b" ++ wordS w.
+
+  Fixpoint expS (e : exp) : string :=
+    match e with
+    | Var x => x
+    | Const n => binS n
+    | Add e1 e2 => expS e1 ++ " + " ++ expS e2
+    | Read e1 => "*(" ++ expS e1 ++ ")"
+    | NotNull e1 => expS e1 ++ " <> NULL"
+    end.
+
+  Definition newline := String (Ascii.ascii_of_nat 10) "".
+
+  Fixpoint stmtS' (indent : string) (s : stmt) : string :=
+    match s with
+    | Skip => ""
+    | Assign x e => indent ++ x ++ " = " ++ expS e ++ ";"
+    | Write ae ve => indent ++ "*(" ++ expS ae ++ ") = " ++ expS ve ++ ";"
+    | Seq s1 s2 => stmtS' indent s1 ++ newline ++ stmtS' indent s2
+
+    | IfThenElse e s1 s2 => indent ++ "if (" ++ expS e ++ ") {" ++ newline
+                                   ++ stmtS' ("  " ++ indent) s1 ++ newline
+                                   ++ indent ++ "} else {" ++ newline
+                                   ++ stmtS' ("  " ++ indent) s2 ++ newline
+                                   ++ indent ++ "}"
+    | WhileLoop e s1 => indent ++ "while (" ++ expS e ++ ") {" ++ newline
+                               ++ stmtS' ("  " ++ indent) s1 ++ newline
+                               ++ indent ++ "}"
+    end.
+
+  Definition stmtS := stmtS' "".
 End DeeplyEmbedded.
 
 
@@ -1247,7 +1281,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
         let H := fresh in
         (assert (H : vm $? x = None) by (simplify; equality);
          clear H; k x)
-        || let x' := eval simpl in (x ++ "'")%string in keepTrying x' in
+        || let x' := eval simpl in (x ++ "_")%string in keepTrying x' in
     keepTrying "tmp".
 
   Ltac translate := simpl;
@@ -3243,14 +3277,21 @@ End MixedToDeep.
 
 (** * Getting concrete *)
 
-Module Bw64.
-  Definition bit_width := 64.
+Module Bw32.
+  Definition bit_width := 32.
   Theorem bit_width_nonzero : bit_width > 0.
   Proof.
     unfold bit_width; linear_arithmetic.
   Qed.
-End Bw64.
+End Bw32.
 
-Module MixedEmbedded64.
-  Module Import ME := MixedEmbedded(Bw64).
-End MixedEmbedded64.
+Module MixedEmbedded32.
+  Module Import ME := MixedToDeep(Bw32).
+
+  Definition adder_exported := Eval compute in DE.stmtS adder_compiled.
+  Definition reader_exported := Eval compute in DE.stmtS reader_compiled.
+  Definition incrementer_exported := Eval compute in DE.stmtS incrementer_compiled.
+  Definition summer_exported := Eval compute in DE.stmtS summer_compiled.
+  Definition reverse_alt_exported := Eval compute in DE.stmtS reverse_alt_compiled.
+
+End MixedEmbedded32.

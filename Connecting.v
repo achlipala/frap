@@ -178,8 +178,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   | Bind {result result'} (c1 : cmd result') (c2 : result' -> cmd result) : cmd result
   | Read (a : wrd) : cmd wrd
   | Write (a v : wrd) : cmd unit
-  | Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc
-  | Fail {result} : cmd result.
+  | Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc.
 
   (* We're leaving out allocation and deallocation, to avoid distraction from
    * the main point of the examples to follow. *)
@@ -397,8 +396,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   | HtLoop : forall {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) I,
       (forall acc, hoare_triple (I (Again acc)) (body acc) I)
       -> hoare_triple (I (Again init)) (Loop init body) (fun r => I (Done r))
-  | HtFail : forall {result},
-      hoare_triple (fun _ => False) (Fail (result := result)) (fun _ _ => False)
 
   | HtRead : forall a R,
       hoare_triple (exists v, a |-> v * R v)%sep (Read a) (fun r => a |-> r * R r)%sep
@@ -499,15 +496,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     exists (fun o => x o * R)%sep; propositional; eauto.
     unfold star in *; simp; eauto 7.
     unfold star in *; simp; eauto 7.
-  Qed.
-
-  Lemma invert_Fail : forall result P Q,
-    hoare_triple P (Fail (result := result)) Q
-    -> forall h, P h -> False.
-  Proof.
-    induct 1; propositional; eauto.
-
-    unfold star in *; simp; eauto.
   Qed.
 
   (* Now that we proved enough basic facts, let's hide the definitions of all
@@ -847,8 +835,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   Ltac step0 := basic || eapply HtBind || (eapply use_lemma; [ basic | cancel; auto ])
                 || (eapply use_lemma; [ eapply HtRead' | solve [ cancel; auto ] ])
                 || (eapply HtRead''; solve [ cancel ])
-                || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ])
-                || (eapply HtConsequence; [ apply HtFail | .. ]).
+                || (eapply HtStrengthen; [ eapply use_lemma; [ basic | cancel; auto ] | ]).
   Ltac step := step0; simp.
   Ltac ht := simp; repeat step.
   Ltac conseq := simplify; eapply HtConsequence.

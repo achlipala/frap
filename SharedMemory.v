@@ -400,7 +400,7 @@ Qed.
  * technique to also harness commutativity of operations that *do* depend on the
  * shared state, but in particular controlled ways?  Why, yes we can!  The most
  * popular such technique from the model-checking world is
- * *partial order reduction*. *)
+ * *partial-order reduction*. *)
 
 (* First, here's an example where we should be able to do better than allowing
  * either thread to run in every step, as we model-check. *)

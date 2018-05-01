@@ -4209,11 +4209,11 @@ With these ingredients, we can state the reduction theorem.
   If $\summ{c_2}{s}$ and $\tof{c_1 || c_2}{n}$, then to prove $\mt{natf}$ as an invariant of $\mathbb T(h, l, c_1 || c_2)$, it suffices to prove $\mt{natf}$ as an invariant of $\mathbb T_C(h, l, c_1, c_2, s)$.
 \end{theorem}
 \begin{proof}
-  We assume for the sake of contradiction that there exists some derivation $\smallsteps{(h, l, c)}{(h', l', c')}$, where $\neg \natf{h', l', c'}$.
+  Setting $c = c_1 || c_2$, we assume for the sake of contradiction that there exists some derivation $\smallsteps{(h, l, c)}{(h', l', c')}$, where $\neg \natf{h', l', c'}$.
   First, since $c$ runs in bounded time, by Lemma \ref{completion}, we can \emph{complete} that execution to continue running to some $(h'', l'', c'')$, which is a stuck state.
   By Lemma \ref{stillFailing}, $\neg \natf{h'', l'', c''}$.
   Next, we conclude that there exists $i$ such that $(h, l, c) \to^i (h'', l'', c'')$.
-  By Lemma \ref{translate_trace}, there exist $h'$, $l'$, and $c'$ where $\smallstepsC{(h, l, c_1 || c_2)}{s}{(h', l', c')}$ and $\neg \natf{c'}$.
+  By Lemma \ref{translate_trace}, there exist $h'''$, $l'''$, and $c'''$ where $\smallstepsC{(h, l, c_1 || c_2)}{s}{(h''', l''', c''')}$ and $\neg \natf{c'''}$.
   These facts contradict our assumption that $\mt{natf}$ is an invariant of $\mathbb T_C(h, l, c_1, c_2, s)$.
 \end{proof}
 
@@ -4232,11 +4232,11 @@ With these ingredients, we can state the reduction theorem.
 \end{proof}
 
 \begin{lemma}\label{translate_trace}
-  If $(h, l, c_1 || c_2) \to^i (h', l', c')$, and $(h', l', c')$ is stuck and about to fail, and $\summ{c_2}{s}$, then there exist $h'$, $l'$, and $c''$ such that $\smallstepsC{(h, l, c_1 || c_2)}{s}{(h', l', c'')}$ and $\neg \natf{c''}$.
+  If $(h, l, c_1 || c_2) \to^i (h', l', c')$, and $(h', l', c')$ is stuck and about to fail, and $\summ{c_2}{s}$, then there exist $h''$, $l''$, and $c'''$ such that $\smallstepsC{(h, l, c_1 || c_2)}{s}{(h'', l'', c''')}$ and $\neg \natf{c'''}$.
 \end{lemma}
 \begin{proof}
   By induction on $i$.
-  Note that induction on the structure of a derivation $\smallsteps{(h, l, c)}{(h', l', c')}$ would \emph{not} be sufficient here, as we will see in the proof sketch below that we sometimes invoke the induction hypothesis on an execution trace that is not just the tail of the one we started with.
+  Note that induction on the structure of a derivation $\smallsteps{(h, l, c_1 || c_2)}{(h', l', c')}$ would \emph{not} be sufficient here, as we will see in the proof sketch below that we sometimes invoke the induction hypothesis on an execution trace that is not just the tail of the one we started with.
 
   If $i = 0$, then $(h, l, c_1 || c_2)$ is already about to fail, and the conclusion follows trivially.
 

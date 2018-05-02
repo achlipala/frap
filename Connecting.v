@@ -6,7 +6,6 @@
 Require Import Frap SepCancel ModelCheck Classes.Morphisms.
 Require Import Arith.Div2 Eqdep.
 
-
 (** * Some odds and ends from past chapters *)
 
 Ltac simp := repeat (simplify; subst; propositional;
@@ -15,11 +14,30 @@ Ltac simp := repeat (simplify; subst; propositional;
                          end); try linear_arithmetic.
 
 
+(** * Orientation *)
+
+(* We've now done plenty of Coq proofs that apply to idealizations of real-world
+ * programming languages.  What happens when we want to connect to real
+ * development ecosystems?  The corresponding book chapter works through several
+ * dimensions of variation across approaches.  The whole subject is an active
+ * area of research, and there aren't standard solutions that everyone agrees
+ * on.  The rest of this code file develops one avant-garde approach. *)
+
+
 (** * Bitvectors of known length *)
+
+(* One way we can increase realism is ditching the natural numbers for
+ * bitvectors of fixed size, as we find in, e.g., registers of most computer
+ * processors.  A simple dependent type definition gets the job done. *)
 
 Inductive word : nat -> Set :=
 | WO : word O
 | WS : bool -> forall {n}, word n -> word (S n).
+
+(* The index of a [word] tells us how many bits it takes up. *)
+
+(* Next come a set of operation definitions, whose details we will gloss
+ * over. *)
 
 Fixpoint wordToNat {sz} (w : word sz) : nat :=
   match w with
@@ -44,11 +62,15 @@ Fixpoint natToWord (sz n : nat) : word sz :=
 Definition wzero {sz} := natToWord sz 0.
 Definition wone {sz} := natToWord sz 1.
 Notation "^" := (natToWord _) (at level 0).
+(* Note this notation that we do use later, for "casting" a natural number into
+ * a word.  (We might "lose" bits if the input number is too large!) *)
 
 Definition wplus {sz} (w1 w2 : word sz) : word sz :=
   natToWord sz (wordToNat w1 + wordToNat w2).
 
 Infix "^+" := wplus (at level 50, left associativity).
+(* And we will also use this notation in the main development, as a binary
+ * addition operator.  The remaining definitions are safe to gloss over. *)
 
 Definition whd {sz} (w : word (S sz)) : bool :=
   match w in word sz' return match sz' with
@@ -148,6 +170,9 @@ Proof.
   equality.
 Qed.
 
+(* Oh, but pay attention to this one: much of our development will be
+ * paramterized over what word size to consider.  Any module implementing this
+ * type explains one particular choice. *)
 Module Type BIT_WIDTH.
   Parameter bit_width : nat.
   Axiom bit_width_nonzero : bit_width > 0.
@@ -156,6 +181,10 @@ End BIT_WIDTH.
 
 (** * A modification of last chapter's language, to use words instead of naturals *)
 
+(* There actually isn't much to say about this language and its separation
+ * logic.  We are almost just copying and pasting word operations for [nat]
+ * operations.  Also, we drop failure and dynamic memory allocation, since they
+ * would just distract from the main point. *)
 
 Module MixedEmbedded(Import BW : BIT_WIDTH).
   Definition wrd := word bit_width.
@@ -179,9 +208,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   | Read (a : wrd) : cmd wrd
   | Write (a v : wrd) : cmd unit
   | Loop {acc : Set} (init : acc) (body : acc -> cmd (loop_outcome acc)) : cmd acc.
-
-  (* We're leaving out allocation and deallocation, to avoid distraction from
-   * the main point of the examples to follow. *)
 
   Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
   Notation "'for' x := i 'loop' c1 'done'" := (Loop i (fun x => c1)) (right associativity, at level 80).
@@ -217,37 +243,22 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     Step := (step (A := result))^*
   |}.
 
-  (* Now let's get into the first distinctive feature of separation logic: an
-   * assertion language that takes advantage of *partiality* of heaps.  We give our
-   * definitions inside a module, which will shortly be used as a parameter to
-   * another module (from the book library), to get some free automation for
-   * implications between these assertions. *)
   Module Import S <: SEP.
     Definition hprop := heap -> Prop.
-    (* A [hprop] is a regular old assertion over heaps. *)
 
-    (* Implication *)
     Definition himp (p q : hprop) := forall h, p h -> q h.
 
-    (* Equivalence *)
     Definition heq (p q : hprop) := forall h, p h <-> q h.
 
-    (* Lifting a pure proposition: it must hold, and the heap must be empty. *)
     Definition lift (P : Prop) : hprop :=
       fun h => P /\ h = $0.
 
-    (* Separating conjunction, one of the two big ideas of separation logic.
-     * When does [star p q] apply to [h]?  When [h] can be partitioned into two
-     * subheaps [h1] and [h2], respectively compatible with [p] and [q].  See book
-     * module [Map] for definitions of [split] and [disjoint]. *)
     Definition star (p q : hprop) : hprop :=
       fun h => exists h1 h2, split h h1 h2 /\ disjoint h1 h2 /\ p h1 /\ q h2.
 
-    (* Existential quantification *)
     Definition exis {A} (p : A -> hprop) : hprop :=
       fun h => exists x, p x h.
 
-    (* Convenient notations *)
     Notation "[| P |]" := (lift P) : sep_scope.
     Infix "*" := star : sep_scope.
     Notation "'exists' x .. y , p" := (exis (fun x => .. (exis (fun y => p)) ..)) : sep_scope.
@@ -256,9 +267,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     Notation "p ===> q" := (himp p%sep q%sep) (no associativity, at level 70).
 
     Local Open Scope sep_scope.
-
-    (* And now we prove some key algebraic properties, whose details aren't so
-     * important.  The library automation uses these properties. *)
 
     Lemma iff_two : forall A (P Q : A -> Prop),
       (forall x, P x <-> Q x)
@@ -355,7 +363,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   End S.
 
   Export S.
-  (* Instantiate our big automation engine to these definitions. *)
   Module Import Se := SepCancel.Make(S).
   Export Se.
 
@@ -435,11 +442,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     eapply HtConsequence; eauto.
     reflexivity.
   Qed.
-
-  (* Now, we carry out a moderately laborious soundness proof!  It's safe to skip
-   * ahead to the text "Examples", but a few representative lemma highlights
-   * include [invert_Read], [preservation], [progress], and the main theorem
-   * [hoare_triple_sound]. *)
 
   Lemma invert_Return : forall {result : Set} (r : result) P Q,
     hoare_triple P (Return r) Q
@@ -582,7 +584,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     cancel.
   Qed.
 
-  (* Temporarily transparent again! *)
   Transparent heq himp lift star exis ptsto.
 
   Lemma preservation : forall {result} (c : cmd result) h c' h',
@@ -766,7 +767,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     cases s; simp; eauto.
   Qed.
 
-  (* Fancy theorem to help us rewrite within preconditions and postconditions *)
   Instance hoare_triple_morphism : forall A,
     Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
   Proof.
@@ -791,7 +791,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   Qed.
 
 
-  (** * Examples *)
+  (** * Examples, starting with reusable tactics *)
 
   Global Opaque heq himp lift star exis ptsto.
 
@@ -942,7 +942,13 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
 End MixedEmbedded.
 
 
-(** * A simple C-like language with just two data types *)
+(** * A simple C-like language, embedded deeply *)
+
+(* In [DeepAndShallowEmbeddings], we saw how to extract programs from the last
+ * language to OCaml and run them with an interpreter.  That interpreter needs
+ * to be trusted, and its performance isn't so great.  It could be better to
+ * generate C-like syntax trees in Coq and output them directly.  We will use
+ * this next language to that end. *)
 
 Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   Definition wrd := word bit_width.
@@ -1017,7 +1023,12 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     Step := step
   |}.
 
+
   (** ** Printing as C code *)
+
+  (* Here we have the pay-off: even within Coq, it is easy to print these syntax
+   * trees as normal C (concrete) syntax.  The functions speak for
+   * themselves! *)
 
   Fixpoint wordS {sz} (w : word sz) : string :=
     match w with
@@ -1063,9 +1074,18 @@ End DeeplyEmbedded.
 
 (** * Connecting the two *)
 
+(* Reasoning about the mixed-embedding language is much more pleasant than for
+ * the deep-embedding language.  Let's implement a verified translation from the
+ * former to the latter.  The translation will be an inductive judgment. *)
+
 Module MixedToDeep(Import BW : BIT_WIDTH).
   Module Import DE := DeeplyEmbedded(BW).
   Module Import ME := MixedEmbedded(BW).
+
+  (* Key insight: we translate with respect to a valuation [V], telling us the
+   * values of the variables in the deep-embedding world.  When we hit a value
+   * of the mixed-embedding world, one translation option is to find a variable
+   * known to hold that value, outputting that variable as the translation! *)
 
   Inductive translate_exp (V : valuation) : forall {A}, A -> exp -> Prop :=
   | TrAdd : forall (v1 v2 : wrd) e1 e2,
@@ -1077,16 +1097,12 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       -> translate_exp V v (Var x)
   | TrConst : forall v,
       translate_exp V v (Const v).
+  (* Something subtle happens in this last case.  We can turn any value into a
+   * constant of the deep embedding?  Sounds like a cop-out!  See a note below
+   * on why the cop-out doesn't apply. *)
 
-  Fixpoint couldWrite (x : var) (s : stmt) : bool :=
-    match s with
-    | Assign y _ => if x ==v y then true else false
-    | Skip
-    | DE.Write _ _ => false
-    | Seq s1 s2
-    | IfThenElse _ s1 s2 => couldWrite x s1 || couldWrite x s2
-    | WhileLoop _ s1 => couldWrite x s1
-    end.
+  (* Things get pretty intricate from here on, including with a weird sort of
+   * polymorphism over relations.  We will only comment on the main points. *)
 
   Inductive translate_result (V : valuation) (v : wrd) : stmt -> Prop :=
   | TrReturn : forall e,
@@ -1122,6 +1138,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | TwoWords => wrd * wrd
     end%type.
 
+  (* This is the main relation for translating commands. *)
   Inductive translate 
     : forall {rt}, (valuation -> rtt rt -> stmt -> Prop)
                  -> valuation -> forall {A}, cmd A -> stmt -> Prop :=
@@ -1134,11 +1151,21 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
       -> x <> "acc"
       -> translate_exp V v e
       -> (forall w, translate translate_return (V $+ (x, w)) (c w) s1)
+         (* ^-- Note this crucial case for translating [Bind].  We require that
+          * the translation of the body be correct for any possible value of the
+          * mixed-embedding variable, so long as we guarantee that the value is
+          * also stashed in deep-embedding variable [x] before proceeding! *)
       -> translate translate_return V (Bind (Return v) c) (Seq (Assign x e) s1)
   | TrAssigned : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (v : wrd) (c : wrd -> cmd B) x s1,
       V $? x = Some v
       -> translate translate_return V (c v) s1
       -> translate translate_return V (Bind (Return v) c) (Seq Skip s1)
+  (* ^-- Note also "extra" rules like this one, which won't be used in
+   * translating a command in the first place.  Instead, they are only used to
+   * "strengthen the induction hypothesis" in the simulation proof we use to
+   * show soundness of translation.  In other words, execution of
+   * mixed-embedding programs generates intermediate states (e.g., with "extra"
+   * [Skip]s) that we still need to relate to the deep embedding. *)
   | TrRead : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (a : wrd) (c : wrd -> cmd B) e x s1,
       V $? x = None
       -> x <> "i"
@@ -1154,6 +1181,10 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
   | TrAssignedUnit : forall rt (translate_return : valuation -> rtt rt -> stmt -> Prop) V B (c : unit -> cmd B) s1,
       translate translate_return V (c tt) s1
       -> translate translate_return V (Bind (Return tt) c) (Seq Skip s1)
+
+  (* Next, note that the [Loop] rules only apply to a restricted pattern, to
+   * simplify the formalism.  The next rule is the one used in compilation,
+   * while the rest are only used internally in the soundness proof. *)
   | TrLoop : forall V (initA initB : wrd) body {A} (c : wrd * wrd -> cmd A) ea s1 s2,
       V $? "i" = None
       -> V $? "acc" = None
@@ -1276,6 +1307,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
                          c)
                    (Seq (Seq s' (WhileLoop (Var "i") s1)) s2).
 
+  (* Here are tactics to compile programs automatically. *)
+
   Ltac freshFor vm k :=
     let rec keepTrying x :=
         let H := fresh in
@@ -1306,6 +1339,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate _ ?V (Bind (Loop _ _) _) _ ] =>
       eapply TrLoop; [ simplify; equality | simplify; equality | | intros | intros ]
     end.
+
+  (** ** Some examples of compiling programs *)
 
   Example adder (a b c : wrd) :=
     Bind (Return (a ^+ b)) (fun ab => Return (ab ^+ c)).
@@ -1393,6 +1428,22 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Definition reverse_alt_compiled := Eval simpl in proj1_sig translate_reverse_alt.
 
+
+  (** ** Soundness proof *)
+
+  (* We omit explanation of most of these details, which get rather hairy.
+   * Also, these proof scripts are not exactly modeling best practices in
+   * automation.  Maybe some day the author will be motivated to clean them
+   * up. *)
+
+  (* We do point out here that one recurring motif throughout the lemmas is
+   * taking a translation run and applying it in a *larger* valuation than was
+   * used as input.  Intuitively, it is OK to run with extra variables around,
+   * if we don't actually read them.  This opportunity is important for
+   * translated loop bodies, which, after the first loop iteration, get run with
+   * their own past variable settings still in place, even though the body
+   * provably never reads its own past settings of temporary variables. *)
+
   Lemma eval_translate : forall H V V' e v,
       eval H (V $++ V') e v
       -> forall (v' : wrd), translate_exp V v' e
@@ -1435,6 +1486,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     simplify; equality.
   Qed.
 
+  (* Complex statement here, really dealing mostly with the whole idea of
+   * ignoring parts of valuations! *)
   Lemma step_translate_loop : forall V (c : cmd (wrd * wrd)) s,
       translate (rt := TwoWords) translate_loop_body V c s
       -> forall H H' V' V'' s',
@@ -2615,9 +2668,9 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eassumption.
     eapply lookup_None_dom.
     rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
-    eassumption.    
+    eassumption.
 
-    Unshelve.
+    Grab Existential Variables.
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
@@ -2636,6 +2689,9 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     exact (^0) || exact (Return (^0)).
   Qed.
 
+  (* This is the invariant for simulation!  Note the crucial addition of extra
+   * variables in the valuation.  We carefully chose the two languages to treat
+   * the heap identically, so we can require heap equality. *)
   Inductive translated : forall {A}, DE.heap * valuation * stmt -> ME.heap * cmd A -> Prop :=
   | Translated : forall A H V V' s (c : cmd A),
       translate (rt := OneWord) translate_result V c s
@@ -3107,7 +3163,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eexists.
     repeat econstructor.
 
-    Unshelve.
+    Grab Existential Variables.
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
@@ -3135,6 +3191,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     exact (^0) || exact (Return (^0)).
   Qed.
 
+  (* The main theorem!  Prove a Hoare triple in the high-level language;
+   * conclude safe execution in the low-level language. *)
   Theorem hoare_triple_sound : forall P (c : cmd wrd) Q V s H,
       hoare_triple P c Q
       -> P H
@@ -3169,6 +3227,9 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eauto.
     eauto.
   Qed.
+
+
+  (** ** Applying the main theorem to the earlier examples *)
 
   Theorem adder_ok : forall a b c,
       {{emp}}
@@ -3276,6 +3337,8 @@ End MixedToDeep.
 
 
 (** * Getting concrete *)
+
+(* Let's generate C code for the concrete bitwidth of 32. *)
 
 Module Bw32.
   Definition bit_width := 32.

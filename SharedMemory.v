@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 15: Operational Semantics for Shared-Memory Concurrency
+  * Chapter 16: Operational Semantics for Shared-Memory Concurrency
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

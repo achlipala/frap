@@ -957,8 +957,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | Var (x : var)
   | Const (n : wrd)
   | Add (e1 e2 : exp)
-  | Read (e : exp)
-  | NotNull (e : exp).
+  | Read (e : exp).
 
   Inductive stmt :=
   | Skip
@@ -984,10 +983,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
   | VRead : forall H V e1 p v,
       eval H V e1 p
       -> H $? p = Some v
-      -> eval H V (Read e1) v
-  | VNotNull : forall H V e1 p,
-      eval H V e1 p
-      -> eval H V (NotNull e1) (if weq p (^0) then ^1 else ^0).
+      -> eval H V (Read e1) v.
 
   Inductive step : heap * valuation * stmt -> heap * valuation * stmt -> Prop :=
   | StAssign : forall H V x e v,
@@ -1046,7 +1042,6 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
     | Const n => binS n
     | Add e1 e2 => expS e1 ++ " + " ++ expS e2
     | Read e1 => "*(" ++ expS e1 ++ ")"
-    | NotNull e1 => expS e1 ++ " <> NULL"
     end.
 
   Definition newline := String (Ascii.ascii_of_nat 10) "".

@@ -3453,7 +3453,7 @@ In fact, we can prove that any other state is unstuck, though we won't bother he
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Deep Embeddings, Shallow Embeddings, and Options in Between}
+\chapter{label{embeddings}Deep Embeddings, Shallow Embeddings, and Options in Between}
 
 So far, in this book, we have followed the typographic conventions of ordinary mathematics and logic, as they would be worked out on whiteboards.
 In parallel, we have mechanized all of the definitions and proofs in Coq.
@@ -3937,6 +3937,242 @@ For instance, here is the one we prove for $\mt{Write}$.
 \end{proof}
 
 Again, without the introduction of the $R$ variable, we would get stuck proving the case for the frame rule.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Connecting to Real-World Programming Languages}
+
+Our exercises so far have been confined to proofs of programs in idealized programming languages.
+How can proof assistants be used to derive results about full-scale languages?
+Developers are already used to coordinating build processes\index{build processes} that plumb together multiple languages and tools.
+A proof assistant like Coq can become one tool in such a build flow.
+However, the interesting wrinkle that arises is the chance to do more than just get tools cooperating on building executable code.
+We can also get tools cooperating on generating proofs of parts of the system.
+
+It is worth emphasizing that this whole subject is a very active area of research.
+There are many competing approaches, and it is not clear which will be most practical in the long run.
+With this chapter, we survey the interesting design dimensions and approaches to them that are known today.
+We also go into more detail on one avant-garde approach, of verified compilation of shallowly embedded programs to deeply embedded programs in Coq.
+
+\section{Where Does the Buck Stop?}
+
+For any system where we really care about correctness (or its special case of security\index{security}), it is common to delineate a \emph{trusted code base (TCB)}\index{trusted code base}\index{TCB}: the parts of the system where bugs could invalidate correctness.
+By implication, system components outside the TCB can be arbitarily buggy without endangering correctness.
+
+When we use Coq, the Coq proof checker itself is in the TCB.
+Implicitly, all the infrastructure below the proof checker is also trusted.
+That includes the OCaml\index{OCaml} compiler (since Coq is implemented in OCaml), the operating-system kernel\index{operating systems}, the processor beneath\index{processors}, and so on.
+Interestingly, most of Coq is \emph{not} trusted.
+For instance, the tactic engine outputs proof terms\index{proof terms} in a core language, and we only need to trust the (relatively small) checker for that language.
+
+The point is, we always draw the trust boundary somewhere, and we always reason informally starting at some layer of a system.
+Our real-world-connecting examples of prior chapters have stopped at extracting OCaml code from Coq developments.
+We could avoid trusting extraction (and the OCaml compiler) by instead proving properties of C abstract syntax trees.
+However, then we are still trusting the C compiler!
+So we could verify that compiler and even the operating system its outputs run on.
+However, then we are still trusting the computer processor!
+So we could verify the processor, even down to the level of circuits\index{circuits} with analog dynamics modeled using differential equations\index{differential equations}.
+However, then we are still trusting our characterization of the laws of physics!
+
+In summary, it is naive to suggest that some formal-methods developments ``prove the whole system'' while others do not.
+
+\section{Modes of Connecting to Real Artifacts}
+
+\encoding
+Any strategy in this space involves some connection between a proved component and an unproved component.
+Oversimplifying a bit, we are considering what is the ``last level'' of a proof that spans multiple abstraction layer\index{abstraction layers}.
+(The ``first level'' will be the top-level specification of an application or whatever other piece has a proof that is not used as a lemma for some other proof.)
+
+\subsection{Modes Based on Extraction}
+
+The easiest ``last level'' connection is via \emph{extraction}\index{extraction}, which translates Gallina programs into functional programs in languages like OCaml\index{OCaml}, Haskell\index{Haskell}, and Scheme\index{Scheme}.
+Other proof assistants than Coq tend to include similar extraction facilities.
+When the formal object of study is already a purely functional program, extraction is a very natural fit.
+Its main downside are TCB size and performance.
+On the TCB front, a variety of compilers, including the one for extraction itself, remain trusted.
+On the performance front, it is often possible to make a functional program run much faster or use much less memory by translating it to, say, a C program that doesn't rely on garbage collection.
+
+Extraction can be part of other, less-obvious connections, where we bring certain kinds of \emph{side effects}\index{side effects} and real-world interactions into scope.
+For instance, a common class of applications is \emph{reactive systems}\index{reactive systems}.
+The system is viewed as an object, in the sense of object-oriented programming\index{object-oriented programming}, with encapsulated private state and public methods that are allowed to read and modify that state.
+Some methods are designated as \emph{event handlers}\index{event handlers}: they are called when various input events take place in the real world, like when a packet is received from a network.
+An event handler in turn signals output actions to take in response.
+This model is actually quite easy to implement using extraction: a reactive system is a choice of private state type plus a set of pure functions, each taking in the state and returning the new modified state.
+The pure functions are the methods of the object.
+Expressive power in this style is very high, though the TCB-size and performance objections remain.
+
+In Chapter \ref{embeddings}, we already saw another approach to adding side effects\index{side effects} atop extracted code: extract syntax trees, perhaps in a mixed embedding\index{mixed embedding}, run with an interpreter\index{interpreter} coded directly in the target language of extraction.
+That interpreter is free to use whatever side effects the host language supports.
+If anything, the TCB-size and performance objections increase with this approach, given the additional level of indirection that comes from using syntax trees and interpretation.
+However, the flexibility can be very appealing, with a straightforward means of allowing most any side effect.
+
+\subsection{Modes Based on Explicit Rendering}
+
+Another ``last level'' strategy is to do explicit translation between abstract syntax trees and concrete, textual code formats.
+These translations usually have nothing proved about them, meaning they belong to TCBs, but often the translators are simple enough that it is relatively unworrying to trust them.
+
+In one direction, we implement a tool that takes in, say, the textual syntax of C code, outputting Coq source code for corresponding explicit syntax trees.
+Now we can reason about these trees like any other mathematical objects coded manually in Coq.
+A downside of this approach is that it is relatively complex to parse mainstream programming languages, yet we are trusting just such a parser.
+However, this style often supports the smoothest integration with legacy code bases.
+
+In the other direction, we write a Coq function from syntax trees to strings of concrete code in some widely used language.
+This function is still trusted, but it tends to be much shorter and worthy of trust than its inverse.
+Coq can be run as part of a build process, printing to the screen the string that has been computed from a syntax tree.
+A scripting language can be used to extract the string from Coq's output, write it to a file, and call a conventional compiler.
+A major challenge of this approach is that only deeply embedded languages have straightforward printing to concrete syntax, in practice, while shallowly embedded languages tend to be easier to do proofs about.
+
+
+\section{The Importance of Modularity}
+
+\modularity
+Our discussion so far leaves out an important dimension.
+Often significant projects are divided into libraries\index{libraries}, and we want to be able to prove libraries independently of each other.
+We have a few choices for facing this reality of large-scale development.
+
+The easiest approach is to use Coq pipelines to generate single libraries, which are linked outside of Coq.
+Our libraries may even be linked\index{linking} with modules written in other languages or that would otherwise resist whatever proof methods we used.
+These connections across languages may enlarge the TCB significantly, but we can boost performance by linking with crucial but unverified code.
+
+We may also want to give modules first-class status in Coq and prove the correctness of linking mechanisms.
+In concert with verified compilers\index{compiler verification}, possibilities open up to do linking across languages without expanding the TCB.
+All languages can be compiled to some common format, like assembly language, and the compiled version of each libary can be given a specification in a common logical format, like a particular Hoare logic.
+With all the pieces in place, we wind up with the semantics of the common language in the TCB, but the compilers and all aspects of their source languages stay outside the TCB.
+
+
+\section{Case Study: From a Mixed Embedding to a Deep Embedding}
+
+This chapter's associated Coq code works out a case study of verified compilation from a mixed embedding to a deep embedding, realizing one of the ``last level'' options above that keeps the best of both worlds: straightforward program proof with a mixed embedding, but the smaller TCB and improved performance that comes from outputting concrete C\index{C programming language} syntax from Coq.
+
+\subsection{Source and Target Languages}
+
+Our mixed-embedding source language will be a simplification of last chapter's language.
+$$\begin{array}{rrcl}
+  \textrm{Commands} & c &::=& \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Loop} \; i \; f \mid \mt{Read} \; n \mid \mt{Write} \; n \; n
+\end{array}$$
+
+Our deep-embedding target language will expose essentially the same features but more in the traditional style of C and related languages.
+$$\begin{array}{rrcl}
+  \textrm{Expressions} & e &::=& x \mid n \mid e + e \mid \readfrom{e} \\
+  \textrm{Statements} &s &::=& \skipe \mid \assign{x}{e} \mid \writeto{e}{e} \mid s; s \mid \ifte{e}{s}{s} \mid \while{e}{s}
+\end{array}$$
+
+We assume standard small-step semantics for both languages, referring to the Coq code for details.
+A state of the source language takes the form $(h, c)$ for a heap $h$, while a state of the target language adds a variable valuation $v$, for triples $(h, v, c)$.
+
+\subsection{Formal Compilation}
+
+It is not at all obvious how to translate from a mixed embedding\index{mixed embedding} to a deep embedding\index{deep embedding}.
+We can't just write a compiler as a Gallina function, because the $\mt{Bind}$ construct is encoded using functions of the metalanguage.
+As a result, there is no way to ``recurse under a binder''!
+
+\newcommand{\dscomp}[3]{#1 \vdash #2 \hookrightarrow #3}
+
+However, inductive predicate definitions\index{inductive predicates} give us all the power we need, when we mix in the power of logical quantifiers\index{quantifiers}.
+We will define a judgment $\dscomp{v}{c}{s}$, indicating that mixed-embedded command $c$ can be compiled to statement $s$, assuming that we start running $s$ when the valuation includes every mapping from $v$.
+
+A good warmup is defining a related judgment $\dscomp{v}{n}{e}$, compiling normal Gallina numeric expressions $n$ into syntactic expressions $e$.
+
+$$\infer{\dscomp{v}{x}{n}}{
+  v(x) = n
+}
+\quad \infer{\dscomp{v}{n_1 + n_2}{e_1 + e_2}}{
+  \dscomp{v}{n_1}{e_1}
+  & \dscomp{v}{n_2}{e_2}
+}$$
+
+So far, the logic is straightforward.
+When we want to mention a number, it suffices to find a variable that has already been assigned that number.
+Translation recurses through addition in a natural way.
+(Note that, in the addition rule, the ``+'' on the left of the arrow is normal Gallina addition, while the ``+'' on the right is syntactic ``plus'' of the deeply embedded language!)
+
+Another rule may appear at first to be overly powerful.
+$$\infer{\dscomp{v}{n}{n}}{}$$
+
+That is, any numeric expression may be injected into the deep embedding \emph{as a constant}.
+How can we hope to embed all Gallina expressions in C?
+The details of the command-compilation rules reveal why we are safe, so let us turn to those rules.
+
+The rules we show here are simplified from the full set in the Coq development, supporting an even smaller subset of the source language, to make the presentation easier to understand.
+The rule for lone $\mt{Return}$ commands is simple, delegating most of the work to expression compilation, using a designated variable \texttt{result} to hold the final answer of a command.
+
+$$\infer{\dscomp{v}{\mt{Return} \; n}{\assign{\texttt{result}}{e}}}{
+  \dscomp{v}{n}{e}
+}$$
+
+The most interesting rules cover uses of $\mt{Bind}$ on various primitive operations directly.
+Here is the simplest such rule, where the primitive is simple $\mt{Return}$.
+
+$$\infer{\dscomp{v}{x \leftarrow \mt{Return} \; n; c(x)}{\assign{y}{e}; s}}{
+    y \notin \dom{v}
+    & \dscomp{v}{n}{e}
+    & (\forall w. \; \dscomp{\mupd{v}{y}{w}}{c(w)}{s})
+}$$
+
+This rule selects a deep-embedding variable name $y$ to correspond to $x$ in the source program.
+(Actually, the source-program $\mt{Bind}$ is encoded as a call to a higher-order function, so no choice of a particular $x$ is present.)
+The name $y$ must not already be present in the valuation $v$ -- it must not have been chosen already for a command executed earlier.
+Next, we find an expression $e$ that represents the value $n$ being bound.
+Finally, we reach the trickiest part.
+The statement $s$ needs to represent the $\mt{Bind}$ body $c$, \emph{for any value $w$ that $n$ might evaluate to}.
+For every such choice $w$, we extend $v$ to record that $w$ was assigned to $y$.
+In parallel, we pass $w$ into the body $c$.
+As a result, the expression-translation rule for variables can pick up on this connection and compile mentions of $w$ into uses of $y$!
+
+Here is where we see why it wasn't problematic earlier to include a rule that translates any number $n$ into a constant in the deep embedding.
+Most numeric expressions in a source program will depend on results of earlier $\mt{Bind}$ operations.
+However, \emph{the quantified premise of the last rule enforces that the output statement $s$ is not allowed to depend on $w$ directly}!
+The values of introduced variables can only be accessed through deeply embedded variable names.
+In other words, if we tried to use the constant rule directly to prove the quantified premise of that last rule, when the body involves a $\mt{Return}$ of a complex expression that mentions the bound variable, we would generate $s$ that includes $w$, which is not allowed.
+
+Similar rules are present for $\mt{Read}$ and $\mt{Write}$, which interestingly are compiled the same way as $\mt{Return}$.
+From a syntactic, compilation standpoint, they do not behave differently from pure computation.
+More involved and raising new complications is the rule for loops; see the Coq code for details.
+
+\subsection{Soundness Proof}
+
+\begin{theorem}\label{dscompsim}
+  If $\dscomp{v}{c}{s}$, then the source-language transition system starting at $(h, c)$ simulates\index{simulation} the target-language transition system starting at $(h, v, s)$.
+\end{theorem}
+\begin{proof}
+  In other words, every execution of the target-language system can be mimicked by one of the source-language system, where the states are connected throughout by some relation that we choose.
+  A good choice is the relation $\sim$ defined by this inference rule.
+
+  $$\infer{(h, v \uplus v', s) \sim (h, c)}{
+    \dscomp{v}{c}{s}
+  }$$
+
+  Note that the only departure from the theorem statement itself is the allowance for compiled program $s$ to run in a \emph{larger} valuation than we compiled it against.
+  It is safe to provide extra variables $v'$ (merged into $v$ with disjoint union), so long as the program never reads them, which our translation judgment enforces.
+  We need to allow for extra variables because loop bodies run multiple times, with later iterations technically being exposed to temporary-variable values set by earlier iterations.
+
+  Actually, we need to modify our translation judgment so that it also applies to ``silly'' intermediate states of execution in the target language.
+  For instance, we wind up with $\skipe$s that are quickly stepped away, yet those configurations must be related to source configurations by $\sim$.
+  Here is one example of the extra rules that we need to add to make our induction hypothsis strong enough.
+
+  $$\infer{\dscomp{v}{x \leftarrow \mt{Return} \; n; c(x)}{\mt{skip}; s}}{
+    v(y) = n
+    & \dscomp{v}{c(n)}{s}
+  }$$
+
+  The premises encode our expectation that an assignment of $n$ to $y$ ``just ran.''
+\end{proof}
+
+This result can be composed with soundness of any Hoare logic for the source language.
+The associated Coq code defines one, essentially following our separation logic\index{separation logic} from last chapter.
+
+\begin{theorem}
+  If $\hoare{P}{c}{Q}$, $P(h)$, $\dscomp{v}{c}{s}$, and $\texttt{result} \notin \dom{v}$, then it is invariant of the transition system starting in $(h, v, s)$ that execution never gets stuck.
+\end{theorem}
+\begin{proof}
+  First, we switch to proving an invariant of the system $(h, c)$ using the simulation from Theorem \ref{dscompsim}.
+  Next, we use the soundness theorem of the Hoare logic to weaken the invariant proved in that way into the one we want in the end.
+\end{proof}
+
+At this point, we can verify the high-level program conveniently while arriving at a low-level program automatically.
+That low-level program is easy to print as a string of concrete C code, as the associated Coq code demonstrates.
+We only trust the simple printing process, not the compiler that got us from a mixed embedding to a C-like syntax tree.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

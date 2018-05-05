@@ -26,7 +26,7 @@ Definition pick_ {A} (P : A -> Prop) : comp A := P.
 Definition refine {A} (c1 c2 : comp A) :=
   forall a, c2 a -> c1 a.
 
-Ltac morphisms := unfold refine, impl, pointwise_relation, bind; hnf; first_order.
+Ltac morphisms := unfold refine, impl, pointwise_relation, bind, ret, pick_; hnf; first_order; subst; eauto.
 
 Global Instance refine_PreOrder A : PreOrder (@refine A).
 Proof.
@@ -60,6 +60,13 @@ Qed.
 
 Theorem bind_ret : forall A B (v : A) (c2 : A -> comp B),
     refine (bind (ret v) c2) (c2 v).
+Proof.
+  morphisms.
+Qed.
+
+Theorem pick_one : forall {A} {P : A -> Prop} v,
+    P v
+    -> refine (pick_ P) (ret v).
 Proof.
   morphisms.
 Qed.
@@ -118,16 +125,27 @@ Proof.
   linear_arithmetic.
 Qed.
 
+(* We run this next step to hide an evar, so that rewriting isn't too eager to
+ * make up values for it. *)
+Ltac hide_evars :=
+  match goal with
+  | [ |- refine _ (?f _ _) ] => set f
+  | [ |- refine _ (?f _) ] => set f
+  | [ |- refine _ ?f ] => set f
+  end.
+
 Ltac begin :=
-  eexists; simplify;
-    (* We run this next step to hide an evar, so that rewriting isn't too eager to
-     * make up values for it. *)
-    match goal with
-    | [ |- refine _ (?f _) ] => set f
-    end.
+  eexists; simplify; hide_evars.
 
 Ltac finish :=
   match goal with
+  | [ |- refine ?e (?f ?arg1 ?arg2) ] =>
+    let g := eval pattern arg1, arg2 in e in
+    match g with
+    | ?g' _ _ =>
+      let f' := eval unfold f in f in
+      unify f' g'; reflexivity
+    end
   | [ |- refine ?e (?f ?arg) ] =>
     let g := eval pattern arg in e in
     match g with
@@ -135,6 +153,9 @@ Ltac finish :=
       let f' := eval unfold f in f in
       unify f' g'; reflexivity
     end
+  | [ |- refine ?e ?f ] =>
+    let f' := eval unfold f in f in
+    unify f' e; reflexivity
   end.
 
 (* Let's derive an efficient implementation. *)
@@ -218,7 +239,7 @@ Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
 
 Hint Constructors RefineMethods.
 
-Record adt_refine {names} (adt1 adt2 : adt names) := {
+Record adt_refine {names} (adt1 adt2 : adt names) : Prop := {
   ArRel : AdtState adt1 -> AdtState adt2 -> Prop;
   ArConstructors : forall s2,
       AdtConstructor adt2 s2
@@ -317,11 +338,11 @@ Theorem refine_trans : forall names (adt1 adt2 adt3 : adt names),
     -> adt_refine adt1 adt3.
 Proof.
   simplify.
-  invert X.
-  invert X0.
-  choose_relation (fun s1 s3 => exists s2, ArRel0 s1 s2 /\ ArRel1 s2 s3); eauto.
+  invert H.
+  invert H0.
+  choose_relation (fun s1 s3 => exists s2, ArRel s1 s2 /\ ArRel0 s2 s3); eauto.
 
-  apply ArConstructors1 in H.
+  apply ArConstructors0 in H.
   first_order.
 Qed.
 
@@ -385,41 +406,98 @@ Proof.
   choose_relation (@eq state); eauto.
 Qed.
 
-Inductive RepChangeMethods {state1 state2} (R : state1 -> state2 -> Prop)
+Inductive RepChangeMethods {state1 state2} (absfunc : state2 -> state1)
   : forall {names}, methods state1 names -> methods state2 names -> Prop :=
 | RchNil :
-    RepChangeMethods R MethodsNil MethodsNil
+    RepChangeMethods absfunc MethodsNil MethodsNil
 | RchCons : forall name names oldbody (ms1 : methods state1 names) (ms2 : methods state2 names),
-    RepChangeMethods R ms1 ms2
-    -> RepChangeMethods R
+    RepChangeMethods absfunc ms1 ms2
+    -> RepChangeMethods absfunc
        (MethodsCons {| MethodName := name; MethodBody := oldbody |} ms1)
        (MethodsCons {| MethodName := name; MethodBody := (fun s arg =>
-                         pick s'_res where
-                           forall s0, R s0 s
-                                      -> exists s', oldbody s0 arg (s', snd s'_res)
-                                                     /\ R s' (fst s'_res)) |} ms2).
+                         p <- oldbody (absfunc s) arg;
+                         s' <- pick s' where absfunc s' = fst p;
+                         ret (s', snd p)) |} ms2).
 
-Lemma RepChangeMethods_ok : forall state1 state2 (R : state1 -> state2 -> Prop)
+Lemma RepChangeMethods_ok : forall state1 state2 (absfunc : state2 -> state1)
   names (ms1 : methods state1 names) (ms2 : methods state2 names),
-    RepChangeMethods R ms1 ms2
-    -> RefineMethods R ms1 ms2.
+    RepChangeMethods absfunc ms1 ms2
+    -> RefineMethods (fun s1 s2 => absfunc s2 = s1) ms1 ms2.
 Proof.
   induct 1; eauto.
+  econstructor; eauto.
+  morphisms.
+  invert H3.
+  cases x; simplify; subst.
+  eauto.
 Qed.
 
 Hint Resolve RepChangeMethods_ok.
 
-Theorem refine_rep : forall state1 state2 (R : state1 -> state2 -> Prop)
+Theorem refine_rep : forall state1 state2 (absfunc : state2 -> state1)
                             names (ms1 : methods state1 names) (ms2 : methods state2 names)
                             constr,
-    RepChangeMethods R ms1 ms2
+    RepChangeMethods absfunc ms1 ms2
     -> adt_refine {| AdtState := state1;
                      AdtConstructor := constr;
                      AdtMethods := ms1 |}
                   {| AdtState := state2;
-                     AdtConstructor := s0 <- constr; pick s where R s0 s;
+                     AdtConstructor := s0 <- constr; pick s where absfunc s = s0;
                      AdtMethods := ms2 |}.
 Proof.
   simplify.
-  choose_relation R; eauto.
+  choose_relation (fun s1 s2 => absfunc s2 = s1); eauto.
 Qed.
+
+(** ** Tactics for easy use of those refinement principles *)
+
+Ltac refine_rep f := eapply refine_trans; [ apply refine_rep with (absfunc := f);
+                                            repeat (apply RchNil
+                                                    || refine (RchCons _ _ _ _ _ _ _)) | cbv beta ].
+
+Ltac refine_constructor := eapply refine_trans; [ apply refine_constructor; hide_evars | ].
+
+Ltac refine_method nam := eapply refine_trans; [ eapply refine_method with (name := nam); [
+  | repeat (refine (RepmHead _ _ _ _ _)
+            || (refine (RepmSkip _ _ _ _ _ _ _ _ _ _); [ equality | ])) ];
+    cbv beta; simplify; hide_evars | ].
+
+Ltac refine_finish := apply refine_refl.
+
+(** ** Example: the numeric counter again *)
+
+Definition derived_counter : { counter' | adt_refine counter counter' }.
+  unfold counter; eexists.
+  refine_rep (fun p => fst p + snd p).
+
+  refine_constructor.
+  rewrite bind_ret.
+  rewrite (pick_one (0, 0)).
+  finish.
+  equality.
+
+  refine_method "increment1".
+  rewrite bind_ret; simplify.
+  rewrite (pick_one (fst s + arg, snd s)).
+  rewrite bind_ret; simplify.
+  finish.
+  simplify; linear_arithmetic.
+
+  refine_method "increment2".
+  rewrite bind_ret; simplify.
+  rewrite (pick_one (fst s, snd s + arg)).
+  rewrite bind_ret; simplify.
+  finish.
+  simplify; linear_arithmetic.
+
+  refine_method "value".
+  rewrite bind_ret; simplify.
+  rewrite (pick_one s).
+  rewrite bind_ret; simplify.
+  finish.
+  equality.
+
+  refine_finish.
+Defined.
+  
+Eval simpl in proj1_sig derived_counter.

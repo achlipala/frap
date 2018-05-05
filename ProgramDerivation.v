@@ -152,3 +152,139 @@ Print impl.
  * here. *)
 Transparent max.
 Eval compute in impl (1 :: 7 :: 8 :: 2 :: 13 :: 6 :: nil).
+
+
+(** * Abstract data types (ADTs) *)
+
+Record method_ {state : Type} := {
+  MethodName : string;
+  MethodBody : state -> nat -> comp (state * nat)
+}.
+
+Arguments method_ : clear implicits.
+
+Inductive methods {state : Type} : list string -> Type :=
+| MethodsNil : methods []
+| MethodsCons : forall (m : method_ state) {names},
+    methods names
+    -> methods (MethodName m :: names).
+
+Arguments methods : clear implicits.
+
+Notation "'method' name [[ self , arg ]] = body" :=
+  {| MethodName := name;
+     MethodBody := fun self arg => body |}
+    (at level 100, self at level 0, arg at level 0).
+
+Record adt {names : list string} := {
+  AdtState : Type;
+  AdtConstructor : comp AdtState;
+  AdtMethods : methods AdtState names
+}.
+
+Arguments adt : clear implicits.
+
+Notation "'ADT' { 'rep' = state 'and' 'constructor' = constr ms }" :=
+  {| AdtState := state;
+     AdtConstructor := constr;
+     AdtMethods := ms |}.
+
+Notation "'and' m1 'and' .. 'and' mn" :=
+  (MethodsCons m1 (.. (MethodsCons mn MethodsNil) ..)) (at level 101).
+
+
+(** * ADT refinement *)
+
+Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
+  : forall {names}, methods state1 names -> methods state2 names -> Prop :=
+| RmNil : RefineMethods R MethodsNil MethodsNil
+| RmCons : forall name names (f1 : state1 -> nat -> comp (state1 * nat))
+                  (f2 : state2 -> nat -> comp (state2 * nat))
+                  (ms1 : methods state1 names) (ms2 : methods state2 names),
+    (forall s1 s2 arg s2' res,
+        R s1 s2
+        -> f2 s2 arg (s2', res)
+        -> exists s1', f1 s1 arg (s1', res)
+                       /\ R s1' s2')
+    -> RefineMethods R ms1 ms2
+    -> RefineMethods R (MethodsCons {| MethodName := name; MethodBody := f1 |} ms1)
+                       (MethodsCons {| MethodName := name; MethodBody := f2 |} ms2).
+
+Record adt_refine {names} (adt1 adt2 : adt names) := {
+  ArRel : AdtState adt1 -> AdtState adt2 -> Prop;
+  ArConstructors : forall s2,
+      AdtConstructor adt2 s2
+      -> exists s1, AdtConstructor adt1 s1
+                    /\ ArRel s1 s2;
+  ArMethods : RefineMethods ArRel (AdtMethods adt1) (AdtMethods adt2)
+}.
+
+Ltac choose_relation R :=
+  match goal with
+  | [ |- adt_refine ?a ?b ] => apply (Build_adt_refine _ a b R)
+  end; simplify.
+
+(** ** Example: numeric counter *)
+
+Definition counter := ADT {
+  rep = nat
+  and constructor = ret 0
+  and method "increment1"[[self, arg]] = ret (self + arg, 0)
+  and method "increment2"[[self, arg]] = ret (self + arg, 0)
+  and method "value"[[self, _]] = ret (self, self)
+}.
+
+Definition split_counter := ADT {
+  rep = nat * nat
+  and constructor = ret (0, 0)
+  and method "increment1"[[self, arg]] = ret ((fst self + arg, snd self), 0)
+  and method "increment2"[[self, arg]] = ret ((fst self, snd self + arg), 0)
+  and method "value"[[self, _]] = ret (self, fst self + snd self)
+}.
+
+Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic.
+
+Theorem split_counter_ok : adt_refine counter split_counter.
+Proof.
+  choose_relation (fun n p => n = fst p + snd p).
+
+  unfold ret in *; subst.
+  eauto.
+
+  repeat constructor; simplify; unfold ret in *; subst;
+    match goal with
+    | [ H : (_, _) = (_, _) |- _ ] => invert H
+    end; eauto.
+
+  Grab Existential Variables.
+  exact 0.
+Qed.
+
+
+(** * General refinement strategies *)
+
+Lemma RefineMethods_refl : forall state names (ms : methods state names),
+    RefineMethods (@eq _) ms ms.
+Proof.
+  induct ms.
+  constructor.
+  cases m; constructor; first_order.
+  subst; eauto.
+Qed.  
+
+Theorem refine_constructor : forall names state constr1 constr2 (ms : methods _ names),
+    refine constr1 constr2
+    -> adt_refine {| AdtState := state;
+                     AdtConstructor := constr1;
+                     AdtMethods := ms |}
+                  {| AdtState := state;
+                     AdtConstructor := constr2;
+                     AdtMethods := ms |}.
+Proof.
+  simplify.
+  match goal with
+  | [ |- adt_refine ?a ?b ] => apply (Build_adt_refine names a b (@eq _))
+  end; simplify.
+  morphisms.
+  apply RefineMethods_refl.
+Qed.

@@ -6,6 +6,12 @@
 
 Require Import FrapWithoutSets.
 Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
+Require Import Eqdep.
+
+Ltac inv_pair :=
+  match goal with
+  | [ H : existT _ _ _ = existT _ _ _ |- _ ] => apply inj_pair2 in H; invert H
+  end.
 
 
 (** * The computation monad *)
@@ -210,6 +216,8 @@ Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
     -> RefineMethods R (MethodsCons {| MethodName := name; MethodBody := f1 |} ms1)
                        (MethodsCons {| MethodName := name; MethodBody := f2 |} ms2).
 
+Hint Constructors RefineMethods.
+
 Record adt_refine {names} (adt1 adt2 : adt names) := {
   ArRel : AdtState adt1 -> AdtState adt2 -> Prop;
   ArConstructors : forall s2,
@@ -272,6 +280,51 @@ Proof.
   subst; eauto.
 Qed.  
 
+Hint Immediate RefineMethods_refl.
+
+Theorem refine_refl : forall names (adt1 : adt names),
+    adt_refine adt1 adt1.
+Proof.
+  simplify.
+  choose_relation (@eq (AdtState adt1)); eauto.
+Qed.
+
+Lemma RefineMethods_trans : forall state1 state2 state3 names
+                                   R1 R2
+                                   (ms1 : methods state1 names)
+                                   (ms2 : methods state2 names)
+                                   (ms3 : methods state3 names),
+
+    RefineMethods R1 ms1 ms2
+    -> RefineMethods R2 ms2 ms3
+    -> RefineMethods (fun s1 s3 => exists s2, R1 s1 s2 /\ R2 s2 s3) ms1 ms3.
+Proof.
+  induct 1; invert 1; repeat inv_pair; eauto.
+
+  econstructor; eauto.
+  first_order.
+  eapply H5 in H2; eauto.
+  first_order.
+  eapply H in H2; eauto.
+  first_order.
+Qed.
+
+Hint Resolve RefineMethods_trans.
+
+Theorem refine_trans : forall names (adt1 adt2 adt3 : adt names),
+    adt_refine adt1 adt2
+    -> adt_refine adt2 adt3
+    -> adt_refine adt1 adt3.
+Proof.
+  simplify.
+  invert X.
+  invert X0.
+  choose_relation (fun s1 s3 => exists s2, ArRel0 s1 s2 /\ ArRel1 s2 s3); eauto.
+
+  apply ArConstructors1 in H.
+  first_order.
+Qed.
+
 Theorem refine_constructor : forall names state constr1 constr2 (ms : methods _ names),
     refine constr1 constr2
     -> adt_refine {| AdtState := state;
@@ -282,9 +335,5 @@ Theorem refine_constructor : forall names state constr1 constr2 (ms : methods _ 
                      AdtMethods := ms |}.
 Proof.
   simplify.
-  match goal with
-  | [ |- adt_refine ?a ?b ] => apply (Build_adt_refine names a b (@eq _))
-  end; simplify.
-  morphisms.
-  apply RefineMethods_refl.
+  choose_relation (@eq state); eauto.
 Qed.

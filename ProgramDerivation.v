@@ -272,7 +272,7 @@ Qed.
 (** * General refinement strategies *)
 
 Lemma RefineMethods_refl : forall state names (ms : methods state names),
-    RefineMethods (@eq _) ms ms.
+    RefineMethods eq ms ms.
 Proof.
   induct ms.
   constructor.
@@ -336,4 +336,90 @@ Theorem refine_constructor : forall names state constr1 constr2 (ms : methods _ 
 Proof.
   simplify.
   choose_relation (@eq state); eauto.
+Qed.
+
+Inductive ReplaceMethod {state} (name : string)
+          (oldbody newbody : state -> nat -> comp (state * nat))
+  : forall {names}, methods state names -> methods state names -> Prop :=
+| RepmHead : forall names (ms : methods state names),
+    ReplaceMethod name oldbody newbody
+                  (MethodsCons {| MethodName := name; MethodBody := oldbody |} ms)
+                  (MethodsCons {| MethodName := name; MethodBody := newbody |} ms)
+| RepmSkip : forall name' names oldbody' (ms1 ms2 : methods state names),
+    name' <> name
+    -> ReplaceMethod name oldbody newbody ms1 ms2
+    -> ReplaceMethod name oldbody newbody
+                  (MethodsCons {| MethodName := name'; MethodBody := oldbody' |} ms1)
+                  (MethodsCons {| MethodName := name'; MethodBody := oldbody' |} ms2).
+
+Theorem ReplaceMethod_ok : forall state name
+                                  (oldbody newbody : state -> nat -> comp (state * nat))
+                                  names (ms1 ms2 : methods state names),
+    (forall s arg, refine (oldbody s arg) (newbody s arg))
+    -> ReplaceMethod name oldbody newbody ms1 ms2
+    -> RefineMethods eq ms1 ms2.
+Proof.
+  induct 1.
+
+  econstructor; eauto.
+  unfold refine in *; simplify; subst; eauto.
+
+  econstructor; eauto.
+  simplify; subst; eauto.
+Qed.
+
+Hint Resolve ReplaceMethod_ok.
+
+Theorem refine_method : forall state name (oldbody newbody : state -> nat -> comp (state * nat))
+                               names (ms1 ms2 : methods state names) constr,
+    (forall s arg, refine (oldbody s arg) (newbody s arg))
+    -> ReplaceMethod name oldbody newbody ms1 ms2
+    -> adt_refine {| AdtState := state;
+                     AdtConstructor := constr;
+                     AdtMethods := ms1 |}
+                  {| AdtState := state;
+                     AdtConstructor := constr;
+                     AdtMethods := ms2 |}.
+Proof.
+  simplify.
+  choose_relation (@eq state); eauto.
+Qed.
+
+Inductive RepChangeMethods {state1 state2} (R : state1 -> state2 -> Prop)
+  : forall {names}, methods state1 names -> methods state2 names -> Prop :=
+| RchNil :
+    RepChangeMethods R MethodsNil MethodsNil
+| RchCons : forall name names oldbody (ms1 : methods state1 names) (ms2 : methods state2 names),
+    RepChangeMethods R ms1 ms2
+    -> RepChangeMethods R
+       (MethodsCons {| MethodName := name; MethodBody := oldbody |} ms1)
+       (MethodsCons {| MethodName := name; MethodBody := (fun s arg =>
+                         pick s'_res where
+                           forall s0, R s0 s
+                                      -> exists s', oldbody s0 arg (s', snd s'_res)
+                                                     /\ R s' (fst s'_res)) |} ms2).
+
+Lemma RepChangeMethods_ok : forall state1 state2 (R : state1 -> state2 -> Prop)
+  names (ms1 : methods state1 names) (ms2 : methods state2 names),
+    RepChangeMethods R ms1 ms2
+    -> RefineMethods R ms1 ms2.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Resolve RepChangeMethods_ok.
+
+Theorem refine_rep : forall state1 state2 (R : state1 -> state2 -> Prop)
+                            names (ms1 : methods state1 names) (ms2 : methods state2 names)
+                            constr,
+    RepChangeMethods R ms1 ms2
+    -> adt_refine {| AdtState := state1;
+                     AdtConstructor := constr;
+                     AdtMethods := ms1 |}
+                  {| AdtState := state2;
+                     AdtConstructor := s0 <- constr; pick s where R s0 s;
+                     AdtMethods := ms2 |}.
+Proof.
+  simplify.
+  choose_relation R; eauto.
 Qed.

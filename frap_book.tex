@@ -461,7 +461,7 @@ The quoted remark could just as well be in Spanish instead of English, in which 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Data Abstraction}
+\chapter{Data Abstraction}\label{adt}
 
 All of the fully formal proofs in this book are worked out only in associated Coq code.
 Therefore, before proceeding to more topics in program semantics and proof, it is important to develop some basic Coq competence.
@@ -4173,6 +4173,184 @@ The associated Coq code defines one, essentially following our separation logic\
 At this point, we can verify the high-level program conveniently while arriving at a low-level program automatically.
 That low-level program is easy to print as a string of concrete C code, as the associated Coq code demonstrates.
 We only trust the simple printing process, not the compiler that got us from a mixed embedding to a C-like syntax tree.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Deriving Programs from Specifications}
+
+We have generally focused so far on proving that programs meet specifications.
+What if we could generate programs from their specifications, in ways that guarantee correctness?
+Let's explore that direction, in the tradition of \emph{program derivation}\index{program derivation} via \emph{stepwise refinement}\index{stepwise refinement}.
+
+\section{Sets as Computations}
+
+The heart of stepwise refinement is to start with a specification and gradually transform it until it deserves to be called an implementation.
+It will help to use a common program format for specifications, implementations, and intermediate states on the path from the former to the latter.
+One convenient choice is \emph{sets of allowable answers}.
+A specification is naturally considered as a relation $R$ between inputs and outputs, where the set-based version of the specification for inputs $x$ is $\mt{spec}(x) = \{y \mid x \; R \; y\}$.
+An implementation is naturally considered as a function $f$ from an input to an output, which can be modeled with singleton sets as $\mt{impl}(x) = \{f(x)\}$.
+Intermediate terms in our derivations may still be sets with multiple elements, but we aim to winnow down to single choices eventually.
+
+Computations of this kind form a \emph{monad}\index{monad} with respect to two particular operators.
+Monads are an abstraction of sequential computation, popular in functional programming.
+They require definitions of ``return'' and ``bind'' operators, which we give here, writing $\mathcal P$ for the ``powerset''\index{powerset} operator that lifts types into sets.
+\begin{eqnarray*}
+  \mt{ret} &:& \forall \alpha. \; \alpha \to \mathcal P(\alpha) \\
+  \mt{ret} &=& \lambda x. \; \{x\} \\
+  \mt{bind} &:& \forall \alpha, \beta. \; \mathcal P(\alpha) \to (\alpha \to \mathcal P(\beta)) \to \mathcal P(\beta) \\
+  \mt{bind} &=& \lambda c_1. \; \lambda c_2. \; \bigcup_{x \in c_1} c_2(x)
+\end{eqnarray*}
+
+We write $x \leftarrow c_1; c_2(x)$ as shorthand for $\mt{bind} \; c_1 \; c_2$.
+
+A valid monad must also satisfy three algebraic laws.
+We will state just one of those laws here, with respect to the superset relation $\supseteq$, which we read as ``refines into.''\index{refinement}
+That is, the lefthand operand is a more specification-like computation, which we want to replace with the righthand operand, which should be more concrete.
+In other words, any legal answer for the new computation is also legal for the old one.
+However, we may decide that the new computation rules out some answers that were previously under consideration.
+If we rule out all the possible answers, then we will be stuck, if we ever want to refine to a singleton set!
+
+With our notion of refinement in place, we can state three key properties, the first of which is one of the monad laws.
+
+\begin{theorem}\label{bindret}
+  $\mt{bind} \; (\mt{ret} \; v) \; c \supseteq c(v)$.
+\end{theorem}
+
+\begin{theorem}\label{refine1}
+  If $c_1 \supseteq c'_1$, then $\mt{bind} \; c_1 \; c_2 \supseteq \mt{bind} \; c'_1 \; c_2$.
+\end{theorem}
+
+\begin{theorem}\label{refine2}
+  If $\forall x. \; c_2(x) \supseteq c'_2(x)$, then $\mt{bind} \; c_1 \; c_2 \supseteq \mt{bind} \; c_1 \; c'_2$.
+\end{theorem}
+
+Together with the well-known reflexivity and transitivity of $\supseteq$, these laws set us up for convenient \emph{equational reasoning}\index{equational reasoning}.
+That is, we start from a specification and repeatedly \emph{rewrite}\index{rewriting} in it using $\supseteq$ facts, until we arrive at an acceptable implementation (singleton set whose element reads as an efficient computation).
+Rewriting requires us to descend inside the structure of a term to find a match for the lefthand side of a $\supseteq$ fact.
+When we descend into the first argument or second argument of a $\mt{bind}$, we appeal to Theorem \ref{refine1} or \ref{refine2}, respectively.
+We also use transitivity of $\supseteq$ to chain together multiple rewritings.
+Finally, we use Theorem \ref{bindret} whenever we have reduced a prefix of a computation into deterministic code.
+
+The associated Coq code contains an example of this kind of refinement in action.
+There are enough details that mechanized assistance is especially worthwhile.
+
+\section{Refinement for Abstract Data Types}
+
+Abstract data types (ADTs)\index{abstract data type} are an important program-encapsulation feature that we studied in Chapter \ref{adt}.
+Recall that they package private state together with public methods that can manipulate it, somewhat in the style of object-oriented programming\index{object-oriented programming}.
+Let us now study how to start from an ADT specification and refine it gradually into an efficient implementation, in a way that leaves a ``proof trail'' justifying correctness.
+
+For simplicity, we will force all methods to take $\mathbb N$ as input and return $\mathbb N$ as output, in addition to the implicit threading-through of an object's private state.
+The whole theory generalizes to methods of varying type.
+
+\begin{definition}
+  An \emph{abstract data type (ADT)}\index{abstract data type} over a set $M$ of methods is a triple $\angled{\mathcal S, \mathcal C, \mathcal M_{m \in M}}$, where $\mathcal S$ is the set of private states, $\mathcal C : \mathcal P(\mathcal S)$ is a \emph{constructor}\index{constructor} that initializes the state, and each $\mathcal M_m : \mathcal S \times \mathbb N \to \mathcal P(\mathcal S \times \mathbb N)$ is a method.
+\end{definition}
+
+Note that constructor and method bodies live in the computation monad, allowing them to be nondeterminstic and to mix program-style and specification-style code.
+
+\begin{definition}
+  Consider two ADTs $\mathcal T^1 = \angled{\mathcal S^1, \mathcal C^1, \mathcal M^1_{m \in M}}$ and $\mathcal T^2 = \angled{\mathcal S^2, \mathcal C^2, \mathcal M^2_{m \in M}}$ over the same methods $M$.
+  We say that $\mathcal T^2$ refines $\mathcal T^1$ (written, with overloaded notation, as $\mathcal T^1 \supseteq \mathcal T^2$) when there exists binary relation $R$ on $\mathcal S^1$ and $\mathcal S^2$ such that:
+  \begin{enumerate}
+  \item $\forall s_2 \in \mathcal C^2. \; \exists s_1 \in \mathcal C^1. \; s_1 \; R \; s_2$
+  \item \begin{tabular}{l}
+    $\forall m, s_1, s_2. \; s_1 \; R \; s_2 \Rightarrow \forall x, y, s'_2. \; (s'_2, y) \in \mathcal M^2_m(s_2, x)$ \\
+    $\hspace{.1in} \Rightarrow \exists s'_1. \; (s'_1, y) \in \mathcal M^1_m(s_1, x) \land s'_1 \; R \; s'_2$
+  \end{tabular}
+  \end{enumerate}
+\end{definition}
+
+In fact, the relation $R$ here is a \emph{simulation}\index{simulation}, in the sense of Chapter \ref{compiler_correctness}!
+Intuitively, any sequence of method calls on $\mathcal T^2$ can be \emph{simulated} with the same sequence of method calls on $\mathcal T^1$ yielding the same answers.
+The private states in the two worlds needn't be precisely equal, but at each step they must remain related by $R$.
+
+A number of very handy refinement principles apply.
+
+\begin{theorem}[Reflexivity]\label{adtrefl}
+  $\mathcal T \supseteq \mathcal T$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation to be equality.
+\end{proof}
+
+\begin{theorem}[Transitivity]
+  If $\mathcal T_1 \supseteq \mathcal T_2$ and $\mathcal T_2 \supseteq \mathcal T_3$, then $\mathcal T_1 \supseteq \mathcal T_3$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation for the conclusion to be the composition of the relations for the premises.
+\end{proof}
+
+\begin{theorem}[Focusing on a constructor]
+  If $\mathcal C^1 \supseteq \mathcal C^2$, then $\angled{\mathcal S, \mathcal C^1, \mathcal M_{m \in M}} \supseteq \angled{\mathcal S, \mathcal C^2, \mathcal M_{m \in M}}$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation to be equality.
+\end{proof}
+
+\begin{theorem}[Focusing on a method]\label{refinemethod}
+  Let $m$ be one of the methods for $\mathcal T$, and let the body of that method be $c$.
+  Let $\mathcal T'$ be the result of replacing $m$'s body in $\mathcal T$ with a new function $c'$.
+  If $\forall s, x. \; c(s, x) \supseteq c'(s, x)$, then $\mathcal T \supseteq \mathcal T'$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation to be equality.
+\end{proof}
+
+The next simulation principle is one of the most powerful.
+
+\begin{theorem}[Change of representation]\label{repchange}
+  Let $\mathcal T = \angled{\mathcal S, \mathcal C, \mathcal M_{m \in M}}$ be an ADT, and pick $A : \mathcal S' \to \mathcal S$ (for some new state set $\mathcal S'$) as an \emph{abstraction function}\index{abstraction function}.
+  Now define $\mathcal T' = \angled{\mathcal S', \mathcal C', \mathcal M'_{m \in M}}$, where:
+  \begin{enumerate}
+  \item $\mathcal C' = s \leftarrow \mathcal C; \{s' \mid A(s') = s\}$
+  \item $\mathcal M'_m = \lambda s'_0, x. \; \mathcal (s, y) \leftarrow M_m(A(s'_0), x); s' \leftarrow \{s' \mid A(s') = s\}; \mt{ret} \; (s', y)$
+  \end{enumerate}
+  Then $\mathcal T \supseteq \mathcal T'$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation $\{(A(s), s) \mid s \in \mathcal S'\}$.
+\end{proof}
+
+The intuition of representation change is that we choose $\mathcal S'$ as some clever new data structure.
+We are responsible for a formal characterization of how it relates to the original, more obvious data structure.
+Abstraction function $A$ shows how to ``undo our cleverness,'' computing the old version of a state.
+It would generally be inefficient to run this conversion on every method call.
+Luckily, the new method bodies generated by this rule can be subjected to further optimization!
+For instance, we can use Theorem \ref{refinemethod} to rewrite method bodies further.
+We will especially want to do so to replace subcomputations of the form $\{s' \mid A(s') = s\}$, which stand for calling $A^{-1}$ on particular values.
+Of course not every function has an inverse as a total relation, let alone a total function, so there is no purely mechanical way to rewrite inverse function calls into executable code.
+
+See the associated Coq code for some examples of these rules in action for concrete program derivations.
+It turns out that Theorems \ref{adtrefl} through \ref{repchange} are \emph{complete}: any correct refinement fact on ADTs can be proved using them alone.
+
+\section{Another Example Refinement Principle: Adding a Cache}
+
+Still, it can be helpful to formulate additional ADT-refinement principles, capturing common optimization strategies.
+As an example, we formalize the idea of \emph{adding a cache to a data structure}\index{caching}, which is also known as \emph{finite differencing}\index{finite differencing} in the literature.
+
+\begin{theorem}[Adding a cache]
+  Let $\mathcal T = \angled{\mathcal S, \mathcal C, \mathcal M_{m \in M}}$ be an ADT, and pick a method $m$ such that $\mathcal M_m = \lambda s, x. \; \mt{ret} \; (s, f(s))$ for some pure function $f : \mathcal S \to \mathbb N$.
+  Now define $\mathcal T' = \angled{\mathcal S \times \mathbb N, \mathcal C', \mathcal M'_{m \in M}}$, where:
+  \begin{enumerate}
+  \item $\mathcal C' = s \leftarrow \mathcal C; \mt{ret} \; (s, f(s))$
+  \item $\mathcal M'_m = \lambda (s, c), x. \; \mt{ret} \; ((s, c), c)$
+  \item For $m' \neq m$, $\mathcal M'_{m'} = \lambda (s, c), x. \; \mathcal (s', y) \leftarrow M_m(s, x); c' \leftarrow \{c' \mid f(s) = c \Rightarrow f(s') = c'\}; \mt{ret} \; ((s', c'), y)$
+  \end{enumerate}
+  Then $\mathcal T \supseteq \mathcal T'$.
+\end{theorem}
+\begin{proof}
+  Justified by choosing the simulation relation $\{(s, (s, f(s))) \mid s \in \mathcal S\}$.
+\end{proof}
+
+Intuitively, method $m$ is a pure \emph{observer}, not changing the state, only returning some pure function $f$ of it.
+We change the state set from $\mathcal S$ to $\mathcal S \times \mathbb N$, so that the second component of a state \emph{caches} the output of $f$ on the first component.
+Like in a change of representation, method bodies are all rewritten automatically, but pick-from-set operations are inserted, and we must refine them away to arrive at a final implementation.
+
+Here the crucial such pattern is $\{c' \mid f(s) = c \Rightarrow f(s') = c'\}$.
+Intuitively, we are asked to choose a cache value $c'$ that is correct for the new state $s'$, while we are allowed to \emph{assume} that the prior cache value $c$ was accurate for the old state $s$.
+Therefore, it is natural to give an efficient formula for computing $c'$ in terms of $c$.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

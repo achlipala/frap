@@ -1,9 +1,3 @@
-(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 16: Deriving Programs from Specifications
-  * Author: Adam Chlipala
-  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
-  * Some material borrowed from Fiat <http://plv.csail.mit.edu/fiat/> *)
-
 Require Import Frap.
 Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
 Require Import Eqdep.
@@ -14,49 +8,18 @@ Ltac inv_pair :=
   end.
 
 
-(* We have generally focused so far on proving that programs meet
- * specifications.  What if we could generate programs from their
- * specifications, in ways that guarantee correctness?  Let's explore that
- * direction, in the tradition of *program derivation* via
- * *stepwise refinement*. *)
-
-
 (** * The computation monad *)
 
-(* One counterintuitive design choice will be to represent specifications and
- * implementations in the same "language," which is essentially Gallina with the
- * added ability to pick elements nondeterministically from arbitrary sets. *)
-
-(* Specifically, a process producing type [A] is represents as [comp A]. *)
 Definition comp (A : Type) := A -> Prop.
-(* The computation is represented by the set of legal values it might
- * generate. *)
 
-(* Computations form a monad, with the following two operators. *)
 Definition ret {A} (x : A) : comp A := eq x.
-(* Note how [eq x] is one way of writing "the singleton set of [x],", using
- * partial application of the two-argument equality predicate [eq]. *)
 Definition bind {A B} (c1 : comp A) (c2 : A -> comp B) : comp B :=
   fun b => exists a, c1 a /\ c2 a b.
-(* As in some of our earlier examples, [bind] is for sequencing one computation
- * after another.  For this monad, existential quantification provides a natural
- * explanation of sequencing. *)
 
 Definition pick_ {A} (P : A -> Prop) : comp A := P.
-(* Here is a convenient wrapper function for injecting an arbitrary set into
- * [comp].  This operator stands for nondeterministic choice of any value in the
- * set. *)
 
-(* Here is the correctness condition, for when [c2] implements [c1].  From left
- * to right in the operands of [refine], we move closer to a concrete
- * implementation. *)
 Definition refine {A} (c1 c2 : comp A) :=
   forall a, c2 a -> c1 a.
-(* Note how this definition is just subset inclusion, in the right direction. *)
-
-(* Next, we use Coq's *setoid* feature to declare compatibility of our
- * definitions with the [rewrite] tactic.  See the Coq manual on setoids for
- * background on what we are doing and why. *)
 
 Ltac morphisms := unfold refine, impl, pointwise_relation, bind, ret, pick_; hnf; first_order; subst; eauto.
 
@@ -92,17 +55,12 @@ Qed.
 
 (** ** OK, back to the details we want to focus on. *)
 
-(* Here we have one of the monad laws, showing how traditional computational
- * reduction is compatible with refinement. *)
 Theorem bind_ret : forall A B (v : A) (c2 : A -> comp B),
     refine (bind (ret v) c2) (c2 v).
 Proof.
   morphisms.
 Qed.
 
-(* Here's an example specific to this monad.  One way to resolve a
- * nondeterministic pick from a set is to replace it with a specific element
- * from the set. *)
 Theorem pick_one : forall {A} {P : A -> Prop} v,
     P v
     -> refine (pick_ P) (ret v).
@@ -114,62 +72,8 @@ Notation "'pick' x 'where' P" := (pick_ (fun x => P)) (at level 80, x at level 0
 Notation "x <- c1 ; c2" := (bind c1 (fun x => c2)) (at level 81, right associativity).
 
 
-(** * Picking a number not in a list *)
+(** * Some handy tactics *)
 
-(* Let's illustrate the big idea with an example derivation. *)
-
-(* A specification of what it means to choose a number that is not in a
- * particular list *)
-Definition notInList (ls : list nat) :=
-  pick n where ~In n ls.
-
-(* We can use a simple property to justify a decomposition of the original
- * spec. *)
-Theorem notInList_decompose : forall ls,
-  refine (notInList ls) (upper <- pick upper where forall n, In n ls -> upper >= n;
-                         pick beyond where beyond > upper).
-Proof.
-  simplify.
-  unfold notInList, refine, bind, pick_, not.
-  first_order.
-  apply H in H0.
-  linear_arithmetic.
-Qed.
-
-(* A simple traversal will find the maximum list element, which is a good upper
- * bound. *)
-Definition listMax := fold_right max 0.
-
-(* ...and we can prove it! *)
-Theorem listMax_upperBound : forall init ls,
-  forall n, In n ls -> fold_right max init ls >= n.
-Proof.
-  induct ls; simplify; propositional.
-  linear_arithmetic.
-  apply IHls in H0.
-  linear_arithmetic.
-Qed.
-
-(* Now we restate that result as a computation refinement. *)
-Theorem listMax_refines : forall ls,
-  refine (pick upper where forall n, In n ls -> upper >= n) (ret (listMax ls)).
-Proof.
-  unfold refine, pick_, ret; simplify; subst.
-  apply listMax_upperBound; assumption.
-Qed.
-
-(* An easy way to find a number higher than another: add 1! *)
-Theorem increment_refines : forall n,
-  refine (pick higher where higher > n) (ret (n + 1)).
-Proof.
-  unfold refine, pick_, ret; simplify; subst.
-  linear_arithmetic.
-Qed.
-
-(** ** Interlude: defining some tactics for key parts of derivation *)
-
-(* We run this next step to hide an evar, so that rewriting isn't too eager to
- * make up values for it. *)
 Ltac hide_evars :=
   match goal with
   | [ |- refine _ (?f _ _) ] => set f
@@ -177,12 +81,9 @@ Ltac hide_evars :=
   | [ |- refine _ ?f ] => set f
   end.
 
-(* This tactic starts a script that finds a term to refine another. *)
 Ltac begin :=
   eexists; simplify; hide_evars.
 
-(* This tactic ends such a derivation, in effect undoing the effect of
- * [hide_evars]. *)
 Ltac finish :=
   match goal with
   | [ |- refine ?e (?f ?arg1 ?arg2) ] =>
@@ -204,56 +105,34 @@ Ltac finish :=
     unify f' e; reflexivity
   end.
 
-(** ** Back to the example *)
 
-(* Let's derive an efficient implementation. *)
+(** * Picking a number not in a list *)
+
+Definition notInList (ls : list nat) :=
+  pick n where ~In n ls.
+
 Definition implementation : sig (fun f : list nat -> comp nat => forall ls, refine (notInList ls) (f ls)).
-  begin.
-  rewrite notInList_decompose.
-  rewrite listMax_refines.
-  rewrite bind_ret.
-  rewrite increment_refines.
-  finish.
-Defined.
+Admitted.
 
-(* We can extract the program that we found as a standlone, executable Gallina
- * term. *)
-Definition impl := Eval simpl in proj1_sig implementation.
+(*Definition impl := Eval simpl in proj1_sig implementation.
 
-(* We'll locally expose the definition of [max], so we can compute neatly
- * here. *)
 Transparent max.
-Eval compute in impl (1 :: 7 :: 8 :: 2 :: 13 :: 6 :: nil).
+Eval compute in impl (1 :: 7 :: 8 :: 2 :: 13 :: 6 :: nil).*)
 
 
 (** * Abstract data types (ADTs) *)
 
-(* Stepwise refinement can be most satisfying to build objects with multiple
- * methods.  The specification of such an object is often called an abstract
- * data type (ADT), and we studied them (from a verification perspective) in
- * module DataAbstraction.  Let's see how we can build implementations
- * automatically from ADTs.  First, some preliminary definitions. *)
-
-(* Every method inhabits this type, where [state] is the type of private state
- * for the object. *)
 Record method_ {state : Type} := {
   MethodName : string;
   MethodBody : state -> nat -> comp (state * nat)
 }.
-(* A body takes the current state as input and produces the new state as output.
- * Additionally, we have hardcoded both the parameter type and the return type
- * to [nat], for simplicity.  The only wrinkle is that a body result is in the
- * [comp] monad, to let it mix features from specification and
- * implementation. *)
-
 Arguments method_ : clear implicits.
+
 Notation "'method' name [[ self , arg ]] = body" :=
   {| MethodName := name;
      MethodBody := fun self arg => body |}
     (at level 100, self at level 0, arg at level 0).
 
-(* Next, this type collects several method definitions, given a list of their
- * names. *)
 Inductive methods {state : Type} : list string -> Type :=
 | MethodsNil : methods []
 | MethodsCons : forall (m : method_ state) {names},
@@ -262,16 +141,11 @@ Inductive methods {state : Type} : list string -> Type :=
 
 Arguments methods : clear implicits.
 
-(* Finally, the definition of an abstract data type, which will apply to both
- * specifications (the classical sense of ADT) and implementations. *)
 Record adt {names : list string} := {
   AdtState : Type;
   AdtConstructor : comp AdtState;
   AdtMethods : methods AdtState names
 }.
-(* An ADT has a state type, one constructor to initialize the state, and a set
- * of methods that may read and write the state. *)
-
 Arguments adt : clear implicits.
 
 Notation "'ADT' { 'rep' = state 'and' 'constructor' = constr ms }" :=
@@ -282,8 +156,6 @@ Notation "'ADT' { 'rep' = state 'and' 'constructor' = constr ms }" :=
 Notation "'and' m1 'and' .. 'and' mn" :=
   (MethodsCons m1 (.. (MethodsCons mn MethodsNil) ..)) (at level 101).
 
-(* Here's one quick example, of a counter with duplicate "increment" methods. *)
-
 Definition counter := ADT {
   rep = nat
   and constructor = ret 0
@@ -292,21 +164,9 @@ Definition counter := ADT {
   and method "value"[[self, _]] = ret (self, self)
 }.
 
-(* This example hasn't used the power of the [comp] monad, but we will get
- * there later. *)
-
 
 (** * ADT refinement *)
 
-(* What does it mean to take sound implementation steps from an ADT toward an
- * efficient implementation?  We formalize refinement for ADTs as well.  The key
- * principle will be *simulation*, very similarly to how we used the idea for
- * compiler verification. *)
-
-(* For a "before" state type [state1] and an "after" state type [state2], we
- * require choice of a simulation relation [R].  This next inductive relation
- * captures when all methods are pairwise compatible with [R], between the
- * "before" and "after" ADTs. *)
 Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
   : forall {names}, methods state1 names -> methods state2 names -> Prop :=
 | RmNil : RefineMethods R MethodsNil MethodsNil
@@ -327,9 +187,6 @@ Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
 
 Hint Constructors RefineMethods.
 
-(* When does [adt2] refine [adt1]?  When there exists a simulation relation,
- * with respect to which the constructors and methods all satisfy the usual
- * simulation diagram. *)
 Record adt_refine {names} (adt1 adt2 : adt names) : Prop := {
   ArRel : AdtState adt1 -> AdtState adt2 -> Prop;
   ArConstructors : forall s2,
@@ -347,9 +204,6 @@ Ltac choose_relation R :=
 
 (** ** Example: numeric counter *)
 
-(* Let's refine the previous counter spec into an implementation that maintains
- * two separate counters and adds them on demand. *)
-
 Definition split_counter := ADT {
   rep = nat * nat
   and constructor = ret (0, 0)
@@ -360,27 +214,12 @@ Definition split_counter := ADT {
 
 Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic.
 
-(* Here is why the new implementation is correct. *)
 Theorem split_counter_ok : adt_refine counter split_counter.
 Proof.
-  choose_relation (fun n p => n = fst p + snd p).
-
-  unfold ret in *; subst.
-  eauto.
-
-  repeat constructor; simplify; unfold ret in *; subst;
-    match goal with
-    | [ H : (_, _) = (_, _) |- _ ] => invert H
-    end; eauto.
-
-  Grab Existential Variables.
-  exact 0.
-Qed.
+Admitted.
 
 
 (** * General refinement strategies *)
-
-(* ADT refinement forms a preorder, as the next two theorems show. *)
 
 Lemma RefineMethods_refl : forall state names (ms : methods state names),
     RefineMethods eq ms ms.
@@ -436,12 +275,7 @@ Proof.
   first_order.
 Qed.
 
-(* Note the use of relation composition for [refine_trans]. *)
-
 (** ** Refining constructors *)
-
-(* One way to refine an ADT is to perform [comp]-level refinement within its
- * constructor definition. *)
 
 Theorem refine_constructor : forall names state constr1 constr2 (ms : methods _ names),
     refine constr1 constr2
@@ -458,11 +292,6 @@ Qed.
 
 (** ** Refining methods *)
 
-(* Conceptually quite similar, refining within methods requires more syntactic
- * framework. *)
-
-(* This relation captures the process of replacing [oldbody] of method [name]
- * with [newbody]. *)
 Inductive ReplaceMethod {state} (name : string)
           (oldbody newbody : state -> nat -> comp (state * nat))
   : forall {names}, methods state names -> methods state names -> Prop :=
@@ -476,8 +305,6 @@ Inductive ReplaceMethod {state} (name : string)
     -> ReplaceMethod name oldbody newbody
                   (MethodsCons {| MethodName := name'; MethodBody := oldbody' |} ms1)
                   (MethodsCons {| MethodName := name'; MethodBody := oldbody' |} ms2).
-
-(* Let's skip ahead to the next [Theorem]. *)
 
 Lemma ReplaceMethod_ok : forall state name
                                   (oldbody newbody : state -> nat -> comp (state * nat))
@@ -497,7 +324,6 @@ Qed.
 
 Hint Resolve ReplaceMethod_ok.
 
-(* It is OK to replace a method body if the new refines the old as a [comp]. *)
 Theorem refine_method : forall state name (oldbody newbody : state -> nat -> comp (state * nat))
                                names (ms1 ms2 : methods state names) constr,
     (forall s arg, refine (oldbody s arg) (newbody s arg))
@@ -515,10 +341,6 @@ Qed.
 
 (** ** Representation changes *)
 
-(* Some of the most interesting refinements select new data structures.  That
- * is, they pick new state types.  Here we formalize that idea in terms of
- * existence of an *abstraction function* from the new state type to the old. *)
-
 Inductive RepChangeMethods {state1 state2} (absfunc : state2 -> state1)
   : forall {names}, methods state1 names -> methods state2 names -> Prop :=
 | RchNil :
@@ -531,12 +353,6 @@ Inductive RepChangeMethods {state1 state2} (absfunc : state2 -> state1)
                          p <- oldbody (absfunc s) arg;
                          s' <- pick s' where absfunc s' = fst p;
                          ret (s', snd p)) |} ms2).
-(* Interestingly, we managed to rewrite all method bodies automatically, to be
- * compatible with a new data structure!  The catch is that our language of
- * method bodies is inherently noncomputational.  We leave nontrivial work for
- * ourselves, in further refinement of method bodies to remove "pick"
- * operations.  Note how the generic method template above relies on "pick"
- * operations to invert abstraction functions. *)
 
 Lemma RepChangeMethods_ok : forall state1 state2 (absfunc : state2 -> state1)
   names (ms1 : methods state1 names) (ms2 : methods state2 names),
@@ -580,79 +396,35 @@ Ltac refine_method nam := eapply refine_trans; [ eapply refine_method with (name
   | repeat (refine (RepmHead _ _ _ _ _)
             || (refine (RepmSkip _ _ _ _ _ _ _ _ _ _); [ equality | ])) ];
     cbv beta; simplify; hide_evars | ].
-(* Don't be thrown off by the [refine] tactic used here.  It is not related to
- * our notion of refinement!  See module SubsetTypes for an explanation of
- * it. *)
 
 Ltac refine_finish := apply refine_refl.
 
 (** ** Example: the numeric counter again *)
 
-(* Let's generate the two-counter variant through the process of finding a
- * proof, in contrast to theorem [split_counter_ok], which started with the full
- * code of the transformed ADT. *)
-
 Definition derived_counter : sig (adt_refine counter).
-  unfold counter; eexists.
-  refine_rep (fun p => fst p + snd p).
-
-  refine_constructor.
-  rewrite bind_ret.
-  rewrite (pick_one (0, 0)).
-  finish.
-  equality.
-
-  refine_method "increment1".
-  rewrite bind_ret; simplify.
-  rewrite (pick_one (fst s + arg, snd s)).
-  rewrite bind_ret; simplify.
-  finish.
-  simplify; linear_arithmetic.
-
-  refine_method "increment2".
-  rewrite bind_ret; simplify.
-  rewrite (pick_one (fst s, snd s + arg)).
-  rewrite bind_ret; simplify.
-  finish.
-  simplify; linear_arithmetic.
-
-  refine_method "value".
-  rewrite bind_ret; simplify.
-  rewrite (pick_one s).
-  rewrite bind_ret; simplify.
-  finish.
-  equality.
-
-  refine_finish.
-Defined.
+Admitted.
   
 Eval simpl in proj1_sig derived_counter.
 
 
+
+
+
+
+
+
+
 (** * Another refinement strategy: introducing a cache (a.k.a. finite differencing) *)
 
-(* Some methods begin life as expensive computations, such that it pays off to
- * precompute their values.  A generic refinement strategy follows this plan by
- * introducing *caches*. *)
-
-(* Here, [name] names a method whose body leaves the state alone and returns the
- * result of [func] applied to that state. *)
 Inductive CachingMethods {state} (name : string) (func : state -> nat)
   : forall {names}, methods state names -> methods (state * nat) names -> Prop :=
 | CmNil :
     CachingMethods name func MethodsNil MethodsNil
-
-(* Here is how we rewrite [name] itself.  We are extending state with an extra
- * cache of [func]'s value, so it is legal just to return that cache. *)
 | CmCached : forall names (ms1 : methods state names) (ms2 : methods _ names),
     CachingMethods name func ms1 ms2
     -> CachingMethods name func
        (MethodsCons {| MethodName := name; MethodBody := (fun s _ => ret (s, func s)) |} ms1)
        (MethodsCons {| MethodName := name; MethodBody := (fun s arg => ret (s, snd s)) |} ms2)
-
-(* Any other method now picks up an obligation to recompute the cache value
- * whenever changing the state.  We express that recomputation with a pick, to
- * be refined later into efficient logic. *)
 | CmDefault : forall name' names oldbody (ms1 : methods state names) (ms2 : methods _ names),
     name' <> name
     -> CachingMethods name func ms1 ms2
@@ -714,8 +486,6 @@ Ltac refine_cache nam := eapply refine_trans; [ eapply refine_cache with (name :
 
 (** ** An example with lists of numbers *)
 
-(* Let's work out an example of caching. *)
-
 Definition sum := fold_right plus 0.
 
 Definition nats := ADT {
@@ -726,22 +496,6 @@ Definition nats := ADT {
 }.
 
 Definition optimized_nats : sig (adt_refine nats).
-  unfold nats; eexists.
-
-  refine_cache "sum".
-
-  refine_constructor.
-  rewrite bind_ret.
-  finish.
-
-  refine_method "add".
-  rewrite bind_ret; simplify.
-  rewrite (pick_one (arg + snd s)).
-  rewrite bind_ret.
-  finish.
-  equality.
-
-  refine_finish.
-Defined.
+Admitted.
 
 Eval simpl in proj1_sig optimized_nats.

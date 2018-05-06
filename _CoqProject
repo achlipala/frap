@@ -49,6 +49,8 @@ SepCancel.v
 SeparationLogic_template.v
 SeparationLogic.v
 Connecting.v
+ProgramDerivation_template.v
+ProgramDerivation.v
 SharedMemory.v
 ConcurrentSeparationLogic_template.v
 ConcurrentSeparationLogic.v

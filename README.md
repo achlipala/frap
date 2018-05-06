@@ -27,9 +27,10 @@ The main narrative, also present in the book PDF, presents standard program-proo
 * Chapter 13: `DeepAndShallowEmbeddings.v`
 * Chapter 14: `SeparationLogic.v`
 * Chapter 15: `Connecting.v`
-* Chapter 16: `SharedMemory.v`
-* Chapter 17: `ConcurrentSeparationLogic.v`
-* Chapter 18: `MessagesAndRefinement.v`
+* Chapter 16: `ProgramDerivation.v`
+* Chapter 17: `SharedMemory.v`
+* Chapter 18: `ConcurrentSeparationLogic.v`
+* Chapter 19: `MessagesAndRefinement.v`
 
 There are also two supplementary files that are independent of the main narrative, for introducing programming with dependent types, a distinctive Coq feature that we neither use nor recommend for the problem sets, but which many students find interesting (and useful in other contexts).
 * `SubsetTypes.v`: a first introduction to dependent types by attaching predicates to normal types (used after `CompilerCorrectness.v` in the last course offering)

@@ -474,7 +474,7 @@ Hint Resolve try_ptsto_first.
 
 (** ** The nonzero shared counter *)
 
-(* This program has two threads shared a numeric counter, which starts out as
+(* This program has two threads sharing a numeric counter, which starts out as
  * nonzero and remains that way, since each thread only increments the counter,
  * with the lock held to avoid race conditions. *)
 

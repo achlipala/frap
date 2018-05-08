@@ -3674,7 +3674,7 @@ As a result, our extracted programs achieve the asymptotic performance that we w
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Separation Logic}
+\chapter{Separation Logic}\label{seplog}
 
 In our Hoare-logic examples so far, we have intentionally tread lightly when it comes to the potential aliasing\index{aliasing} of pointer variables in a program.
 Generally, we have only worked with, for instance, a single array at a time.
@@ -4355,7 +4355,7 @@ Therefore, it is natural to give an efficient formula for computing $c'$ in term
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Introduction to Reasoning About Shared-Memory Concurrency}
+\chapter{Introduction to Reasoning About Shared-Memory Concurrency}\label{sharedmem}
 
 Separation logic~\index{separation logic} tames sharing of a mutable memory across libraries and data structures.
 We will need some additional techniques when we add concurrency to the mix, resulting in the \emph{shared-memory}\index{shared-memory concurrency} style of concurrency.
@@ -4730,13 +4730,13 @@ This condition effectively forces the ample set for the example program above to
 
 \chapter{Concurrent Separation Logic}
 
-The last two chapters respectively introduced techniques for reasoning about two tricky aspects of programs: heap-allocated linked data structures\index{linked data structures} and shared-memory concurrency\index{shared-memory concurrency}.
+Chapters \ref{seplog} and \ref{sharedmem} respectively introduced techniques for reasoning about two tricky aspects of programs: heap-allocated linked data structures\index{linked data structures} and shared-memory concurrency\index{shared-memory concurrency}.
 When we add concurrency to the mix for a program-reasoning problem, we are often surprised at how much more complex it becomes.
 This chapter introduces a pleasant exception to the rule, \emph{concurrent separation logic}\index{concurrent separation logic}, a rather small addition to separation logic\index{separation logic} that supports invariant-based reasoning about threads-and-locks shared-memory programs.
 
 \section{Object Language: Loops and Locks}
 
-Here's the object language we adopt, which should be old hat by now, just mixing together features of the object languages from the previous two chapters.
+Here's the object language we adopt, which should be old hat by now, just mixing together features of the object languages from Chapters \ref{seplog} and \ref{sharedmem}.
 
 $$\begin{array}{rrcl}
   \textrm{Commands} & c &::=& \mt{Fail} \mid \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Loop} \; i \; f \\

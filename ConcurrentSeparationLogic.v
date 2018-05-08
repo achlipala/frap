@@ -9,8 +9,8 @@ Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 
-(* Let's combine the subjects of the last two lectures, to let us prove
- * correctness of concurrent programs that do dynamic management of shared
+(* Let's combine the subjects of SeparationLogic and SharedMemory, to let us
+ * prove correctness of concurrent programs that do dynamic management of shared
  * memory. *)
 
 
@@ -493,7 +493,7 @@ Hint Resolve try_ptsto_first.
 
 (** ** The nonzero shared counter *)
 
-(* This program has two threads shared a numeric counter, which starts out as
+(* This program has two threads sharing a numeric counter, which starts out as
  * nonzero and remains that way, since each thread only increments the counter,
  * with the lock held to avoid race conditions.  (Actually, the lock isn't
  * needed to maintain the property in this case, but it's a pleasant starting

@@ -29,7 +29,7 @@ Notation channel := nat (only parsing).
 (* Here are the basic syntactic constructions of processes. *)
 Inductive proc :=
 | NewChannel (notThese : list channel) (k : channel -> proc)
-(* Pick a new channel [ch] name not found in [notThese], and continue like
+(* Pick a new channel name [ch] not found in [notThese], and continue like
  * [k ch]. *)
 
 | BlockChannel (ch : channel) (pr : proc)
@@ -101,8 +101,8 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
 (* Let's explain how programs run.  We'll give a flavor of operational semantics
  * called a "labeled transition system," because each step will include a label
  * that explains what happened.  In this case, the only relevant happenings are
- * sends or receives on channels.  Crucially, we supress send/receive labels for
- * operations blocked by [Block]s. *)
+ * sends or receives on channels.  Crucially, we suppress send/receive labels
+ * for operations blocked by [Block]s. *)
 
 Record message := {
   Channel : channel;

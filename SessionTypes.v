@@ -9,7 +9,11 @@ Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 
-(** * Defining the Type System *)
+(** * Two-Party Session Types *)
+
+Module TwoParty.
+
+(** ** Defining the type system *)
 
 Inductive type :=
 | TSend (ch : channel) (A : Set) (t : A -> type)
@@ -32,7 +36,7 @@ Inductive hasty : proc -> type -> Prop :=
     hasty Done TDone.
 
 
-(** * Examples of Typed Processes *)
+(** * Examples of typed processes *)
 
 (* Recall our first example from last chapter. *)
 Definition addN (k : nat) (input output : channel) : proc :=
@@ -53,7 +57,7 @@ Proof.
 Qed.
 
 
-(** * Complementing Types *)
+(** * Complementing types *)
 
 Fixpoint complement (t : type) : type :=
   match t with
@@ -233,3 +237,5 @@ Proof.
                                               send_payment_info payment_success add_review);
     hasty.
 Qed.
+
+End TwoParty.

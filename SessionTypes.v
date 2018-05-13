@@ -274,7 +274,7 @@ Section parties.
   | HtRecv : forall mayNotSend ch sr (A : Set) (k : A -> _) t (witness : A),
       channels ch = {| Sender := sr; Receiver := p |}
       -> sr <> p
-      -> (forall v, hasty p mayNotSend (k v) (t v))
+      -> (forall v, hasty p false (k v) (t v))
       -> hasty p mayNotSend (Recv ch k) (Communicate ch t)
   | HtSkip : forall mayNotSend ch sr rr (A : Set) pr (t : A -> _) (witness : A),
       channels ch = {| Sender := sr; Receiver := rr |}
@@ -285,6 +285,7 @@ Section parties.
   | HtDone : forall mayNotSend,
       hasty p mayNotSend Done TDone.
 End parties.
+
 
 (** * Parallel execution preserves the existence of complementary session types. *)
 
@@ -378,6 +379,32 @@ Inductive typed_multistate party (channels : channel -> parties party) (t : type
 
 Hint Constructors typed_multistate.
 
+
+Ltac side :=
+  match goal with
+  | [ |- ?E = {| Sender := _; Receiver := _ |} ] =>
+    let E' := eval hnf in E in change E with E';
+    repeat match goal with
+           | [ |- context[if ?E then _ else _] ] => cases E; try (exfalso; equality)
+           end;
+    try (exfalso; equality);
+    repeat match goal with
+           | [ H : NoDup _ |- _ ] => invert H
+           end; simplify; try (exfalso; equality); equality
+  | [ |- _ <> _ ] => equality
+  end.
+
+Ltac hasty := simplify; repeat match goal with
+                               | [ |- typed_multistate _ _ _ _ ] => econstructor; simplify
+                               | [ |- hasty _ _ _ _ _ ] =>
+                                 apply HtDone
+                                 || (eapply HtSend; [ side | side | ])
+                                 || (eapply HtRecv; [ constructor | side | side | simplify ])
+                                 || (eapply HtSkip; [ constructor | side | side | side | simplify ])
+                               | [ |- hasty _ _ _ _ (match ?E with _ => _ end) ] => cases E
+                               | [ |- hasty _ _ _ (match ?E with _ => _ end) _ ] => cases E
+                               end.
+
 Lemma no_silent_steps : forall party (channels : _ -> parties party) p mns pr t,
     hasty channels p mns pr t
     -> forall pr', lstep pr Silent pr'
@@ -414,7 +441,6 @@ Lemma mayNotSend_really : forall party (channels : _ -> parties party) p pr t,
 Proof.
   induct 1; eauto; invert 1.
   Unshelve.
-  assumption.
   assumption.
 Qed.
 
@@ -1014,31 +1040,6 @@ Section online_store.
       {| Sender := Merchant;
          Receiver := Customer |}.
 
-  Ltac side :=
-    match goal with
-    | [ |- ?E = {| Sender := _; Receiver := _ |} ] =>
-      let E' := eval hnf in E in change E with E';
-      repeat match goal with
-             | [ |- context[if ?E then _ else _] ] => cases E; try equality
-             end;
-      try equality;
-      repeat match goal with
-             | [ H : NoDup _ |- _ ] => invert H
-             end; simplify; equality
-    | [ |- _ <> _ ] => equality
-    end.
-
-  Ltac hasty := simplify; repeat match goal with
-                                 | [ |- typed_multistate _ _ _ _ ] => econstructor; simplify
-                                 | [ |- hasty _ _ _ _ _ ] =>
-                                   apply HtDone
-                                   || (eapply HtSend; [ side | side | ])
-                                   || (eapply HtRecv; [ constructor | side | side | simplify ])
-                                   || (eapply HtSkip; [ constructor | side | side | side | ])
-                                 | [ |- hasty _ _ _ _ (match ?E with _ => _ end) ] => cases E
-                                 | [ |- hasty _ _ _ (match ?E with _ => _ end) _ ] => cases E
-                                 end.
-
   Example online_store_no_deadlock : forall product payment_info in_stock payment_checker,
       NoDup [request_product; in_stock_or_not; send_payment_info; payment_success; add_review]
       -> invariantFor (trsys_of (customer product payment_info
@@ -1060,5 +1061,111 @@ Section online_store.
     hasty; constructor.
   Qed.
 End online_store.
+
+Inductive store_party' := Customer' | Merchant' | Warehouse.
+
+Section online_store_with_warehouse.
+  Variables request_product in_stock_or_not send_payment_info payment_success add_review
+            merchant_to_warehouse warehouse_to_merchant : channel.
+
+  Definition customer' (product payment_info : string) :=
+    !!request_product(product);
+    ??in_stock_or_not(worked : bool);
+    if worked then
+      !!send_payment_info(payment_info);
+      ??payment_success(worked_again : bool);
+      if worked_again then
+        !!add_review((product, "awesome"));
+        Done
+      else
+        Done
+    else
+      Done.
+
+  Definition merchant' (payment_checker : string -> bool) :=
+    ??request_product(product : string);
+    !!merchant_to_warehouse(product);
+    ??warehouse_to_merchant(in_stock : bool);
+    if in_stock then
+      !!in_stock_or_not(true);
+      ??send_payment_info(payment_info : string);
+      if payment_checker payment_info then
+        !!payment_success(true);
+        ??add_review(_ : (string * string)%type);
+        Done
+      else
+        !!payment_success(false);
+        Done
+    else
+      !!in_stock_or_not(false);
+      Done.
+
+  Definition warehouse (in_stock : string -> bool) :=
+    ??merchant_to_warehouse(product : string);
+    if in_stock product then
+      !!warehouse_to_merchant(true);
+      Done
+    else
+      !!warehouse_to_merchant(false);
+      Done.
+
+  Definition online_store_type' :=
+    (!!!request_product(_ : string);
+     !!!merchant_to_warehouse(_ : string);
+     !!!warehouse_to_merchant(_ : bool);
+     !!!in_stock_or_not(worked : bool);
+     if worked then
+       !!!send_payment_info(_ : string);
+       !!!payment_success(worked_again : bool);
+       if worked_again then
+         !!!add_review(_ : (string * string)%type);
+         TDone
+       else
+         TDone
+     else
+       TDone)%st.
+
+  Definition online_store_channels' (ch : channel) :=
+    if ch ==n request_product then
+      {| Sender := Customer';
+         Receiver := Merchant' |}
+    else if ch ==n send_payment_info then
+      {| Sender := Customer';
+         Receiver := Merchant' |}
+    else if ch ==n add_review then
+      {| Sender := Customer';
+         Receiver := Merchant' |}
+    else if ch ==n merchant_to_warehouse then
+      {| Sender := Merchant';
+         Receiver := Warehouse |}
+    else if ch ==n warehouse_to_merchant then
+      {| Sender := Warehouse;
+         Receiver := Merchant' |}
+    else
+      {| Sender := Merchant';
+         Receiver := Customer' |}.
+
+  Example online_store_no_deadlock' : forall product payment_info in_stock good_infos,
+      NoDup [request_product; in_stock_or_not; send_payment_info; payment_success; add_review;
+             merchant_to_warehouse; warehouse_to_merchant]
+      -> invariantFor (trsys_of (customer' product payment_info
+                                 || (merchant' in_stock
+                                     || (warehouse good_infos || Done))))
+                      (fun pr => inert pr
+                                 \/ exists pr', lstep pr Silent pr').
+  Proof.
+    simplify.
+    eapply no_deadlock with (t := online_store_type')
+                            (all_parties := [Customer'; Merchant'; Warehouse])
+                            (channels := online_store_channels');
+    simplify.
+
+    repeat constructor; simplify; equality.
+
+    cases p; auto.
+
+    hasty; constructor.
+  Qed.
+End online_store_with_warehouse.
 
 End Multiparty.

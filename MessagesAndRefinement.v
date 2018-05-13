@@ -335,7 +335,7 @@ Definition add2_once (input output : channel) : proc :=
  * of the first process as the fancy *implementation* and the second process as
  * the simpler *specification*. *)
 Inductive R_add2 : proc -> proc -> Prop :=
-| Initial : forall input output,
+| Starting : forall input output,
     input <> output
     -> R_add2
          (New[input;output](ch); ??input(n : nat); !!ch(n + 1); Done

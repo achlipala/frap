@@ -40,7 +40,11 @@ Definition addN (k : nat) (input output : channel) : proc :=
   !!output(n + k);
   Done.
 
-Ltac hasty := simplify; repeat (constructor; simplify).
+Ltac hasty := simplify; repeat ((constructor; simplify)
+                                || match goal with
+                                   | [ |- hasty _ (match ?E with _ => _ end) ] => cases E
+                                   | [ |- hasty (match ?E with _ => _ end) _ ] => cases E
+                                   end).
 
 Theorem addN_typed : forall k input output,
     hasty (addN k input output) (???input(_ : nat); !!!output(_ : nat); TDone).
@@ -68,6 +72,68 @@ Theorem add2_client_typed : forall input output,
 Proof.
   hasty.
 Qed.
+
+(** ** Example *)
+
+Section online_store.
+  Variables request_product in_stock_or_not send_payment_info payment_success add_review : channel.
+
+  Definition customer (product payment_info : string) :=
+    !!request_product(product);
+    ??in_stock_or_not(worked : bool);
+    if worked then
+      !!send_payment_info(payment_info);
+      ??payment_success(worked_again : bool);
+      if worked_again then
+        !!add_review((product, "awesome"));
+        Done
+      else
+        Done
+    else
+      Done.
+
+  Definition customer_type :=
+    (!!!request_product(_ : string);
+     ???in_stock_or_not(worked : bool);
+     if worked then
+       !!!send_payment_info(_ : string);
+       ???payment_success(worked_again : bool);
+       if worked_again then
+         !!!add_review(_ : (string * string)%type);
+         TDone
+       else
+         TDone
+     else
+       TDone)%st.
+
+  Theorem customer_hasty : forall product payment_info,
+      hasty (customer product payment_info) customer_type.
+  Proof.
+    hasty.
+  Qed.
+
+  Definition merchant (in_stock payment_checker : string -> bool) :=
+    ??request_product(product : string);
+    if in_stock product then
+      !!in_stock_or_not(true);
+      ??send_payment_info(payment_info : string);
+      if payment_checker payment_info then
+        !!payment_success(true);
+        ??add_review(_ : (string * string)%type);
+        Done
+      else
+        !!payment_success(false);
+        Done
+    else
+      !!in_stock_or_not(false);
+      Done.
+
+  Theorem merchant_hasty : forall in_stock payment_checker,
+      hasty (merchant in_stock payment_checker) (complement customer_type).
+  Proof.
+    hasty.
+  Qed.
+End online_store.
 
 
 (** * Parallel execution preserves the existence of complementary session types. *)
@@ -148,4 +214,22 @@ Proof.
   invert H0; invert H1; simplify; eauto.
   Unshelve.
   assumption.
+Qed.
+
+Example online_store_no_deadlock : forall request_product in_stock_or_not
+                                          send_payment_info payment_success add_review
+                                          product payment_info in_stock payment_checker,
+  invariantFor (trsys_of (customer request_product in_stock_or_not
+                                   send_payment_info payment_success add_review
+                                   product payment_info
+                          || merchant request_product in_stock_or_not
+                                      send_payment_info payment_success add_review
+                                      in_stock payment_checker))
+               (fun pr => pr = (Done || Done)
+                          \/ exists l' pr', lstep pr l' pr').
+Proof.
+  simplify.
+  eapply no_deadlock with (t := customer_type request_product in_stock_or_not
+                                              send_payment_info payment_success add_review);
+    hasty.
 Qed.

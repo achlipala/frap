@@ -55,3 +55,4 @@ SharedMemory.v
 ConcurrentSeparationLogic_template.v
 ConcurrentSeparationLogic.v
 MessagesAndRefinement.v
+SessionTypes.v

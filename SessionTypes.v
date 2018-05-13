@@ -30,7 +30,7 @@ Inductive hasty : proc -> type -> Prop :=
 | HtSend : forall ch (A : Set) (v : A) k t,
     hasty k t
     -> hasty (Send ch v k) (TSend ch A t)
-| HtRecv : forall ch (A : Set) (k : A -> _) t,
+| HtRecv : forall ch (A : Set) (k : A -> _) t (v : A),
     (forall v, hasty (k v) t)
     -> hasty (Recv ch k) (TRecv ch A t)
 | HtDone :
@@ -200,4 +200,79 @@ Proof.
   first_order.
   rewrite complement_inverse in H.
   first_order.
+Qed.
+
+Lemma notstuck_send : forall pr1 t,
+    hasty pr1 t
+    -> forall pr2, hasty pr2 (complement t)
+    -> forall ch (A : Set) (v : A) pr1', lstep pr1 (Output {| Channel := ch; Value := v |}) pr1'
+    -> exists pr2', lstep pr2 (Input {| Channel := ch; Value := v |}) pr2'.
+Proof.
+  induct 1; invert 1; simplify; eauto;
+    match goal with
+    | [ H : lstep _ _ _ |- _ ] => invert H; eauto
+    end.
+Qed.
+
+Lemma notstuck_nosilent : forall pr1 t,
+    hasty pr1 t
+    -> forall pr1', lstep pr1 Silent pr1'
+    -> False.
+Proof.
+  induct 1; invert 1; simplify; eauto.
+Qed.
+
+Lemma notstuck_recv : forall pr1 t,
+    hasty pr1 t
+    -> forall pr2, hasty pr2 (complement t)
+    -> forall ch (A : Set) (v : A) pr1', lstep pr1 (Input {| Channel := ch; Value := v |}) pr1'
+    -> exists (v' : A) pr2', lstep pr2 (Output {| Channel := ch; Value := v' |}) pr2'.
+Proof.
+  induct 1; invert 1; simplify; eauto;
+    match goal with
+    | [ H : lstep _ _ _ |- _ ] => invert H; eauto
+    end.
+Qed.
+
+Lemma one_thread_progress : forall pr t,
+    hasty pr t
+    -> pr = Done \/ exists l pr', lstep pr l pr'.
+Proof.
+  induct 1; first_order; subst; eauto.
+  Unshelve.
+  assumption.
+Qed.
+
+Lemma hasty_Done : forall t,
+    hasty Done t
+    -> forall pr, hasty pr (complement t)
+    -> pr = Done.
+Proof.
+  induct 1; invert 1; eauto.
+Qed.
+
+Theorem no_deadlock : forall pr1 pr2 t,
+    hasty pr1 t
+    -> hasty pr2 (complement t)
+    -> invariantFor (trsys_of (pr1 || pr2))
+                    (fun pr => pr = (Done || Done)
+                               \/ exists l' pr', lstep pr l' pr').
+Proof.
+  simplify.
+  eapply invariant_weaken.
+  eapply complementarity_forever; eauto.
+  simplify; first_order; subst.
+  specialize (one_thread_progress H2); first_order; subst.
+
+  eapply hasty_Done in H2; eauto.
+  equality.
+
+  cases x2.
+  exfalso; eauto using notstuck_nosilent.
+  right.
+  cases a; cases m.
+  eapply notstuck_send in H1; [ | eauto | eauto ].
+  first_order; eauto.
+  eapply notstuck_recv in H1; [ | eauto | eauto ].
+  first_order; eauto.
 Qed.

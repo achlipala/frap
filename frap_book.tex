@@ -3466,7 +3466,7 @@ This chapter gives a ``yes'' answer, working toward redefining last chapter's Ho
 Since whiteboard math doesn't usually bother with encoding details, here we must break with our convention of using only standard notation in the book.
 Instead, we will use notation closer to literal Coq code, and, in fact, more of the technical action than usual is only found in the accompanying Coq source file.
 
-\section{The Basics}
+\section{The Basics}\label{mixed}
 
 Recall some terminology introduced in Section \ref{metalanguage}: every formal proof is carried out in some \emph{metalanguage}\index{metalanguage}, which, in our case, is Coq's logic and programming language called Gallina\index{Gallina}.
 A syntactic language that we formalize is called an \emph{object language}\index{object language}.
@@ -5208,6 +5208,171 @@ $$\begin{array}{l}
 Note that, without the abstraction boundaries at the start, this fact would not be derivable.
 We would need to worry about meddlesome threads in our environment interacting directly with $c_1$ or $c_2$, spoiling the protocol and forcing us to add extra cases to the righthand side of the refinement.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\compl}[1]{\overline{#1}}
+\newcommand{\channels}[0]{\mathcal C}
+\newcommand{\mpty}[4]{#1 :_{#2,#3} #4}
+
+\chapter{Session Types}
+
+Process algebra, as we met it last chapter, can be helpful for modeling network protocols\index{network protocols}.
+Here, multiple \emph{parties} step through a script of exchanging messages and making decisions based on message contents.
+A buggy party might introduce a \emph{deadlock}\index{deadlock}, where, say, party A is blocked waiting for a message from party B, while B is also waiting for A.
+\emph{Session types} are a style of static type system\index{type system} that rule out deadlock while allowing convenient separate checking of each party, given a shared protocol type.
+
+There is an almost unlimited variation of different versions of session types.
+We still step through a progression of three variants here, and even by the end there will be obvious protocols that don't fit the framework.
+Still, we aim to convey the core ideas of the approach.
+
+\section{Basic Two-Party Session Types}
+
+Each of our type systems will apply to the object language from the prior chapter.
+Assume for now that a protocol involves exactly two parties.
+Here is a simple type system, explaining a protocol's ``script'' from the perspective of one party.
+$$\begin{array}{rrcl}
+  \textrm{Base types} & \sigma \\
+  \textrm{Session types} & \tau &::=& \send{c}{\sigma}{\tau} \mid \; \recv{c}{\sigma}{\tau} \mid \done
+\end{array}$$
+
+\abstraction
+We model simple parties with no internal duplication or parallelism.
+A session type looks like an abstracted version of a process, remembering only the \emph{types} of messages exchanged on channels, rather than their \emph{values}.
+A simple set of typing rules makes the connection.
+$$\infer{\send{c}{v}{p} : \; \send{c}{\sigma}{\tau}}{
+  v : \sigma
+  & p : \tau
+}
+\quad \infer{\recv{c}{x}{p(x)} : \; \recv{c}{\sigma}{\tau}}{
+  \forall v : \sigma. \; p(v) : \tau
+}
+\quad \infer{\done : \done}{}$$
+
+The only wrinkle in these rules is the use of universal quantification for the receive rule, to force the body to type-check under any well-typed value read from the channel.
+Actually, such proof obligations may be nontrivial when we encode this object language in the mixed-embedding\index{mixed embeddings} style of Section \ref{mixed}, where the body $p$ in the rule could include arbitrary metalanguage computation, to choose a body based on the value $v$ read from the channel.
+
+The associated Coq code demonstrates tactics to deal with that complication, for automatic type-checking of concrete programs.
+That code is also where we keep all of our concrete examples of object-language programs.
+
+For the rest of this chapter, we will interpret last chapter's object language as a transition system with one small change: we only allow silent steps\index{silent steps}.
+That is, we only model whole programs, with no communication with ``the environment.''
+As a result, we consider self-contained protocols.
+
+A satisfying soundness theorem applies to our type system.  To state it, we first need the crucial operation of \emph{complementing}\index{complement (of a session type)} a session type.
+\begin{eqnarray*}
+  \compl{\send{c}{\sigma}{\tau}} &=& \recv{c}{\sigma}{\compl{\tau}} \\
+  \compl{\recv{c}{\sigma}{\tau}} &=& \send{c}{\sigma}{\compl{\tau}} \\
+  \compl{\done} &=& \done
+\end{eqnarray*}
+
+It is apparent that complementation just swaps the sends and receives.
+When the original session type tells one party what to do, the complement type tells the other party what to do.
+
+Using complementation, we can give succinct conditions for deadlock freedom of a pair of parties.
+
+\begin{theorem}\label{stsound1}
+  If $p_1 : \tau$ and $p_2 : \compl{\tau}$, then it is an invariant of $\parl{p_1}{p_2}$ that an intermediate process is either $\parl{\done}{\done}$ or can take a step.
+\end{theorem}
+\begin{proof}
+  By invariant induction, after strengthening the invariant to say that any intermediate process takes the form $\parl{p'_1}{p'_2}$, where, for some type $\tau'$, we have $p'_1 : \tau'$ and $p'_2 : \compl{\tau'}$.
+  The inductive case of the proof proceeds by simple inversion on the derivation of $p'_1 : \tau'$, where by the definition of complement it is apparent that any communication $p'_1$ performs has a matching action at the start of $p'_2$.
+  The choice of $\tau'$ changes during such a step, to the ``tail'' of the old $\tau'$.
+\end{proof}
+
+\section{Dependent Two-Party Session Types}
+
+It is a boring protocol that follows such a regular communication pattern as our first type system accepts.
+Rather, it tends to be crucial to change up the expected protocol steps, based on \emph{values} sent over channels.
+It is natural to switch to a \emph{dependent}\index{dependent types} type system to strengthen our expressiveness.
+That is, a communication type will allow its body type to depend on the value sent or received.
+$$\begin{array}{rrcl}
+  \textrm{Session types} & \tau &::=& \send{c}{x : \sigma}{\tau(x)} \mid \; \recv{c}{x : \sigma}{\tau(x)} \mid \done
+\end{array}$$
+
+Each nontrivial construct does more than give the base type that should be sent or received on or from a channel.
+We also bind a variable $x$, to stand for the value sent or received.
+It may be unintuitive that we must introduce a binder even for sends, when the sender is in control of which value will be sent.
+The reason is that we must allow the sender to then continue with different subprotocols for different values that might be sent.
+We should not force the sender's hand by fixing a value in advance, when that value might depend on arbitrary program logic.
+
+Very little change is needed in the typing rules.
+$$\infer{\send{c}{v}{p} : \; \send{c}{x : \sigma}{\tau(x)}}{
+  v : \sigma
+  & p : \tau(v)
+}
+\quad \infer{\recv{c}{x}{p(x)} : \; \recv{c}{x : sigma}{\tau(x)}}{
+  \forall v : \sigma. \; p(v) : \tau(v)
+}
+\quad \infer{\done : \done}{}$$
+
+Our deadlock-freedom property is easy to reestablish.
+
+\begin{theorem}
+  If $p_1 : \tau$ and $p_2 : \compl{\tau}$, then it is an invariant of $\parl{p_1}{p_2}$ that an intermediate process is either $\parl{\done}{\done}$ or can take a step.
+\end{theorem}
+\begin{proof}
+  Literally the same Coq proof script as for Theorem \ref{stsound1}!
+\end{proof}
+
+\section{Multiparty Session Types}\index{multiparty session types}
+
+New complications arise when multiple parties are communicating in a protocol.
+The Coq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in stock.
+Many other such examples appear in the real world.
+
+Now it is no longer possible to start from one party's view of a protocol and compute any other party's view.
+The reason is that each message only involves two parties.
+Any other party will not see that message in its own session type, making it impossible to preserve that message in a complement-like operation.
+
+Instead, we define one global session type that includes only ``send'' operations.
+However, we name the parties and parameterize on a mapping $\channels$ from channels to unique parties that own their send and receive ends.
+That is, for any given channel and operation on it (send and receive), precisely one party is given permission to perform the operation -- and indeed, when the time comes, that party is \emph{obligated} to perform the operation, to avoid deadlock.
+
+With that view in mind, our type language gets even simpler.
+$$\begin{array}{rrcl}
+  \textrm{Session types} & \tau &::=& \send{c}{x : \sigma}{\tau(x)} \mid \done
+\end{array}$$
+
+We redefine the typing judgment as $\mpty{p}{\alpha}{b}{\tau}$.
+Here $\alpha$ is the identifier of the party running $p$, and $b$ is a Boolean that, when set, enforces that $p$'s next action is a receive.
+$$\infer{\mpty{\send{c}{v}{p}}{\alpha}{\bot}{\send{c}{x : \sigma}{\tau(x)}}}{
+  v : \sigma
+  & \channels(c) = (\alpha, \beta)
+  & \beta \neq \alpha
+  & \mpty{p}{\alpha}{\bot}{\tau(v)}
+}$$
+
+$$\infer{\mpty{\recv{c}{x}{p(x)}}{\alpha}{b}{\send{c}{x : \sigma}{\tau(x)}}}{
+  \channels(c) = (\beta, \alpha)
+  & \beta \neq \alpha
+  & \forall v : \sigma. \; \mpty{p(v)}{\alpha}{\bot}{\tau(v)}
+}$$
+
+$$\infer{\mpty{p}{\alpha}{b}{\send{c}{x : \sigma}{\tau(x)}}}{
+  \channels(c) = (\beta, \gamma)
+  & \beta \neq \alpha
+  & \gamma \neq \alpha
+  & \forall v : \sigma. \; \mpty{p}{\alpha}{\top}{\tau(v)}
+}$$
+
+$$\infer{\mpty{\done}{\alpha}{b}{\done}}{}$$
+
+The first two rules encode the simple cases where the current party $\alpha$ is one of the two designated to step next in the protocol, as we verify by looking up the channel in $\channels$.
+It is important that the send and receive ends of the channel are owned by different parties, or we would clearly have a deadlock, as that party would either wait forever for a message from itself or try futilely to send itself a message!
+The $\neq$ premises enforce that condition.
+Also, the Boolean subscript enforces that we cannot be running a send operation if we have been instructed to run a receive next.
+That flag is reset to false in the recursive premises, since the obligation the flag implies is only for the very next command.
+
+The third rule is crucial: it applies to a process that is not participating in the next step of the protocol.
+That is, we look up the owners of the channel that comes next, and we verify that neither owner is $\alpha$.
+In this case, we merely proceed to the next protocol step, leaving the process unchanged.
+Crucially, we must be prepared for any value that might be exchanged in this skipped step, even though we do not see it ourselves.
+
+Why does the last premise of the third rule set the Boolean flag, forcing the next action to be a receive?
+Otherwise, at some point in the protocol, we could have multiple parties trying to send messages.
+In such a scenario, there might not be a unique step that the composed parties can take.
+The proofs are easier if we can assume deterministic execution within a protocol, which is why we introduced this static restriction.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -354,7 +354,7 @@ Lemma input_typed : forall pr ch A v pr',
     -> forall t, hasty pr t
                  -> exists k, pr = Recv ch k /\ pr' = k v.
 Proof.
-  induct 1; invert 1; eauto.
+  invert 1; invert 1; eauto.
 Qed.
 
 Lemma output_typed : forall pr ch A v pr',
@@ -362,7 +362,7 @@ Lemma output_typed : forall pr ch A v pr',
     -> forall t, hasty pr t
                  -> exists k, pr = Send ch v k /\ pr' = k.
 Proof.
-  induct 1; invert 1; eauto.
+  invert 1; invert 1; eauto.
 Qed.
 
 Lemma complementarity_forever : forall pr1 pr2 t,

@@ -1417,3 +1417,167 @@ Section online_store_with_warehouse.
 End online_store_with_warehouse.
 
 End Multiparty.
+
+
+(** * A bonus: running orthogonal protocols in parallel *)
+
+Inductive mayTouch : proc -> channel -> Prop :=
+| MtSend1 : forall ch (A : Set) (v : A) k,
+    mayTouch (Send ch v k) ch
+| MtSend2 : forall ch (A : Set) (v : A) k ch',
+    mayTouch k ch'
+    -> mayTouch (Send ch v k) ch'
+| MtRecv1 : forall ch (A : Set) (k : A -> _),
+    mayTouch (Recv ch k) ch
+| MtRecv2 : forall ch (A : Set) (v : A) k ch',
+    mayTouch (k v) ch'
+    -> mayTouch (Recv ch k) ch'
+| MtNewChannel : forall ch chs ch' k,
+    mayTouch (k ch') ch
+    -> mayTouch (NewChannel chs k) ch
+| MtBlockChannel : forall ch ch' k,
+    mayTouch k ch
+    -> mayTouch (BlockChannel ch' k) ch
+| MtPar1 : forall ch pr1 pr2,
+    mayTouch pr1 ch
+    -> mayTouch (Par pr1 pr2) ch
+| MtPar2 : forall ch pr1 pr2,
+    mayTouch pr2 ch
+    -> mayTouch (Par pr1 pr2) ch
+| MtDup : forall ch pr1,
+    mayTouch pr1 ch
+    -> mayTouch (Dup pr1) ch.
+
+Hint Constructors mayTouch.
+
+Import BasicTwoParty Multiparty.
+
+Lemma lstep_mayTouch : forall pr l pr',
+    lstep pr l pr'
+    -> forall ch, mayTouch pr' ch -> mayTouch pr ch.
+Proof.
+  induct 1; invert 1; eauto;
+    eapply MtRecv2;
+    match goal with
+    | [ H : _ = _ |- _ ] => rewrite <- H; eauto
+    end.
+Qed.
+
+Hint Immediate lstep_mayTouch.
+
+Lemma Input_mayTouch : forall pr ch (A : Set) (v : A) pr',
+    lstep pr (Input {| Channel := ch; Value := v |}) pr'
+    -> mayTouch pr ch.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Lemma Output_mayTouch : forall pr ch (A : Set) (v : A) pr',
+    lstep pr (Output {| Channel := ch; Value := v |}) pr'
+    -> mayTouch pr ch.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Hint Immediate Input_mayTouch Output_mayTouch.
+
+Lemma independent_execution : forall pr1 pr2 pr,
+  lstepSilent^* (pr1 || pr2) pr
+  -> (forall ch, mayTouch pr1 ch -> mayTouch pr2 ch -> False)
+  -> exists pr1' pr2', pr = pr1' || pr2'
+                       /\ lstepSilent^* pr1 pr1'
+                       /\ lstepSilent^* pr2 pr2'.
+Proof.
+  induct 1; simplify; eauto.
+  invert H.
+  
+  specialize (IHtrc _ _ eq_refl).
+  match type of IHtrc with
+  | ?P -> _ => assert P by eauto
+  end.
+  first_order.
+  eauto 10.
+
+  specialize (IHtrc _ _ eq_refl).
+  match type of IHtrc with
+  | ?P -> _ => assert P by eauto
+  end.
+  first_order.
+  eauto 10.
+
+  exfalso; eauto.
+
+  exfalso; eauto.
+Qed.
+
+Theorem independently_deadlock_free : forall pr1 pr2,
+    invariantFor (trsys_of pr1)
+                 (fun pr => inert pr
+                            \/ exists pr', lstep pr Silent pr')
+    -> invariantFor (trsys_of pr2)
+                    (fun pr => inert pr
+                               \/ exists pr', lstep pr Silent pr')
+    -> (forall ch, mayTouch pr1 ch -> mayTouch pr2 ch -> False)
+    -> invariantFor (trsys_of (pr1 || pr2))
+                    (fun pr => inert pr
+                               \/ exists pr', lstep pr Silent pr').
+Proof.
+  unfold invariantFor; simplify.
+  propositional; subst.
+  apply independent_execution in H3; auto.
+  first_order; subst.
+  apply H in H3; apply H0 in H4; auto.
+  first_order; eauto.
+Qed.
+
+Ltac NoDup :=
+  repeat match goal with
+         | [ H : NoDup _ |- _ ] => invert H
+         end; simplify.
+
+Ltac mayTouch :=
+  match goal with
+  | [ H : mayTouch (match ?E with _ => _ end) _ |- _ ] => cases E
+  | [ H : mayTouch _ _ |- _ ] => invert H; try solve [ equality ]
+  end.
+
+Example online_store_no_deadlock' : forall k input output
+                                           product payment_info payment_checker in_stock
+                                           add_review payment_success send_payment_info
+                                           in_stock_or_not request_product
+                                           merchant_to_warehouse warehouse_to_merchant,
+  NoDup [input; output;
+           request_product; in_stock_or_not; send_payment_info; payment_success; add_review;
+             merchant_to_warehouse; warehouse_to_merchant]
+    -> invariantFor (trsys_of ((addN k input output
+                                || add2_client input output)
+                               || ((customer' request_product in_stock_or_not
+                                              send_payment_info payment_success add_review
+                                              product payment_info
+                                    || (merchant' request_product in_stock_or_not
+                                                  send_payment_info payment_success add_review
+                                                  merchant_to_warehouse
+                                                  warehouse_to_merchant payment_checker
+                                        || (warehouse merchant_to_warehouse
+                                                      warehouse_to_merchant
+                                                      in_stock || Done))))))
+                    (fun pr => inert pr
+                               \/ exists pr', lstep pr Silent pr').
+Proof.
+  simplify.
+  eapply independently_deadlock_free.
+
+  eapply invariant_weaken.
+  apply adding_no_deadlock.
+  NoDup; equality.
+  simplify.
+  first_order; subst; eauto.
+
+  apply online_store_no_deadlock'.
+  NoDup; repeat constructor; simplify; equality.
+
+  simplify.
+  NoDup; propositional.
+  generalize dependent H1.
+  repeat mayTouch; intro; repeat mayTouch.
+Qed.

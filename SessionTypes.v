@@ -768,35 +768,6 @@ Proof.
   assumption.
 Qed.
 
-Lemma absolutely_nobody : forall (party : Set) pr pr',
-    lstep pr Silent pr'
-    -> forall (channels : _ -> parties party) all_parties ch (A : Set) (k : A -> _),
-      typed_multistate channels (Communicate ch k) all_parties pr
-      -> (In (Sender (channels ch)) all_parties -> False)
-      -> (In (Receiver (channels ch)) all_parties -> False)
-      -> False.
-Proof.
-  induct 1; invert 1; simplify; try solve [ exfalso; eauto ].
-
-  invert H4.
-  rewrite H7 in *; simplify; eauto.
-  rewrite H9 in *; simplify; eauto.
-  eapply IHlstep; eauto.
-
-  invert H5.
-  rewrite H8 in *; simplify; eauto.
-  rewrite H10 in *; simplify; eauto.
-  eapply output_is_legit in H0; eauto.
-
-  invert H5.
-  rewrite H8 in *; simplify; eauto.
-  rewrite H10 in *; simplify; eauto.
-  eauto.
-
-  Unshelve.
-  assumption.
-Qed.
-
 Lemma comm_stuck : forall (party : Set) pr pr',
     lstep pr Silent pr'
     -> forall (channels : _ -> parties party) all_parties ch (A : Set) (k : A -> _),

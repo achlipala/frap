@@ -5214,6 +5214,7 @@ We would need to worry about meddlesome threads in our environment interacting d
 \newcommand{\compl}[1]{\overline{#1}}
 \newcommand{\channels}[0]{\mathcal C}
 \newcommand{\mpty}[4]{#1 :_{#2,#3} #4}
+\newcommand{\mptys}[3]{#1 :_{#2} #3}
 
 \chapter{Session Types}
 
@@ -5266,8 +5267,11 @@ A satisfying soundness theorem applies to our type system.  To state it, we firs
   \compl{\done} &=& \done
 \end{eqnarray*}
 
+\modularity
 It is apparent that complementation just swaps the sends and receives.
 When the original session type tells one party what to do, the complement type tells the other party what to do.
+The power of this approach is that we can write one global protocol description (the session type) and then check two parties' code against it separately.
+A new version of one party can be dropped in without rechecking the other party's code.
 
 Using complementation, we can give succinct conditions for deadlock freedom of a pair of parties.
 
@@ -5301,7 +5305,7 @@ $$\infer{\send{c}{v}{p} : \; \send{c}{x : \sigma}{\tau(x)}}{
   v : \sigma
   & p : \tau(v)
 }
-\quad \infer{\recv{c}{x}{p(x)} : \; \recv{c}{x : sigma}{\tau(x)}}{
+\quad \infer{\recv{c}{x}{p(x)} : \; \recv{c}{x : \sigma}{\tau(x)}}{
   \forall v : \sigma. \; p(v) : \tau(v)
 }
 \quad \infer{\done : \done}{}$$
@@ -5317,7 +5321,7 @@ Our deadlock-freedom property is easy to reestablish.
 
 \section{Multiparty Session Types}\index{multiparty session types}
 
-New complications arise when multiple parties are communicating in a protocol.
+New complications arise when more than two parties are communicating in a protocol.
 The Coq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in stock.
 Many other such examples appear in the real world.
 
@@ -5335,7 +5339,7 @@ $$\begin{array}{rrcl}
 \end{array}$$
 
 We redefine the typing judgment as $\mpty{p}{\alpha}{b}{\tau}$.
-Here $\alpha$ is the identifier of the party running $p$, and $b$ is a Boolean that, when set, enforces that $p$'s next action is a receive.
+Here $\alpha$ is the identifier of the party running $p$, and $b$ is a Boolean that, when set, enforces that $p$'s next action (if any) is a receive.
 $$\infer{\mpty{\send{c}{v}{p}}{\alpha}{\bot}{\send{c}{x : \sigma}{\tau(x)}}}{
   v : \sigma
   & \channels(c) = (\alpha, \beta)
@@ -5362,7 +5366,7 @@ The first two rules encode the simple cases where the current party $\alpha$ is 
 It is important that the send and receive ends of the channel are owned by different parties, or we would clearly have a deadlock, as that party would either wait forever for a message from itself or try futilely to send itself a message!
 The $\neq$ premises enforce that condition.
 Also, the Boolean subscript enforces that we cannot be running a send operation if we have been instructed to run a receive next.
-That flag is reset to false in the recursive premises, since the obligation the flag implies is only for the very next command.
+That flag is reset to false in the recursive premises, since we only use the flag to express an obligation for the very next command.
 
 The third rule is crucial: it applies to a process that is not participating in the next step of the protocol.
 That is, we look up the owners of the channel that comes next, and we verify that neither owner is $\alpha$.
@@ -5373,6 +5377,68 @@ Why does the last premise of the third rule set the Boolean flag, forcing the ne
 Otherwise, at some point in the protocol, we could have multiple parties trying to send messages.
 In such a scenario, there might not be a unique step that the composed parties can take.
 The proofs are easier if we can assume deterministic execution within a protocol, which is why we introduced this static restriction.
+
+To amend our theorem statement, we need to characterize when a process implements a set of parties correctly.
+We use the judgment $\mptys{p}{\vec{\alpha}}{\tau}$ to that end, where $p$ is the process, $\vec{\alpha}$ is a list of all the involved parties, and $\tau$ is the type they must follow collectively.
+$$\infer{\mptys{\done}{[]}{\tau}}{}
+\quad \infer{\mptys{\parl{p_1}{p_2}}{\concat{\alpha}{\vec{\beta}}}{\tau}}{
+  \mpty{p_1}{\alpha}{\bot}{\tau}
+  & \mptys{p_2}{\vec{\beta}}{\tau}
+}$$
+
+The heart of the proof is demonstrating the existence of a unique sequence of steps to a point where all parties are done.
+Here is a sketch of the key lemmas.
+
+\begin{lemma}\label{forever_done}
+  If $\mptys{p}{\vec{\alpha}}{\done}$, then $p$ can't take any silent step.
+\end{lemma}
+\begin{proof}
+  By induction on any derivation of a silent step, followed by inversion on $\mptys{p}{\vec{\alpha}}{\done}$.
+\end{proof}
+
+\begin{lemma}\label{comm_stuck}
+  If $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$ and at least one of sender or receiver of channel $c$ is missing from $\vec{\alpha}$, then $p$ can't take any silent step.
+\end{lemma}
+\begin{proof}
+  By induction on any derivation of a silent step, followed by inversion on $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$.
+\end{proof}
+
+\begin{lemma}\label{preserve_unused}
+  Assume that $\vec{\alpha}$ is a duplicate-free list of parties excluding both sender and receiver of channel $c$.
+  If $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$, then for any $v : \sigma$, we have $\mptys{p'}{\vec{\alpha}}{\tau(v)}$.
+  In other words, when we have well-typed code for a set of parties that do not participate in the first step of a protocol, that code remains well-typed when we advance to the next protocol step.
+\end{lemma}
+\begin{proof}
+  By induction on the derivation of $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$.
+\end{proof}
+
+\begin{lemma}\label{find_sender}
+  Assume that $\vec{\alpha}$ is a duplicate-free list of parties, at least comprehensive enough to include the sender of channel $c$.
+  However, $\vec{\alpha}$ should \emph{exclude} the receiver of $c$.
+  If $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$ and $\lts{p}{\writel{c}{v}}{p'}$, then $\mptys{p'}{\vec{\alpha}}{\tau(v)}$.
+\end{lemma}
+\begin{proof}
+  By induction on steps followed by inversion on multiparty typing.
+  As we step through elements of $\vec{\alpha}$, we expect to ``pass'' parties that do not participate in the current protocol step.
+  Lemma \ref{preserve_unused} lets us justify those passings.
+\end{proof}
+
+\begin{theorem}
+  Assume that $\vec{\alpha}$ is a duplicate-free list of \emph{all} parties for a protocol.
+  If $\mptys{p}{\vec{\alpha}}{\tau}$, then it is an invariant of $p$ that an intermediate process is either inert (made up only of $\done$s and parallel compositions) or can take a step.
+\end{theorem}
+\begin{proof}
+  By invariant induction, after strengthening the invariant to say that any intermediate process $p'$ satisfies $\mptys{p'}{\vec{\alpha}}{\tau'}$ for some $\tau'$.
+  The inductive case uses Lemma \ref{forever_done} to rule out steps by finished protocols, and it uses Lemma \ref{comm_stuck} to rule out cases that are impossible because parties that are scheduled to go next are not present in $\vec{\alpha}$.
+  Interesting cases are where we find that one of the active parties is at the head of $\vec{\alpha}$.
+  That party either sends or receives.
+  In the first case, we appeal to Lemma \ref{find_sender} to find a receiver among the remaining parties.
+  In the second case, we appeal to an analogous lemma (not stated here) to find a sender.
+
+  The other crucial case of the proof is showing that existence of a multiparty typing implies that, if a process is not inert, it can take a step.
+  The reasoning is quite similar to in the inductive case, but where instead of showing that any possible step preserves typing, we demonstrate that a particular step exists.
+  The head of the session type telegraphs what step it is: for the communication at the head of the type, the assigned sending party sends to the assigned receiving party.
+\end{proof}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

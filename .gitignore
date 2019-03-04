@@ -12,7 +12,7 @@
 Makefile.coq
 Makefile.coq.conf
 *.glob
-*.v.d
+*.d
 *.vo
 frap.tgz
 .coq-native

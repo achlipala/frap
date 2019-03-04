@@ -776,25 +776,25 @@ Inductive boundRunningTime : cmd -> nat -> Prop :=
 
 (* Perhaps surprisingly, there exist commands that have no finite time bounds!
  * Mixed-embedding languages often have these counterintuitive properties. *)
+Fixpoint scribbly (n : nat) : cmd :=
+  match n with
+  | O => Return 0
+  | S n' => _ <- Write n' 0; scribbly n'
+  end.
+
+Lemma scribbly_time : forall n m,
+    boundRunningTime (scribbly n) m
+    -> m >= n.
+Proof.
+  induct n; invert 1; auto.
+  invert H2.
+  specialize (H4 n0).
+  apply IHn in H4.
+  linear_arithmetic.
+Qed.
+
 Theorem boundRunningTime_not_total : exists c, forall n, ~boundRunningTime c n.
 Proof.
-  Fixpoint scribbly (n : nat) : cmd :=
-    match n with
-    | O => Return 0
-    | S n' => _ <- Write n' 0; scribbly n'
-    end.
-
-  Lemma scribbly_time : forall n m,
-      boundRunningTime (scribbly n) m
-      -> m >= n.
-  Proof.
-    induct n; invert 1; auto.
-    invert H2.
-    specialize (H4 n0).
-    apply IHn in H4.
-    linear_arithmetic.
-  Qed.
-
   exists (n <- Read 0; scribbly n); propositional.
   invert H.
   specialize (H4 (S n2)).

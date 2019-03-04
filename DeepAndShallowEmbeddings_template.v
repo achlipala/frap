@@ -731,7 +731,7 @@ Module DeeperWithFail.
   | Stepped (h : heap) (c : cmd result)
   | Failed.
 
-  Implicit Arguments Failed [result].
+  Arguments Failed {result}.
 
   Fixpoint step {result} (c : cmd result) (h : heap) : stepResult result :=
     match c with

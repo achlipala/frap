@@ -1972,6 +1972,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
 \renewcommand{\O}[0]{\mathsf{O}}
 
 As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise for the reader.
+(While the treatment of subtraction may seem gratuitously imprecise, recall that we are working here with natural numbers and not integers, such that subtraction ``sticks'' at zero when the result would otherwise be negative.)
 \begin{eqnarray*}
   \mathbb D &=& \{\E, \O, \top\} \\
   \mathcal C(n) &=& \textrm{$\E$ or $\O$, depending on parity of $n$} \\

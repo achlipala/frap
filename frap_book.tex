@@ -217,6 +217,8 @@ Such types can be defined by enumerating their \emph{constructor}\index{construc
   \mathsf{Times} &:& \mathsf{Exp} \times \mathsf{Exp} \to \mathsf{Exp}
 \end{eqnarray*}
 
+Note that the ``$\times$'' here is not the multiplication operator of concrete syntax, but rather the Cartesian-product operator\index{Cartesian product} of set theory, to indicate a type of pairs!
+
 Such a list of constructors defines the set $\mathsf{Exp}$ to contain exactly those terms that can be built up with the constructors.
 In inference-rule notation:
 \encoding
@@ -810,7 +812,7 @@ In that sense, with this translation, we make progress toward efficient implemen
 \newcommand{\compile}[1]{{\left \lfloor #1 \right \rfloor}}
 
 Throughout this book, we will use notation $\compile{\ldots}$ for compilation, where the floor-based notation suggests \emph{moving downward} to a lower abstraction level.
-Here is the compiler that concerns us now, where we write $\concat{s_1}{s_2}$ for concatenation of two stacks $s_1$ and $s_2$.
+Here is the compiler that concerns us now, where we write $\concat{\overline{i_1}}{\overline{i_2}}$ for concatenation of two instruction sequences $\overline{i_1}$ and $\overline{i_2}$.
 \encoding
 \begin{eqnarray*}
   \compile{n} &=& \mathsf{PushConst}(n) \\
@@ -843,7 +845,7 @@ e \arrow{r}{\compile{\ldots}} \arrow{dr}{\denote{\ldots}} & \compile{e} \arrow{d
 As usual, we leave proof details for the associated Coq code, but the key insight of the proof is to strengthen the induction hypothesis via a lemma.
 
 \begin{lemma}
-  $\denote{\concat{\compile{e}}{\overline{i}}}(v, s) = \denote{\overline{i}}(v, \concat{\denote{e}v}{s})$.
+  $\denote{\concat{\compile{e}}{\overline{i}}}(v, s) = \denote{\overline{i}}(v, \push{\denote{e}v}{s})$.
 \end{lemma}
 
 We strengthen the statement by considering both an arbitrary initial stack $s$ and a sequence of extra instructions $\overline{i}$ to be run after $e$.
@@ -1972,6 +1974,7 @@ One example, which we'll formalize in more detail shortly, would be to label eac
 \renewcommand{\O}[0]{\mathsf{O}}
 
 As an example, consider this formalization of even-odd analysis, whose proof of soundness is left as an exercise for the reader.
+(While the treatment of subtraction may seem gratuitously imprecise, recall that we are working here with natural numbers and not integers, such that subtraction ``sticks'' at zero when the result would otherwise be negative.)
 \begin{eqnarray*}
   \mathbb D &=& \{\E, \O, \top\} \\
   \mathcal C(n) &=& \textrm{$\E$ or $\O$, depending on parity of $n$} \\

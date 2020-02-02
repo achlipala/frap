@@ -12,9 +12,7 @@
 Makefile.coq
 Makefile.coq.conf
 *.glob
-*.v.d
-*.coq.d
-*.coqdeps.d
+*.d
 *.vo
 *.vok
 *.vos

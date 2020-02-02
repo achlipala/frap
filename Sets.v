@@ -35,7 +35,7 @@ Section set.
 End set.
 
 Infix "\in" := In (at level 70).
-Notation "[ P ]" := (check P).
+(*Notation "[ P ]" := (check P).*)
 Infix "\cup" := union (at level 40).
 Infix "\cap" := intersection (at level 40).
 Infix "\setminus" := minus (at level 40).

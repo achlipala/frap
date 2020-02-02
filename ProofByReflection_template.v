@@ -2,6 +2,7 @@ Require Import Frap.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
+Set Universe Polymorphism.
 
 
 (** * Proving Evenness *)
@@ -272,10 +273,10 @@ Fixpoint formulaDenote (atomics : asgn) (f : formula) : Prop :=
     | Imp f1 f2 => formulaDenote atomics f1 -> formulaDenote atomics f2
   end.
 
+Require Import ListSet.
+
 Section my_tauto.
   Variable atomics : asgn.
-
-  Require Import ListSet.
 
   Definition add (s : set propvar) (v : propvar) := set_add eq_nat_dec v s.
 

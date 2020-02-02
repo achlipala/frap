@@ -586,14 +586,14 @@ Fixpoint formulaDenote (atomics : asgn) (f : formula) : Prop :=
     | Imp f1 f2 => formulaDenote atomics f1 -> formulaDenote atomics f2
   end.
 
+Require Import ListSet.
+
 Section my_tauto.
   Variable atomics : asgn.
 
   (* Now we are ready to define some helpful functions based on the [ListSet]
    * module of the standard library, which (unsurprisingly) presents a view of
    * lists as sets. *)
-
-  Require Import ListSet.
 
   (* The [eq_nat_dec] below is a richly typed equality test on [nat]s.  We'll
    * get to the ideas behind it in a later class. *)

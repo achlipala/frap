@@ -13,7 +13,11 @@ Makefile.coq
 Makefile.coq.conf
 *.glob
 *.v.d
+*.coq.d
+*.coqdeps.d
 *.vo
+*.vok
+*.vos
 frap.tgz
 .coq-native
 Deep.ml*

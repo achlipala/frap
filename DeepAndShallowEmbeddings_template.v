@@ -9,12 +9,12 @@ Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 3
 Definition heap := fmap nat nat.
 Definition assertion := heap -> Prop.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 
-Hint Rewrite max_l max_r using linear_arithmetic.
+Hint Rewrite max_l max_r using linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -396,9 +396,9 @@ Module Deep.
     cases (interp c h).
     eauto.
   Qed.
-
-  Extraction "Deep.ml" array_max increment_all.
 End Deep.
+
+Extraction "Deep.ml" Deep.array_max Deep.increment_all.
 
 
 (** * A slightly fancier deep embedding, adding unbounded loops *)
@@ -690,10 +690,9 @@ Module Deeper.
     eapply invert_Return; eauto.
     simplify; auto.
   Qed.
-
-  Extraction "Deeper.ml" index_of.
 End Deeper.
 
+Extraction "Deeper.ml" Deeper.index_of.
 
 (** * Adding the possibility of program failure *)
 
@@ -731,7 +730,7 @@ Module DeeperWithFail.
   | Stepped (h : heap) (c : cmd result)
   | Failed.
 
-  Implicit Arguments Failed [result].
+  Arguments Failed {result}.
 
   Fixpoint step {result} (c : cmd result) (h : heap) : stepResult result :=
     match c with
@@ -762,8 +761,6 @@ Module DeeperWithFail.
               | Failed => Failed
               end
     end.
-
-  Extraction "DeeperWithFail.ml" forever.
 
   Inductive hoare_triple : assertion -> forall {result}, cmd result -> (result -> assertion) -> Prop :=
   | HtReturn : forall P {result : Set} (v : result),
@@ -1047,7 +1044,7 @@ Module DeeperWithFail.
     reflexivity.
   Qed.
 
-  Hint Rewrite firstn_nochange fold_left_firstn using linear_arithmetic.
+  Hint Rewrite firstn_nochange fold_left_firstn using linear_arithmetic : core.
 
   Theorem heapfold_ok : forall {A : Set} (init : A) combine
                                (ls : list nat) (f : A -> nat -> A),
@@ -1088,7 +1085,7 @@ Module DeeperWithFail.
     apply IHls; linear_arithmetic.
   Qed.
 
-  Hint Resolve le_max.
+  Hint Resolve le_max : core.
 
   Theorem array_max_ok : forall ls : list nat,
     {{ h ~> forall i, i < length ls -> h $! i = nth_default 0 ls i}}
@@ -1097,3 +1094,5 @@ Module DeeperWithFail.
   Proof.
   Admitted.
 End DeeperWithFail.
+
+Extraction "DeeperWithFail.ml" DeeperWithFail.forever.

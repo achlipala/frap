@@ -1071,7 +1071,7 @@ Ltac substring :=
              destruct N; simplify
          end; try linear_arithmetic; eauto; try equality.
 
-Hint Resolve le_n_S.
+Hint Resolve le_n_S : core.
 
 Lemma substring_le : forall s n m,
   length (substring n m s) <= m.
@@ -1105,7 +1105,7 @@ Proof.
   induct s1; substring.
 Qed.
 
-Hint Resolve length_emp append_emp substring_le substring_split length_app1.
+Hint Resolve length_emp append_emp substring_le substring_split length_app1 : core.
 
 Lemma substring_app_fst : forall s2 s1 n,
   length s1 = n
@@ -1151,7 +1151,7 @@ End sumbool_and.
 
 Infix "&&" := sumbool_and (at level 40, left associativity).
 
-Hint Extern 1 (_ <= _) => linear_arithmetic.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 
 Section split.
   Variables P1 P2 : string -> Prop.
@@ -1217,7 +1217,7 @@ Section split.
   Defined.
 End split.
 
-Implicit Arguments split [P1 P2].
+Arguments split [P1 P2].
 
 (* And now, a few more boring lemmas.  Rejoin at "BOREDOM VANQUISHED", if you
  * like. *)
@@ -1253,7 +1253,7 @@ Proof.
   induct s; substring.
 Qed.
 
-Hint Extern 1 (String _ _ = String _ _) => f_equal.
+Hint Extern 1 (String _ _ = String _ _) => f_equal : core.
 
 Lemma substring_stack : forall s n2 m1 m2,
   m1 <= m2
@@ -1337,7 +1337,7 @@ Section dec_star.
   (* Some new lemmas and hints about the [star] type family are useful.  Rejoin
    * at BOREDOM DEMOLISHED to skip the details. *)
 
-  Hint Constructors star.
+  Hint Constructors star : core.
 
   Lemma star_empty : forall s,
     length s = 0
@@ -1365,14 +1365,14 @@ Section dec_star.
       end.
   Qed.
 
-  Hint Resolve star_empty star_singleton star_app.
+  Hint Resolve star_empty star_singleton star_app : core.
 
   Variable s : string.
 
   Hint Extern 1 (exists i : nat, _) =>
     match goal with
     | [ H : P (String _ ?S) |- _ ] => exists (length S); simplify
-    end.
+    end : core.
 
   Lemma star_inv : forall s,
     star P s
@@ -1426,7 +1426,7 @@ Section dec_star.
      * an index into [s] that splits [s] into a nonempty prefix and a suffix,
      * such that the prefix satisfies [P] and the suffix satisfies [P']. *)
 
-    Hint Extern 1 (_ \/ _) => linear_arithmetic.
+    Hint Extern 1 (_ \/ _) => linear_arithmetic : core.
 
     Definition dec_star'' : forall l : nat,
       {exists l', S l' <= l
@@ -1467,7 +1467,7 @@ Section dec_star.
     linear_arithmetic.
   Qed.
 
-  Hint Resolve star_length_contra star_length_flip substring_suffix_emp.
+  Hint Resolve star_length_contra star_length_flip substring_suffix_emp : core.
 
   (* The work of [dec_star''] is nested inside another linear search by
    * [dec_star'], which provides the final functionality we need, but for
@@ -1507,7 +1507,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve app_cong.
+Hint Resolve app_cong : core.
 
 (* With these helper functions completed, the implementation of our [matches]
  * function is refreshingly straightforward. *)

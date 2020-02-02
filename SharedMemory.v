@@ -13,8 +13,8 @@ Set Asymmetric Patterns.
 Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 Definition heap := fmap nat nat.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 
 (** * An object language with shared-memory concurrency *)
@@ -203,7 +203,7 @@ Definition trsys_ofL (h : heap) (l : locks) (c : cmd) := {|
 
 (* Now we prove some basic facts; commentary resumes before [step_runLocal]. *)
 
-Hint Constructors step stepL.
+Hint Constructors step stepL : core.
 
 Lemma run_Return : forall h l r h' l' c,
   step^* (h, l, Return r) (h', l', c)
@@ -265,7 +265,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve StepBindRecur_star StepParRecur1_star StepParRecur2_star.
+Hint Resolve StepBindRecur_star StepParRecur1_star StepParRecur2_star : core.
 
 Lemma runLocal_idem : forall c, runLocal (runLocal c) = runLocal c.
 Proof.
@@ -722,7 +722,7 @@ Proof.
   first_order; eauto.
 Qed.
 
-Hint Constructors summarize.
+Hint Constructors summarize : core.
 
 (* The next two lemmas show that, once a summary is accurate for a command, it
  * remains accurate throughout the whole execution lifetime of the command. *)
@@ -776,25 +776,25 @@ Inductive boundRunningTime : cmd -> nat -> Prop :=
 
 (* Perhaps surprisingly, there exist commands that have no finite time bounds!
  * Mixed-embedding languages often have these counterintuitive properties. *)
+Fixpoint scribbly (n : nat) : cmd :=
+  match n with
+  | O => Return 0
+  | S n' => _ <- Write n' 0; scribbly n'
+  end.
+
+Lemma scribbly_time : forall n m,
+    boundRunningTime (scribbly n) m
+    -> m >= n.
+Proof.
+  induct n; invert 1; auto.
+  invert H2.
+  specialize (H4 n0).
+  apply IHn in H4.
+  linear_arithmetic.
+Qed.
+
 Theorem boundRunningTime_not_total : exists c, forall n, ~boundRunningTime c n.
 Proof.
-  Fixpoint scribbly (n : nat) : cmd :=
-    match n with
-    | O => Return 0
-    | S n' => _ <- Write n' 0; scribbly n'
-    end.
-
-  Lemma scribbly_time : forall n m,
-      boundRunningTime (scribbly n) m
-      -> m >= n.
-  Proof.
-    induct n; invert 1; auto.
-    invert H2.
-    specialize (H4 n0).
-    apply IHn in H4.
-    linear_arithmetic.
-  Qed.
-
   exists (n <- Read 0; scribbly n); propositional.
   invert H.
   specialize (H4 (S n2)).
@@ -802,7 +802,7 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Constructors boundRunningTime.
+Hint Constructors boundRunningTime : core.
 
 (* Key property: taking a step of execution lowers the running-time bound. *)
 Lemma boundRunningTime_step : forall c n h l h' l',
@@ -1029,7 +1029,7 @@ Inductive stepsi : nat -> heap * locks * cmd -> heap * locks * cmd -> Prop :=
     -> stepsi i st2 st3
     -> stepsi (S i) st1 st3.
 
-Hint Constructors stepsi.
+Hint Constructors stepsi : core.
 
 Theorem steps_stepsi : forall st1 st2,
     step^* st1 st2
@@ -1038,7 +1038,7 @@ Proof.
   induct 1; first_order; eauto.
 Qed.
 
-Hint Constructors stepC.
+Hint Constructors stepC : core.
 
 (* The next few lemmas are quite technical.  Commentary resumes for
  * [translate_trace]. *)

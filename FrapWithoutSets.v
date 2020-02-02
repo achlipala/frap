@@ -1,5 +1,5 @@
 Require Import Eqdep String Arith Omega Program Sets Relations Map Var Invariant Bool ModelCheck.
-Export String Arith Sets Relations Map Var Invariant Bool ModelCheck.
+Export Ascii String Arith Sets Relations Map Var Invariant Bool ModelCheck.
 Require Import List.
 Export List ListNotations.
 Open Scope string_scope.

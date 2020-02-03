@@ -351,8 +351,6 @@ Proof.
   apply HtAssign.
   simplify.
   t.
-  ring [H0].
-  (* This variant of [ring] suggests a hypothesis to use in the proof. *)
   simplify.
   t.
 Qed.
@@ -368,7 +366,6 @@ Theorem fact_ok_snazzy : forall n,
   {{_&v ~> v $! "acc" = fact n}}.
 Proof.
   ht.
-  ring [H0].
 Qed.
 
 (** ** Selection sort *)

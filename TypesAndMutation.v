@@ -394,7 +394,6 @@ Module References.
     invert H0; eauto 6.
     apply H3 in H0; t.
 
-    rewrite lookup_add_ne by linear_arithmetic.
     apply H4.
     linear_arithmetic.
   Qed.

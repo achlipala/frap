@@ -1,4 +1,4 @@
-Require Import Eqdep String Arith Omega Program Sets Relations Map Var Invariant Bool ModelCheck.
+Require Import Eqdep String Arith Lia Program Sets Relations Map Var Invariant Bool ModelCheck.
 Export Ascii String Arith Sets Relations Map Var Invariant Bool ModelCheck.
 Require Import List.
 Export List ListNotations.
@@ -177,33 +177,16 @@ Ltac doSubtract :=
 Ltac simpl_maps :=
   repeat match goal with
          | [ |- context[add ?m ?k1 ?v $? ?k2] ] =>
-           (rewrite (@lookup_add_ne _ _ m k1 k2 v) by (congruence || omega))
-           || (rewrite (@lookup_add_eq _ _ m k1 k2 v) by (congruence || omega))
+           (rewrite (@lookup_add_ne _ _ m k1 k2 v) by (congruence || lia))
+           || (rewrite (@lookup_add_eq _ _ m k1 k2 v) by (congruence || lia))
          end.
 
-Ltac simplify := repeat (unifyTails; pose proof I);
-                repeat match goal with
-                       | [ H : True |- _ ] => clear H
-                       end;
+Ltac simplify := repeat unifyTails;
                 repeat progress (simpl in *; intros; try autorewrite with core in *; simpl_maps);
                                  repeat (normalize_set || doSubtract).
 Ltac propositional := intuition idtac.
 
-Ltac linear_arithmetic := intros;
-    repeat match goal with
-           | [ |- context[max ?a ?b] ] =>
-             let Heq := fresh "Heq" in destruct (Max.max_spec a b) as [[? Heq] | [? Heq]];
-               rewrite Heq in *; clear Heq
-           | [ _ : context[max ?a ?b] |- _ ] =>
-             let Heq := fresh "Heq" in destruct (Max.max_spec a b) as [[? Heq] | [? Heq]];
-               rewrite Heq in *; clear Heq
-           | [ |- context[min ?a ?b] ] =>
-             let Heq := fresh "Heq" in destruct (Min.min_spec a b) as [[? Heq] | [? Heq]];
-               rewrite Heq in *; clear Heq
-           | [ _ : context[min ?a ?b] |- _ ] =>
-             let Heq := fresh "Heq" in destruct (Min.min_spec a b) as [[? Heq] | [? Heq]];
-               rewrite Heq in *; clear Heq
-           end; omega.
+Ltac linear_arithmetic := lia.
 
 Ltac equality := intuition congruence.
 
@@ -333,8 +316,8 @@ Inductive ordering (n m : nat) :=
 | Gt (_ : n > m).
 
 Local Hint Constructors ordering.
-Local Hint Extern 1 (_ < _) => omega.
-Local Hint Extern 1 (_ > _) => omega.
+Local Hint Extern 1 (_ < _) => lia.
+Local Hint Extern 1 (_ > _) => lia.
 
 Theorem totally_ordered : forall n m, ordering n m.
 Proof.

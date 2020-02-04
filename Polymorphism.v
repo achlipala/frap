@@ -24,7 +24,7 @@ Inductive option (A : Set) : Set :=
 | None
 | Some (v : A).
 
-Arguments None [A].
+Arguments None {A}.
 (* This command asks Coq to *infer* the [A] type for each specific use of
  * [None]. *)
 
@@ -61,7 +61,7 @@ Inductive list (A : Set) : Set :=
 | nil
 | cons (hd : A) (tl : list A).
 
-Arguments nil [A].
+Arguments nil {A}.
 
 (* [nil] is the empty list, while [cons], standing for "construct," extends a
  * list of length [n] into one of length [n+1]. *)
@@ -346,7 +346,7 @@ Inductive tree (A : Set) : Set :=
 | Leaf
 | Node (l : tree A) (d : A) (r : tree A).
 
-Arguments Leaf [A].
+Arguments Leaf {A}.
 
 Example tr1 : tree nat := Node (Node Leaf 7 Leaf) 8 (Node Leaf 9 (Node Leaf 10 Leaf)).
 
@@ -448,6 +448,7 @@ Inductive statement : Set :=
  * almost-natural-looking embedded programs in Coq. *)
 Coercion Const : nat >-> expression.
 Coercion Var : string >-> expression.
+Declare Scope embedded_scope.
 Infix "+" := Plus : embedded_scope.
 Infix "-" := Minus : embedded_scope.
 Infix "*" := Times : embedded_scope.

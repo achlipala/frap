@@ -1538,7 +1538,7 @@ Proof.
     repeat erewrite interp_agree in * by eassumption; eauto 10.
 
   assert (Hnu : noUnderscoreArith e = true) by assumption.
-  eapply flatten_Assign with (tempCount := 0) (dst := x) in Hnu; eauto.
+  eapply flatten_Assign with (tempCount := 0) (dst := x) in Hnu; try eassumption.
   first_order.
   do 3 eexists.
   split.
@@ -1659,8 +1659,8 @@ Proof.
     simplify; propositional; eauto.
 
   invert H1; simplify; subst.
-  assert (noUnderscore c2 = true) by eauto.
-  eapply flatten_ok' in H5; eauto.
+  assert (noUnderscore c2 = true) by eauto 4.
+  eapply flatten_ok' in H5; eauto 4.
   first_order.
   cases vc2; simplify; subst.
   pose proof (plug_total x0 (flattenContext C)).

@@ -170,6 +170,7 @@ Qed.
 (* BEGIN syntax macros that won't be explained *)
 Coercion Const : nat >-> exp.
 Coercion Var : string >-> exp.
+Declare Scope cmd_scope.
 Notation "*[ e ]" := (Read e) : cmd_scope.
 Infix "+" := Plus : cmd_scope.
 Infix "-" := Minus : cmd_scope.
@@ -189,6 +190,7 @@ Notation "{{ I }} 'while' b 'loop' body 'done'" := (While_ I b body) (at level 7
 Notation "'assert' {{ I }}" := (Assert I) (at level 75).
 Delimit Scope cmd_scope with cmd.
 
+Declare Scope reset_scope.
 Infix "+" := plus : reset_scope.
 Infix "-" := Init.Nat.sub : reset_scope.
 Infix "*" := mult : reset_scope.
@@ -351,8 +353,6 @@ Proof.
   apply HtAssign.
   simplify.
   t.
-  ring [H0].
-  (* This variant of [ring] suggests a hypothesis to use in the proof. *)
   simplify.
   t.
 Qed.
@@ -368,7 +368,6 @@ Theorem fact_ok_snazzy : forall n,
   {{_&v ~> v $! "acc" = fact n}}.
 Proof.
   ht.
-  ring [H0].
 Qed.
 
 (** ** Selection sort *)
@@ -384,10 +383,10 @@ Proof.
   ht.
 Qed.
 
-Hint Resolve leq_f.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
-Hint Extern 1 (_ < _) => linear_arithmetic.
-Hint Extern 1 (_ <= _) => linear_arithmetic.
+Hint Resolve leq_f : core.
+Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Hint Extern 1 (_ < _) => linear_arithmetic : core.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 (* We also register [linear_arithmetic] as a step to try during proof search. *)
 
 (* These invariants are fairly hairy, but probably the best way to understand
@@ -471,7 +470,7 @@ Inductive step : heap * valuation * cmd -> heap * valuation * cmd -> Prop :=
   a h v
   -> step (h, v, Assert a) (h, v, Skip).
 
-Hint Constructors step.
+Hint Constructors step : core.
 
 Definition trsys_of (st : heap * valuation * cmd) := {|
   Initial := {st};

@@ -143,7 +143,7 @@ Proof.
   eauto.
 Qed.
 
-Local Hint Constructors invariantViaSimulation.
+Local Hint Constructors invariantViaSimulation : core.
 
 Theorem invariant_simulates : forall state1 state2 (R : state1 -> state2 -> Prop)
   (sys1 : trsys state1) (sys2 : trsys state2) (inv2 : state2 -> Prop),

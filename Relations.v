@@ -12,7 +12,7 @@ Section trc.
     -> trc y z
     -> trc x z.
 
-  Hint Constructors trc.
+  Hint Constructors trc : core.
 
   Theorem trc_one : forall x y, R x y
     -> trc x y.
@@ -20,7 +20,7 @@ Section trc.
     eauto.
   Qed.
 
-  Hint Resolve trc_one.
+  Hint Resolve trc_one : core.
 
   Theorem trc_trans : forall x y, trc x y
     -> forall z, trc y z
@@ -29,7 +29,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trc_trans.
+  Hint Resolve trc_trans : core.
 
   Inductive trcEnd : A -> A -> Prop :=
   | TrcEndRefl : forall x, trcEnd x x
@@ -38,7 +38,7 @@ Section trc.
     -> R y z
     -> trcEnd x z.
 
-  Hint Constructors trcEnd.
+  Hint Constructors trcEnd : core.
 
   Lemma TrcFront' : forall x y z,
     R x y
@@ -48,7 +48,7 @@ Section trc.
     induction 2; eauto.
   Qed.
 
-  Hint Resolve TrcFront'.
+  Hint Resolve TrcFront' : core.
 
   Theorem trc_trcEnd : forall x y, trc x y
     -> trcEnd x y.
@@ -56,7 +56,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trc_trcEnd.
+  Hint Resolve trc_trcEnd : core.
 
   Lemma TrcBack' : forall x y z,
     trc x y
@@ -66,7 +66,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve TrcBack'.
+  Hint Resolve TrcBack' : core.
 
   Theorem trcEnd_trans : forall x y, trcEnd x y
     -> forall z, trcEnd y z
@@ -75,7 +75,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trcEnd_trans.
+  Hint Resolve trcEnd_trans : core.
   
   Theorem trcEnd_trc : forall x y, trcEnd x y
     -> trc x y.
@@ -83,7 +83,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trcEnd_trc.
+  Hint Resolve trcEnd_trc : core.
 
   Inductive trcLiteral : A -> A -> Prop :=
   | TrcLiteralRefl : forall x, trcLiteral x x
@@ -93,7 +93,7 @@ Section trc.
   | TrcInclude : forall x y, R x y
     -> trcLiteral x y.
 
-  Hint Constructors trcLiteral.
+  Hint Constructors trcLiteral : core.
 
   Theorem trc_trcLiteral : forall x y, trc x y
     -> trcLiteral x y.
@@ -107,7 +107,7 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trc_trcLiteral trcLiteral_trc.
+  Hint Resolve trc_trcLiteral trcLiteral_trc : core.
 
   Theorem trcEnd_trcLiteral : forall x y, trcEnd x y
     -> trcLiteral x y.
@@ -121,10 +121,10 @@ Section trc.
     induction 1; eauto.
   Qed.
 
-  Hint Resolve trcEnd_trcLiteral trcLiteral_trcEnd.
+  Hint Resolve trcEnd_trcLiteral trcLiteral_trcEnd : core.
 End trc.
 
 Notation "R ^*" := (trc R) (at level 0).
 Notation "*^ R" := (trcEnd R) (at level 0).
 
-Hint Constructors trc.
+Hint Constructors trc : core.

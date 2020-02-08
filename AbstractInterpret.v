@@ -58,7 +58,7 @@ Record absint_sound (a : absint) : Prop := {
 
 Hint Resolve TopSound ConstSound AddSound SubtractSound MultiplySound
      AddMonotone SubtractMonotone MultiplyMonotone
-     JoinSoundLeft JoinSoundRight.
+     JoinSoundLeft JoinSoundRight : core.
 
 
 
@@ -103,7 +103,7 @@ Proof.
   cases (s $? x); equality.
 Qed.
 
-Hint Resolve subsumed_refl.
+Hint Resolve subsumed_refl : core.
 
 Lemma subsumed_use : forall a (s s' : astate a) x n t0 t,
   s $? x = Some t0
@@ -131,7 +131,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve subsumed_use subsumed_use_empty.
+Hint Resolve subsumed_use subsumed_use_empty : core.
 
 Lemma subsumed_trans : forall a (s1 s2 s3 : astate a),
   subsumed s1 s2
@@ -156,7 +156,7 @@ Proof.
   invert H0; eauto.
 Qed.
 
-Hint Resolve subsumed_merge_left.
+Hint Resolve subsumed_merge_left : core.
 
 Lemma subsumed_add : forall a, absint_sound a
   -> forall (s1 s2 : astate a) x v1 v2,
@@ -170,7 +170,7 @@ Proof.
   specialize (H0 x0); eauto.
 Qed.
 
-Hint Resolve subsumed_add.
+Hint Resolve subsumed_add : core.
 
 
 (** * Flow-sensitive analysis *)
@@ -190,7 +190,7 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve compatible_add.
+Hint Resolve compatible_add : core.
 
 (* A similar result follows about soundness of expression interpretation. *)
 Theorem absint_interp_ok : forall a, absint_sound a
@@ -208,7 +208,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Resolve absint_interp_ok.
+Hint Resolve absint_interp_ok : core.
 
 Definition astates (a : absint) := fmap cmd (astate a).
 
@@ -281,7 +281,7 @@ Inductive abs_step a : astate a * cmd -> astate a * cmd -> Prop :=
   -> ss $? c' = Some s'
   -> abs_step (s, c) (s', c').
 
-Hint Constructors abs_step.
+Hint Constructors abs_step : core.
 
 Definition absint_trsys a (c : cmd) := {|
   Initial := {($0, c)};
@@ -293,7 +293,7 @@ Inductive Rabsint a : valuation * cmd -> astate a * cmd -> Prop :=
   compatible s v
   -> Rabsint (v, c) (s, c).
 
-Hint Constructors abs_step Rabsint.
+Hint Constructors abs_step Rabsint : core.
 
 Theorem absint_simulates : forall a v c,
   absint_sound a
@@ -351,7 +351,7 @@ Proof.
   unfold subsumeds; simplify; eauto.
 Qed.
 
-Hint Resolve subsumeds_refl.
+Hint Resolve subsumeds_refl : core.
 
 Lemma subsumeds_add : forall a (ss1 ss2 : astates a) c s1 s2,
   subsumeds ss1 ss2
@@ -363,7 +363,7 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve subsumeds_add.
+Hint Resolve subsumeds_add : core.
 
 Lemma subsumeds_empty : forall a (ss : astates a),
   subsumeds $0 ss.
@@ -459,7 +459,7 @@ Proof.
   cases (s $? x); eauto.
 Qed.
 
-Hint Resolve absint_interp_monotone.
+Hint Resolve absint_interp_monotone : core.
 
 Lemma absint_step_monotone : forall a, absint_sound a
     -> forall (s : astate a) c wrap ss,

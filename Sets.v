@@ -1,4 +1,4 @@
-Require Import Classical FunctionalExtensionality List.
+Require Import Bool Classical FunctionalExtensionality List.
 
 Set Implicit Arguments.
 
@@ -131,7 +131,7 @@ Section properties.
   Qed.
 End properties.
 
-Hint Resolve subseteq_refl subseteq_In.
+Hint Resolve subseteq_refl subseteq_In : core.
 
 (*Hint Rewrite union_constant.*)
 
@@ -505,8 +505,6 @@ Section setexpr.
     pose proof (member_ok a ns2).
     destruct (member a ns2); simpl in *; auto; congruence.
   Qed.
-
-  Require Import Bool.
 
   Theorem compare_sets : forall env e1 e2,
       let nf1 := normalize_setexpr e1 in

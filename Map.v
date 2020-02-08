@@ -136,9 +136,9 @@ Module Type S.
   Hint Extern 1 => match goal with
                      | [ H : lookup (empty _ _) _ = Some _ |- _ ] =>
                        rewrite lookup_empty in H; discriminate
-                   end.
+                   end : core.
 
-  Hint Resolve includes_lookup includes_add empty_includes.
+  Hint Resolve includes_lookup includes_add empty_includes : core.
 
   Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
        lookup_merge lookup_restrict_true lookup_restrict_false using congruence.
@@ -152,7 +152,7 @@ Module Type S.
           | [ |- context[lookup (add _ ?k _) ?k' ] ] => destruct (classic (k = k')); subst
         end).
 
-  Hint Extern 3 (_ = _) => maps_equal.
+  Hint Extern 3 (_ = _) => maps_equal : core.
 
   Axiom lookup_split : forall A B (m : fmap A B) k v k' v',
     (m $+ (k, v)) $? k' = Some v'
@@ -267,9 +267,9 @@ Module Type S.
       -> disjoint h3 h2.
   End splitting.
 
-  Hint Immediate disjoint_comm split_comm.
-  Hint Immediate split_empty_bwd disjoint_hemp disjoint_hemp' split_assoc1 split_assoc2.
-  Hint Immediate disjoint_assoc1 disjoint_assoc2 split_join split_disjoint disjoint_assoc3.
+  Hint Immediate disjoint_comm split_comm : core.
+  Hint Immediate split_empty_bwd disjoint_hemp disjoint_hemp' split_assoc1 split_assoc2 : core.
+  Hint Immediate disjoint_assoc1 disjoint_assoc2 split_join split_disjoint disjoint_assoc3 : core.
 End S.
 
 Module M : S.
@@ -593,7 +593,7 @@ Module M : S.
     Definition split (h h1 h2 : fmap K V) : Prop :=
       h = h1 $++ h2.
 
-    Hint Extern 2 (_ <> _) => congruence.
+    Hint Extern 2 (_ <> _) => congruence : core.
 
     Ltac splt := unfold disjoint, split, join, lookup in *; intros; subst;
                  try match goal with
@@ -661,7 +661,7 @@ Module M : S.
       splt.
     Qed.
 
-    Hint Immediate disjoint_comm split_comm.
+    Hint Immediate disjoint_comm split_comm : core.
 
     Lemma split_assoc1 : forall h h1 h' h2 h3,
       split h h1 h'

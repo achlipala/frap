@@ -431,7 +431,7 @@ Ltac dep_cases E :=
 (** * More with [N] *)
 
 Lemma recursion_step: forall {A: Type} (a: A) (f: N -> A -> A) (n: N),
-    N.recursion a f (n + 1) = f n (N.recursion a f n).
+    N.recursion a f (n + 1)%N = f n (N.recursion a f n).
 Proof.
   intros until f. setoid_rewrite N.add_1_r.
   eapply N.recursion_succ; cbv; intuition congruence.
@@ -459,7 +459,7 @@ Ltac unfold_recurse f k :=
   lazymatch rhs with
   | N.recursion ?base ?step =>
     let g := eval cbv beta in (step k (f k)) in
-    rewrite (recursion_step base step k : f (k + 1) = g) in *
+    rewrite (recursion_step base step k : f (k + 1)%N = g) in *
   | _ => let expected := open_constr:(N.recursion _ _) in
          fail "The provided term" f "expands to" rhs "which is not of the expected form" expected
   end.

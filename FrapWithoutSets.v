@@ -208,7 +208,10 @@ Ltac linear_arithmetic := intros;
 Ltac equality := intuition congruence.
 
 Ltac cases E :=
-  ((is_var E; destruct E)
+  ((repeat match type of E with
+           | _ \/ _ => destruct E as [E | E]
+           end)
+   || (is_var E; destruct E)
    || match type of E with
       | {_} + {_} => destruct E
       | _ => let Heq := fresh "Heq" in destruct E eqn:Heq

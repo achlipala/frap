@@ -31,7 +31,7 @@ Definition pascal := {|
   AppearedInYear := 1970
 |}.
 
-Definition c := {|
+Definition clang := {|
   Name := "C";
   PurelyFunctional := false;
   AppearedInYear := 1972
@@ -55,7 +55,7 @@ Definition ocaml := {|
   AppearedInYear := 1996
 |}.
 
-Definition languages := [pascal; c; gallina; haskell; ocaml].
+Definition languages := [pascal; clang; gallina; haskell; ocaml].
 
 
 (** * Classic list functions *)
@@ -213,7 +213,7 @@ Definition not_introduced_later (l1 l2 : programming_language) : bool :=
 
 Compute insertion_sort
         not_introduced_later
-        [gallina; pascal; c; ocaml; haskell].
+        [gallina; pascal; clang; ocaml; haskell].
 
 Corollary insertion_sort_languages : forall langs,
     sorted not_introduced_later (insertion_sort not_introduced_later langs) = true.
@@ -274,12 +274,12 @@ Inductive xform :=
 | IsZero
 | Not.
 
-Fixpoint interp (xf : xform) : dyn -> dyn :=
+Fixpoint transform (xf : xform) : dyn -> dyn :=
   match xf with
   | Identity => id
-  | Compose f1 f2 => compose (interp f1) (interp f2)
-  | Map f => dmap (interp f)
-  | Filter f => dfilter (interp f)
+  | Compose f1 f2 => compose (transform f1) (transform f2)
+  | Map f => dmap (transform f)
+  | Filter f => dfilter (transform f)
 
   | ConstantBool b => fun _ => Bool b
   | ConstantNumber n => fun _ => Number n
@@ -287,8 +287,8 @@ Fixpoint interp (xf : xform) : dyn -> dyn :=
   | Not => dnot
   end.
 
-Compute interp (Map IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
-Compute interp (Filter IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
+Compute transform (Map IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
+Compute transform (Filter IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
 
 Fixpoint optimize (xf : xform) : xform :=
   match xf with
@@ -298,6 +298,9 @@ Fixpoint optimize (xf : xform) : xform :=
     | xf1', Identity => xf1'
     | Not, Not => Identity
     | Map xf1', Map xf2' => Map (Compose xf1' xf2')
+    | Not, ConstantBool b => ConstantBool (negb b)
+    | IsZero, ConstantNumber 0 => ConstantBool true
+    | IsZero, ConstantNumber (S _) => ConstantBool false
     | xf1', xf2' => Compose xf1' xf2'
     end
   | Map xf1 =>
@@ -392,7 +395,7 @@ Proof.
   equality.
 Qed.
 
-Theorem optimize_ok : forall xf x, interp (optimize xf) x = interp xf x.
+Theorem optimize_ok : forall xf x, transform (optimize xf) x = transform xf x.
 Proof.
   induct xf; simplify; try equality.
 
@@ -401,6 +404,7 @@ Proof.
       (cases (optimize xf2); optimize_ok).
 
     cases x; simplify; trivial.
+    cases n; trivial.
   }
 
   {
@@ -485,7 +489,7 @@ Proof.
 Qed.
 
 Theorem neverGrow : forall xf x,
-    dsize (interp xf x) <= dsize x.
+    dsize (transform xf x) <= dsize x.
 Proof.
   induct xf; simplify; try linear_arithmetic.
 
@@ -521,6 +525,188 @@ Proof.
   cases x; trivial.
 Qed.
 
+
+(** * Combinators for syntax-tree transformations *)
+
+(* Let's reprise the imperative language from the end of Interpreters. *)
+
+Inductive arith : Set :=
+| Const (n : nat)
+| Var (x : var)
+| Plus (e1 e2 : arith)
+| Minus (e1 e2 : arith)
+| Times (e1 e2 : arith).
+
+Definition valuation := fmap var nat.
+
+Fixpoint interp (e : arith) (v : valuation) : nat :=
+  match e with
+  | Const n => n
+  | Var x =>
+    match v $? x with
+    | None => 0
+    | Some n => n
+    end
+  | Plus e1 e2 => interp e1 v + interp e2 v
+  | Minus e1 e2 => interp e1 v - interp e2 v
+  | Times e1 e2 => interp e1 v * interp e2 v
+  end.
+
+Inductive cmd :=
+| Skip
+| Assign (x : var) (e : arith)
+| Sequence (c1 c2 : cmd)
+| Repeat (e : arith) (body : cmd).
+
+Fixpoint selfCompose {A} (f : A -> A) (n : nat) : A -> A :=
+  match n with
+  | O => fun x => x
+  | S n' => fun x => selfCompose f n' (f x)
+  end.
+
+Lemma selfCompose_extensional : forall {A} (f g : A -> A) n x,
+  (forall y, f y = g y)
+  -> selfCompose f n x = selfCompose g n x.
+Proof.
+  induct n; simplify; try equality.
+
+  rewrite H.
+  apply IHn.
+  trivial.
+Qed.
+
+Fixpoint exec (c : cmd) (v : valuation) : valuation :=
+  match c with
+  | Skip => v
+  | Assign x e => v $+ (x, interp e v)
+  | Sequence c1 c2 => exec c2 (exec c1 v)
+  | Repeat e body => selfCompose (exec body) (interp e v) v
+  end.
+
+Fixpoint seqself (c : cmd) (n : nat) : cmd :=
+  match n with
+  | O => Skip
+  | S n' => Sequence c (seqself c n')
+  end.
+
+(* Now consider a more abstract way of describing optimizations concisely. *)
+
+Record rule := {
+  OnCommand : cmd -> cmd;
+  OnExpression : arith -> arith
+}.
+
+Fixpoint bottomUp (r : rule) (c : cmd) : cmd :=
+  match c with
+  | Skip => r.(OnCommand) Skip
+  | Assign x e => r.(OnCommand) (Assign x (r.(OnExpression) e))
+  | Sequence c1 c2 => r.(OnCommand) (Sequence (bottomUp r c1) (bottomUp r c2))
+  | Repeat e body => r.(OnCommand) (Repeat (r.(OnExpression) e) (bottomUp r body))
+  end.
+
+Definition crule (f : cmd -> cmd) : rule :=
+  {| OnCommand := f; OnExpression := fun e => e |}.
+Definition erule (f : arith -> arith) : rule :=
+  {| OnCommand := fun c => c; OnExpression := f |}.
+Definition andThen (r1 r2 : rule) : rule :=
+  {| OnCommand := compose r2.(OnCommand) r1.(OnCommand);
+     OnExpression := compose r2.(OnExpression) r1.(OnExpression) |}.
+
+Definition plus0 := erule (fun e =>
+                             match e with
+                             | Plus e' (Const 0) => e'
+                             | _ => e
+                             end).
+Definition unrollLoops := crule (fun c =>
+                                   match c with
+                                   | Repeat (Const n) body => seqself body n
+                                   | _ => c
+                                   end).
+
+Compute bottomUp plus0
+        (Sequence (Assign "x" (Plus (Var "x") (Const 0)))
+                  (Assign "y" (Var "x"))).
+
+Compute bottomUp unrollLoops
+        (Repeat (Plus (Const 2) (Const 0))
+                (Sequence (Assign "x" (Plus (Var "x") (Const 0)))
+                          (Assign "y" (Var "x")))).
+
+Compute bottomUp (andThen plus0 unrollLoops)
+        (Repeat (Plus (Const 2) (Const 0))
+                (Sequence (Assign "x" (Plus (Var "x") (Const 0)))
+                          (Assign "y" (Var "x")))).
+
+Definition correct (r : rule) :=
+  (forall c v, exec (r.(OnCommand) c) v = exec c v)
+  /\ (forall e v, interp (r.(OnExpression) e) v = interp e v).
+
+Theorem crule_correct : forall f,
+    (forall c v, exec (f c) v = exec c v)
+    -> correct (crule f).
+Proof.
+  first_order.
+Qed.
+
+Theorem erule_correct : forall f,
+    (forall e v, interp (f e) v = interp e v)
+    -> correct (erule f).
+Proof.
+  first_order.
+Qed.
+
+Theorem andThen_correct : forall r1 r2,
+    correct r1
+    -> correct r2
+    -> correct (andThen r1 r2).
+Proof.
+  unfold andThen; first_order; simplify; eauto using eq_trans.
+Qed.
+
+Theorem bottomUp_correct : forall r,
+    correct r
+    -> forall c v, exec (bottomUp r c) v = exec c v.
+Proof.
+  unfold correct; induct c; simplify; propositional.
+
+  rewrite H0.
+  trivial.
+
+  rewrite H0.
+  simplify.
+  equality.
+
+  rewrite H0.
+  simplify.
+  equality.
+
+  rewrite H0.
+  simplify.
+  rewrite H1.
+  apply selfCompose_extensional.
+  trivial.
+Qed.
+
+Definition rBottomUp (r : rule) : rule :=
+  {| OnCommand := bottomUp r;
+     OnExpression := r.(OnExpression) |}.
+
+Theorem rBottomUp_correct : forall r,
+    correct r
+    -> correct (rBottomUp r).
+Proof.
+  unfold correct; simplify; propositional.
+  apply bottomUp_correct.
+  unfold correct; propositional.
+Qed.
+
+Definition zzz := Assign "x" (Plus (Plus (Plus (Var "x") (Const 0)) (Const 0)) (Const 0)).
+
+Compute bottomUp plus0 zzz.
+Compute bottomUp (rBottomUp plus0) zzz.
+Compute bottomUp (rBottomUp (rBottomUp plus0)) zzz.
+Compute bottomUp (rBottomUp (rBottomUp (rBottomUp plus0))) zzz.
+       
 
 (** * Motivating continuations with search problems *)
 

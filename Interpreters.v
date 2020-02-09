@@ -6,7 +6,7 @@
 Require Import Frap.
 
 
-(* We begin with a return to our arithmetic language from the last chapter,
+(* We begin with a return to our arithmetic language from BasicSyntax,
  * adding subtraction*, which will come in handy later.
  * *: good pun, right? *)
 Inductive arith : Set :=
@@ -25,7 +25,7 @@ Example ex2 := Plus (Var "y") (Times (Var "x") (Const 3)).
  * Actually, it's not quite that simple.
  * We need to consider the meaning to be a function over a valuation
  * to the variables, which in turn is itself a finite map from variable
- * names to numbers.  We use the book library's [map] type family. *)
+ * names to numbers.  We use the book library's [fmap] type family. *)
 Definition valuation := fmap var nat.
 (* That is, the domain is [var] (a synonym for [string]) and the codomain/range
  * is [nat]. *)
@@ -97,9 +97,7 @@ Proof.
 
   equality.
 
-  rewrite IHe1.
-  rewrite IHe2.
-  ring.
+  linear_arithmetic.
 Qed.
 (* Well, that's a relief! ;-) *)
 
@@ -121,11 +119,11 @@ Proof.
 
   (* One case left after our basic heuristic:
    * the variable case, naturally! *)
-  cases (x ==v replaceThis); simplify; try equality.
+  cases (x ==v replaceThis); simplify; equality.
 Qed.
 (* Great; we seem to have gotten that one right, too. *)
 
-(* Let's also defined a pared-down version of the expression-simplificaton
+(* Let's also define a pared-down version of the expression-simplification
  * functions from last chapter. *)
 Fixpoint doSomeArithmetic (e : arith) : arith :=
   match e with
@@ -208,7 +206,8 @@ Fixpoint compile (e : arith) : list instruction :=
  * Skip down to the next theorem to see the overall correctness statement.
  * It turns out that we need to strengthen the induction hypothesis with a
  * lemma, to push the proof through. *)
-Lemma compile_ok' : forall e v is stack, run (compile e ++ is) v stack = run is v (interp e v :: stack).
+Lemma compile_ok' : forall e v is stack,
+    run (compile e ++ is) v stack = run is v (interp e v :: stack).
 Proof.
   induct e; simplify.
 
@@ -310,6 +309,7 @@ Example factorial_ugly :=
  * them from our examples. *)
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.
+Declare Scope arith_scope.
 Infix "+" := Plus : arith_scope.
 Infix "-" := Minus : arith_scope.
 Infix "*" := Times : arith_scope.
@@ -346,7 +346,7 @@ Definition factorial_body :=
  * Note that here we're careful to put the quantified variable [input] *first*,
  * because the variables coming after it will need to *change* in the course of
  * the induction.  Try switching the order to see what goes wrong if we put
-e * [input] later. *)
+ * [input] later. *)
 Lemma factorial_ok' : forall input output v,
   v $? "input" = Some input
   -> v $? "output" = Some output

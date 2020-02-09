@@ -3,7 +3,7 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap.
+Require Import Frap Program.
 
 (* Next stop in touring the basic Coq ingredients of functional programming and
  * proof: functions as first-class data.  These days, most trendy programming
@@ -228,7 +228,186 @@ Proof.
 Qed.
 
 
+(** * A language of functions and its interpreter *)
+
+Inductive dyn :=
+| Failure
+| Bool (b : bool)
+| Number (n : nat)
+| Pair (d1 d2 : dyn)
+| List (ds : list dyn).
+
+Definition idIfList (x : dyn) : dyn :=
+  match x with
+  | List _ => x
+  | _ => Failure
+  end.
+
+Definition idIfBool (x : dyn) : dyn :=
+  match x with
+  | Bool _ => x
+  | _ => Failure
+  end.
+
+Definition dmap (f : dyn -> dyn) (x : dyn) : dyn :=
+  match x with
+  | List ds => List (map f ds)
+  | _ => Failure
+  end.
+
+Definition dfilter (f : dyn -> dyn) (x : dyn) : dyn :=
+  match x with
+  | List ds => List (filter (fun arg => match f arg with
+                                        | Bool b => b
+                                        | _ => false
+                                        end) ds)
+  | _ => Failure
+  end.
+
+Definition dfold (f : dyn -> dyn) (x : dyn) : dyn :=
+  match x with
+  | Pair acc (List ds) =>
+    fold_left (fun arg acc' => f (Pair arg acc')) ds acc
+  | _ => Failure
+  end.
+
+Definition disZero (x : dyn) : dyn :=
+  Bool (match x with
+        | Number 0 => true
+        | _ => false
+        end).
+
+Definition dadd (x : dyn) : dyn :=
+  match x with
+  | Pair (Number n1) (Number n2) => Number (n1 + n2)
+  | _ => Failure
+  end.
+
+Definition dnot (x : dyn) : dyn :=
+  match x with
+  | Bool b => Bool (negb b)
+  | _ => Failure
+  end.
+
+Inductive xform :=
+| Identity
+| IdentityIfBool
+| IdentityIfList
+| Compose (xf1 xf2 : xform)
+| Map (xf1 : xform)
+| Filter (xf1 : xform)
+| Fold (xf1 : xform)
+
+| IsZero
+| Add
+| Not.
+
+Fixpoint interp (xf : xform) : dyn -> dyn :=
+  match xf with
+  | Identity => id
+  | IdentityIfBool => idIfBool
+  | IdentityIfList => idIfList
+  | Compose f1 f2 => compose (interp f1) (interp f2)
+  | Map f => dmap (interp f)
+  | Filter f => dfilter (interp f)
+  | Fold f => dfold (interp f)
+
+  | IsZero => disZero
+  | Add => dadd
+  | Not => dnot
+  end.
+
+Compute interp (Map IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
+Compute interp (Filter IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
+
+Fixpoint optimize (xf : xform) : xform :=
+  match xf with
+  | Compose xf1 xf2 =>
+    match optimize xf1, optimize xf2 with
+    | Identity, xf2' => xf2'
+    | xf1', Identity => xf1'
+    | Not, Not => IdentityIfBool
+    | Map xf1', Map xf2' => Map (Compose xf1' xf2')
+    | xf1', xf2' => Compose xf1' xf2'
+    end
+  | Map xf1 =>
+    match optimize xf1 with
+    | Identity => IdentityIfList
+    | xf1' => Map xf1'
+    end
+  | _ => xf
+  end.
+
+Ltac optimize_ok :=
+  simplify; unfold compose, dmap in *;
+  repeat match goal with
+         | [ H : forall x : dyn, _ = _ |- _ ] => rewrite H
+         end;
+  repeat match goal with
+         | [ H : forall x : dyn, _ = _ |- _ ] => rewrite <- H
+         end; auto.
+
+Lemma dnot_dnot : forall d, dnot (dnot d) = idIfBool d.
+Proof.
+  induct d; simplify; trivial.
+
+  SearchRewrite (negb (negb _)).
+  rewrite negb_involutive.
+  trivial.
+Qed.
+
+Hint Rewrite dnot_dnot.
+
+Lemma map_identity : forall A (f : A -> A) (ls : list A),
+    (forall x, x = f x)
+    -> map f ls = ls.
+Proof.
+  induct ls; simplify; equality.
+Qed.
+
+Hint Rewrite map_identity map_map using assumption.
+
+Lemma map_same : forall A B (f1 f2 : A -> B) ls,
+    (forall x, f1 x = f2 x)
+    -> map f1 ls = map f2 ls.
+Proof.
+  induct ls; simplify; equality.
+Qed.
+
+Lemma List_map_same : forall A (f1 f2 : A -> dyn) ls,
+    (forall x, f1 x = f2 x)
+    -> List (map f1 ls) = List (map f2 ls).
+Proof.
+  simplify.
+  f_equal.
+  apply map_same; assumption.
+Qed.
+
+Hint Immediate List_map_same : core.
+
+Theorem optimize_ok : forall xf x, interp (optimize xf) x = interp xf x.
+Proof.
+  induct xf; simplify; try equality.
+
+  {
+    cases (optimize xf1); optimize_ok;
+      (cases (optimize xf2); optimize_ok).
+
+    cases x; simplify; trivial.
+  }
+
+  {
+    cases (optimize xf); optimize_ok;
+      (cases x; optimize_ok).
+  }
+Qed.
+
+
 (** * Motivating continuations with search problems *)
+
+(* We're getting into advanced material here, so it may often make sense to stop
+ * before this point in a class presentation.  But, if you want to learn about
+ * one of the classic cool features of functional programming.... *)
 
 (* One fascinating flavor of first-class functions is *continuations*, which are
  * essentially functions that are meant to be called on the *results* of other

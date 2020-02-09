@@ -231,89 +231,59 @@ Qed.
 (** * A language of functions and its interpreter *)
 
 Inductive dyn :=
-| Failure
 | Bool (b : bool)
 | Number (n : nat)
-| Pair (d1 d2 : dyn)
 | List (ds : list dyn).
-
-Definition idIfList (x : dyn) : dyn :=
-  match x with
-  | List _ => x
-  | _ => Failure
-  end.
-
-Definition idIfBool (x : dyn) : dyn :=
-  match x with
-  | Bool _ => x
-  | _ => Failure
-  end.
 
 Definition dmap (f : dyn -> dyn) (x : dyn) : dyn :=
   match x with
   | List ds => List (map f ds)
-  | _ => Failure
+  | _ => x
   end.
 
 Definition dfilter (f : dyn -> dyn) (x : dyn) : dyn :=
   match x with
-  | List ds => List (filter (fun arg => match f arg with
+    List ds => List (filter (fun arg => match f arg with
                                         | Bool b => b
                                         | _ => false
                                         end) ds)
-  | _ => Failure
-  end.
-
-Definition dfold (f : dyn -> dyn) (x : dyn) : dyn :=
-  match x with
-  | Pair acc (List ds) =>
-    fold_left (fun arg acc' => f (Pair arg acc')) ds acc
-  | _ => Failure
+  | _ => x
   end.
 
 Definition disZero (x : dyn) : dyn :=
-  Bool (match x with
-        | Number 0 => true
-        | _ => false
-        end).
-
-Definition dadd (x : dyn) : dyn :=
   match x with
-  | Pair (Number n1) (Number n2) => Number (n1 + n2)
-  | _ => Failure
+  | Number 0 => Bool true
+  | Number _ => Bool false
+  | _ => x
   end.
 
 Definition dnot (x : dyn) : dyn :=
   match x with
   | Bool b => Bool (negb b)
-  | _ => Failure
+  | x => x
   end.
 
 Inductive xform :=
 | Identity
-| IdentityIfBool
-| IdentityIfList
 | Compose (xf1 xf2 : xform)
 | Map (xf1 : xform)
 | Filter (xf1 : xform)
-| Fold (xf1 : xform)
 
+| ConstantBool (b : bool)
+| ConstantNumber (n : nat)
 | IsZero
-| Add
 | Not.
 
 Fixpoint interp (xf : xform) : dyn -> dyn :=
   match xf with
   | Identity => id
-  | IdentityIfBool => idIfBool
-  | IdentityIfList => idIfList
   | Compose f1 f2 => compose (interp f1) (interp f2)
   | Map f => dmap (interp f)
   | Filter f => dfilter (interp f)
-  | Fold f => dfold (interp f)
 
+  | ConstantBool b => fun _ => Bool b
+  | ConstantNumber n => fun _ => Number n
   | IsZero => disZero
-  | Add => dadd
   | Not => dnot
   end.
 
@@ -326,14 +296,19 @@ Fixpoint optimize (xf : xform) : xform :=
     match optimize xf1, optimize xf2 with
     | Identity, xf2' => xf2'
     | xf1', Identity => xf1'
-    | Not, Not => IdentityIfBool
+    | Not, Not => Identity
     | Map xf1', Map xf2' => Map (Compose xf1' xf2')
     | xf1', xf2' => Compose xf1' xf2'
     end
   | Map xf1 =>
     match optimize xf1 with
-    | Identity => IdentityIfList
+    | Identity => Identity
     | xf1' => Map xf1'
+    end
+  | Filter xf1 =>
+    match optimize xf1 with
+    | ConstantBool true => Identity
+    | xf1' => Filter xf1'
     end
   | _ => xf
   end.
@@ -347,7 +322,7 @@ Ltac optimize_ok :=
          | [ H : forall x : dyn, _ = _ |- _ ] => rewrite <- H
          end; auto.
 
-Lemma dnot_dnot : forall d, dnot (dnot d) = idIfBool d.
+Lemma dnot_dnot : forall d, dnot (dnot d) = d.
 Proof.
   induct d; simplify; trivial.
 
@@ -383,7 +358,39 @@ Proof.
   apply map_same; assumption.
 Qed.
 
-Hint Immediate List_map_same : core.
+Lemma filter_same : forall A (f1 f2 : A -> bool) ls,
+    (forall x, f1 x = f2 x)
+    -> filter f1 ls = filter f2 ls.
+Proof.
+  induct ls; simplify; try equality.
+  rewrite H.
+  cases (f2 a); simplify; equality.
+Qed.
+
+Lemma List_filter_same : forall (f1 f2 : dyn -> bool) ls,
+    (forall x, f1 x = f2 x)
+    -> List (filter f1 ls) = List (filter f2 ls).
+Proof.
+  simplify.
+  f_equal.
+  apply filter_same; assumption.
+Qed.
+
+Hint Resolve List_map_same List_filter_same : core.
+
+Hint Extern 5 (_ = match _ with Bool _ => _ | _ => _ end) =>
+    match goal with
+    | [ H : forall x : dyn, _ |- _ ] => rewrite <- H
+    end : core.
+
+Lemma filter_ident : forall A (f : A -> bool) ls,
+    (forall x, f x = true)
+    -> filter f ls = ls.
+Proof.
+  induct ls; simplify; try equality.
+  rewrite H.
+  equality.
+Qed.
 
 Theorem optimize_ok : forall xf x, interp (optimize xf) x = interp xf x.
 Proof.
@@ -400,6 +407,118 @@ Proof.
     cases (optimize xf); optimize_ok;
       (cases x; optimize_ok).
   }
+
+  {
+    cases (optimize xf); optimize_ok;
+      (cases x; optimize_ok);
+      repeat match goal with
+             | [ |- context[match ?E with _ => _ end] ] => cases E; simplify; trivial
+             end; auto.
+    rewrite filter_ident; trivial.
+    intro.
+    rewrite <- IHxf.
+    trivial.
+  }
+Qed.
+
+(** ** Are these really optimizations?  Can they ever grow a term's size? *)
+
+Fixpoint size (xf : xform) : nat :=
+  match xf with
+  | Identity
+  | Not
+  | IsZero
+  | ConstantBool _
+  | ConstantNumber _ => 1
+
+  | Compose xf1 xf2 => 1 + size xf1 + size xf2
+  | Map xf
+  | Filter xf => 1 + size xf
+  end.
+
+Theorem optimize_optimizes : forall xf, size (optimize xf) <= size xf.
+Proof.
+  induct xf; simplify; try linear_arithmetic;
+    repeat match goal with
+           | [ |- context[match ?E with _ => _ end] ] =>
+             cases E; simplify; try linear_arithmetic
+           end.
+Qed.
+
+(** ** More interestingly, the same is true of the action of these
+       transformations on concrete values! *)
+
+Fixpoint sum (ls : list nat) : nat :=
+  match ls with
+  | nil => 0
+  | x :: ls' => x + sum ls'
+  end.
+
+Fixpoint dsize (d : dyn) : nat :=
+  match d with
+  | Bool _
+  | Number _ => 1
+  | List ds => 1 + sum (map dsize ds)
+  end.
+
+Lemma dsize_positive : forall d, 1 <= dsize d.
+Proof.
+  induct d; simplify; linear_arithmetic.
+Qed.
+
+Hint Immediate dsize_positive : core.
+
+Lemma sum_map_monotone : forall A (f1 f2 : A -> nat) ds,
+    (forall x, f1 x <= f2 x)
+    -> sum (map f1 ds) <= sum (map f2 ds).
+Proof.
+  induct ds; simplify; try linear_arithmetic; propositional.
+  specialize (H a).
+  linear_arithmetic.
+Qed.
+
+Lemma neverGrow_filter : forall f ds,
+    sum (map dsize (filter f ds)) <= sum (map dsize ds).
+Proof.
+  induct ds; simplify; try linear_arithmetic.
+  cases (f a); simplify; linear_arithmetic.
+Qed.
+
+Theorem neverGrow : forall xf x,
+    dsize (interp xf x) <= dsize x.
+Proof.
+  induct xf; simplify; try linear_arithmetic.
+
+  unfold id.
+  trivial.
+
+  unfold compose.
+  eauto using le_trans.
+
+  unfold dmap.
+  cases x; trivial.
+  simplify.
+  Search (S _ <= S _).
+  apply le_n_S.
+  apply sum_map_monotone.
+  trivial.
+
+  unfold dfilter.
+  cases x; trivial.
+  simplify.
+  apply le_n_S.
+  apply neverGrow_filter.
+
+  apply dsize_positive.
+
+  apply dsize_positive.
+
+  unfold disZero.
+  cases x; trivial.
+  cases n; trivial.
+
+  unfold dnot.
+  cases x; trivial.
 Qed.
 
 

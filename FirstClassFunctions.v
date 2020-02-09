@@ -164,7 +164,7 @@ Fixpoint sorted {A} (le : A -> A -> bool) (ls : list A) : bool :=
     end
   end.
 
-(* [insert] preserves sortedness.  Note the crucial hypothesis that comaprator
+(* [insert] preserves sortedness.  Note the crucial hypothesis that comparator
  * [le] is *total*: any two elements are related by it, in one order or the
  * other. *)
 Lemma insert_sorted : forall {A} (le : A -> A -> bool) a,
@@ -189,7 +189,7 @@ Proof.
   rewrite H3, H4; trivial.
   rewrite H1; simplify.
   trivial.
-Qed.  
+Qed.
 
 (* Main theorem: [insertion_sort] produces only sorted lists. *)
 Theorem insertion_sort_sorted : forall {A} (le : A -> A -> bool),

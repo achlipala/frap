@@ -97,7 +97,8 @@ Proof.
 
   equality.
 
-  linear_arithmetic.
+  rewrite IHe1, IHe2.
+  ring.
 Qed.
 (* Well, that's a relief! ;-) *)
 

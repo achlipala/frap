@@ -732,8 +732,6 @@ Fixpoint allSublists {A} (ls : list A) : list (list A) :=
 
 Compute allSublists [1; 2; 3].
 
-Definition sum ls := fold_left plus ls 0.
-
 (* This is the main function we want to define.  It looks for a sublist whose
  * sum matches some target. *)
 Fixpoint sublistSummingTo (ns : list nat) (target : nat) : option (list nat) :=
@@ -1075,16 +1073,16 @@ Fixpoint flattenKD {A} (fuel : nat) (t : tree A) (acc : list A)
 
 (* A somewhat peculiar notion of size for trees.  Why that 2 instead of 1?
  * Because it lets the proof below work out! *)
-Fixpoint size {A} (t : tree A) : nat :=
+Fixpoint tree_size {A} (t : tree A) : nat :=
   match t with
   | Leaf => 0
-  | Node l _ r => 2 + size l + size r
+  | Node l _ r => 2 + tree_size l + tree_size r
   end.
 
 Fixpoint continuation_size {A} (k : flatten_continuation A) : nat :=
   match k with
   | KDone => 0
-  | KMore l d k' => 1 + size l + continuation_size k'
+  | KMore l d k' => 1 + tree_size l + continuation_size k'
   end.
 
 (* A continuation encodes a flattening call, waiting to be run.
@@ -1100,7 +1098,7 @@ Fixpoint flatten_cont {A} (k : flatten_continuation A) : list A :=
  * *strong induction* via the parameter [fuel], which bounds the actual fuel
  * amount [fuel']. *)
 Lemma flattenKD_ok' : forall {A} fuel fuel' (t : tree A) acc k,
-    size t + continuation_size k < fuel' < fuel
+    tree_size t + continuation_size k < fuel' < fuel
     -> flattenKD fuel' t acc k
        = flatten_cont k ++ flatten t ++ acc.
 Proof.
@@ -1126,10 +1124,10 @@ Qed.
 (* A nice, simple final theorem can be stated, when we initialize fuel in the
  * right way. *)
 Theorem flattenKD_ok : forall {A} (t : tree A),
-    flattenKD (size t + 1) t [] KDone = flatten t.
+    flattenKD (tree_size t + 1) t [] KDone = flatten t.
 Proof.
   simplify.
-  rewrite flattenKD_ok' with (fuel := size t + 2).
+  rewrite flattenKD_ok' with (fuel := tree_size t + 2).
   simplify.
   apply app_nil_r.
   simplify.
@@ -1191,7 +1189,7 @@ Proof.
 Qed.
 
 Theorem flattenS_ok : forall {A} (t : tree A),
-    flattenS (size t + 1) t [] [] = flatten t.
+    flattenS (tree_size t + 1) t [] [] = flatten t.
 Proof.
   simplify.
   rewrite flattenS_flattenKD.

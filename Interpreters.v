@@ -97,7 +97,8 @@ Proof.
 
   equality.
 
-  linear_arithmetic.
+  rewrite IHe1, IHe2.
+  ring.
 Qed.
 (* Well, that's a relief! ;-) *)
 
@@ -309,7 +310,7 @@ Example factorial_ugly :=
  * them from our examples. *)
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.
-Declare Scope arith_scope.
+(*Declare Scope arith_scope.*)
 Infix "+" := Plus : arith_scope.
 Infix "-" := Minus : arith_scope.
 Infix "*" := Times : arith_scope.

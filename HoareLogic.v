@@ -170,7 +170,7 @@ Qed.
 (* BEGIN syntax macros that won't be explained *)
 Coercion Const : nat >-> exp.
 Coercion Var : string >-> exp.
-Declare Scope cmd_scope.
+(*Declare Scope cmd_scope.*)
 Notation "*[ e ]" := (Read e) : cmd_scope.
 Infix "+" := Plus : cmd_scope.
 Infix "-" := Minus : cmd_scope.
@@ -190,7 +190,7 @@ Notation "{{ I }} 'while' b 'loop' body 'done'" := (While_ I b body) (at level 7
 Notation "'assert' {{ I }}" := (Assert I) (at level 75).
 Delimit Scope cmd_scope with cmd.
 
-Declare Scope reset_scope.
+(*Declare Scope reset_scope.*)
 Infix "+" := plus : reset_scope.
 Infix "-" := Init.Nat.sub : reset_scope.
 Infix "*" := mult : reset_scope.

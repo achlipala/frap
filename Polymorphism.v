@@ -448,7 +448,7 @@ Inductive statement : Set :=
  * almost-natural-looking embedded programs in Coq. *)
 Coercion Const : nat >-> expression.
 Coercion Var : string >-> expression.
-Declare Scope embedded_scope.
+(*Declare Scope embedded_scope.*)
 Infix "+" := Plus : embedded_scope.
 Infix "-" := Minus : embedded_scope.
 Infix "*" := Times : embedded_scope.

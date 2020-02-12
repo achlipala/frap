@@ -101,7 +101,7 @@ Ltac instantiate_obviouses :=
 (** * Interlude: special notations and induction principle for [N] *)
 
 (* Note: recurse is an identifier, but we will always use the name "recurse" by convention *)
-Declare Scope N_recursion_scope.
+(*Declare Scope N_recursion_scope.*)
 Notation "recurse 'by' 'cases' | 0 => A | n + 1 => B 'end'" :=
   (N.recursion A (fun n recurse => B))
   (at level 11, A at level 200, n at level 0, B at level 200,

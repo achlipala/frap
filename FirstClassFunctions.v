@@ -230,10 +230,21 @@ Qed.
 
 (** * A language of functions and its interpreter *)
 
+(* Let's now work through an example of a language and its interpreter.
+ * Specifically, we'll define a language of first-class functions and
+ * higher-order functions.  It would be natural to make our language statically
+ * typed, but it turns out we need a bit more Coq sophistication to implement a
+ * proper interpreter for such an embedded language, which we'll postpone for
+ * module DependentInductiveTypes.  Instead, here's a simple "universal type"
+ * along the lines of dynamically typed languages like Python. *)
 Inductive dyn :=
 | Bool (b : bool)
 | Number (n : nat)
 | List (ds : list dyn).
+
+(* Next, we implement dynamic versions of a few handy library functions.
+ * Notice that they have arbitrary default behavior when passed improperly typed
+ * arguments. *)
 
 Definition dmap (f : dyn -> dyn) (x : dyn) : dyn :=
   match x with
@@ -263,6 +274,7 @@ Definition dnot (x : dyn) : dyn :=
   | x => x
   end.
 
+(* Here's our syntax-tree type for functions (transformations). *)
 Inductive xform :=
 | Identity
 | Compose (xf1 xf2 : xform)
@@ -274,10 +286,12 @@ Inductive xform :=
 | IsZero
 | Not.
 
+(* And here's our simple interpreter. *)
 Fixpoint transform (xf : xform) : dyn -> dyn :=
   match xf with
-  | Identity => id
+  | Identity => id (* from the Coq standard library *)
   | Compose f1 f2 => compose (transform f1) (transform f2)
+                     (* ditto for [compose] *)
   | Map f => dmap (transform f)
   | Filter f => dfilter (transform f)
 
@@ -290,6 +304,7 @@ Fixpoint transform (xf : xform) : dyn -> dyn :=
 Compute transform (Map IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
 Compute transform (Filter IsZero) (List [Number 0; Number 1; Number 2; Number 0; Number 3]).
 
+(* Here's a grab bag of optimizations of our programs. *)
 Fixpoint optimize (xf : xform) : xform :=
   match xf with
   | Compose xf1 xf2 =>
@@ -316,6 +331,9 @@ Fixpoint optimize (xf : xform) : xform :=
   | _ => xf
   end.
 
+(* This tactic turns out to work well to prove our optimizations correct.  We'll
+ * have to wait for module IntroToProofScripting to understand better what is
+ * going on. *)
 Ltac optimize_ok :=
   simplify; unfold compose, dmap in *;
   repeat match goal with
@@ -324,6 +342,8 @@ Ltac optimize_ok :=
   repeat match goal with
          | [ H : forall x : dyn, _ = _ |- _ ] => rewrite <- H
          end; auto.
+
+(* Now, a few useful alegbraic properties of our wrapper functions. *)
 
 Lemma dnot_dnot : forall d, dnot (dnot d) = d.
 Proof.
@@ -440,6 +460,7 @@ Fixpoint size (xf : xform) : nat :=
   | Filter xf => 1 + size xf
   end.
 
+(* Answer: no! *)
 Theorem optimize_optimizes : forall xf, size (optimize xf) <= size xf.
 Proof.
   induct xf; simplify; try linear_arithmetic;
@@ -464,6 +485,8 @@ Fixpoint dsize (d : dyn) : nat :=
   | Number _ => 1
   | List ds => 1 + sum (map dsize ds)
   end.
+
+(* Some lemmas first, and then the main theorem result *)
 
 Lemma dsize_positive : forall d, 1 <= dsize d.
 Proof.
@@ -589,13 +612,15 @@ Fixpoint seqself (c : cmd) (n : nat) : cmd :=
   | S n' => Sequence c (seqself c n')
   end.
 
-(* Now consider a more abstract way of describing optimizations concisely. *)
+(* Now consider a more abstract way of describing optimizations concisely.
+ * We package tree-rewriting functions of two kinds, in records. *)
 
 Record rule := {
   OnCommand : cmd -> cmd;
   OnExpression : arith -> arith
 }.
 
+(* Such a strategy can be applied *bottom-up* in a syntax tree. *)
 Fixpoint bottomUp (r : rule) (c : cmd) : cmd :=
   match c with
   | Skip => r.(OnCommand) Skip
@@ -604,6 +629,7 @@ Fixpoint bottomUp (r : rule) (c : cmd) : cmd :=
   | Repeat e body => r.(OnCommand) (Repeat (r.(OnExpression) e) (bottomUp r body))
   end.
 
+(* Here are a few handy *combinators* for building [rule]s. *)
 Definition crule (f : cmd -> cmd) : rule :=
   {| OnCommand := f; OnExpression := fun e => e |}.
 Definition erule (f : arith -> arith) : rule :=
@@ -612,6 +638,7 @@ Definition andThen (r1 r2 : rule) : rule :=
   {| OnCommand := compose r2.(OnCommand) r1.(OnCommand);
      OnExpression := compose r2.(OnExpression) r1.(OnExpression) |}.
 
+(* Two basic examples of rules *)
 Definition plus0 := erule (fun e =>
                              match e with
                              | Plus e' (Const 0) => e'
@@ -623,6 +650,7 @@ Definition unrollLoops := crule (fun c =>
                                    | _ => c
                                    end).
 
+(* Let's see what effects they have on simple examples. *)
 Compute bottomUp plus0
         (Sequence (Assign "x" (Plus (Var "x") (Const 0)))
                   (Assign "y" (Var "x"))).
@@ -637,9 +665,12 @@ Compute bottomUp (andThen plus0 unrollLoops)
                 (Sequence (Assign "x" (Plus (Var "x") (Const 0)))
                           (Assign "y" (Var "x")))).
 
+(* Here is a good semantic correctness notion for rules. *)
 Definition correct (r : rule) :=
   (forall c v, exec (r.(OnCommand) c) v = exec c v)
   /\ (forall e v, interp (r.(OnExpression) e) v = interp e v).
+
+(* Some theorems for proving correctness of our combinators *)
 
 Theorem crule_correct : forall f,
     (forall c v, exec (f c) v = exec c v)
@@ -663,6 +694,7 @@ Proof.
   unfold andThen; first_order; simplify; eauto using eq_trans.
 Qed.
 
+(* A bottom-up traversal with a correct rule is also correct. *)
 Theorem bottomUp_correct : forall r,
     correct r
     -> forall c v, exec (bottomUp r c) v = exec c v.
@@ -687,6 +719,8 @@ Proof.
   trivial.
 Qed.
 
+(* A twist: we can also package bottom-up traversal as a rule in its own right,
+ * which can then be used in other bottom-up traversals! *)
 Definition rBottomUp (r : rule) : rule :=
   {| OnCommand := bottomUp r;
      OnExpression := r.(OnExpression) |}.
@@ -700,6 +734,9 @@ Proof.
   unfold correct; propositional.
 Qed.
 
+(* This example demonstrates how this kind of nested traversal can find
+ * additional optimizations.  Watch as the program shrinks while we ratchet up
+ * the level of nesting. *)
 Definition zzz := Assign "x" (Plus (Plus (Plus (Var "x") (Const 0)) (Const 0)) (Const 0)).
 
 Compute bottomUp plus0 zzz.

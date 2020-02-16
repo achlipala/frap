@@ -413,7 +413,7 @@ $$\begin{array}{rrcl}
 
 Note how the applicability of the semiring theory is incomparable to the applicability of the linear-arithmetic theory.
 That is, while some goals are provable via either, some are provable only via the semiring theory and some provable only by linear arithmetic.
-For instance, by the semiring theory, we can prove $x \times y = y \times x$, while linear arithmetic can prove $x - x = 0$.
+For instance, by the semiring theory, we can prove $x(y + z) = xy + xz$, while linear arithmetic can prove $x - x = 0$.
 
 \section{Simplification and Rewriting}
 
@@ -456,7 +456,7 @@ We have $x$ as a variable of the metalanguage, while $\mathsf{Var}(x)$ is a vari
 It is difficult to use English to explain the distinction between the two in complete formality, but be on the lookout for places where formulas mix concepts of the metalanguage and object language!
 The general patterns should soon become clear, as they are somehow already familiar to us from natural-language sentences like:
 \begin{quote}
-  The wise man said ``it is time to prove some theorems.''
+  The wise man said, ``it is time to prove some theorems.''
 \end{quote}
 The quoted remark could just as well be in Spanish instead of English, in which case we have two languages nested in a nontrivial way.
 
@@ -544,7 +544,7 @@ There is also a dual implementation where we enqueue to list backs and dequeue f
 
 Proofs of the algebraic laws, for both implementations, appear in the associated Coq code.
 Both versions actually take quadratic time in practice, assuming concatenation takes time linear in the length of its first argument.
-There is a famous, more clever implementation that achieves amortized\index{amortized time} linear time, but we will need to expand our algebraic style to accommodate it.
+There is a famous, more clever implementation that achieves amortized\index{amortized time} constant time (linear time to run a whole sequence of operations), but we will need to expand our algebraic style to accommodate it.
 
 
 \section{Algebraic Interfaces with Custom Equivalence Relations}

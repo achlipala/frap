@@ -29,7 +29,7 @@ Inductive fact_state :=
  * throughout recursive invocations of a predicate (though this definition does
  * not use recursion).  After the colon, we give a type that expresses which
  * additional arguments exist, followed by [Prop] for "proposition."
- * Putting this inductive definition in [Prop] is what marks at as a predicate.
+ * Putting this inductive definition in [Prop] is what marks it as a predicate.
  * Our prior definitions have implicitly been in [Set], the normal universe
  * of mathematical objects. *)
 Inductive fact_init (original_input : nat) : fact_state -> Prop :=

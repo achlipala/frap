@@ -182,7 +182,7 @@ Section propositional.
   Admitted.
 End propositional.
 
-(* Backrtracking example #1 *)
+(* Backtracking example #1 *)
 
 Theorem m1 : True.
 Proof.

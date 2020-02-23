@@ -483,6 +483,25 @@ Goal False.
   length (1 :: 2 :: 3 :: nil) ltac:(fun n => pose n).
 Abort.
 
+(* However, it's not always convenient to use continuation passing style
+ * everywhere, so cool kids use the following hack to sneak side effects
+ * into otherwise functional Ltac code: *)
+Module Import WithPrintingFixedWithoutContinuations.
+  Ltac length ls :=
+    let __ := match constr:(Set) with
+              | _ => (* put all your side effects here:*)
+                     idtac ls; assert (ls = ls) by equality
+              end in
+    match ls with
+    | nil => constr:(O)
+    | _ :: ?ls' => let L := length ls' in constr:(S L)
+    end.
+End WithPrintingFixedWithoutContinuations.
+
+Goal False.
+  let n := length (1 :: 2 :: 3 :: nil) in
+  pose n.
+Abort.
 
 (** * Recursive Proof Search *)
 

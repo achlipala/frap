@@ -150,7 +150,7 @@ Module Algebraic.
     Definition empty A : t A := [].
     Definition enqueue A (q : t A) (x : A) : t A := q ++ [x].
 
-    (* [dequeue] is now constant time, with no recursion and just a single
+    (* [dequeue] is now constant-time, with no recursion and just a single
      * pattern match. *)
     Definition dequeue A (q : t A) : option (t A * A) :=
       match q with

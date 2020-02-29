@@ -360,7 +360,7 @@ Qed.
 (* Automated proofs used here, if only to save time in class.
  * See book code for more manual proofs, too. *)
 
-Hint Constructors trc step eval.
+Hint Constructors trc step eval : core.
 
 Theorem big_small : forall v c v', eval v c v'
   -> step^* (v, c) (v', Skip).
@@ -430,8 +430,8 @@ Proof.
   assumption.
 Qed.
 
-Hint Constructors isEven.
-Hint Resolve isEven_minus2 isEven_plus.
+Hint Constructors isEven : core.
+Hint Resolve isEven_minus2 isEven_plus : core.
 
 Definition my_loop :=
   while "n" loop
@@ -581,7 +581,7 @@ Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
 
 (* We can prove equivalence between the two formulations. *)
 
-Hint Constructors plug step0 cstep.
+Hint Constructors plug step0 cstep : core.
 
 Theorem step_cstep : forall v c v' c',
   step (v, c) (v', c')
@@ -614,176 +614,6 @@ Admitted.
 
 
 
-
-
-(** * Example of how easy it is to add concurrency to a contextual semantics *)
-
-Module Concurrent.
-  (* Let's add a construct for *parallel execution* of two commands.  Such
-   * parallelism may be nested arbitrarily. *)
-  Inductive cmd :=
-  | Skip
-  | Assign (x : var) (e : arith)
-  | Sequence (c1 c2 : cmd)
-  | If (e : arith) (then_ else_ : cmd)
-  | While (e : arith) (body : cmd)
-  | Parallel (c1 c2 : cmd).
-
-  Notation "x <- e" := (Assign x e%arith) (at level 75).
-  Infix ";;" := Sequence (at level 76). (* This one changed slightly, to avoid parsing clashes. *)
-  Notation "'when' e 'then' then_ 'else' else_ 'done'" := (If e%arith then_ else_) (at level 75, e at level 0).
-  Notation "'while' e 'loop' body 'done'" := (While e%arith body) (at level 75).
-  Infix "||" := Parallel.
-
-
-  (* We need surprisingly few changes to the contextual semantics, to explain
-   * this new feature.  First, we allow a hole to appear on *either side* of a
-   * [Parallel].  In other words, the "scheduler" may choose either "thread" to
-   * run next. *)
-  Inductive context :=
-  | Hole
-  | CSeq (C : context) (c : cmd)
-  | CPar1 (C : context) (c : cmd)
-  | CPar2 (c : cmd) (C : context).
-
-  (* We explain the meaning of plugging the new contexts in the obvious way. *)
-  Inductive plug : context -> cmd -> cmd -> Prop :=
-  | PlugHole : forall c, plug Hole c c
-  | PlugSeq : forall c C c' c2,
-    plug C c c'
-    -> plug (CSeq C c2) c (Sequence c' c2)
-  | PlugPar1 : forall c C c' c2,
-    plug C c c'
-    -> plug (CPar1 C c2) c (Parallel c' c2)
-  | PlugPar2 : forall c C c' c1,
-    plug C c c'
-    -> plug (CPar2 c1 C) c (Parallel c1 c').
-
-  (* The only new step rules are for "cleaning up" finished "threads," which
-   * have reached the point of being [Skip] commands. *)
-  Inductive step0 : valuation * cmd -> valuation * cmd -> Prop :=
-  | Step0Assign : forall v x e,
-    step0 (v, Assign x e) (v $+ (x, interp e v), Skip)
-  | Step0Seq : forall v c2,
-    step0 (v, Sequence Skip c2) (v, c2)
-  | Step0IfTrue : forall v e then_ else_,
-    interp e v <> 0
-    -> step0 (v, If e then_ else_) (v, then_)
-  | Step0IfFalse : forall v e then_ else_,
-    interp e v = 0
-    -> step0 (v, If e then_ else_) (v, else_)
-  | Step0WhileTrue : forall v e body,
-    interp e v <> 0
-    -> step0 (v, While e body) (v, Sequence body (While e body))
-  | Step0WhileFalse : forall v e body,
-    interp e v = 0
-    -> step0 (v, While e body) (v, Skip)
-  | Step0Par1 : forall v c,
-    step0 (v, Parallel Skip c) (v, c).
-
-  Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
-  | CStep : forall C v c v' c' c1 c2,
-    plug C c c1
-    -> step0 (v, c) (v', c')
-    -> plug C c' c2
-    -> cstep (v, c1) (v', c2).
-
-  (** Example: stepping a specific program. *)
-
-  (* Here's the classic cautionary-tale program about remembering to lock your
-   * concurrent threads. *)
-  Definition prog :=
-    ("a" <- "n";;
-     "n" <- "a" + 1)
-    || ("b" <- "n";;
-        "n" <- "b" + 1).
-
-  Hint Constructors plug step0 cstep.
-
-  (* The naive "expected" answer is attainable. *)
-  Theorem correctAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
-                                              /\ v $? "n" = Some (n + 2).
-  Proof.
-    eexists; propositional.
-    unfold prog.
-
-    econstructor.
-    eapply CStep with (C := CPar1 (CSeq Hole _) _); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar1 Hole _); eauto.
-
-    econstructor.
-    eapply CStep with (C := CPar1 Hole _); eauto.
-
-    econstructor.
-    eapply CStep with (C := Hole); eauto.
-
-    econstructor.
-    eapply CStep with (C := CSeq Hole _); eauto.
-
-    econstructor.
-    eapply CStep with (C := Hole); eauto.
-
-    econstructor.
-    eapply CStep with (C := Hole); eauto.
-
-    econstructor.
-
-    simplify.
-    f_equal.
-    ring.
-  Qed.
-
-  (* But so is the "wrong" answer! *)
-  Theorem wrongAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
-                                            /\ v $? "n" = Some (n + 1).
-  Proof.
-    eexists; propositional.
-    unfold prog.
-  Admitted.
-
-
-  (** Proving equivalence with non-contextual semantics *)
-
-  (* To give us something interesting to prove, let's also define a
-   * non-contextual small-step semantics.  Note how we have to do some more
-   * explicit threading of mutable state through recursive invocations. *)
-  Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
-  | StepAssign : forall v x e,
-    step (v, Assign x e) (v $+ (x, interp e v), Skip)
-  | StepSeq1 : forall v c1 c2 v' c1',
-    step (v, c1) (v', c1')
-    -> step (v, Sequence c1 c2) (v', Sequence c1' c2)
-  | StepSeq2 : forall v c2,
-    step (v, Sequence Skip c2) (v, c2)
-  | StepIfTrue : forall v e then_ else_,
-    interp e v <> 0
-    -> step (v, If e then_ else_) (v, then_)
-  | StepIfFalse : forall v e then_ else_,
-    interp e v = 0
-    -> step (v, If e then_ else_) (v, else_)
-  | StepWhileTrue : forall v e body,
-    interp e v <> 0
-    -> step (v, While e body) (v, Sequence body (While e body))
-  | StepWhileFalse : forall v e body,
-    interp e v = 0
-    -> step (v, While e body) (v, Skip)
-  | StepParSkip1 : forall v c,
-    step (v, Parallel Skip c) (v, c)
-  | StepPar1 : forall v c1 c2 v' c1',
-    step (v, c1) (v', c1')
-    -> step (v, Parallel c1 c2) (v', Parallel c1' c2)
-  | StepPar2 : forall v c1 c2 v' c2',
-    step (v, c2) (v', c2')
-    -> step (v, Parallel c1 c2) (v', Parallel c1 c2').
-
-  Hint Constructors step.
-
-  (* Now, an automated proof of equivalence.  Actually, it's *exactly* the same
-   * proof we used for the old feature set!  For full dramatic effect, copy and
-   * paste here from above. *)
-End Concurrent.
 
 
 (** * Determinism *)
@@ -837,3 +667,91 @@ Proof.
   apply cstep_step.
   eassumption.
 Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(** * Example of how easy it is to add concurrency to a contextual semantics *)
+
+(** At this point, we add concurrency to the code we already wrote above. *)
+
+(*
+(* Here's the classic cautionary-tale program about remembering to lock your
+ * concurrent threads. *)
+Definition prog :=
+  ("a" <- "n";;
+   "n" <- "a" + 1)
+  || ("b" <- "n";;
+      "n" <- "b" + 1).
+
+Hint Constructors plug step0 cstep : core.
+
+(* The naive "expected" answer is attainable. *)
+Theorem correctAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
+                                            /\ v $? "n" = Some (n + 2).
+Proof.
+  eexists; propositional.
+  unfold prog.
+
+  econstructor.
+  eapply CStep with (C := CPar1 (CSeq Hole _) _); eauto.
+
+  econstructor.
+  eapply CStep with (C := CPar1 Hole _); eauto.
+
+  econstructor.
+  eapply CStep with (C := CPar1 Hole _); eauto.
+
+  econstructor.
+  eapply CStep with (C := Hole); eauto.
+
+  econstructor.
+  eapply CStep with (C := CSeq Hole _); eauto.
+
+  econstructor.
+  eapply CStep with (C := Hole); eauto.
+
+  econstructor.
+  eapply CStep with (C := Hole); eauto.
+
+  econstructor.
+
+  simplify.
+  f_equal.
+  ring.
+Qed.
+
+(* But so is the "wrong" answer! *)
+Theorem wrongAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
+                                          /\ v $? "n" = Some (n + 1).
+Proof.
+  eexists; propositional.
+  unfold prog.
+Admitted.
+*)

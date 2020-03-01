@@ -44,7 +44,7 @@ Qed.
  * automate searching through sequences of that kind, when we prime it with good
  * suggestions of single proof steps to try, as with this command: *)
 
-Hint Constructors plusR.
+Hint Constructors plusR : core.
 
 (* That is, every constructor of [plusR] should be considered as an atomic proof
  * step, from which we enumerate step sequences. *)
@@ -205,7 +205,7 @@ SearchRewrite (O + _).
  * as a candidate step for any leaf of a proof tree, meaning that all premises
  * of the rule need to match hypotheses. *)
 
-Hint Immediate plus_O_n.
+Hint Immediate plus_O_n : core.
 
 (* The counterpart to [PlusS] we will prove ourselves. *)
 
@@ -219,7 +219,7 @@ Qed.
 (* The command [Hint Resolve] adds a new candidate proof step, to be attempted
  * at any level of a proof tree, not just at leaves. *)
 
-Hint Resolve plusS.
+Hint Resolve plusS : core.
 
 (* Now that we have registered the proper hints, we can replicate our previous
  * examples with the normal, functional addition [plus]. *)
@@ -251,7 +251,7 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Resolve plusO.
+Hint Resolve plusO : core.
 
 (* Note that, if we consider the inputs to [plus] as the inputs of a
  * corresponding logic program, the new rule [plusO] introduces an ambiguity.
@@ -276,7 +276,7 @@ Check eq_trans.
  * effects of an unfortunate hint choice. *)
 
 Section slow.
-  Hint Resolve eq_trans.
+  Hint Resolve eq_trans : core.
 
   (* The following fact is false, but that does not stop [eauto] from taking a
    * very long time to search for proofs of it.  We use the handy [Time] command
@@ -367,7 +367,7 @@ Proof.
   simplify; equality.
 Qed.
 
-Hint Resolve length_O length_S.
+Hint Resolve length_O length_S : core.
 
 (* Let us apply these hints to prove that a [list nat] of length 2 exists.
  * (Here we register [length_O] with [Hint Resolve] instead of [Hint Immediate]
@@ -383,9 +383,9 @@ Proof.
    * type were left undetermined, by the end of the proof.  Specifically, these
    * variables stand for the 2 elements of the list we find.  Of course it makes
    * sense that the list length follows without knowing the data values.  In Coq
-   * 8.6, the [Unshelve] command brings these goals to the forefront, where we
-   * can solve each one with [exact O], but usually it is better to avoid
-   * getting to such a point.
+   * 8.6 and up, the [Unshelve] command brings these goals to the forefront,
+   * where we can solve each one with [exact O], but usually it is better to
+   * avoid getting to such a point.
    *
    * To debug such situations, it can be helpful to print the current internal
    * representation of the proof, so we can see where the unification variables
@@ -424,17 +424,17 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Resolve plusO'.
+Hint Resolve plusO' : core.
 
 (* Finally, we meet [Hint Extern], the command to register a custom hint.  That
  * is, we provide a pattern to match against goals during proof search.
  * Whenever the pattern matches, a tactic (given to the right of an arrow [=>])
  * is attempted.  Below, the number [1] gives a priority for this step.  Lower
  * priorities are tried before higher priorities, which can have a significant
- * effect on proof search time, i.e. when we manage to give lower priorities to
+ * effect on proof-search time, i.e. when we manage to give lower priorities to
  * the cheaper rules. *)
 
-Hint Extern 1 (sum _ = _) => simplify.
+Hint Extern 1 (sum _ = _) => simplify : core.
 
 (* Now we can find a length-2 list whose sum is 0. *)
 
@@ -497,7 +497,7 @@ Inductive eval (var : nat) : exp -> nat -> Prop :=
   -> eval var e2 n2
   -> eval var (Plus e1 e2) (n1 + n2).
 
-Hint Constructors eval.
+Hint Constructors eval : core.
 
 (* We can use [auto] to execute the semantics for specific expressions. *)
 
@@ -531,13 +531,13 @@ Proof.
   simplify; subst; auto.
 Qed.
 
-Hint Resolve EvalPlus'.
+Hint Resolve EvalPlus' : core.
 
 (* Further, we instruct [eauto] to apply [ring], via [Hint Extern].  We should
  * try this step for any equality goal. *)
 
 Section use_ring.
-  Hint Extern 1 (_ = _) => ring.
+  Hint Extern 1 (_ = _) => ring : core.
 
   (* Now we can return to [eval1'] and prove it automatically. *)
 
@@ -597,7 +597,7 @@ Proof.
   simplify; subst; auto.
 Qed.
 
-Hint Resolve EvalConst' EvalVar'.
+Hint Resolve EvalConst' EvalVar' : core.
 
 (* Next, we prove a few hints that feel a bit like cheating, as they telegraph
  * the procedure for choosing values of [k] and [n].  Nonetheless, with these
@@ -629,7 +629,7 @@ Section cheap_hints.
     simplify; ring.
   Qed.
 
-  Hint Resolve zero_times plus_0 times_1 combine.
+  Hint Resolve zero_times plus_0 times_1 combine : core.
 
   Theorem linear : forall e, exists k n,
     forall var, eval var e (k * var + n).
@@ -673,14 +673,14 @@ Ltac robust_ring_simplify :=
 
 (* This tactic is pretty expensive, but let's try it eventually whenever the
  * goal is an equality. *)
-Hint Extern 5 (_ = _) => robust_ring_simplify.
+Hint Extern 5 (_ = _) => robust_ring_simplify : core.
 
 (* The only other missing ingredient is priming Coq with some good ideas for
  * instantiating existential quantifiers.  These will all be tried in some
  * order, in a particular proof search. *)
-Hint Extern 1 (exists n : nat, _) => exists 0.
-Hint Extern 1 (exists n : nat, _) => exists 1.
-Hint Extern 1 (exists n : nat, _) => eexists (_ + _).
+Hint Extern 1 (exists n : nat, _) => exists 0 : core.
+Hint Extern 1 (exists n : nat, _) => exists 1 : core.
+Hint Extern 1 (exists n : nat, _) => eexists (_ + _) : core.
 (* Note how this last hint uses [eexists] to provide an instantiation with
  * wildcards inside it.  Each underscore is replaced with a fresh unification
  * variable. *)
@@ -695,9 +695,9 @@ Qed.
 (* Here's a quick tease using a feature that we'll explore fully in a later
  * class.  Let's use a mysterious construct [sigT] instead of [exists]. *)
 
-Hint Extern 1 (sigT (fun n : nat => _)) => exists 0.
-Hint Extern 1 (sigT (fun n : nat => _)) => exists 1.
-Hint Extern 1 (sigT (fun n : nat => _)) => eexists (_ + _).
+Hint Extern 1 (sigT (fun n : nat => _)) => exists 0 : core.
+Hint Extern 1 (sigT (fun n : nat => _)) => exists 1 : core.
+Hint Extern 1 (sigT (fun n : nat => _)) => eexists (_ + _) : core.
 
 Theorem linear_computable : forall e, sigT (fun k => sigT (fun n =>
   forall var, eval var e (k * var + n))).
@@ -745,7 +745,7 @@ Section side_effect_sideshow.
   Qed.
 
   (* That was easy enough.  [eauto] could have solved the whole thing, but humor
-   * me by considering this slightly less automated proof.  Watch what happens
+   * me by considering this slightly less-automated proof.  Watch what happens
    * when we add a new premise. *)
 
   Variable z : A.
@@ -814,7 +814,7 @@ Abort.
  * restatement of the theorem we mean to prove.  Luckily, a simpler form
  * suffices, by appealing to the [equality] tactic. *)
 
-Hint Extern 1 (_ <> _) => equality.
+Hint Extern 1 (_ <> _) => equality : core.
 
 Theorem bool_neq : true <> false.
 Proof.
@@ -843,7 +843,7 @@ Section forall_and.
     Hint Extern 1 (P ?X) =>
       match goal with
         | [ H : forall x, P x /\ _ |- _ ] => apply (proj1 (H X))
-      end.
+      end : core.
 
     auto.
   Qed.
@@ -859,7 +859,7 @@ End forall_and.
 Fail Hint Extern 1 (?P ?X) =>
   match goal with
     | [ H : forall x, P x /\ _ |- _ ] => apply (proj1 (H X))
-  end.
+  end : core.
 
 (* Coq's [auto] hint databases work as tables mapping _head symbols_ to lists of
  * tactics to try.  Because of this, the constant head of an [Extern] pattern
@@ -874,7 +874,7 @@ Fail Hint Extern 1 (?P ?X) =>
 Hint Extern 1 =>
   match goal with
     | [ H : forall x, ?P x /\ _ |- ?P ?X ] => apply (proj1 (H X))
-  end.
+  end : core.
 
 (* Be forewarned that a [Hint Extern] of this kind will be applied at _every_
  * node of a proof tree, so an expensive Ltac script may slow proof search

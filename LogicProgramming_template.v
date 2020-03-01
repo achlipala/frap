@@ -83,7 +83,7 @@ Admitted.
 Check eq_trans.
 
 Section slow.
-  Hint Resolve eq_trans.
+  Hint Resolve eq_trans : core.
 
   Example zero_minus_one : exists x, 1 + x = 0.
     Time eauto 1.
@@ -173,7 +173,7 @@ Inductive eval (var : nat) : exp -> nat -> Prop :=
   -> eval var e2 n2
   -> eval var (Plus e1 e2) (n1 + n2).
 
-Hint Constructors eval.
+Hint Constructors eval : core.
 
 Example eval1 : forall var, eval var (Plus Var (Plus (Const 8) Var)) (var + (8 + var)).
 Proof.

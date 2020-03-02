@@ -518,7 +518,8 @@ Ltac inster n :=
         end
     end.
 
-(* Important: when one recursive call fails, the backtracking semantics of
+(* Important: when one recursive call fails (happens when [n] reaches zero and
+ * [intuition] leaves some open goals), the backtracking semantics of
  * [match goal] cause us to try the next instantiation! *)
 
 Section test_inster.

@@ -85,6 +85,8 @@ Proof.
 Qed.
 
 (* Transitive-reflexive closure is so common that it deserves a shorthand notation! *)
+Set Warnings "-notation-overridden". (* <-- needed while we play with defining one
+                                      * of the book's notations ourselves locally *)
 Notation "R ^*" := (trc R) (at level 0).
 
 (* Now let's use it to execute the factorial program. *)

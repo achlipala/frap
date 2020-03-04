@@ -3,6 +3,8 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
+Set Warnings "-notation-overridden". (* <-- needed while we play with defining one
+                                      * of the book's notations ourselves locally *)
 Require Import Frap TransitionSystems.
 
 Set Implicit Arguments.
@@ -175,28 +177,64 @@ Qed.
 Theorem factorial_ok_2 :
   invariantFor (factorial_sys 2) (fact_correct 2).
 Proof.
-Admitted.
+  simplify.
+  eapply invariant_weaken.
 
+  apply multiStepClosure_ok.
+  simplify.
+  rewrite fact_init_is.
 
+  eapply MscStep.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_empty.
+  simplify.
 
+  eapply MscStep.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_empty.
+  simplify.
 
+  eapply MscStep.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_split.
+  simplify.
+  invert H.
+  simplify.
+  apply singleton_in.
+  apply oneStepClosure_empty.
+  simplify.
 
+  apply MscDone.
+  apply prove_oneStepClosure; simplify.
+  assumption.
+  propositional; subst; invert H0; simplify; propositional.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  simplify.
+  unfold fact_correct.
+  propositional; subst; trivial.
+Qed.
 
 (* BEGIN CODE THAT WILL NOT BE EXPLAINED IN DETAIL! *)
 
@@ -404,25 +442,10 @@ Proof.
   assumption.
 Qed.
 
-Theorem add2_ok :
+(*Theorem add2_ok :
   invariantFor add2_sys add2_correct.
 Proof.
-Admitted.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Admitted.*)
 
 Inductive add2_bthread :=
 | BRead
@@ -488,7 +511,7 @@ Qed.
 Hint Rewrite add2_init_is.
 
 (* Now, let's verify the original system. *)
-(*Theorem add2_ok :
+Theorem add2_ok :
   invariantFor add2_sys add2_correct.
 Proof.
   (* First step: strengthen the invariant.  We leave an underscore for the
@@ -597,7 +620,7 @@ Proof.
 
   invert H1.
   propositional.
-Qed.*)
+Qed.
 
 
 (** * Another abstraction example *)
@@ -1373,35 +1396,17 @@ Qed.
 Theorem twoadd2_ok :
   invariantFor (parallel twoadd_sys twoadd_sys) (twoadd_correct (private := _)).
 Proof.
-Admitted.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  eapply invariant_weaken.
+  eapply invariant_simulates.
+  apply withInterference_abstracts.
+  apply withInterference_parallel.
+  apply twoadd_ok.
+  apply twoadd_ok.
+  
+  unfold twoadd_correct.
+  invert 1.
+  assumption.
+Qed.
 
 (* In fact, this modularity technique is so powerful that we now get correctness
  * for any number of threads, "for free"!  Here's a tactic definition, which we

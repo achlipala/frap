@@ -3,6 +3,8 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
+Set Warnings "-notation-overridden". (* <-- needed while we play with defining one
+                                      * of the book's notations ourselves locally *)
 Require Import Frap TransitionSystems.
 
 Set Implicit Arguments.

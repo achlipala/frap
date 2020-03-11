@@ -901,7 +901,7 @@ Compute tempVar 2.
  * lack of clashes.  We also prove some properties that will come in handy
  * later. *)
 
-Fixpoint noUnderscoreVar (x : var) : bool :=
+Definition noUnderscoreVar (x : var) : bool :=
   match x with
   | String "_" _ => false
   | _ => true

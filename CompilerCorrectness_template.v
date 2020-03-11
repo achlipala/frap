@@ -613,7 +613,7 @@ Compute tempVar 0.
 Compute tempVar 1.
 Compute tempVar 2.
 
-Fixpoint noUnderscoreVar (x : var) : bool :=
+Definition noUnderscoreVar (x : var) : bool :=
   match x with
   | String "_" _ => false
   | _ => true

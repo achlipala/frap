@@ -23,3 +23,5 @@ Deeper.ml*
 DeeperWithFail.ml*
 *.dir-locals.el
 *.cache
+fraplib
+fraplib.tgz

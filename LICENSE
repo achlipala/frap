@@ -1,0 +1,59 @@
+"Formal Reasoning About Programs" code license information
+<http://adam.chlipala.net/frap/>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+CAUTION: Most of the source files in this distribution are NOT
+open-source in the usual sense.  See the comment at the beginning of
+each source file for its license, which is Creative Commons, oriented
+more toward free distribution of books than the usual collaborative
+model of open-source software.  The author really is trying to keep
+you from remixing your own versions of the book.
+
+However, a few of the library modules used here are sufficiently
+useful that they are released separately under a BSD license, included
+below.  However, the author's advice is: please don't use these
+library modules in real projects.  They are not designed for any use
+beside getting the reader up and running quickly in reading the book,
+sacrificing practicality (and minimal use of axioms) for simplicity.
+
+The following license applies ONLY to the source files:
+Relations.v
+Map.v
+Var.v
+Invariant.v
+ModelCheck.v
+FrapWithoutSets.v
+Sets.v
+Frap.v
+AbstractInterpret.v
+SepCancel.v
+
+~~~~~~~~~~~
+BSD LICENSE
+~~~~~~~~~~~
+
+Copyright (c) 2016-2020, Adam Chlipala
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+- The names of contributors may not be used to endorse or promote products
+  derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.

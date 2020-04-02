@@ -138,8 +138,10 @@ Inductive hoare_triple : assertion -> cmd -> assertion -> Prop :=
   -> hoare_triple P' c Q'.
 
 (* Let's prove that the intuitive description given above really applies to this
- * predicate.  First, a lemma, which is difficult to summarize intuitively!
- * More or less precisely this obligation shows up in the main proof below. *)
+ * predicate.  First, a helper lemma which we will need in the main proof below.
+ * It says that if the loop body preserves the invariant, and executing the loop
+ * terminates, then after executing the loop, the invariant still holds, and the
+ * loop condition is false. *)
 Lemma hoare_triple_big_step_while: forall (I : assertion) b c,
   (forall h v h' v', exec h v c h' v'
                      -> I h v

@@ -3251,7 +3251,7 @@ $$\infer{\bigstep{(h, v, \{I\} \while{b}{c})}{(h', v')}}{
   \denote{b}(h, v)
   & \bigstep{(h, v, c; \{I\} \while{b}{c})}{(h', v')}
 }
-\quad \infer{\bigstep{(h, v, \while{b}{c})}{(h, v)}}{
+\quad \infer{\bigstep{(h, v, \{I\} \while{b}{c})}{(h, v)}}{
   \neg \denote{b}(h, v)
 }$$
 

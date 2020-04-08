@@ -1,3 +1,5 @@
+open DeeperWithFail
+
 let rec i2n n =
   match n with
   | 0 -> O

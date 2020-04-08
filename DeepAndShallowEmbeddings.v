@@ -332,7 +332,7 @@ Module Deep.
   | Write (a v : nat) : cmd unit.
 
   (* These constructors are most easily explained through examples.  We'll
-   * translate both of the programs from the shallowly embedding above. *)
+   * translate both of the programs from the shallow embedding above. *)
 
   Notation "x <- c1 ; c2" := (Bind c1 (fun x => c2)) (right associativity, at level 80).
 

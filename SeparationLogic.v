@@ -12,8 +12,8 @@ Set Asymmetric Patterns.
 
 Definition heap := fmap nat nat.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -181,7 +181,7 @@ Module Import S <: SEP.
     t.
   Qed.
 
-  Hint Resolve split_empty_bwd'.
+  Hint Resolve split_empty_bwd' : core.
 
   Theorem extra_lift : forall (P : Prop) p,
     P
@@ -376,7 +376,7 @@ Proof.
   unfold star, himp in *; simp; eauto 7.
 Qed.
 
-Hint Constructors hoare_triple.
+Hint Constructors hoare_triple : core.
 
 Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
   hoare_triple P (Bind c1 c2) Q
@@ -785,7 +785,7 @@ Proof.
   eauto using deallocate_None.
 Qed.
 
-Hint Constructors step.
+Hint Constructors step : core.
 
 Lemma progress : forall {result} (c : cmd result) P Q,
     hoare_triple P c Q
@@ -1151,7 +1151,7 @@ Proof.
   heq; cases ls; cancel.
 Qed.
 
-Theorem linkedList_nonnull : forall p ls,
+Theorem linkedList_nonnull : forall {p ls},
   p <> 0
   -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |--> [x; p'] * linkedList p' ls'.
 Proof.
@@ -1210,14 +1210,14 @@ Proof.
   (* We use [setoid_rewrite] for rewriting under binders ([exists], in this
    * case).  Note that we also specify hypothesis [n] explicitly, since
    * [setoid_rewrite] isn't smart enough to infer parameters otherwise. *)
-  setoid_rewrite (linkedList_nonnull _ n).
+  setoid_rewrite (linkedList_nonnull n).
   step.
   simp.
   step.
   step.
   simp.
   step.
-  setoid_rewrite (linkedList_nonnull _ n).
+  setoid_rewrite (linkedList_nonnull n).
   cancel.
   simp.
   setoid_rewrite linkedList_null.
@@ -1313,7 +1313,7 @@ Proof.
   simp.
 Qed.
 
-Hint Resolve move_along.
+Hint Resolve move_along : core.
 
 Theorem length_ok : forall p ls,
   {{linkedList p ls}}
@@ -1344,12 +1344,11 @@ Proof.
   cancel.
   simp.
   step.
-  setoid_rewrite (linkedList_nonnull _ n).
+  setoid_rewrite (linkedList_nonnull n).
   step.
   simp.
   step.
   cancel.
-  eauto.
   simp.
   setoid_rewrite <- linkedListSegment_append.
   cancel.
@@ -1361,7 +1360,6 @@ Proof.
   simp.
   step.
   cancel.
-  simp.
   simp.
   rewrite linkedListSegment_null.
   rewrite linkedList_null.

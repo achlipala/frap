@@ -9,8 +9,8 @@ Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 3
 Definition heap := fmap nat nat.
 Definition assertion := heap -> Prop.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic.
+Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -165,7 +165,7 @@ Module Import S <: SEP.
     t.
   Qed.
 
-  Hint Resolve split_empty_bwd'.
+  Hint Resolve split_empty_bwd' : core.
 
   Theorem extra_lift : forall (P : Prop) p,
     P
@@ -601,7 +601,7 @@ Proof.
   simp.
 Qed.
 
-Hint Resolve move_along.
+Hint Resolve move_along : core.
 
 Theorem length_ok : forall p ls,
   {{linkedList p ls}}
@@ -637,7 +637,7 @@ Proof.
   unfold star, himp in *; simp; eauto 7.
 Qed.
 
-Hint Constructors hoare_triple.
+Hint Constructors hoare_triple : core.
 
 Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
   hoare_triple P (Bind c1 c2) Q
@@ -1033,7 +1033,7 @@ Proof.
   eauto using deallocate_None.
 Qed.
 
-Hint Constructors step.
+Hint Constructors step : core.
 
 Lemma progress : forall {result} (c : cmd result) P Q,
     hoare_triple P c Q

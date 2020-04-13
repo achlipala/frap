@@ -36,8 +36,8 @@ Inductive proc :=
 (* Act like [pr], but prevent interaction with other processes through channel
  * [ch].  We effectively force [ch] to be *private*. *)
 
-| Send (ch : channel) {A : Set} (v : A) (k : proc)
-| Recv (ch : channel) {A : Set} (k : A -> proc)
+| Send (ch : channel) {A : Type} (v : A) (k : proc)
+| Recv (ch : channel) {A : Type} (k : A -> proc)
 (* When one process runs a [Send] and the other a [Recv] on the same channel
  * simultaneously, the [Send] moves on to its [k], while the [Recv] moves on to
  * its [k v], for [v] the value that was sent. *)
@@ -106,7 +106,7 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
 
 Record message := {
   Channel : channel;
-  TypeOf : Set;
+  TypeOf : Type;
   Value : TypeOf
 }.
 
@@ -1089,7 +1089,7 @@ Proof.
   invert H6.
   eapply TreeThreads_actionIs in H3; eauto; equality.
   specialize (TreeThreads_actionIs H2 H3); invert 1.
-  invert H5.
+  invert H5. clear H.
   assert (mem n t = true) by eauto.
   rewrite H.
   eauto 10.

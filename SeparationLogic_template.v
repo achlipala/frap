@@ -532,7 +532,7 @@ Proof.
   heq; cases ls; cancel.
 Qed.
 
-Theorem linkedList_nonnull : forall p ls,
+Theorem linkedList_nonnull : forall {p ls},
   p <> 0
   -> linkedList p ls === exists x ls' p', [| ls = x :: ls' |] * p |--> [x; p'] * linkedList p' ls'.
 Proof.

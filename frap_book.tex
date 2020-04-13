@@ -3705,17 +3705,17 @@ $$\infer{\smallstep{(h, x \leftarrow c_1; c_2(x))}{(h', x \leftarrow c'_1; c_2(x
 
 $$\infer{\smallstep{(h, \mt{Loop} \; i \; f)}{(h, x \leftarrow f(\mt{Again}(i)); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
 
-$$\infer{\smallstep{(h, \mt{Read} \; a)}{(h, v)}}{
+$$\infer{\smallstep{(h, \mt{Read} \; a)}{(h, \mt{Return} \; v)}}{
   \msel{h}{a} = v
 }
-\quad \infer{\smallstep{(h, \mt{Write} \; a \; v')}{(\mupd{h}{a}{v'}, ())}}{
+\quad \infer{\smallstep{(h, \mt{Write} \; a \; v')}{(\mupd{h}{a}{v'}, \mt{Return} \; ())}}{
   \msel{h}{a} = v
 }$$
 
-$$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, a)}}{
+$$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, \mt{Return} \; a)}}{
   \dom{h} \cap [a, a+n) = \emptyset
 }
-\quad \infer{\smallstep{(h, \mt{Free} \; a \; n)}{(h - [a, a+n), ())}}{
+\quad \infer{\smallstep{(h, \mt{Free} \; a \; n)}{(h - [a, a+n), \mt{Return} \; ())}}{
 }$$
 
 A few remarks about the last four rules:

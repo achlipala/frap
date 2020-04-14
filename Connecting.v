@@ -110,7 +110,7 @@ Proof.
   intros; apply (shatter_word a).
 Qed.
 
-Hint Resolve shatter_word_0.
+Hint Resolve shatter_word_0 : core.
 
 Require Import Coq.Logic.Eqdep_dec.
 
@@ -314,7 +314,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
       t.
     Qed.
 
-    Hint Resolve split_empty_bwd'.
+    Hint Resolve split_empty_bwd' : core.
 
     Theorem extra_lift : forall (P : Prop) p,
       P
@@ -457,7 +457,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     unfold star, himp in *; simp; eauto 7.
   Qed.
 
-  Hint Constructors hoare_triple.
+  Hint Constructors hoare_triple : core.
 
   Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
     hoare_triple P (Bind c1 c2) Q
@@ -658,7 +658,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     unfold ptsto; reflexivity.
   Qed.
 
-  Hint Constructors step.
+  Hint Constructors step : core.
 
   Lemma progress : forall {result} (c : cmd result) P Q,
       hoare_triple P c Q
@@ -1384,7 +1384,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
                                     next_data <-
                                               (data <- Read p;
                                                next <- Read (p ^+ ^1);
-                                               Return (next, data));
+                                               Return (next, r ^+ data));
                                     Return (Again next_data)))
          (fun pr => Return (snd pr)).
 
@@ -1398,7 +1398,8 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
 
   Definition summer_compiled := Eval simpl in proj1_sig translate_summer.
 
-  (* We restate the program to accommodate limitations in the tactics! *)
+  (* We restate our original example program to accommodate limitations
+   * in the tactics! *)
   Definition reverse_alt p :=
     pr <- for pr := (p, ^0) loop
       let (p, r) := pr in
@@ -2731,7 +2732,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     equality.
   Qed.
 
-  Hint Constructors eval DE.step.
+  Hint Constructors eval DE.step : core.
 
   Lemma translate_exp_sound' : forall V v e,
       translate_exp V v e
@@ -2750,7 +2751,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     induct 1; simplify; eauto.
   Qed.
 
-  Hint Resolve translate_exp_sound translate_exp_sound'.
+  Hint Resolve translate_exp_sound translate_exp_sound' : core.
 
   Lemma not_stuck_loop : forall V (c : cmd (wrd * wrd)) s,
       translate (rt := TwoWords) translate_loop_body V c s
@@ -3351,5 +3352,4 @@ Module MixedEmbedded32.
   Definition incrementer_exported := Eval compute in DE.stmtS incrementer_compiled.
   Definition summer_exported := Eval compute in DE.stmtS summer_compiled.
   Definition reverse_alt_exported := Eval compute in DE.stmtS reverse_alt_compiled.
-
 End MixedEmbedded32.

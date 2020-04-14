@@ -4168,7 +4168,7 @@ This result can be composed with soundness of any Hoare logic for the source lan
 The associated Coq code defines one, essentially following our separation logic\index{separation logic} from last chapter.
 
 \begin{theorem}
-  If $\hoare{P}{c}{Q}$, $P(h)$, $\dscomp{v}{c}{s}$, and $\texttt{result} \notin \dom{v}$, then it is invariant of the transition system starting in $(h, v, s)$ that execution never gets stuck.
+  If $\hoare{P}{c}{Q}$, $P(h)$, $\dscomp{v}{c}{s}$, and $\texttt{result} \notin \dom{v}$, then it is an invariant of the transition system starting in $(h, v, s)$ that execution never gets stuck.
 \end{theorem}
 \begin{proof}
   First, we switch to proving an invariant of the system $(h, c)$ using the simulation from Theorem \ref{dscompsim}.

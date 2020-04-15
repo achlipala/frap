@@ -4079,7 +4079,7 @@ We will define a judgment $\dscomp{v}{c}{s}$, indicating that mixed-embedded com
 
 A good warmup is defining a related judgment $\dscomp{v}{n}{e}$, compiling normal Gallina numeric expressions $n$ into syntactic expressions $e$.
 
-$$\infer{\dscomp{v}{x}{n}}{
+$$\infer{\dscomp{v}{n}{x}}{
   v(x) = n
 }
 \quad \infer{\dscomp{v}{n_1 + n_2}{e_1 + e_2}}{

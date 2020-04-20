@@ -1,4 +1,4 @@
-Require Import Invariant Relations Sets.
+Require Import Invariant Relations Sets Classical.
 
 Set Implicit Arguments.
 
@@ -27,35 +27,57 @@ Proof.
   unfold oneStepClosure; tauto.
 Qed.
 
-Theorem oneStepClosure_done : forall state (sys : trsys state) (invariant : state -> Prop),
-  (forall st, sys.(Initial) st -> invariant st)
-  -> oneStepClosure sys invariant invariant
-  -> invariantFor sys invariant.
-Proof.
-  unfold oneStepClosure, oneStepClosure_current, oneStepClosure_new.
-  intuition eauto using invariant_induction.
-Qed.
-
 Inductive multiStepClosure {state} (sys : trsys state)
   : (state -> Prop) -> (state -> Prop) -> (state -> Prop) -> Prop :=
-| MscDone : forall inv worklist,
-    oneStepClosure sys inv inv
-    -> multiStepClosure sys inv worklist inv
+| MscDone : forall inv,
+    multiStepClosure sys inv (constant nil) inv
 | MscStep : forall inv worklist inv' inv'',
     oneStepClosure sys worklist inv'
     -> multiStepClosure sys (inv \cup inv') (inv' \setminus inv) inv''
     -> multiStepClosure sys inv worklist inv''.
 
+Lemma adding_irrelevant : forall A (s : A) inv inv',
+    s \in (inv \cup inv') \setminus (inv' \setminus inv)
+   -> s \in inv.
+Proof.
+  sets idtac.
+  destruct (classic (inv s)); tauto.
+Qed.
+
 Lemma multiStepClosure_ok' : forall state (sys : trsys state) (inv worklist inv' : state -> Prop),
   multiStepClosure sys inv worklist inv'
   -> (forall st, sys.(Initial) st -> inv st)
+  -> worklist \subseteq inv
+  -> (forall s, s \in inv \setminus worklist
+                      -> forall s', sys.(Step) s s'
+                                    -> s' \in inv)
   -> invariantFor sys inv'.
 Proof.
-  induction 1; simpl; intuition eauto using oneStepClosure_done.
+  induction 1; simpl; intuition.
 
-  apply IHmultiStepClosure.
+  apply invariant_induction; simpl; intuition.
+  eapply H1.
+  red.
+  unfold minus.
+  split; eauto.
+  assumption.
+  
+  apply IHmultiStepClosure; clear IHmultiStepClosure.
   intuition.
-  apply H1 in H2.
+  apply H1 in H4.
+  sets idtac.
+  sets idtac.
+  intuition.
+  apply adding_irrelevant in H4.
+  destruct (classic (s \in worklist)).
+  destruct H.
+  red in H7.
+  eapply H7 in H6.
+  right; eassumption.
+  assumption.
+  left.
+  eapply H3.
+  2: eassumption.
   sets idtac.
 Qed.
 
@@ -63,7 +85,7 @@ Theorem multiStepClosure_ok : forall state (sys : trsys state) (inv : state -> P
   multiStepClosure sys sys.(Initial) sys.(Initial) inv
   -> invariantFor sys inv.
 Proof.
-  eauto using multiStepClosure_ok'.
+  intros; eapply multiStepClosure_ok'; eauto; sets idtac.
 Qed.
 
 Theorem oneStepClosure_empty : forall state (sys : trsys state),

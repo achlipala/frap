@@ -149,6 +149,7 @@ Proof.
   model_check_step.
   model_check_step.
   model_check_step.
+  model_check_step.
   model_check_done.
 
   simplify.
@@ -383,6 +384,7 @@ Proof.
   model_check_step.
   model_check_step.
   model_check_step.
+  model_check_step.
   model_check_done.
 
   simplify.
@@ -428,6 +430,7 @@ Proof.
   eapply invariant_weaken.
   apply multiStepClosure_ok; simplify.
 
+  model_check_step.
   model_check_step.
   model_check_step.
   model_check_step.
@@ -540,7 +543,7 @@ Inductive stepC (s : summary)  : heap * locks * cmd -> heap * locks * cmd -> Pro
                             * with [c0]. *)
 
                            -> step (h, l, c1) (h'', l'', c1'')
-                           (* Finaly, [c] is actually enabled to run, which
+                           (* Finally, [c] is actually enabled to run, which
                             * might not be the case if [c0] is a locking
                             * command. *)
 
@@ -1371,11 +1374,8 @@ Ltac por_closure :=
   repeat (apply oneStepClosure_empty
           || (apply oneStepClosure_split; [ por_invert; try equality; solve [ singletoner ] | ])).
 
-Ltac por_step :=
-  eapply MscStep; [ por_closure | simplify ].
-
-Ltac por_done :=
-  apply MscDone; eapply oneStepClosure_solve; [ por_closure | simplify; solve [ sets ] ].
+Ltac por_step := eapply MscStep; [ por_closure | simplify ].
+Ltac por_done := apply MscDone.
 
 (* OK, ready to return to our last example!  This time we will see state-space
  * exploration that steps a single thread at a time, where the final invariant
@@ -1405,7 +1405,7 @@ Proof.
   por_step.
   por_step.
   por_step.
-
+  por_step.
   por_done.
 
   sets.

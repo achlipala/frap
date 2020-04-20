@@ -318,22 +318,8 @@ Ltac closure :=
   repeat (apply oneStepClosure_empty
           || (apply oneStepClosure_split; [ model_check_invert; try equality; solve [ singletoner ] | ])).
 
-Ltac model_check_done :=
-  apply MscDone; eapply oneStepClosure_solve; [ closure | simplify; solve [ sets ] ].
-
-Ltac model_check_step0 :=
-  eapply MscStep; [ closure | simplify ].
-
-Ltac model_check_step :=
-  match goal with
-  | [ |- multiStepClosure _ ?inv1 _ _ ] =>
-    model_check_step0;
-    match goal with
-    | [ |- multiStepClosure _ ?inv2 _ _ ] =>
-      (assert (inv1 = inv2) by compare_sets; fail 3)
-      || idtac
-    end
-  end.
+Ltac model_check_done := apply MscDone.
+Ltac model_check_step := eapply MscStep; [ closure | simplify ].
 
 Ltac model_check_steps1 := model_check_step || model_check_done.
 Ltac model_check_steps := repeat model_check_steps1.

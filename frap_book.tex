@@ -4533,9 +4533,9 @@ $$\infer{\summ{\mt{Lock} \; a}{(r, w, \ell)}}{
   a \in \ell
 }$$
 
-$$\infer{\summ{c_1 || c_2}{(r, w, \ell)}}{
-  \summ{c_1}{(r, w, \ell)}
-  & \summ{c_1}{(r, w, \ell)}
+$$\infer{\summ{c_1 || c_2}{s}}{
+  \summ{c_1}{s}
+  & \summ{c_2}{s}
 }$$
 
 \newcommand{\na}[1]{\mt{nextAction}(#1)}
@@ -4684,7 +4684,7 @@ The key insights of the prior section can be adapted to prove soundness of a who
 In general, we apply the optimization to remove edges from a state-space graph, whose nodes are states and whose edges are labeled with \emph{actions} $\alpha$.
 In our setting, $\alpha$ is the identifier of the thread scheduled to run next.
 To do model checking, the graph need not be materialized in memory in one go.
-Instead, as an optimization, the graph tends to be constructed on the fly, during state-space exploration.
+Instead, as an optimization, the graph tends to be constructed on-the-fly, during state-space exploration.
 
 The proofs from the last two sections only apply to check the invariant that no thread is about to fail.
 However, the results easily generalize to arbitrary \emph{safety properties}\index{safety properties}, which can be expressed as decidable invariants on states.
@@ -4721,7 +4721,7 @@ What happens if we add them back in?
 Consider this program:
 $$(\mt{while} \; (\mt{true}) \; \{ \; \mt{Write} \; 0 \; 0 \; \}) \; || \; (n \leftarrow \mt{Read} \; 1; \mt{Fail})$$
 An optimization in the spirit of our original from the prior section would happily decree that it is safe always to pick the first thread to run.
-This reduced state transition system never gets around to running the second thread, so exploring the state space never finds the failure!
+This reduced state-transition system never gets around to running the second thread, so exploring the state space never finds the failure!
 To plug this soundness hole, we add a final condition on the ample sets.
 
 \begin{description}

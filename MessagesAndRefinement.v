@@ -118,9 +118,6 @@ Inductive label :=
 | Silent
 | Action (a : action).
 
-(* This command lets us use [action]s implicitly as [label]s. *)
-Coercion Action : action >-> label.
-
 (* This predicate captures when a label doesn't use a channel. *)
 Definition notUse (ch : channel) (l : label) :=
   match l with
@@ -138,11 +135,11 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * we get to shortly. *)
 | LStepSend : forall ch {A : Type} (v : A) k,
     lstep (Send ch v k)
-          (Output {| Channel := ch; Value := v |})
+          (Action (Output {| Channel := ch; Value := v |}))
           k
 | LStepRecv : forall ch {A : Type} (k : A -> _) v,
     lstep (Recv ch k)
-          (Input {| Channel := ch; Value := v |})
+          (Action (Input {| Channel := ch; Value := v |}))
           (k v)
 
 (* A [Dup] always has the option of replicating itself further. *)
@@ -178,12 +175,12 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * exchanged.  This is the only mechanism to let two transitions happen at
  * once. *)
 | LStepRendezvousLeft : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
-    lstep pr1 (Input {| Channel := ch; Value := v |}) pr1'
-    -> lstep pr2 (Output {| Channel := ch; Value := v |}) pr2'
+    lstep pr1 (Action (Input {| Channel := ch; Value := v |})) pr1'
+    -> lstep pr2 (Action (Output {| Channel := ch; Value := v |})) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2')
 | LStepRendezvousRight : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
-    lstep pr1 (Output {| Channel := ch; Value := v |}) pr1'
-    -> lstep pr2 (Input {| Channel := ch; Value := v |}) pr2'
+    lstep pr1 (Action (Output {| Channel := ch; Value := v |})) pr1'
+    -> lstep pr2 (Action (Input {| Channel := ch; Value := v |})) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2').
 
 (* Here's a shorthand for silent steps. *)
@@ -296,7 +293,7 @@ Qed.
  * more. ;-) *)
 
 Lemma invert_Recv : forall ch (A : Type) (k : A -> proc) (x : A) pr,
-    lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
+    lstep (Recv ch k) (Action (Input {| Channel := ch; Value := x |})) pr
     -> pr = k x.
 Proof.
   invert 1; auto.
@@ -814,15 +811,15 @@ Proof.
 Qed.
 
 Lemma notUse_Input_Output : forall ch r,
-    notUse ch (Input r)
-    -> notUse ch (Output r).
+    notUse ch (Action (Input r))
+    -> notUse ch (Action (Output r)).
 Proof.
   simplify; auto.
 Qed.
 
 Lemma notUse_Output_Input : forall ch r,
-    notUse ch (Output r)
-    -> notUse ch (Input r).
+    notUse ch (Action (Output r))
+    -> notUse ch (Action (Input r)).
 Proof.
   simplify; auto.
 Qed.
@@ -1194,7 +1191,7 @@ Hint Constructors manyOf manyOfAndOneOf Rhandoff.
 Lemma manyOf_action : forall this pr,
     manyOf this pr
     -> forall a pr', lstep pr (Action a) pr'
-                          -> exists this', lstep this a this'.
+                          -> exists this', lstep this (Action a) this'.
 Proof.
   induct 1; simplify; eauto.
   invert H.
@@ -1202,7 +1199,7 @@ Proof.
 Qed.
 
 Lemma manyOf_silent : forall this, (forall this', lstepSilent this this' -> False)
-    -> (forall r this', lstep this (Output r) this' -> False)
+    -> (forall r this', lstep this (Action (Output r)) this' -> False)
     -> forall pr, manyOf this pr
       -> forall pr', lstep pr Silent pr'
                      -> manyOf this pr'.
@@ -1217,7 +1214,7 @@ Qed.
 
 Lemma manyOf_rendezvous : forall ch (A : Type) (v : A) (k : A -> _) pr,
     manyOf (Recv ch k) pr
-    -> forall pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'
+    -> forall pr', lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
                    -> manyOfAndOneOf (Recv ch k) (k v) pr'.
 Proof.
   induct 1; simplify; eauto.
@@ -1233,8 +1230,8 @@ Hint Resolve manyOf_silent manyOf_rendezvous.
 
 Lemma manyOfAndOneOf_output : forall ch (A : Type) (k : A -> _) rest ch0 (A0 : Type) (v0 : A0) pr,
     manyOfAndOneOf (Recv ch k) rest pr
-    -> forall pr', lstep pr (Output {| Channel := ch0; Value := v0 |}) pr'
-                   -> exists rest', lstep rest (Output {| Channel := ch0; Value := v0 |}) rest'
+    -> forall pr', lstep pr (Action (Output {| Channel := ch0; Value := v0 |})) pr'
+                   -> exists rest', lstep rest (Action (Output {| Channel := ch0; Value := v0 |})) rest'
                                     /\ manyOfAndOneOf (Recv ch k) rest' pr'.
 Proof.
   induct 1; simplify; eauto.
@@ -1267,7 +1264,7 @@ Hint Resolve manyOf_manyOfAndOneOf.
 
 Lemma no_rendezvous : forall ch0 (A0 : Type) (v : A0) pr1 rest (k : A0 -> _),
     manyOfAndOneOf (??ch0 (x : _); k x) rest pr1
-    -> forall pr1', lstep pr1 (Output {| Channel := ch0; TypeOf := A0; Value := v |}) pr1'
+    -> forall pr1', lstep pr1 (Action (Output {| Channel := ch0; TypeOf := A0; Value := v |})) pr1'
     -> neverUses ch0 rest
     -> False.
 Proof.
@@ -1345,7 +1342,7 @@ Lemma manyOfAndOneOf_action : forall ch (A : Type) (k : A -> _) rest pr,
     -> forall a pr', lstep pr (Action a) pr'
                      -> (exists v : A, a = Input {| Channel := ch; Value := v |})
                         \/ exists rest', manyOfAndOneOf (Recv ch k) rest' pr'
-                                         /\ lstep rest a rest'.
+                                         /\ lstep rest (Action a) rest'.
 Proof.
   induct 1; simplify; eauto.
   invert H; eauto.

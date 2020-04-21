@@ -241,7 +241,7 @@ Inductive couldGenerate : proc -> list action -> Prop :=
 (* Skip ahead to [refines_couldGenerate] to see the top-level connection from
  * [refines]. *)
 
-Hint Constructors couldGenerate.
+Hint Constructors couldGenerate : core.
 
 Lemma lstepSilent_couldGenerate : forall pr1 pr2,
   lstepSilent^* pr1 pr2
@@ -251,7 +251,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_couldGenerate.
+Hint Resolve lstepSilent_couldGenerate : core.
 
 Lemma simulates_couldGenerate' : forall (R : proc -> proc -> Prop),
     (forall pr1 pr2, R pr1 pr2
@@ -305,8 +305,8 @@ Ltac inverter :=
          | [ H : lstepSilent _ _ |- _ ] => invert H
          end.
 
-Hint Constructors lstep.
-Hint Unfold lstepSilent.
+Hint Constructors lstep : core.
+Hint Unfold lstepSilent : core.
 
 Ltac lists' :=
   repeat match goal with
@@ -316,7 +316,7 @@ Ltac lists' :=
 
 Ltac lists := solve [ lists' ].
 
-Hint Extern 1 (NoDup _) => lists.
+Hint Extern 1 (NoDup _) => lists : core.
 
 
 (** * Examples *)
@@ -361,7 +361,7 @@ Inductive R_add2 : proc -> proc -> Prop :=
          (Block intermediate; Done || Done)
          Done.
 
-Hint Constructors R_add2.
+Hint Constructors R_add2 : core.
 
 Theorem add2_once_refines_addN : forall input output,
     input <> output
@@ -462,9 +462,9 @@ Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
     -> RDup R pr2 pr2'
     -> RDup R (Par pr1 pr2) (Par pr1' pr2').
 
-Hint Constructors RDup.
+Hint Constructors RDup : core.
 
-Hint Unfold lstepSilent.
+Hint Unfold lstepSilent : core.
 
 Lemma lstepSilent_Par1 : forall pr1 pr1' pr2,
     lstepSilent^* pr1 pr1'
@@ -480,7 +480,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_Par1 lstepSilent_Par2.
+Hint Resolve lstepSilent_Par1 lstepSilent_Par2 : core.
 
 Lemma refines_Dup_Action : forall R : _ -> _ -> Prop,
     (forall pr1 pr2, R pr1 pr2
@@ -593,7 +593,7 @@ Inductive RPar (R1 R2 : proc -> proc -> Prop) : proc -> proc -> Prop :=
     -> R2 pr2 pr2'
     -> RPar R1 R2 (pr1 || pr2) (pr1' || pr2').
 
-Hint Constructors RPar.
+Hint Constructors RPar : core.
 
 Lemma refines_Par_Action : forall R1 R2 : _ -> _ -> Prop,
     (forall pr1 pr2, R1 pr1 pr2
@@ -706,8 +706,8 @@ Inductive RBlock (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
     R pr1 pr2
     -> RBlock R (Block ch; pr1) (Block ch; pr2).
 
-Hint Constructors RBlock.
-Hint Unfold notUse.
+Hint Constructors RBlock : core.
+Hint Unfold notUse : core.
 
 Lemma lstepSilent_Block : forall ch pr1 pr2,
     lstepSilent^* pr1 pr2
@@ -716,7 +716,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_Block.
+Hint Resolve lstepSilent_Block : core.
 
 Theorem refines_Block : forall pr1 pr2 ch,
     pr1 <| pr2
@@ -743,7 +743,7 @@ Inductive RBlock2 : proc -> proc -> Prop :=
 | RBlock2_1 : forall ch1 ch2 pr,
     RBlock2 (Block ch1; Block ch2; pr) (Block ch2; Block ch1; pr).
 
-Hint Constructors RBlock2.
+Hint Constructors RBlock2 : core.
 
 Theorem refines_Block2 : forall ch1 ch2 pr,
     Block ch1; Block ch2; pr <| Block ch2; Block ch1; pr.
@@ -783,7 +783,7 @@ Inductive neverUses (ch : channel) : proc -> Prop :=
 | NuDone :
     neverUses ch Done.
 
-Hint Constructors neverUses.
+Hint Constructors neverUses : core.
 
 Lemma neverUses_step : forall ch pr1,
     neverUses ch pr1
@@ -793,14 +793,14 @@ Proof.
   induct 1; invert 1; eauto.
 Qed.
 
-Hint Resolve neverUses_step.
+Hint Resolve neverUses_step : core.
 
 Inductive RBlockS : proc -> proc -> Prop :=
 | RBlockS1 : forall ch pr1 pr2,
     neverUses ch pr2
     -> RBlockS (Block ch; pr1 || pr2) ((Block ch; pr1) || pr2).
 
-Hint Constructors RBlockS.
+Hint Constructors RBlockS : core.
 
 Lemma neverUses_notUse : forall ch pr l,
     neverUses ch pr
@@ -824,7 +824,7 @@ Proof.
   simplify; auto.
 Qed.
 
-Hint Resolve neverUses_notUse.
+Hint Resolve neverUses_notUse : core.
 
 Theorem refines_BlockS : forall ch pr1 pr2,
     neverUses ch pr2
@@ -1008,7 +1008,7 @@ Inductive RTree (t : tree) (input output : channel) : proc -> proc -> Prop :=
           (Block output'; threads || Done)
           Done.
 
-Hint Constructors TreeThreads RTree.
+Hint Constructors TreeThreads RTree : core.
 
 Lemma TreeThreads_actionIs : forall ch maySend pr,
     TreeThreads ch maySend pr
@@ -1055,7 +1055,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve TreeThreads_silent TreeThreads_maySend TreeThreads_action TreeThreads_weaken.
+Hint Resolve TreeThreads_silent TreeThreads_maySend TreeThreads_action TreeThreads_weaken : core.
 
 Lemma TreeThreads_inTree_par' : forall n ch t,
     TreeThreads ch (mem n t) (inTree_par' n t ch).
@@ -1066,7 +1066,7 @@ Proof.
   cases (mem n t2); simplify; eauto.
 Qed.
 
-Hint Resolve TreeThreads_inTree_par'.
+Hint Resolve TreeThreads_inTree_par' : core.
 
 (* Finally, the main theorem: *)
 Theorem refines_inTree_par : forall t input output,
@@ -1186,7 +1186,7 @@ Inductive Rhandoff (ch : channel) (A : Type) (v : A) (k : A -> proc) : proc -> p
     -> manyOf (??ch(x : A); k x) recvs
     -> Rhandoff ch v k (Block ch; Done || recvs) rest.
 
-Hint Constructors manyOf manyOfAndOneOf Rhandoff.
+Hint Constructors manyOf manyOfAndOneOf Rhandoff : core.
 
 Lemma manyOf_action : forall this pr,
     manyOf this pr
@@ -1226,7 +1226,7 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve manyOf_silent manyOf_rendezvous.
+Hint Resolve manyOf_silent manyOf_rendezvous : core.
 
 Lemma manyOfAndOneOf_output : forall ch (A : Type) (k : A -> _) rest ch0 (A0 : Type) (v0 : A0) pr,
     manyOfAndOneOf (Recv ch k) rest pr
@@ -1260,7 +1260,7 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve manyOf_manyOfAndOneOf.
+Hint Resolve manyOf_manyOfAndOneOf : core.
 
 Lemma no_rendezvous : forall ch0 (A0 : Type) (v : A0) pr1 rest (k : A0 -> _),
     manyOfAndOneOf (??ch0 (x : _); k x) rest pr1
@@ -1335,7 +1335,7 @@ Proof.
   invert H.
 Qed.
 
-Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous.
+Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous : core.
 
 Lemma manyOfAndOneOf_action : forall ch (A : Type) (k : A -> _) rest pr,
     manyOfAndOneOf (Recv ch k) rest pr

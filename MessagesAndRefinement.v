@@ -136,11 +136,11 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * the value being received is "pulled out of thin air"!  However, it gets
  * determined concretely by comparing against a matching [Send], in a rule that
  * we get to shortly. *)
-| LStepSend : forall ch {A : Set} (v : A) k,
+| LStepSend : forall ch {A : Type} (v : A) k,
     lstep (Send ch v k)
           (Output {| Channel := ch; Value := v |})
           k
-| LStepRecv : forall ch {A : Set} (k : A -> _) v,
+| LStepRecv : forall ch {A : Type} (k : A -> _) v,
     lstep (Recv ch k)
           (Input {| Channel := ch; Value := v |})
           (k v)
@@ -177,11 +177,11 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * value from the same channel, the two sides *rendezvous*, and the value is
  * exchanged.  This is the only mechanism to let two transitions happen at
  * once. *)
-| LStepRendezvousLeft : forall pr1 ch {A : Set} (v : A) pr1' pr2 pr2',
+| LStepRendezvousLeft : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
     lstep pr1 (Input {| Channel := ch; Value := v |}) pr1'
     -> lstep pr2 (Output {| Channel := ch; Value := v |}) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2')
-| LStepRendezvousRight : forall pr1 ch {A : Set} (v : A) pr1' pr2 pr2',
+| LStepRendezvousRight : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
     lstep pr1 (Output {| Channel := ch; Value := v |}) pr1'
     -> lstep pr2 (Input {| Channel := ch; Value := v |}) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2').
@@ -295,7 +295,7 @@ Qed.
 (* Well, you're used to unexplained automation tactics by now, so here are some
  * more. ;-) *)
 
-Lemma invert_Recv : forall ch (A : Set) (k : A -> proc) (x : A) pr,
+Lemma invert_Recv : forall ch (A : Type) (k : A -> proc) (x : A) pr,
     lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
     -> pr = k x.
 Proof.
@@ -768,11 +768,11 @@ Qed.
 (* This predicate is handy for side conditions, to enforce that a process never
  * uses a particular channel for anything. *)
 Inductive neverUses (ch : channel) : proc -> Prop :=
-| NuRecv : forall ch' (A : Set) (k : A -> _),
+| NuRecv : forall ch' (A : Type) (k : A -> _),
     ch' <> ch
     -> (forall v, neverUses ch (k v))
     -> neverUses ch (Recv ch' k)
-| NuSend : forall ch' (A : Set) (v : A) k,
+| NuSend : forall ch' (A : Type) (v : A) k,
     ch' <> ch
     -> neverUses ch k
     -> neverUses ch (Send ch' v k)
@@ -1089,7 +1089,7 @@ Proof.
   invert H6.
   eapply TreeThreads_actionIs in H3; eauto; equality.
   specialize (TreeThreads_actionIs H2 H3); invert 1.
-  invert H5. clear H.
+  invert H5.
   assert (mem n t = true) by eauto.
   rewrite H.
   eauto 10.
@@ -1175,7 +1175,7 @@ Inductive manyOfAndOneOf (common rare : proc) : proc -> Prop :=
     -> manyOfAndOneOf common rare pr2
     -> manyOfAndOneOf common rare (pr1 || pr2).
 
-Inductive Rhandoff (ch : channel) (A : Set) (v : A) (k : A -> proc) : proc -> proc -> Prop :=
+Inductive Rhandoff (ch : channel) (A : Type) (v : A) (k : A -> proc) : proc -> proc -> Prop :=
 | Rhandoff1 : forall recvs,
     neverUses ch (k v)
     -> manyOf (??ch(x : A); k x) recvs
@@ -1215,7 +1215,7 @@ Proof.
   eapply manyOf_action in H4; eauto; first_order; exfalso; eauto.
 Qed.
 
-Lemma manyOf_rendezvous : forall ch (A : Set) (v : A) (k : A -> _) pr,
+Lemma manyOf_rendezvous : forall ch (A : Type) (v : A) (k : A -> _) pr,
     manyOf (Recv ch k) pr
     -> forall pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'
                    -> manyOfAndOneOf (Recv ch k) (k v) pr'.
@@ -1231,7 +1231,7 @@ Qed.
 
 Hint Resolve manyOf_silent manyOf_rendezvous.
 
-Lemma manyOfAndOneOf_output : forall ch (A : Set) (k : A -> _) rest ch0 (A0 : Set) (v0 : A0) pr,
+Lemma manyOfAndOneOf_output : forall ch (A : Type) (k : A -> _) rest ch0 (A0 : Type) (v0 : A0) pr,
     manyOfAndOneOf (Recv ch k) rest pr
     -> forall pr', lstep pr (Output {| Channel := ch0; Value := v0 |}) pr'
                    -> exists rest', lstep rest (Output {| Channel := ch0; Value := v0 |}) rest'
@@ -1265,7 +1265,7 @@ Qed.
 
 Hint Resolve manyOf_manyOfAndOneOf.
 
-Lemma no_rendezvous : forall ch0 (A0 : Set) (v : A0) pr1 rest (k : A0 -> _),
+Lemma no_rendezvous : forall ch0 (A0 : Type) (v : A0) pr1 rest (k : A0 -> _),
     manyOfAndOneOf (??ch0 (x : _); k x) rest pr1
     -> forall pr1', lstep pr1 (Output {| Channel := ch0; TypeOf := A0; Value := v |}) pr1'
     -> neverUses ch0 rest
@@ -1300,7 +1300,7 @@ Proof.
   eauto.
 Qed.
 
-Lemma manyOfAndOneOf_silent : forall ch (A : Set) (k : A -> _) rest pr,
+Lemma manyOfAndOneOf_silent : forall ch (A : Type) (k : A -> _) rest pr,
     manyOfAndOneOf (Recv ch k) rest pr
     -> neverUses ch rest
     -> forall pr', lstep pr Silent pr'
@@ -1340,7 +1340,7 @@ Qed.
 
 Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous.
 
-Lemma manyOfAndOneOf_action : forall ch (A : Set) (k : A -> _) rest pr,
+Lemma manyOfAndOneOf_action : forall ch (A : Type) (k : A -> _) rest pr,
     manyOfAndOneOf (Recv ch k) rest pr
     -> forall a pr', lstep pr (Action a) pr'
                      -> (exists v : A, a = Input {| Channel := ch; Value := v |})
@@ -1368,7 +1368,7 @@ Qed.
  * of each server thread has nothing more to do with the channel we are using to
  * send it requests!  Otherwise, we would need to keep some [Dup] present
  * explicitly in the spec (righthand argument of [<|]). *)
-Theorem handoff : forall ch (A : Set) (v : A) k,
+Theorem handoff : forall ch (A : Type) (v : A) k,
     neverUses ch (k v)
     -> Block ch; (!!ch(v); Done) || Dup (Recv ch k)
        <| k v.

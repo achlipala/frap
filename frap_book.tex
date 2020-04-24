@@ -1168,7 +1168,7 @@ Of course, bugs in this program, like forgetting to include the locking, could l
 \encoding
 To prove that we got the program right, let's formalize it as a transition system.  First, our state set:
 $$\begin{array}{rrcl}
-  \textrm{States} & S &::=& \mathsf{Lock} \mid \mathsf{Read} \mid \mathsf{Write}(n) \mid \mathsf{Unlock} \mid \mathsf{Done}
+  \textrm{States} & P &::=& \mathsf{Lock} \mid \mathsf{Read} \mid \mathsf{Write}(n) \mid \mathsf{Unlock} \mid \mathsf{Done}
 \end{array}$$
 
 Compared to the last example, here we see more clearly that kinds of states correspond to \emph{program counters}\index{program counters} in the imperative code.
@@ -1178,8 +1178,8 @@ Only $\mathsf{Write}$ states carry extra information, in this case the value of 
 At every other program counter, we can prove that the value of variable \texttt{local} has no effect on further transitions, so we don't bother to store it.
 We will account for the value of variable \texttt{global} separately, in a way to be described shortly.
 
-In particular, we will define a transition system for a single thread as $\mathcal L = \angled{(\mathbb N \times \mathbb B) \times S, \mathcal L_0, \to_{\mathcal L}}$.
-We define the state to include not only the thread-local state $S$ but also the value of \texttt{global} (in $\mathbb N$) and whether the lock is currently taken (in $\mathbb B$, the Booleans, with values $\top$ [true] and $\bot$ [false]).
+In particular, we will define a transition system for a single thread as $\mathcal L = \angled{(\mathbb N \times \mathbb B) \times P, \mathcal L_0, \to_{\mathcal L}}$.
+We define the state to include not only the thread-local state $P$ but also the value of \texttt{global} (in $\mathbb N$) and whether the lock is currently taken (in $\mathbb B$, the Booleans, with values $\top$ [true] and $\bot$ [false]).
 There is one designated initial state.
 
 $$\infer{((0, \bot), \mathsf{Lock}) \in \mathcal L_0}{}$$

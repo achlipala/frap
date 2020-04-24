@@ -32,11 +32,11 @@ Module BasicTwoParty.
 (** ** Defining the type system *)
 
 Inductive type :=
-| TSend (ch : channel) (A : Set) (t : type)
+| TSend (ch : channel) (A : Type) (t : type)
 (* This type applies to a process that begins by sending a value of type [A]
  * over channel [ch], then continuing according to type [t]. *)
 
-| TRecv (ch : channel) (A : Set) (t :  type)
+| TRecv (ch : channel) (A : Type) (t :  type)
 (* This type is the dual of the last one: the process begins by receiving a
  * value of type [A] from channel [ch]. *)
 
@@ -47,10 +47,10 @@ Inductive type :=
 
 (* The typing rules mostly just formalize the comments from above. *)
 Inductive hasty : proc -> type -> Prop :=
-| HtSend : forall ch (A : Set) (v : A) k t,
+| HtSend : forall ch (A : Type) (v : A) k t,
     hasty k t
     -> hasty (Send ch v k) (TSend ch A t)
-| HtRecv : forall ch (A : Set) (k : A -> _) t,
+| HtRecv : forall ch (A : Type) (k : A -> _) t,
     (forall v, hasty (k v) t)
     -> hasty (Recv ch k) (TRecv ch A t)
 | HtDone :
@@ -128,13 +128,13 @@ Definition trsys_of pr := {|
 (* Note: here we force silent steps, so that all channel communication is
  * internal. *)
 
-Hint Constructors hasty.
+Hint Constructors hasty : core.
 
 (* The next two lemmas state some inversions that connect stepping and
  * typing. *)
 
 Lemma input_typed : forall pr ch A v pr',
-    lstep pr (Input {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Input {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall t, hasty pr t
                  -> exists k, pr = Recv ch k /\ pr' = k v.
 Proof.
@@ -142,7 +142,7 @@ Proof.
 Qed.
 
 Lemma output_typed : forall pr ch A v pr',
-    lstep pr (Output {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Output {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall t, hasty pr t
                  -> exists k, pr = Send ch v k /\ pr' = k.
 Proof.
@@ -233,18 +233,18 @@ Module TwoParty.
 (** ** Defining the type system *)
 
 Inductive type :=
-| TSend (ch : channel) (A : Set) (t : A -> type)
-| TRecv (ch : channel) (A : Set) (t : A -> type)
+| TSend (ch : channel) (A : Type) (t : A -> type)
+| TRecv (ch : channel) (A : Type) (t : A -> type)
 | TDone.
 (* Note the big change: each follow-up type [t] is parameterized on the value
  * sent or received.  As with our mixed-embedding programs, within these
  * functions we may employ the full expressiveness of Gallina. *)
 
 Inductive hasty : proc -> type -> Prop :=
-| HtSend : forall ch (A : Set) (v : A) k t,
+| HtSend : forall ch (A : Type) (v : A) k t,
     hasty k (t v)
     -> hasty (Send ch v k) (TSend ch t)
-| HtRecv : forall ch (A : Set) (k : A -> _) t,
+| HtRecv : forall ch (A : Type) (k : A -> _) t,
     (forall v, hasty (k v) (t v))
     -> hasty (Recv ch k) (TRecv ch t)
 | HtDone :
@@ -347,10 +347,10 @@ Definition trsys_of pr := {|
   Step := lstepSilent
 |}.
 
-Hint Constructors hasty.
+Hint Constructors hasty : core.
 
 Lemma input_typed : forall pr ch A v pr',
-    lstep pr (Input {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Input {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall t, hasty pr t
                  -> exists k, pr = Recv ch k /\ pr' = k v.
 Proof.
@@ -358,7 +358,7 @@ Proof.
 Qed.
 
 Lemma output_typed : forall pr ch A v pr',
-    lstep pr (Output {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Output {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall t, hasty pr t
                  -> exists k, pr = Send ch v k /\ pr' = k.
 Proof.
@@ -448,7 +448,7 @@ Module Multiparty.
 (** ** Defining the type system *)
 
 Inductive type :=
-| Communicate (ch : channel) (A : Set) (t : A -> type)
+| Communicate (ch : channel) (A : Type) (t : A -> type)
 | TDone.
 (* Things are quite different now.  We define one protocol with a series of
  * communications, not specifying read vs. write polarity.  Every agent will be
@@ -461,7 +461,7 @@ Bind Scope st_scope with type.
 Notation "!!! ch ( x : A ) ; k" := (Communicate ch (fun x : A => k)%st) (right associativity, at level 45, ch at level 0, x at level 0) : st_scope.
 
 Section parties.
-  Variable party : Set.
+  Variable party : Type.
   (* We will formalize typing with respect to some (usually finite) set of
    * parties/agents. *)
 
@@ -476,12 +476,12 @@ Section parties.
 
   (* The first two rules look up the next channel and confirm that the current
    * process is in the right role to perform a send or receive. *)
-  | HtSend : forall ch rr (A : Set) (v : A) k t,
+  | HtSend : forall ch rr (A : Type) (v : A) k t,
     channels ch = {| Sender := p; Receiver := rr |}
     -> rr <> p
     -> hasty p false k (t v)
     -> hasty p false (Send ch v k) (Communicate ch t)
-  | HtRecv : forall mayNotSend ch sr (A : Set) (k : A -> _) t (witness : A),
+  | HtRecv : forall mayNotSend ch sr (A : Type) (k : A -> _) t (witness : A),
       channels ch = {| Sender := sr; Receiver := p |}
       -> sr <> p
       -> (forall v, hasty p false (k v) (t v))
@@ -489,7 +489,7 @@ Section parties.
 
   (* Not all parties participate in all communications.  Uninvolved parties may
    * (or, rather, must!) skip protocol steps. *)
-  | HtSkip : forall mayNotSend ch sr rr (A : Set) pr (t : A -> _) (witness : A),
+  | HtSkip : forall mayNotSend ch sr rr (A : Type) pr (t : A -> _) (witness : A),
       channels ch = {| Sender := sr; Receiver := rr |}
       -> sr <> p
       -> rr <> p
@@ -515,7 +515,7 @@ Definition trsys_of pr := {|
   Step := lstepSilent
 |}.
 
-Hint Constructors hasty.
+Hint Constructors hasty : core.
 
 (* We prove that the type system rules out fancier constructs. *)
 
@@ -546,12 +546,12 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate hasty_not_Block hasty_not_Dup hasty_not_Par.
+Hint Immediate hasty_not_Block hasty_not_Dup hasty_not_Par : core.
 
 (* Next, we characterize how channels must be mapped, given typing of a
  * process. *)
 
-Lemma input_typed' : forall party (channels : _ -> parties party) p mns ch (A : Set) (k : A -> _) t,
+Lemma input_typed' : forall party (channels : _ -> parties party) p mns ch (A : Type) (k : A -> _) t,
     hasty channels p mns (Recv ch k) t
     -> exists sr (witness : A), channels ch = {| Sender := sr; Receiver := p |}
                                 /\ sr <> p.
@@ -562,7 +562,7 @@ Proof.
 Qed.
 
 Lemma input_typed : forall party (channels: _ -> parties party) pr ch A v pr',
-    lstep pr (Input {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Input {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall p mns t, hasty channels p mns pr t
                        -> exists sr k, pr = Recv ch k /\ pr' = k v
                                        /\ channels ch = {| Sender := sr; Receiver := p |}
@@ -574,7 +574,7 @@ Proof.
   eauto 6.
 Qed.
 
-Lemma output_typed' : forall party (channels : _ -> parties party) p mns ch (A : Set) (v : A) k t,
+Lemma output_typed' : forall party (channels : _ -> parties party) p mns ch (A : Type) (v : A) k t,
     hasty channels p mns (Send ch v k) t
     -> exists rr, channels ch = {| Sender := p; Receiver := rr |}
                   /\ rr <> p.
@@ -585,7 +585,7 @@ Proof.
 Qed.
 
 Lemma output_typed : forall party (channels: _ -> parties party) pr ch A v pr',
-    lstep pr (Output {| Channel := ch; TypeOf := A; Value := v |}) pr'
+    lstep pr (Action (Output {| Channel := ch; TypeOf := A; Value := v |})) pr'
     -> forall p mns t, hasty channels p mns pr t
                        -> exists k, pr = Send ch v k /\ pr' = k.
 Proof.
@@ -605,7 +605,7 @@ Inductive typed_multistate party (channels : channel -> parties party) (t : type
     -> typed_multistate channels t ps pr2
     -> typed_multistate channels t (p :: ps) (pr1 || pr2).
 
-Hint Constructors typed_multistate.
+Hint Constructors typed_multistate : core.
 
 (* This fancier typing judgment gets a fancier tactic for type-checking. *)
 
@@ -652,7 +652,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate no_silent_steps.
+Hint Immediate no_silent_steps : core.
 
 Lemma complementarity_forever_done : forall party (channels : _ -> parties party) pr pr',
   lstep pr Silent pr'
@@ -668,7 +668,7 @@ Qed.
 
 Lemma mayNotSend_really : forall party (channels : _ -> parties party) p pr t,
     hasty channels p true pr t
-    -> forall m pr', lstep pr (Output m) pr'
+    -> forall m pr', lstep pr (Action (Output m)) pr'
                      -> False.
 Proof.
   induct 1; eauto; invert 1.
@@ -676,10 +676,10 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate mayNotSend_really.
+Hint Immediate mayNotSend_really : core.
 
-Lemma may_not_output : forall (party : Set) pr pr' ch (A : Set) (v : A),
-    lstep pr (Output {| Channel := ch; Value := v |}) pr'
+Lemma may_not_output : forall (party : Type) pr pr' ch (A : Type) (v : A),
+    lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
     -> forall (channels : _ -> parties party) p t,
       hasty channels p true pr t
       -> False.
@@ -692,11 +692,11 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate may_not_output.
+Hint Immediate may_not_output : core.
 
-Lemma output_is_legit : forall (party : Set) pr pr' ch (A : Set) (v : A),
-    lstep pr (Output {| Channel := ch; Value := v |}) pr'
-    -> forall (channels : _ -> parties party) all_parties ch' (A' : Set) (k : A' -> _),
+Lemma output_is_legit : forall (party : Type) pr pr' ch (A : Type) (v : A),
+    lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
+    -> forall (channels : _ -> parties party) all_parties ch' (A' : Type) (k : A' -> _),
       typed_multistate channels (Communicate ch' k) all_parties pr
       -> In (Sender (channels ch')) all_parties.
 Proof.
@@ -716,9 +716,10 @@ Proof.
   assumption.
 Qed.
 
-Lemma output_is_first : forall (party : Set) pr pr' ch (A : Set) (v : A),
-    lstep pr (Output {| Channel := ch; Value := v |}) pr'
-    -> forall (channels : _ -> parties party) all_parties ch' (A' : Set) (k : A' -> _),
+
+Lemma output_is_first : forall (party : Type) pr pr' ch (A : Type) (v : A),
+    lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
+    -> forall (channels : _ -> parties party) all_parties ch' (A' : Type) (k : A' -> _),
       typed_multistate channels (Communicate ch' k) all_parties pr
       -> ch' = ch.
 Proof.
@@ -735,18 +736,18 @@ Proof.
   assumption.
 Qed.
 
-Lemma input_is_legit' : forall (party : Set) pr ch (A : Set) (v : A)
+Lemma input_is_legit' : forall (party : Type) pr ch (A : Type) (v : A)
                                (channels : _ -> parties party) p mns t,
     hasty channels p mns pr t
-    -> forall pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'
+    -> forall pr', lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
                    -> p = Receiver (channels ch).
 Proof.
   induct 1; eauto; invert 1.
   rewrite H; auto.
 Qed.
 
-Lemma input_is_legit : forall (party : Set) pr pr' ch (A : Set) (v : A),
-    lstep pr (Input {| Channel := ch; Value := v |}) pr'
+Lemma input_is_legit : forall (party : Type) pr pr' ch (A : Type) (v : A),
+    lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
     -> forall (channels : _ -> parties party) all_parties t,
       typed_multistate channels t all_parties pr
       -> In (Receiver (channels ch)) all_parties.
@@ -768,9 +769,9 @@ Proof.
   assumption.
 Qed.
 
-Lemma comm_stuck : forall (party : Set) pr pr',
+Lemma comm_stuck : forall (party : Type) pr pr',
     lstep pr Silent pr'
-    -> forall (channels : _ -> parties party) all_parties ch (A : Set) (k : A -> _),
+    -> forall (channels : _ -> parties party) all_parties ch (A : Type) (k : A -> _),
       typed_multistate channels (Communicate ch k) all_parties pr
       -> (In (Sender (channels ch)) all_parties
           -> In (Receiver (channels ch)) all_parties
@@ -814,10 +815,10 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Local Hint Immediate hasty_relax.
+Local Hint Immediate hasty_relax : core.
 
 Lemma complementarity_preserve_unused : forall party (channels : _ -> parties party)
-                                               pr ch (A : Set) (t : A -> _) all_parties,
+                                               pr ch (A : Type) (t : A -> _) all_parties,
     typed_multistate channels (Communicate ch t) all_parties pr
     -> ~In (Sender (channels ch)) all_parties
     -> ~In (Receiver (channels ch)) all_parties
@@ -836,7 +837,7 @@ Qed.
 
 Lemma hasty_output : forall pr party (channels : _ -> parties party) p mns t,
     hasty channels p mns pr t
-    -> forall ch (A : Set) (v : A) pr', lstep pr (Output {| Channel := ch; Value := v |}) pr'
+    -> forall ch (A : Type) (v : A) pr', lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
       -> Sender (channels ch) = p.
 Proof.
   induct 1; invert 1.
@@ -852,8 +853,8 @@ Proof.
   assumption.
 Qed.
 
-Lemma complementarity_find_sender : forall party (channels : _ -> parties party) pr ch (A : Set) (v : A) pr',
-  lstep pr (Output {| Channel := ch; Value := v |}) pr'
+Lemma complementarity_find_sender : forall party (channels : _ -> parties party) pr ch (A : Type) (v : A) pr',
+  lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
   -> forall (t : A -> _) all_parties,
       typed_multistate channels (Communicate ch t) all_parties pr
       -> NoDup all_parties
@@ -896,8 +897,8 @@ Proof.
   assumption.
 Qed.
 
-Lemma complementarity_find_receiver : forall party (channels : _ -> parties party) pr ch (A : Set) (v : A) pr',
-  lstep pr (Input {| Channel := ch; Value := v |}) pr'
+Lemma complementarity_find_receiver : forall party (channels : _ -> parties party) pr ch (A : Type) (v : A) pr',
+  lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
   -> forall (t : A -> _) all_parties,
       typed_multistate channels (Communicate ch t) all_parties pr
       -> NoDup all_parties
@@ -942,7 +943,7 @@ Qed.
 
 Lemma output_is_legit' : forall party (channels : _ -> parties party) p mns pr t,
     hasty channels p mns pr t
-    -> forall ch (A : Set) (v : A) pr', lstep pr (Output {| Channel := ch; Value := v |}) pr'
+    -> forall ch (A : Type) (v : A) pr', lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
     -> p = Sender (channels ch).
 Proof.
   induct 1; invert 1; simplify; try solve [ exfalso; eauto ].
@@ -957,7 +958,7 @@ Qed.
 
 Lemma complementarity_forever' : forall party (channels : _ -> parties party) pr pr',
   lstep pr Silent pr'
-  -> forall ch (A : Set) (t : A -> _) all_parties,
+  -> forall ch (A : Type) (t : A -> _) all_parties,
       typed_multistate channels (Communicate ch t) all_parties pr
       -> NoDup all_parties
       -> In (Sender (channels ch)) all_parties
@@ -1057,7 +1058,7 @@ Inductive inert : proc -> Prop :=
     -> inert pr2
     -> inert (pr1 || pr2).
 
-Hint Constructors inert.
+Hint Constructors inert : core.
 
 (* Now a few more fiddly lemmas.  See you again at the [Theorem]. *)
 
@@ -1069,13 +1070,13 @@ Proof.
   invert H; eauto.
 Qed.
 
-Hint Immediate typed_multistate_inert.
+Hint Immediate typed_multistate_inert : core.
 
 Lemma deadlock_find_receiver : forall party (channels : _ -> parties party) all_parties
-                                      ch (A : Set) (k : A -> _) pr,
+                                      ch (A : Type) (k : A -> _) pr,
     typed_multistate channels (Communicate ch k) all_parties pr
     -> In (Receiver (channels ch)) all_parties
-    -> forall v : A, exists pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'.
+    -> forall v : A, exists pr', lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'.
 Proof.
   induct 1; simplify; propositional; subst.
 
@@ -1101,10 +1102,10 @@ Proof.
 Qed.
 
 Lemma deadlock_find_sender : forall party (channels : _ -> parties party) all_parties
-                                    ch (A : Set) (k : A -> _) pr,
+                                    ch (A : Type) (k : A -> _) pr,
     typed_multistate channels (Communicate ch k) all_parties pr
     -> In (Sender (channels ch)) all_parties
-    -> exists (v : A) pr', lstep pr (Output {| Channel := ch; Value := v |}) pr'.
+    -> exists (v : A) pr', lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'.
 Proof.
   induct 1; simplify; propositional; subst.
 
@@ -1127,7 +1128,7 @@ Proof.
 Qed.
 
 Lemma no_deadlock' : forall party (channels : _ -> parties party) all_parties
-                            ch (A : Set) (k : A -> _) pr,
+                            ch (A : Type) (k : A -> _) pr,
     NoDup all_parties
     -> typed_multistate channels (Communicate ch k) all_parties pr
     -> In (Sender (channels ch)) all_parties
@@ -1393,14 +1394,14 @@ End Multiparty.
 (** * A bonus: running orthogonal protocols in parallel *)
 
 Inductive mayTouch : proc -> channel -> Prop :=
-| MtSend1 : forall ch (A : Set) (v : A) k,
+| MtSend1 : forall ch (A : Type) (v : A) k,
     mayTouch (Send ch v k) ch
-| MtSend2 : forall ch (A : Set) (v : A) k ch',
+| MtSend2 : forall ch (A : Type) (v : A) k ch',
     mayTouch k ch'
     -> mayTouch (Send ch v k) ch'
-| MtRecv1 : forall ch (A : Set) (k : A -> _),
+| MtRecv1 : forall ch (A : Type) (k : A -> _),
     mayTouch (Recv ch k) ch
-| MtRecv2 : forall ch (A : Set) (v : A) k ch',
+| MtRecv2 : forall ch (A : Type) (v : A) k ch',
     mayTouch (k v) ch'
     -> mayTouch (Recv ch k) ch'
 | MtNewChannel : forall ch chs ch' k,
@@ -1419,7 +1420,7 @@ Inductive mayTouch : proc -> channel -> Prop :=
     mayTouch pr1 ch
     -> mayTouch (Dup pr1) ch.
 
-Hint Constructors mayTouch.
+Hint Constructors mayTouch : core.
 
 Import BasicTwoParty Multiparty.
 
@@ -1434,23 +1435,23 @@ Proof.
     end.
 Qed.
 
-Hint Immediate lstep_mayTouch.
+Hint Immediate lstep_mayTouch : core.
 
-Lemma Input_mayTouch : forall pr ch (A : Set) (v : A) pr',
-    lstep pr (Input {| Channel := ch; Value := v |}) pr'
+Lemma Input_mayTouch : forall pr ch (A : Type) (v : A) pr',
+    lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
     -> mayTouch pr ch.
 Proof.
   induct 1; eauto.
 Qed.
 
-Lemma Output_mayTouch : forall pr ch (A : Set) (v : A) pr',
-    lstep pr (Output {| Channel := ch; Value := v |}) pr'
+Lemma Output_mayTouch : forall pr ch (A : Type) (v : A) pr',
+    lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
     -> mayTouch pr ch.
 Proof.
   induct 1; eauto.
 Qed.
 
-Hint Immediate Input_mayTouch Output_mayTouch.
+Hint Immediate Input_mayTouch Output_mayTouch : core.
 
 Lemma independent_execution : forall pr1 pr2 pr,
   lstepSilent^* (pr1 || pr2) pr

@@ -36,8 +36,8 @@ Inductive proc :=
 (* Act like [pr], but prevent interaction with other processes through channel
  * [ch].  We effectively force [ch] to be *private*. *)
 
-| Send (ch : channel) {A : Set} (v : A) (k : proc)
-| Recv (ch : channel) {A : Set} (k : A -> proc)
+| Send (ch : channel) {A : Type} (v : A) (k : proc)
+| Recv (ch : channel) {A : Type} (k : A -> proc)
 (* When one process runs a [Send] and the other a [Recv] on the same channel
  * simultaneously, the [Send] moves on to its [k], while the [Recv] moves on to
  * its [k v], for [v] the value that was sent. *)
@@ -106,7 +106,7 @@ Definition tester (metaInput input output metaOutput : channel) : proc :=
 
 Record message := {
   Channel : channel;
-  TypeOf : Set;
+  TypeOf : Type;
   Value : TypeOf
 }.
 
@@ -117,9 +117,6 @@ Inductive action :=
 Inductive label :=
 | Silent
 | Action (a : action).
-
-(* This command lets us use [action]s implicitly as [label]s. *)
-Coercion Action : action >-> label.
 
 (* This predicate captures when a label doesn't use a channel. *)
 Definition notUse (ch : channel) (l : label) :=
@@ -136,13 +133,13 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * the value being received is "pulled out of thin air"!  However, it gets
  * determined concretely by comparing against a matching [Send], in a rule that
  * we get to shortly. *)
-| LStepSend : forall ch {A : Set} (v : A) k,
+| LStepSend : forall ch {A : Type} (v : A) k,
     lstep (Send ch v k)
-          (Output {| Channel := ch; Value := v |})
+          (Action (Output {| Channel := ch; Value := v |}))
           k
-| LStepRecv : forall ch {A : Set} (k : A -> _) v,
+| LStepRecv : forall ch {A : Type} (k : A -> _) v,
     lstep (Recv ch k)
-          (Input {| Channel := ch; Value := v |})
+          (Action (Input {| Channel := ch; Value := v |}))
           (k v)
 
 (* A [Dup] always has the option of replicating itself further. *)
@@ -177,13 +174,13 @@ Inductive lstep : proc -> label -> proc -> Prop :=
  * value from the same channel, the two sides *rendezvous*, and the value is
  * exchanged.  This is the only mechanism to let two transitions happen at
  * once. *)
-| LStepRendezvousLeft : forall pr1 ch {A : Set} (v : A) pr1' pr2 pr2',
-    lstep pr1 (Input {| Channel := ch; Value := v |}) pr1'
-    -> lstep pr2 (Output {| Channel := ch; Value := v |}) pr2'
+| LStepRendezvousLeft : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
+    lstep pr1 (Action (Input {| Channel := ch; Value := v |})) pr1'
+    -> lstep pr2 (Action (Output {| Channel := ch; Value := v |})) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2')
-| LStepRendezvousRight : forall pr1 ch {A : Set} (v : A) pr1' pr2 pr2',
-    lstep pr1 (Output {| Channel := ch; Value := v |}) pr1'
-    -> lstep pr2 (Input {| Channel := ch; Value := v |}) pr2'
+| LStepRendezvousRight : forall pr1 ch {A : Type} (v : A) pr1' pr2 pr2',
+    lstep pr1 (Action (Output {| Channel := ch; Value := v |})) pr1'
+    -> lstep pr2 (Action (Input {| Channel := ch; Value := v |})) pr2'
     -> lstep (Par pr1 pr2) Silent (Par pr1' pr2').
 
 (* Here's a shorthand for silent steps. *)
@@ -244,7 +241,7 @@ Inductive couldGenerate : proc -> list action -> Prop :=
 (* Skip ahead to [refines_couldGenerate] to see the top-level connection from
  * [refines]. *)
 
-Hint Constructors couldGenerate.
+Hint Constructors couldGenerate : core.
 
 Lemma lstepSilent_couldGenerate : forall pr1 pr2,
   lstepSilent^* pr1 pr2
@@ -254,7 +251,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_couldGenerate.
+Hint Resolve lstepSilent_couldGenerate : core.
 
 Lemma simulates_couldGenerate' : forall (R : proc -> proc -> Prop),
     (forall pr1 pr2, R pr1 pr2
@@ -295,8 +292,8 @@ Qed.
 (* Well, you're used to unexplained automation tactics by now, so here are some
  * more. ;-) *)
 
-Lemma invert_Recv : forall ch (A : Set) (k : A -> proc) (x : A) pr,
-    lstep (Recv ch k) (Input {| Channel := ch; Value := x |}) pr
+Lemma invert_Recv : forall ch (A : Type) (k : A -> proc) (x : A) pr,
+    lstep (Recv ch k) (Action (Input {| Channel := ch; Value := x |})) pr
     -> pr = k x.
 Proof.
   invert 1; auto.
@@ -308,8 +305,8 @@ Ltac inverter :=
          | [ H : lstepSilent _ _ |- _ ] => invert H
          end.
 
-Hint Constructors lstep.
-Hint Unfold lstepSilent.
+Hint Constructors lstep : core.
+Hint Unfold lstepSilent : core.
 
 Ltac lists' :=
   repeat match goal with
@@ -319,7 +316,7 @@ Ltac lists' :=
 
 Ltac lists := solve [ lists' ].
 
-Hint Extern 1 (NoDup _) => lists.
+Hint Extern 1 (NoDup _) => lists : core.
 
 
 (** * Examples *)
@@ -364,7 +361,7 @@ Inductive R_add2 : proc -> proc -> Prop :=
          (Block intermediate; Done || Done)
          Done.
 
-Hint Constructors R_add2.
+Hint Constructors R_add2 : core.
 
 Theorem add2_once_refines_addN : forall input output,
     input <> output
@@ -465,9 +462,9 @@ Inductive RDup (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
     -> RDup R pr2 pr2'
     -> RDup R (Par pr1 pr2) (Par pr1' pr2').
 
-Hint Constructors RDup.
+Hint Constructors RDup : core.
 
-Hint Unfold lstepSilent.
+Hint Unfold lstepSilent : core.
 
 Lemma lstepSilent_Par1 : forall pr1 pr1' pr2,
     lstepSilent^* pr1 pr1'
@@ -483,7 +480,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_Par1 lstepSilent_Par2.
+Hint Resolve lstepSilent_Par1 lstepSilent_Par2 : core.
 
 Lemma refines_Dup_Action : forall R : _ -> _ -> Prop,
     (forall pr1 pr2, R pr1 pr2
@@ -596,7 +593,7 @@ Inductive RPar (R1 R2 : proc -> proc -> Prop) : proc -> proc -> Prop :=
     -> R2 pr2 pr2'
     -> RPar R1 R2 (pr1 || pr2) (pr1' || pr2').
 
-Hint Constructors RPar.
+Hint Constructors RPar : core.
 
 Lemma refines_Par_Action : forall R1 R2 : _ -> _ -> Prop,
     (forall pr1 pr2, R1 pr1 pr2
@@ -709,8 +706,8 @@ Inductive RBlock (R : proc -> proc -> Prop) : proc -> proc -> Prop :=
     R pr1 pr2
     -> RBlock R (Block ch; pr1) (Block ch; pr2).
 
-Hint Constructors RBlock.
-Hint Unfold notUse.
+Hint Constructors RBlock : core.
+Hint Unfold notUse : core.
 
 Lemma lstepSilent_Block : forall ch pr1 pr2,
     lstepSilent^* pr1 pr2
@@ -719,7 +716,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve lstepSilent_Block.
+Hint Resolve lstepSilent_Block : core.
 
 Theorem refines_Block : forall pr1 pr2 ch,
     pr1 <| pr2
@@ -746,7 +743,7 @@ Inductive RBlock2 : proc -> proc -> Prop :=
 | RBlock2_1 : forall ch1 ch2 pr,
     RBlock2 (Block ch1; Block ch2; pr) (Block ch2; Block ch1; pr).
 
-Hint Constructors RBlock2.
+Hint Constructors RBlock2 : core.
 
 Theorem refines_Block2 : forall ch1 ch2 pr,
     Block ch1; Block ch2; pr <| Block ch2; Block ch1; pr.
@@ -768,11 +765,11 @@ Qed.
 (* This predicate is handy for side conditions, to enforce that a process never
  * uses a particular channel for anything. *)
 Inductive neverUses (ch : channel) : proc -> Prop :=
-| NuRecv : forall ch' (A : Set) (k : A -> _),
+| NuRecv : forall ch' (A : Type) (k : A -> _),
     ch' <> ch
     -> (forall v, neverUses ch (k v))
     -> neverUses ch (Recv ch' k)
-| NuSend : forall ch' (A : Set) (v : A) k,
+| NuSend : forall ch' (A : Type) (v : A) k,
     ch' <> ch
     -> neverUses ch k
     -> neverUses ch (Send ch' v k)
@@ -786,7 +783,7 @@ Inductive neverUses (ch : channel) : proc -> Prop :=
 | NuDone :
     neverUses ch Done.
 
-Hint Constructors neverUses.
+Hint Constructors neverUses : core.
 
 Lemma neverUses_step : forall ch pr1,
     neverUses ch pr1
@@ -796,14 +793,14 @@ Proof.
   induct 1; invert 1; eauto.
 Qed.
 
-Hint Resolve neverUses_step.
+Hint Resolve neverUses_step : core.
 
 Inductive RBlockS : proc -> proc -> Prop :=
 | RBlockS1 : forall ch pr1 pr2,
     neverUses ch pr2
     -> RBlockS (Block ch; pr1 || pr2) ((Block ch; pr1) || pr2).
 
-Hint Constructors RBlockS.
+Hint Constructors RBlockS : core.
 
 Lemma neverUses_notUse : forall ch pr l,
     neverUses ch pr
@@ -814,20 +811,20 @@ Proof.
 Qed.
 
 Lemma notUse_Input_Output : forall ch r,
-    notUse ch (Input r)
-    -> notUse ch (Output r).
+    notUse ch (Action (Input r))
+    -> notUse ch (Action (Output r)).
 Proof.
   simplify; auto.
 Qed.
 
 Lemma notUse_Output_Input : forall ch r,
-    notUse ch (Output r)
-    -> notUse ch (Input r).
+    notUse ch (Action (Output r))
+    -> notUse ch (Action (Input r)).
 Proof.
   simplify; auto.
 Qed.
 
-Hint Resolve neverUses_notUse.
+Hint Resolve neverUses_notUse : core.
 
 Theorem refines_BlockS : forall ch pr1 pr2,
     neverUses ch pr2
@@ -1011,7 +1008,7 @@ Inductive RTree (t : tree) (input output : channel) : proc -> proc -> Prop :=
           (Block output'; threads || Done)
           Done.
 
-Hint Constructors TreeThreads RTree.
+Hint Constructors TreeThreads RTree : core.
 
 Lemma TreeThreads_actionIs : forall ch maySend pr,
     TreeThreads ch maySend pr
@@ -1058,7 +1055,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Resolve TreeThreads_silent TreeThreads_maySend TreeThreads_action TreeThreads_weaken.
+Hint Resolve TreeThreads_silent TreeThreads_maySend TreeThreads_action TreeThreads_weaken : core.
 
 Lemma TreeThreads_inTree_par' : forall n ch t,
     TreeThreads ch (mem n t) (inTree_par' n t ch).
@@ -1069,7 +1066,7 @@ Proof.
   cases (mem n t2); simplify; eauto.
 Qed.
 
-Hint Resolve TreeThreads_inTree_par'.
+Hint Resolve TreeThreads_inTree_par' : core.
 
 (* Finally, the main theorem: *)
 Theorem refines_inTree_par : forall t input output,
@@ -1175,7 +1172,7 @@ Inductive manyOfAndOneOf (common rare : proc) : proc -> Prop :=
     -> manyOfAndOneOf common rare pr2
     -> manyOfAndOneOf common rare (pr1 || pr2).
 
-Inductive Rhandoff (ch : channel) (A : Set) (v : A) (k : A -> proc) : proc -> proc -> Prop :=
+Inductive Rhandoff (ch : channel) (A : Type) (v : A) (k : A -> proc) : proc -> proc -> Prop :=
 | Rhandoff1 : forall recvs,
     neverUses ch (k v)
     -> manyOf (??ch(x : A); k x) recvs
@@ -1189,12 +1186,12 @@ Inductive Rhandoff (ch : channel) (A : Set) (v : A) (k : A -> proc) : proc -> pr
     -> manyOf (??ch(x : A); k x) recvs
     -> Rhandoff ch v k (Block ch; Done || recvs) rest.
 
-Hint Constructors manyOf manyOfAndOneOf Rhandoff.
+Hint Constructors manyOf manyOfAndOneOf Rhandoff : core.
 
 Lemma manyOf_action : forall this pr,
     manyOf this pr
     -> forall a pr', lstep pr (Action a) pr'
-                          -> exists this', lstep this a this'.
+                          -> exists this', lstep this (Action a) this'.
 Proof.
   induct 1; simplify; eauto.
   invert H.
@@ -1202,7 +1199,7 @@ Proof.
 Qed.
 
 Lemma manyOf_silent : forall this, (forall this', lstepSilent this this' -> False)
-    -> (forall r this', lstep this (Output r) this' -> False)
+    -> (forall r this', lstep this (Action (Output r)) this' -> False)
     -> forall pr, manyOf this pr
       -> forall pr', lstep pr Silent pr'
                      -> manyOf this pr'.
@@ -1215,9 +1212,9 @@ Proof.
   eapply manyOf_action in H4; eauto; first_order; exfalso; eauto.
 Qed.
 
-Lemma manyOf_rendezvous : forall ch (A : Set) (v : A) (k : A -> _) pr,
+Lemma manyOf_rendezvous : forall ch (A : Type) (v : A) (k : A -> _) pr,
     manyOf (Recv ch k) pr
-    -> forall pr', lstep pr (Input {| Channel := ch; Value := v |}) pr'
+    -> forall pr', lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
                    -> manyOfAndOneOf (Recv ch k) (k v) pr'.
 Proof.
   induct 1; simplify; eauto.
@@ -1229,12 +1226,12 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve manyOf_silent manyOf_rendezvous.
+Hint Resolve manyOf_silent manyOf_rendezvous : core.
 
-Lemma manyOfAndOneOf_output : forall ch (A : Set) (k : A -> _) rest ch0 (A0 : Set) (v0 : A0) pr,
+Lemma manyOfAndOneOf_output : forall ch (A : Type) (k : A -> _) rest ch0 (A0 : Type) (v0 : A0) pr,
     manyOfAndOneOf (Recv ch k) rest pr
-    -> forall pr', lstep pr (Output {| Channel := ch0; Value := v0 |}) pr'
-                   -> exists rest', lstep rest (Output {| Channel := ch0; Value := v0 |}) rest'
+    -> forall pr', lstep pr (Action (Output {| Channel := ch0; Value := v0 |})) pr'
+                   -> exists rest', lstep rest (Action (Output {| Channel := ch0; Value := v0 |})) rest'
                                     /\ manyOfAndOneOf (Recv ch k) rest' pr'.
 Proof.
   induct 1; simplify; eauto.
@@ -1263,11 +1260,11 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve manyOf_manyOfAndOneOf.
+Hint Resolve manyOf_manyOfAndOneOf : core.
 
-Lemma no_rendezvous : forall ch0 (A0 : Set) (v : A0) pr1 rest (k : A0 -> _),
+Lemma no_rendezvous : forall ch0 (A0 : Type) (v : A0) pr1 rest (k : A0 -> _),
     manyOfAndOneOf (??ch0 (x : _); k x) rest pr1
-    -> forall pr1', lstep pr1 (Output {| Channel := ch0; TypeOf := A0; Value := v |}) pr1'
+    -> forall pr1', lstep pr1 (Action (Output {| Channel := ch0; TypeOf := A0; Value := v |})) pr1'
     -> neverUses ch0 rest
     -> False.
 Proof.
@@ -1300,7 +1297,7 @@ Proof.
   eauto.
 Qed.
 
-Lemma manyOfAndOneOf_silent : forall ch (A : Set) (k : A -> _) rest pr,
+Lemma manyOfAndOneOf_silent : forall ch (A : Type) (k : A -> _) rest pr,
     manyOfAndOneOf (Recv ch k) rest pr
     -> neverUses ch rest
     -> forall pr', lstep pr Silent pr'
@@ -1338,14 +1335,14 @@ Proof.
   invert H.
 Qed.
 
-Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous.
+Hint Resolve manyOfAndOneOf_silent manyOf_rendezvous : core.
 
-Lemma manyOfAndOneOf_action : forall ch (A : Set) (k : A -> _) rest pr,
+Lemma manyOfAndOneOf_action : forall ch (A : Type) (k : A -> _) rest pr,
     manyOfAndOneOf (Recv ch k) rest pr
     -> forall a pr', lstep pr (Action a) pr'
                      -> (exists v : A, a = Input {| Channel := ch; Value := v |})
                         \/ exists rest', manyOfAndOneOf (Recv ch k) rest' pr'
-                                         /\ lstep rest a rest'.
+                                         /\ lstep rest (Action a) rest'.
 Proof.
   induct 1; simplify; eauto.
   invert H; eauto.
@@ -1368,7 +1365,7 @@ Qed.
  * of each server thread has nothing more to do with the channel we are using to
  * send it requests!  Otherwise, we would need to keep some [Dup] present
  * explicitly in the spec (righthand argument of [<|]). *)
-Theorem handoff : forall ch (A : Set) (v : A) k,
+Theorem handoff : forall ch (A : Type) (v : A) k,
     neverUses ch (k v)
     -> Block ch; (!!ch(v); Done) || Dup (Recv ch k)
        <| k v.

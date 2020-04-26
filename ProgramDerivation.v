@@ -497,7 +497,7 @@ Proof.
   simplify; subst; eauto.
 Qed.
 
-Hint Resolve ReplaceMethod_ok.
+Hint Resolve ReplaceMethod_ok : core.
 
 (* It is OK to replace a method body if the new refines the old as a [comp]. *)
 Theorem refine_method : forall state name (oldbody newbody : state -> nat -> comp (state * nat))

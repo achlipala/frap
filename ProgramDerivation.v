@@ -8,6 +8,8 @@ Require Import Frap.
 Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
 Require Import Eqdep.
 
+Set Warnings "-cannot-define-projection".
+
 Ltac inv_pair :=
   match goal with
   | [ H : existT _ _ _ = existT _ _ _ |- _ ] => apply inj_pair2 in H; invert H
@@ -325,7 +327,7 @@ Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
     -> RefineMethods R (MethodsCons {| MethodName := name; MethodBody := f1 |} ms1)
                        (MethodsCons {| MethodName := name; MethodBody := f2 |} ms2).
 
-Hint Constructors RefineMethods.
+Hint Constructors RefineMethods : core.
 
 (* When does [adt2] refine [adt1]?  When there exists a simulation relation,
  * with respect to which the constructors and methods all satisfy the usual
@@ -358,7 +360,7 @@ Definition split_counter := ADT {
   and method "value"[[self, _]] = ret (self, fst self + snd self)
 }.
 
-Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic.
+Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic : core.
 
 (* Here is why the new implementation is correct. *)
 Theorem split_counter_ok : adt_refine counter split_counter.
@@ -389,9 +391,9 @@ Proof.
   constructor.
   cases m; constructor; first_order.
   subst; eauto.
-Qed.  
+Qed.
 
-Hint Immediate RefineMethods_refl.
+Hint Immediate RefineMethods_refl : core.
 
 Theorem refine_refl : forall names (adt1 : adt names),
     adt_refine adt1 adt1.
@@ -420,7 +422,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve RefineMethods_trans.
+Hint Resolve RefineMethods_trans : core.
 
 Theorem refine_trans : forall names (adt1 adt2 adt3 : adt names),
     adt_refine adt1 adt2
@@ -551,7 +553,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve RepChangeMethods_ok.
+Hint Resolve RepChangeMethods_ok : core.
 
 Theorem refine_rep : forall state1 state2 (absfunc : state2 -> state1)
                             names (ms1 : methods state1 names) (ms2 : methods state2 names)
@@ -648,7 +650,7 @@ Inductive CachingMethods {state} (name : string) (func : state -> nat)
     CachingMethods name func ms1 ms2
     -> CachingMethods name func
        (MethodsCons {| MethodName := name; MethodBody := (fun s _ => ret (s, func s)) |} ms1)
-       (MethodsCons {| MethodName := name; MethodBody := (fun s arg => ret (s, snd s)) |} ms2)
+       (MethodsCons {| MethodName := name; MethodBody := (fun s _ => ret (s, snd s)) |} ms2)
 
 (* Any other method now picks up an obligation to recompute the cache value
  * whenever changing the state.  We express that recomputation with a pick, to
@@ -686,7 +688,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve CachingMethods_ok.
+Hint Resolve CachingMethods_ok : core.
 
 Theorem refine_cache : forall state name (func : state -> nat)
                             names (ms1 : methods state names) (ms2 : methods (state * nat) names)

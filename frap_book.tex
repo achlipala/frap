@@ -4745,7 +4745,7 @@ Here's the object language we adopt, which should be old hat by now, just mixing
 
 $$\begin{array}{rrcl}
   \textrm{Commands} & c &::=& \mt{Fail} \mid \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Loop} \; i \; f \\
-  &&& \mid \mt{Read} \; a \mid \mt{Write} \; a \; v \mid \mt{Lock} \; a \mid \mt{Unlock} \; a \mid c || c
+  &&& \mid \mt{Read} \; a \mid \mt{Write} \; a \; v \mid \mt{Alloc} \; n \mid \mt{Free} \; a \; n \mid \mt{Lock} \; a \mid \mt{Unlock} \; a \mid c || c
 \end{array}$$
 
 $$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
@@ -4760,6 +4760,12 @@ $$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; v)}}{
 }
 \quad \infer{\smallstep{(h, l, \mt{Write} \; a \; v')}{(\mupd{h}{a}{v'}, l, \mt{Return} \; ())}}{
   \msel{h}{a} = v
+}$$
+
+$$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, \mt{Return} \; a)}}{
+  \dom{h} \cap [a, a+n) = \emptyset
+}
+\quad \infer{\smallstep{(h, \mt{Free} \; a \; n)}{(h - [a, a+n), \mt{Return} \; ())}}{
 }$$
 
 $$\infer{\smallstep{(h, l, \mt{Lock} \; a)}{(h, l \cup \{a\}, \mt{Return} \; ())}}{

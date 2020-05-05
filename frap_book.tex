@@ -5416,7 +5416,7 @@ Here is a sketch of the key lemmas.
 
 \begin{lemma}\label{preserve_unused}
   Assume that $\vec{\alpha}$ is a duplicate-free list of parties excluding both sender and receiver of channel $c$.
-  If $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$, then for any $v : \sigma$, we have $\mptys{p'}{\vec{\alpha}}{\tau(v)}$.
+  If $\mptys{p}{\vec{\alpha}}{\; \send{c}{x : \sigma}{\tau(x)}}$, then for any $v : \sigma$, we have $\mptys{p}{\vec{\alpha}}{\tau(v)}$.
   In other words, when we have well-typed code for a set of parties that do not participate in the first step of a protocol, that code remains well-typed when we advance to the next protocol step.
 \end{lemma}
 \begin{proof}

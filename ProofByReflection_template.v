@@ -305,18 +305,22 @@ Section my_tauto.
     induct s; simplify; equality.
   Qed.
 
-  Fixpoint forward (f : formula) (known : set propvar) (hyp : formula)
+  Fixpoint forward (known : set propvar) (hyp : formula)
            (cont : set propvar -> bool) : bool :=
     match hyp with
     | Atomic v => cont (add known v)
     | Truth => cont known
     | Falsehood => true
-    | And h1 h2 => forward (Imp h2 f) known h1 (fun known' =>
-                     forward f known' h2 cont)
-    | Or h1 h2 => forward f known h1 cont && forward f known h2 cont
+    | And h1 h2 => forward known h1 (fun known' =>
+                     forward known' h2 cont)
+    | Or h1 h2 => forward known h1 cont && forward known h2 cont
     | Imp _ _ => cont known
     end.
 
+  Compute fun cont => forward [] (Atomic 0) cont.
+  Compute fun cont => forward [] (Or (Atomic 0) (Atomic 1)) cont.
+  Compute fun cont => forward [] (Or (Atomic 0) (And (Atomic 1) (Atomic 2))) cont.
+  
   Fixpoint backward (known : set propvar) (f : formula) : bool :=
     match f with
     | Atomic v => if In_dec eq_nat_dec v known then true else false
@@ -324,12 +328,20 @@ Section my_tauto.
     | Falsehood => false
     | And f1 f2 => backward known f1 && backward known f2
     | Or f1 f2 => backward known f1 || backward known f2
-    | Imp f1 f2 => forward f2 known f1 (fun known' => backward known' f2)
+    | Imp f1 f2 => forward known f1 (fun known' => backward known' f2)
     end.
+
+  Compute backward [] (Atomic 0).
+  Compute backward [0] (Atomic 0).
+  Compute backward [0; 2] (Or (Atomic 0) (Atomic 1)).
+  Compute backward [2] (Or (Atomic 0) (Atomic 1)).
+  Compute backward [2] (Imp (Atomic 0) (Or (Atomic 0) (Atomic 1))).
+  Compute backward [2] (Imp (Or (Atomic 0) (Atomic 3)) (Or (Atomic 0) (Atomic 1))).
+  Compute backward [2] (Imp (Or (Atomic 1) (Atomic 0)) (Or (Atomic 0) (Atomic 1))).
 End my_tauto.
 
 Lemma forward_ok : forall atomics hyp f known cont,
-    forward f known hyp cont = true
+    forward known hyp cont = true
     -> (forall known', allTrue atomics known'
                        -> cont known' = true
                        -> formulaDenote atomics f)
@@ -349,14 +361,10 @@ Proof.
   eassumption.
   assumption.
 
-  eapply IHhyp1 in H.
-  simplify; propositional.
-  simplify.
-  eapply IHhyp2.
+  eapply IHhyp1.
   eassumption.
-  assumption.
-  assumption.
-  assumption.
+  simplify.
+  eauto.
   assumption.
   assumption.
 
@@ -472,7 +480,7 @@ Ltac vars_in P acc :=
     end
   end.
 
-(* Reification of formula [P], with a pregenertaed list [vars] of variables it
+(* Reification of formula [P], with a pregenerated list [vars] of variables it
  * may mention *)
 Ltac reify_tauto' P vars :=
   match P with

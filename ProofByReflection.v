@@ -24,7 +24,7 @@ Set Asymmetric Patterns.
 
 (** * Proving Evenness *)
 
-(* Proving that particular natural number constants are even is certainly
+(* Proving that particular natural-number constants are even is certainly
  * something we would rather have happen automatically.  The Ltac-programming
  * techniques that we learned last week make it easy to implement such a
  * procedure. *)
@@ -56,7 +56,7 @@ Unset Printing All.
  * a choice of [n], and we wind up giving every even number from 0 to 254 in
  * that position, at some point or another, for quadratic proof-term size.
  *
- * It is also unfortunate not to have static typing guarantees that our tactic
+ * It is also unfortunate not to have static-typing guarantees that our tactic
  * always behaves appropriately.  Other invocations of similar tactics might
  * fail with dynamic type errors, and we would not know about the bugs behind
  * these errors until we happened to attempt to prove complex enough goals.
@@ -116,7 +116,7 @@ Qed.
 
 Ltac prove_even_reflective :=
   match goal with
-    | [ |- isEven ?N] => apply check_even_ok; reflexivity
+    | [ |- isEven _ ] => apply check_even_ok; reflexivity
   end.
 
 Theorem even_256' : isEven 256.
@@ -369,6 +369,7 @@ Section monoid.
   (* We can make short work of theorems like this one: *)
 
   Theorem t1 : forall a b c d, a + b + c + d = a + (b + c) + d.
+  Proof.
     simplify; monoid.
 
     (* Our tactic has canonicalized both sides of the equality, such that we can
@@ -394,7 +395,7 @@ End monoid.
 
 (** * Set Simplification for Model Checking *)
 
-(* Let's take a closer look at model-checking proofs like from last class. *)
+(* Let's take a closer look at model-checking proofs like from an earlier class. *)
 
 (* Here's a simple transition system, where state is just a [nat], and where
  * each step subtracts 1 or 2. *)
@@ -504,7 +505,7 @@ Ltac simplify_set :=
   end.
 
 (* Back to our example, which we can now finish without calling [simplify] to
- * reduces trees of union operations. *)
+ * reduce trees of union operations. *)
 Lemma subtract_ok :
   invariantFor (subtract_sys 5)
                (fun n => n <= 5).
@@ -635,18 +636,23 @@ Section my_tauto.
    * puzzles novices, so don't worry if it takes a while to digest!), which will
    * be called once for each case. *)
 
-  Fixpoint forward (f : formula) (known : set propvar) (hyp : formula)
+  Fixpoint forward (known : set propvar) (hyp : formula)
            (cont : set propvar -> bool) : bool :=
     match hyp with
     | Atomic v => cont (add known v)
     | Truth => cont known
     | Falsehood => true
-    | And h1 h2 => forward (Imp h2 f) known h1 (fun known' =>
-                     forward f known' h2 cont)
-    | Or h1 h2 => forward f known h1 cont && forward f known h2 cont
+    | And h1 h2 => forward known h1 (fun known' =>
+                     forward known' h2 cont)
+    | Or h1 h2 => forward known h1 cont && forward known h2 cont
     | Imp _ _ => cont known
     end.
 
+  (* Some examples might help get the idea across. *)
+  Compute fun cont => forward [] (Atomic 0) cont.
+  Compute fun cont => forward [] (Or (Atomic 0) (Atomic 1)) cont.
+  Compute fun cont => forward [] (Or (Atomic 0) (And (Atomic 1) (Atomic 2))) cont.
+  
   (* A [backward] function implements analysis of the final goal.  It calls
    * [forward] to handle implications. *)
 
@@ -657,12 +663,21 @@ Section my_tauto.
     | Falsehood => false
     | And f1 f2 => backward known f1 && backward known f2
     | Or f1 f2 => backward known f1 || backward known f2
-    | Imp f1 f2 => forward f2 known f1 (fun known' => backward known' f2)
+    | Imp f1 f2 => forward known f1 (fun known' => backward known' f2)
     end.
+
+  (* Examples: *)
+  Compute backward [] (Atomic 0).
+  Compute backward [0] (Atomic 0).
+  Compute backward [0; 2] (Or (Atomic 0) (Atomic 1)).
+  Compute backward [2] (Or (Atomic 0) (Atomic 1)).
+  Compute backward [2] (Imp (Atomic 0) (Or (Atomic 0) (Atomic 1))).
+  Compute backward [2] (Imp (Or (Atomic 0) (Atomic 3)) (Or (Atomic 0) (Atomic 1))).
+  Compute backward [2] (Imp (Or (Atomic 1) (Atomic 0)) (Or (Atomic 0) (Atomic 1))).
 End my_tauto.
 
 Lemma forward_ok : forall atomics hyp f known cont,
-    forward f known hyp cont = true
+    forward known hyp cont = true
     -> (forall known', allTrue atomics known'
                        -> cont known' = true
                        -> formulaDenote atomics f)
@@ -682,14 +697,10 @@ Proof.
   eassumption.
   assumption.
 
-  eapply IHhyp1 in H.
-  simplify; propositional.
-  simplify.
-  eapply IHhyp2.
+  eapply IHhyp1.
   eassumption.
-  assumption.
-  assumption.
-  assumption.
+  simplify.
+  eauto.
   assumption.
   assumption.
 
@@ -805,7 +816,7 @@ Ltac vars_in P acc :=
     end
   end.
 
-(* Reification of formula [P], with a pregenertaed list [vars] of variables it
+(* Reification of formula [P], with a pregenerated list [vars] of variables it
  * may mention *)
 Ltac reify_tauto' P vars :=
   match P with

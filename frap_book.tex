@@ -3764,10 +3764,10 @@ We can also define natural comparison operators between assertions, overloading 
 \end{eqnarray*}
 
 The core connectives satisfy a number of handy algebraic laws.
-Here is a sampling.
+Here is a sampling (where we note that the first one takes advantage of the overloading of implication $\Rightarrow$ in two different senses).
 
 $$\infer{P * \lift{\phi} \Rightarrow Q}{
-  \phi \rightarrow (P \Rightarrow Q)
+  \phi \Rightarrow (P \Rightarrow Q)
 }
 \quad \infer{P \Rightarrow Q * \lift{\phi}}{
   \phi

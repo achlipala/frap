@@ -2124,7 +2124,7 @@ Our even-odd example trivially has that property, since it contains only finitel
 It is worth emphasizing that, when those conditions are met, our invariant-finding procedure is guaranteed to terminate, even though the underlying language is Turing-complete, so that most interesting analysis problems are uncomputable!
 The catch is that it is always possible that the invariant found is a trivial one, where the abstract state maps every variable to $\top$.
 
-Here is an example of a program where flow-insensitive even-odd analysis gives the most precise answer.
+Here is an example of a program where flow-insensitive even-odd analysis gives the most precise answer (relative to its simplifying assumption that we must assign the same description to a variable at every step of execution).
 $$\assign{n}{10}; \assign{x}{0}; \while{n > 0}{\assign{x}{x + 2 \times n}; \assign{n}{n - 1}}$$
 
 The abstract state we wind up with is $\mupd{\mupd{\mempty}{n}{\top}}{x}{\E}$.
@@ -2133,7 +2133,7 @@ The abstract state we wind up with is $\mupd{\mupd{\mempty}{n}{\top}}{x}{\E}$.
 
 We can only go so far with flow-insensitive invariants, which don't let us record different facts about the variables for different lines of the program code.
 Such an analysis will get tripped up even by straightline code where parities of variables change as we go.
-Here is a trivial example program where the flow-insensitive analysis returns the useless answer $\mupd{\mempty}{x}{\top}$, when the most precise answer would be $\mupd{\mempty}{x}{\O}$.
+Here is a trivial example program where the flow-insensitive analysis returns the useless answer $\mupd{\mempty}{x}{\top}$, when the most precise answer (about program state after execution) would be $\mupd{\mempty}{x}{\O}$.
 $$\assign{x}{0}; \assign{x}{1}$$
 
 The solution to this problem can be to go to \emph{flow-sensitive}\index{flow-sensitive analysis} analysis, where an abstract state $S$ is a finite map from commands (all the intermediate ``program counters'' of an original command) to the abstract states of the previous section.

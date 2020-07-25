@@ -252,7 +252,7 @@ Module Make(Import S : SEP).
   
   Ltac normalize2 :=
     match goal with
-    | [ |- context[star ?p lift (?P /\ ?Q)] ] => rewrite (lift_uncombine p P Q)
+    | [ |- context[star ?p (lift (?P /\ ?Q))] ] => rewrite (lift_uncombine p P Q)
     | [ |- context[star ?p (star ?q ?r)] ] => rewrite (star_assoc p q r)
     end.
 

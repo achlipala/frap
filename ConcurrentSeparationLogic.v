@@ -699,7 +699,7 @@ Qed.
 
 (* Here's a variant on the last example.  Now we have three stages.
  * Stage 1: push consecutive even numbers to stack 1.
- * Stage 2: pop from stack 1 and push to stack 1, reusing the memory for the
+ * Stage 2: pop from stack 1 and push to stack 2, reusing the memory for the
  *          list node.
  * Stage 3: pop from stack 2 and fail if odd. *)
 

@@ -202,7 +202,7 @@ Definition simulates (R : proc -> proc -> Prop) (pr1 pr2 : proc) :=
                                    -> exists pr2', lstepSilent^* pr2 pr2'
                                                    /\ R pr1' pr2')
 
-  (* Now consider the same scenario where the lefthand process make a nonsilent
+  (* Now consider the same scenario where the lefthand process takes a nonsilent
    * step.  We require that the righthand process can "catch up" in a way that
    * generates the same label that the lefthand process generated. *)
   /\ (forall pr1 pr2, R pr1 pr2

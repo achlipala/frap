@@ -4816,14 +4816,15 @@ $$\infer{\hoare{P'}{c}{Q'}}{
 
 \modularity
 When two threads use disjoint regions of memory, it is trivial to apply this rule of Concurrent Separation Logic to verify the threads independently.
-$$\infer{\hoare{P_1 * P_2}{c_1 || c_2}{\lambda r. \; Q_1(r) * Q_2(r)}}{
+$$\infer{\hoare{P_1 * P_2}{c_1 || c_2}{\lambda \_. \; \lift{\bot}]}}{
   \hoare{P_1}{c_1}{Q_1}
   & \hoare{P_2}{c_2}{Q_2}
 }$$
 The separating conjunction $*$ turned out to be just the right way to express the idea of ``splitting the heap into a part for the first thread and a part for the second thread.''
 Because $c_1$ and $c_2$ touch disjoint memory regions, all of their memory operations commute\index{commutativity}, so that we need not worry about the state-explosion problem, in all the ways that the scheduler might interleave their steps.
+Note that, since for simplicity our running example family of concurrent object languages includes no way for parallel compositions to terminate, it makes sense to assign a contradictory overall postcondition.
 
-However, with realistic shared-memory programs, we don't get off that easy.
+However, with realistic shared-memory programs, we don't get off as easy as the parallel-composition rule suggests.
 Threads \emph{do} share memory regions, using \emph{synchronization}\index{synchronization} to tame the state-explosion problem.
 Our object language includes locks as its example of synchronization, and Concurrent Separation Logic is specialized to locks.
 We may keep the simplistic-seeming rule for parallel composition and implicitly enrich its power by adding a twist, in the form of some other rules.
@@ -4901,7 +4902,7 @@ The first is representative of a family of lemmas that we prove, one for each sy
 As another example incorporating more of the complexities of concurrency, we have this lemma.
 
 \begin{lemma}
-  If $\hoare{P}{c_1 || c_2}{Q}$, then there exist $P_1$, $P_2$, $Q_1$, and $Q_2$ such that $\hoare{P_1}{c_1}{Q_1}$, $\hoare{P_2}{c_2}{Q_2}$, $P \Rightarrow P_1 * P_2$, and $Q_1(()) * Q_2(()) \Rightarrow Q(())$.
+  If $\hoare{P}{c_1 || c_2}{Q}$, then there exist $P_1$, $P_2$, $Q_1$, and $Q_2$ such that $\hoare{P_1}{c_1}{Q_1}$, $\hoare{P_2}{c_2}{Q_2}$, and $P \Rightarrow P_1 * P_2$.
 \end{lemma}
 \begin{proof}
   By induction on the derivation of $\hoare{P}{c_1 || c_2}{Q}$.

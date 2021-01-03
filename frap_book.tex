@@ -3703,7 +3703,7 @@ $$\infer{\smallstep{(h, x \leftarrow c_1; c_2(x))}{(h', x \leftarrow c'_1; c_2(x
 }
 \quad \infer{\smallstep{(h, x \leftarrow \mt{Return} \; v; c(x))}{(h, c(v))}}{}$$
 
-$$\infer{\smallstep{(h, \mt{Loop} \; i \; f)}{(h, x \leftarrow f(\mt{Again}(i)); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
+$$\infer{\smallstep{(h, \mt{Loop} \; i \; f)}{(h, x \leftarrow f(i); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
 
 $$\infer{\smallstep{(h, \mt{Read} \; a)}{(h, \mt{Return} \; v)}}{
   \msel{h}{a} = v
@@ -4753,7 +4753,7 @@ $$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1
 }
 \quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, k, c_2(v))}}{}$$
 
-$$\infer{\smallstep{(h, l, \mt{Loop} \; i \; f)}{(h, l, x \leftarrow f(\mt{Again}(i)); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
+$$\infer{\smallstep{(h, l, \mt{Loop} \; i \; f)}{(h, l, x \leftarrow f(i); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
 
 $$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; v)}}{
   \msel{h}{a} = v

@@ -323,11 +323,13 @@ Inductive hoare_triple (linvs : list hprop) : forall {result}, hprop -> cmd resu
     nth_error linvs a = Some I
     -> hoare_triple linvs I (Unlock a) (fun _ => emp)%sep
 
-(* When forking into two threads, divide the (local) heap among them. *)
+(* When forking into two threads, divide the (local) heap among them.
+ * For simplicity, we never let parallel compositions terminate,
+ * so it is appropriate to assign a contradictory overall postcondition. *)
 | HtPar : forall P1 c1 Q1 P2 c2 Q2,
     hoare_triple linvs P1 c1 Q1
     -> hoare_triple linvs P2 c2 Q2
-    -> hoare_triple linvs (P1 * P2)%sep (Par c1 c2) (fun _ => Q1 tt * Q2 tt)%sep
+    -> hoare_triple linvs (P1 * P2)%sep (Par c1 c2) (fun _ => [| False |])%sep
 
 (* Now we repeat these two structural rules from before. *)
 | HtConsequence : forall {result} (c : cmd result) P Q (P' : hprop) (Q' : _ -> hprop),
@@ -351,6 +353,18 @@ Proof.
   simplify.
   eapply HtConsequence; eauto.
   reflexivity.
+Qed.
+
+Lemma HtStrengthenFalse : forall linvs {result} (c : cmd result) P (Q' : _ -> hprop),
+    hoare_triple linvs P c (fun _ => [| False |])%sep
+    -> hoare_triple linvs P c Q'.
+Proof.
+  simplify.
+  eapply HtStrengthen; eauto.
+  simplify.
+  unfold himp; simplify.
+  cases H0.
+  tauto.
 Qed.
 
 Lemma HtWeaken : forall linvs {result} (c : cmd result) P Q (P' : hprop),
@@ -432,8 +446,8 @@ Ltac use_IH H := conseq; [ apply H | .. ]; ht.
 Ltac loop_inv0 Inv := (eapply HtWeaken; [ apply HtLoop with (I := Inv) | .. ])
                       || (eapply HtConsequence; [ apply HtLoop with (I := Inv) | .. ]).
 Ltac loop_inv Inv := loop_inv0 Inv; ht.
-Ltac fork0 P1 P2 := apply HtWeaken with (P := (P1 * P2)%sep); [ apply HtPar | ].
-Ltac fork P1 P2 := fork0 P1 P2 || (eapply HtStrengthen; [ fork0 P1 P2 | ]).
+Ltac fork0 P1 P2 := apply HtWeaken with (P := (P1 * P2)%sep); [ eapply HtPar | ].
+Ltac fork P1 P2 := fork0 P1 P2 || (eapply HtStrengthenFalse; fork0 P1 P2).
 Ltac use H := (eapply use_lemma; [ eapply H | cancel ])
               || (eapply HtStrengthen; [ eapply use_lemma; [ eapply H | cancel ] | ]).
 
@@ -732,8 +746,6 @@ Proof.
   equality.
   cancel.
   cancel.
-  cancel.
-
   cancel.
 Qed.
 
@@ -1095,10 +1107,9 @@ Lemma invert_Par : forall linvs c1 c2 P Q,
   -> exists P1 P2 Q1 Q2,
       hoare_triple linvs P1 c1 Q1
       /\ hoare_triple linvs P2 c2 Q2
-      /\ P ===> P1 * P2
-      /\ Q1 tt * Q2 tt ===> Q tt.
+      /\ P ===> P1 * P2.
 Proof.
-  induct 1; simp; eauto 10.
+  induct 1; simp; eauto 7.
 
   symmetry in x0.
   apply unit_not_nat in x0; simp.
@@ -1106,11 +1117,10 @@ Proof.
   symmetry in x0.
   apply unit_not_nat in x0; simp.
 
-  eauto 10 using himp_trans.
+  eauto 8 using himp_trans.
 
   exists (x * R)%sep, x0, (fun r => x1 r * R)%sep, x2; simp; eauto.
-  rewrite H2; cancel.
-  rewrite <- H4; cancel.
+  rewrite H3; cancel.
 Qed.
 
 Transparent heq himp lift star exis ptsto.
@@ -1421,12 +1431,10 @@ Proof.
   eapply IHstep in H2.
   simp.
   eexists; propositional.
-  eapply HtStrengthen.
+  apply HtStrengthenFalse.
   econstructor.
   eassumption.
   eassumption.
-  simp.
-  cases r; auto.
   eapply use_himp; try eassumption.
   cancel.
   eapply use_himp; try eassumption.
@@ -1437,16 +1445,14 @@ Proof.
   eapply IHstep in H0.
   simp.
   eexists; propositional.
-  eapply HtStrengthen.
+  apply HtStrengthenFalse.
   econstructor.
   eassumption.
   eassumption.
-  simp.
-  cases r; auto.
   eapply use_himp; try eassumption.
   cancel.
   eapply use_himp; try eassumption.
-  rewrite H3.
+  rewrite H4.
   cancel.
 Qed.
 

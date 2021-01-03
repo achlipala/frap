@@ -629,7 +629,7 @@ Module AlgebraicWithEquivalenceRelation.
       equality.
       unfold equiv, elements.
       simplify.
-      SearchAbout app cons nil.
+      Search app cons nil.
       apply app_inj_tail.
       rewrite <- app_assoc.
       rewrite <- app_assoc.
@@ -1547,7 +1547,7 @@ Module NatRangeSet <: FINITE_SET with Definition key := nat.
     unfold member, add; simplify.
     cases s.
 
-    SearchAbout Compare_dec.leb.
+    Search Compare_dec.leb.
     rewrite Compare_dec.leb_correct.
     equality.
     linear_arithmetic.

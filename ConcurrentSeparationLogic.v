@@ -698,7 +698,7 @@ Proof.
   simp.
   rewrite Heq in H0.
   simp.
-  equality.
+  try equality.
   cancel.
   cancel.
   cancel.
@@ -823,7 +823,7 @@ Proof.
   simp.
   rewrite Heq in H0.
   simp.
-  equality.
+  try equality.
   cancel.
   cancel.
   cancel.

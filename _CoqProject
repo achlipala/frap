@@ -20,6 +20,7 @@ Interpreters_template.v
 Interpreters.v
 FirstClassFunctions_template.v
 FirstClassFunctions.v
+RuleInduction.v
 TransitionSystems_template.v
 TransitionSystems.v
 IntroToProofScripting.v

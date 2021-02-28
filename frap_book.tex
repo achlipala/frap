@@ -951,6 +951,187 @@ c \arrow{r}{^n\ldots} \arrow{d}{\denote{\ldots}} & ^nc \arrow{d}{\denote{\ldots}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\chapter{Inductive Relations and Rule Induction}
+
+We should pause here to consider another crucial mathematical tool that is not in common use outside the study of semantics but which will be essential for almost all language semantics we define from here on.
+That tool is similar to the inductive \emph{set} or \emph{type} definitions we met in Chapter \ref{syntax}.
+However, now we define \emph{relations}\index{inductive relations} (and \emph{predicates}\index{inductive predicates}, the colloquial name for single-argument relations) inductively.
+Let us take some time to work through simple examples before moving on to cases more relevant to semantics.
+
+\section{Finite Sets as Inductive Predicates}
+
+\newcommand{\favs}[1]{\mathsf{favorites}(#1)}
+
+Any finite set is easy to define as a predicate, with a set of inference rules that include no premises.
+For instance, say my favorite numbers are 17, 23, and 42.
+We can define a predicate $\mathsf{favorites}$ as follows.
+$$\infer{\favs{17}}{}
+\quad \infer{\favs{23}}{}
+\quad \infer{\favs{42}}{}$$
+
+As we defined inductive sets as the \emph{smallest} sets satisfying given inference rules, we now define inductive predicates as the \emph{least} predicates satisfying the rules.
+The rules given here require acceptance of 17, 23, and 42 and no more, so those are exactly the values accepted by the predicate.
+
+Any inductive predicate definition has an associated induction principle\index{inductive principle}, which we can derive much as we derived induction principles in Chapter \ref{syntax}.
+Specifically, when we defined $P$ inductively and want to conclude $Q$ from it, we want to prove $\forall x. \; P(x) \Rightarrow Q(x)$.
+We transform each rule into one obligation within the induction, by replacing $P$ with $Q$ in the conclusion, in addition to taking each premise $P(e)$ and pairing it with a new premise $Q(e)$ (an \emph{induction hypothesis}\index{induction hypothesis}).
+
+Our example of $\mathsf{favorites}$ is a degenerate inductive definition whose principle requires no induction hypotheses.  Thus, to prove $\forall x. \; \favs{x} \Rightarrow Q(x)$, we must establish the following.
+$$\infer{Q(7)}{}
+\quad \infer{Q(23)}{}
+\quad \infer{Q(42)}{}$$
+
+That is, to prove that a predicate holds of all elements of a finite set, it suffices to check the predicate for each element.
+In general, induction on proofs of relations is called \emph{rule induction}\index{rule induction}.
+A simple example:
+
+\begin{theorem}
+  All of my favorite numbers are below 50, i.e. $\forall x. \; \favs{x} \Rightarrow x < 50$.
+\end{theorem}
+\begin{proof}
+  By induction on the proof of $\favs{x}$, i.e. with $Q(x) = x < 50$.
+\end{proof}
+
+Note how it is quite natural to see rule induction as induction on proof trees, as if they were just any other tree data structure!
+Indeed, data and proofs are unified in Coq's mathematical foundation.
+
+\section{Transitive Closure of Relations}
+
+Let $R$ be some binary relation.  We define its \emph{transitive closure}\index{transitive closure} $R^+$ by:
+$$\infer{x \; R^+ \; y}{
+  x \; R \; y
+}
+\quad \infer{x \; R^+ z}{
+  x \; R^+ \; y
+  & y \; R^+ \; z
+}$$
+
+That is, $R^+$ is the \emph{least} relation satisfying these rules.
+It should accept argument pairs only if the rules force them to be accepted.
+This relation happens to be the least that both contains $R$ and is transitive.
+The second rule forces $R^+$ to be transitive quite explicitly.
+
+We apply our recipe (changing rule conclusions and adding new inductive hypotheses) to find the induction principle for $R^+$.
+To prove $\forall x, y. \; x \; R^+ \; y \Rightarrow Q(x, y)$, we must show:
+$$\infer{Q(x, y)}{
+  x \; R \; y
+}
+\quad \infer{Q(x, z)}{
+  x \; R^+ \; y
+  & Q(x, y)
+  & y \; R^+ \; z
+  & Q(y, z)
+}$$
+
+As an example with transitive closure, consider an alternative definition of ``less-than'' for natural numbers.
+Let $\prec$ be the relation defined to accept $x$ and $y$ only when $x + 1 = y$.
+Now $\prec^+$ means ``less-than,'' i.e. the second argument is reachable from the first by some finite number of increments.
+We can make the connection formal.
+
+\begin{theorem}
+  If $x \prec^+ y$, then $x < y$.
+\end{theorem}
+\begin{proof}
+  By induction on the proof of $x \prec^+ y$, e.g. with $Q(x, y) = x < y$, considering cases for the two rules defining transitive closure.
+\end{proof}
+
+\begin{lemma}\label{lt_lt''}
+  For any $n$ and $k$, $n \prec^+ (1+k) + n$.
+\end{lemma}
+\begin{proof}
+  By induction on $k$, using the first rule of transitive closure in the base case, and discharging the inductive case using transitivity via $k + n$.
+\end{proof}
+
+\begin{theorem}
+  If $n < m$, then $n \prec^+ m$.
+\end{theorem}
+\begin{proof}
+  By Lemma \ref{lt_lt''}, with $k = m - n - 1$.
+\end{proof}
+
+Another manageable exercise is showing logical equivalence of $R^+$ and $R^{++}$ for any $R$, which requires rule induction in both directions of the proof.
+
+\section{Permutations}
+
+It may not be the most intuitively obvious formulation, but we can use an inductive relation to explain when one list is a permutation\index{permutations} of another, written here as infix relation $\sim$.
+$$\infer{[] \sim []}{}
+\quad \infer{\push{x}{\ell_1} \sim \push{x}{\ell_2}}{
+  \ell_1 \sim \ell_2
+}
+\quad \infer{\push{y}{\push{x}{\ell}} \sim \push{x}{\push{y}{\ell}}}{}
+\quad \infer{\ell \sim \ell''}{
+  \ell \sim \ell'
+  & \ell' \sim \ell''
+}$$
+
+We apply the usual recipe to derive its induction principle, showing $\forall \ell, \ell'. \; \ell \sim \ell' \Rightarrow Q(\ell, \ell')$:
+$$\infer{Q([], [])}{}
+\quad \infer{Q(\push{x}{\ell_1}, \push{x}{\ell_2})}{
+  \ell_1 \sim \ell_2
+  & Q(\ell_1, \ell_2)
+}
+\quad \infer{Q(\push{y}{\push{x}{\ell}}, \push{x}{\push{y}{\ell}})}{}
+\quad \infer{Q(\ell, \ell'')}{
+  \ell \sim \ell'
+  & Q(\ell, \ell')
+  & \ell' \sim \ell''
+  & Q(\ell', \ell'')
+}$$
+
+A number of sensible algebraic properties now follow.
+
+\begin{lemma}\label{Permutation_to_front}
+  $\push{a}{\ell} \sim \concat{\ell}{[a]}$.
+\end{lemma}
+\begin{proof}
+  By induction on $\ell$, with semi-intricate little combinations of the rules of $\sim$ in each case.
+\end{proof}
+
+\begin{theorem}
+  $\ell \sim \mathsf{reverse}(\ell)$.
+\end{theorem}
+\begin{proof}
+  By induction on $\ell$, with appeal to Lemma \ref{Permutation_to_front} in the inductive case.
+\end{proof}
+
+\begin{theorem}
+  If $\ell_1 \sim \ell_2$, then $|\ell_1| = |\ell_2|$.
+\end{theorem}
+\begin{proof}
+  By induction on the proof of $\ell_1 \sim \ell_2$, with each case falling neatly into the decidable theory of equality with uninterpreted functions.
+\end{proof}
+
+\begin{lemma}\label{Permutation_refl}
+  $\ell \sim \ell$.
+\end{lemma}
+\begin{proof}
+  By induction on $\ell$.
+\end{proof}
+  
+\begin{lemma}\label{Permutation_app1}
+  If $\ell_1 \sim \ell_2$, then $\concat{\ell_1}{\ell} \sim \concat{\ell_2}{\ell}$.
+\end{lemma}
+\begin{proof}
+  By induction on the proof of $\ell_1 \sim \ell_2$, appealing to Lemma \ref{Permutation_refl} in the first case.
+\end{proof}
+
+\begin{lemma}\label{Permutation_app2}
+  If $\ell_1 \sim \ell_2$, then $\concat{\ell}{\ell_1} \sim \concat{\ell}{\ell_2}$.
+\end{lemma}
+\begin{proof}
+  By induction on the proof of $\ell_1 \sim \ell_2$.
+\end{proof}
+
+\begin{theorem}
+  If $\ell_1 \sim \ell'_1$ and $\ell_2 \sim \ell'_2$, then $\concat{\ell_1}{\ell_2} \sim \concat{\ell'_1}{\ell'_2}$.
+\end{theorem}
+\begin{proof}
+  Combine Lemmas \ref{Permutation_app1} and \ref{Permutation_app2} using the transitivity rule of $\sim$.
+\end{proof}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \chapter{Transition Systems and Invariants}
 
 For simple programming languages where programs always terminate, it is often most convenient to formalize them using interpreters, as in the last chapter.

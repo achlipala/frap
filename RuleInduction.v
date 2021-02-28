@@ -166,7 +166,36 @@ Proof.
   equality.
 Qed.
 
-Lemma Permutation_app' : forall A (ls ls1 ls2 : list A),
+Lemma Permutation_refl : forall A (ls : list A),
+    Permutation ls ls.
+Proof.
+  induct ls.
+
+  apply perm_nil.
+
+  apply perm_skip.
+  assumption.
+Qed.
+
+Lemma Permutation_app1 : forall A (ls1 ls2 ls : list A),
+    Permutation ls1 ls2
+    -> Permutation (ls1 ++ ls) (ls2 ++ ls).
+Proof.
+  induct 1; simplify.
+
+  apply Permutation_refl.
+
+  apply perm_skip.
+  apply IHPermutation.
+
+  apply perm_swap.
+
+  apply perm_trans with (l' ++ ls).
+  apply IHPermutation1.
+  apply IHPermutation2.
+Qed.
+
+Lemma Permutation_app2 : forall A (ls ls1 ls2 : list A),
     Permutation ls1 ls2
     -> Permutation (ls ++ ls1) (ls ++ ls2).
 Proof.
@@ -179,41 +208,15 @@ Proof.
   assumption.
 Qed.
 
-Lemma Permutation_refl : forall A (ls : list A),
-    Permutation ls ls.
-Proof.
-  induct ls.
-
-  apply perm_nil.
-
-  apply perm_skip.
-  assumption.
-Qed.
-
-Theorem Permutation_app : forall A (ls1 ls1' : list A),
+Theorem Permutation_app : forall A (ls1 ls1' ls2 ls2' : list A),
     Permutation ls1 ls1'
-    -> forall ls2 ls2', Permutation ls2 ls2'
+    -> Permutation ls2 ls2'
     -> Permutation (ls1 ++ ls2) (ls1' ++ ls2').
 Proof.
-  induct 1; simplify.
-
+  simplify.
+  apply perm_trans with (ls1' ++ ls2).
+  apply Permutation_app1.
   assumption.
-
-  apply perm_skip.
-  apply IHPermutation.
+  apply Permutation_app2.
   assumption.
-
-  apply perm_trans with (x :: y :: l ++ ls2).
-  apply perm_swap.
-  apply perm_skip.
-  apply perm_skip.
-  apply Permutation_app'.
-  assumption.
-
-  apply perm_trans with (l' ++ ls2').
-  apply IHPermutation1.
-  assumption.
-  apply IHPermutation2.
-  
-  apply Permutation_refl.
 Qed.

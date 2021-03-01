@@ -228,46 +228,38 @@ Module SimplePropositional.
   Inductive prop :=
   | Truth
   | Falsehood
-  | Var (x : var)
   | And (p1 p2 : prop)
   | Or (p1 p2 : prop).
 
-  Inductive valid (vars : var -> Prop) : prop -> Prop :=
+  Inductive valid : prop -> Prop :=
   | ValidTruth :
-      valid vars Truth
-  | ValidVar : forall x,
-      vars x
-      -> valid vars (Var x)
+      valid Truth
   | ValidAnd : forall p1 p2,
-      valid vars p1
-      -> valid vars p2
-      -> valid vars (And p1 p2)
+      valid p1
+      -> valid p2
+      -> valid (And p1 p2)
   | ValidOr1 : forall p1 p2,
-      valid vars p1
-      -> valid vars (Or p1 p2)
+      valid p1
+      -> valid (Or p1 p2)
   | ValidOr2 : forall p1 p2,
-      valid vars p2
-      -> valid vars (Or p1 p2).
+      valid p2
+      -> valid (Or p1 p2).
 
-  Fixpoint interp (vars : var -> Prop) (p : prop) : Prop :=
+  Fixpoint interp (p : prop) : Prop :=
     match p with
     | Truth => True
     | Falsehood => False
-    | Var x => vars x
-    | And p1 p2 => interp vars p1 /\ interp vars p2
-    | Or p1 p2 => interp vars p1 \/ interp vars p2
+    | And p1 p2 => interp p1 /\ interp p2
+    | Or p1 p2 => interp p1 \/ interp p2
     end.
 
-  Theorem interp_valid : forall vars p, interp vars p -> valid vars p.
+  Theorem interp_valid : forall p, interp p -> valid p.
   Proof.
     induct p; simplify.
 
     apply ValidTruth.
 
     propositional.
-
-    apply ValidVar.
-    assumption.
 
     propositional.
     apply ValidAnd.
@@ -281,13 +273,11 @@ Module SimplePropositional.
     assumption.
   Qed.
 
-  Theorem valid_interp : forall vars p, valid vars p -> interp vars p.
+  Theorem valid_interp : forall p, valid p -> interp p.
   Proof.
     induct 1; simplify.
 
     propositional.
-
-    assumption.
 
     propositional.
 
@@ -300,19 +290,15 @@ Module SimplePropositional.
     match p with
     | Truth => Truth
     | Falsehood => Falsehood
-    | Var x => Var x
     | And p1 p2 => And (commuter p2) (commuter p1)
     | Or p1 p2 => Or (commuter p2) (commuter p1)
     end.
 
-  Theorem valid_commuter_fwd : forall vars p, valid vars p -> valid vars (commuter p).
+  Theorem valid_commuter_fwd : forall p, valid p -> valid (commuter p).
   Proof.
     induct 1; simplify.
 
     apply ValidTruth.
-
-    apply ValidVar.
-    assumption.
 
     apply ValidAnd.
     assumption.
@@ -325,14 +311,11 @@ Module SimplePropositional.
     assumption.
   Qed.
   
-  Theorem valid_commuter_bwd : forall vars p, valid vars (commuter p) -> valid vars p.
+  Theorem valid_commuter_bwd : forall p, valid (commuter p) -> valid p.
   Proof.
     induct p; invert 1; simplify.
 
     apply ValidTruth.
-
-    apply ValidVar.
-    assumption.
 
     apply ValidAnd.
     apply IHp1.

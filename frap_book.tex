@@ -1039,7 +1039,7 @@ We can make the connection formal.
   For any $n$ and $k$, $n \prec^+ (1+k) + n$.
 \end{lemma}
 \begin{proof}
-  By induction on $k$, using the first rule of transitive closure in the base case, and discharging the inductive case using transitivity via $k + n$.
+  By induction on $k$, using the first rule of transitive closure in the base case and discharging the inductive case using transitivity via $k + n$.
 \end{proof}
 
 \begin{theorem}
@@ -1119,7 +1119,7 @@ A number of sensible algebraic properties now follow.
   If $\ell_1 \sim \ell_2$, then $\concat{\ell}{\ell_1} \sim \concat{\ell}{\ell_2}$.
 \end{lemma}
 \begin{proof}
-  By induction on the proof of $\ell_1 \sim \ell_2$.
+  By induction on $\ell$.
 \end{proof}
 
 \begin{theorem}
@@ -1127,6 +1127,211 @@ A number of sensible algebraic properties now follow.
 \end{theorem}
 \begin{proof}
   Combine Lemmas \ref{Permutation_app1} and \ref{Permutation_app2} using the transitivity rule of $\sim$.
+\end{proof}
+
+\section{A Minimal Propositional Logic}
+
+Though we are mostly concerned with programming languages in this book, the same techniques are also often applied to formal languages of logical formulas.
+In fact, there are strong connections between programming languages and logics, with many dual techniques across the sides.
+We won't really dip our toes into those connections, but we can use the example of propositional logic\index{propositional logic} here, to get a taste of formalizing logics, at the same time as we practice with inductive relations.
+
+As a warmup for reasoning about syntax trees of logical formulas, consider this basic language. 
+$$\begin{array}{rrcl}
+  \textrm{Formula} & \phi &::=& \top \mid \bot \mid \phi \land \phi \mid \phi \lor \phi
+\end{array}$$
+
+The constructors are, respectively: truth, falsehood, conjunction (``and''), and disjunction (``or'').
+
+A simple inductive definition of a predicate $\vdash$ (for ``proves'') suffices to explain the meanings of the connectives.
+$$\infer{\vdash \top}{}
+\quad \infer{\vdash \phi_1 \land \phi_2}{
+  \vdash \phi_1
+  & \vdash \phi_2
+}
+\quad \infer{\vdash \phi_1 \lor \phi_2}{
+  \vdash \phi_1
+}
+\quad \infer{\vdash \phi_1 \lor \phi_2}{
+  \vdash \phi_2
+}$$
+
+That is, truth is obviously true, falsehood can't be proved, proving a conjunction requires proving both conjuncts, and proving a disjunction requires proving one disjunct or the other (expressed with two separate rules).
+
+A simple interpreter also does the trick to explain this language.
+\begin{eqnarray*}
+  \denote{\top} &=& \top \\
+  \denote{\bot} &=& \bot \\
+  \denote{\phi_1 \land \phi_2} &=& \denote{\phi_1} \land \denote{\phi_2} \\
+  \denote{\phi_1 \lor \phi_2} &=& \denote{\phi_1} \lor \denote{\phi_2}
+\end{eqnarray*}
+Each syntactic connective is explained in terms of the usual semantic connective in our metalanguage.
+In the formal study of logic, this style of semantics is often associated with \emph{model theory}\index{model theory} and a definition via an inductive relation with \emph{proof theory}\index{proof theory}.
+
+It is good to establish that the two formulations agree, and the two directions of logical equivalence have traditional names.
+
+\begin{theorem}[Soundness of the inductive predicate]\index{soundness of a logic}
+  If $\vdash p$, then $\denote{p}$.
+\end{theorem}
+\begin{proof}
+  By induction on the proof of $\vdash p$, where each case then follows by the rules of propositional logic in the metalanguage (a decidable theory).
+\end{proof}
+
+\begin{theorem}[Completeness of the inductive predicate]\index{completeness of a logic}
+  If $\denote{p}$, then $\vdash p$.
+\end{theorem}
+\begin{proof}
+  By induction on $p$, combining the rules of $\vdash$ with propositional logic in the metalanguage.
+\end{proof}
+
+\section{Propositional Logic with Implication}
+
+Extending to the rest of traditional propositional logic requires us to add a \emph{hypothesis context} to our judgment, mirroring a pattern we will see later in studying type systems (Chapter \ref{types}).
+Our formula language is extended as follows.
+$$\begin{array}{rrcl}
+  \underline{\textrm{Variables}} & p \\
+  \textrm{Formula} & \phi &::=& \top \mid \bot \mid \phi \land \phi \mid \phi \lor \phi \mid \underline{p \mid \phi \Rightarrow \phi}
+\end{array}$$
+Note how we add propositional variables $p$, which stand for unknown truth values.
+
+What is fundamentally harder about modeling implication?
+We need to perform \emph{hypothetical reasoning}\index{hypothetical reasoning}, trying to prove a formula with other formulas available as known facts.
+It is natural to build up a list of hypotheses, as an input to the $\vdash$ predicate.
+By convention, we use metavariable $\Gamma$ (Greek capital gamma) for such a list and call it a \emph{context}.
+First, the context is threaded through the rules we already presented, which are called \emph{introduction rules}\index{introduction rules} because each explains how to prove a fact using a specific connective (introducing that connective to the proof).
+$$\infer{\Gamma \vdash \top}{}
+\quad \infer{\Gamma \vdash \phi_1 \land \phi_2}{
+  \Gamma \vdash \phi_1
+  & \Gamma \vdash \phi_2
+}
+\quad \infer{\Gamma \vdash \phi_1 \lor \phi_2}{
+  \Gamma \vdash \phi_1
+}
+\quad \infer{\vdash \phi_1 \lor \phi_2}{
+  \Gamma \vdash \phi_2
+}$$
+
+Next, we have \emph{modus ponens}\index{mous ponens}, the classic rule for applying an implication, an example of an \emph{elimination rule}\index{elimination rules}, which explains how to take advantage of a fact using a specific connective.
+$$\infer{\Gamma \vdash \phi_2}{
+  \Gamma \vdash \phi_1 \Rightarrow \phi_2
+  & \Gamma \vdash \phi_1
+}$$
+
+A \emph{hypothesis rule} gives the fundamental way of taking advantage of $\Gamma$'s contents.
+$$\infer{\Gamma \vdash \phi}{
+  \phi \in \Gamma
+}$$
+
+The introduction rule for implication is interesting for adding a new hypothesis to the context.
+$$\infer{\Gamma \vdash \phi_1 \Rightarrow \phi_2}{
+  \push{\phi_1}{\Gamma} \vdash \phi_2
+}$$
+
+Most of the remaining connectives have elimination rules, too.
+The simplest case is conjunction, with rules pulling out the conjuncts.
+$$\infer{\Gamma \vdash \phi_1}{
+  \Gamma \vdash \phi_1 \land \phi_2
+}
+\quad \infer{\Gamma \vdash \phi_2}{
+  \Gamma \vdash \phi_1 \land \phi_2
+}$$
+
+We eliminate a disjunction using reasoning by cases, extending the context appropriately in each case.
+$$\infer{\Gamma \vdash \phi}{
+  \Gamma \vdash \phi_1 \lor \phi_2
+  & \push{\phi_1}{\Gamma} \vdash \phi
+  & \push{\phi_2}{\Gamma} \vdash \phi
+}$$
+
+If we manage to prove falsehood, we have a contradiction, and any conclusion follows.
+$$\infer{\Gamma \vdash \phi}{
+  \Gamma \vdash \bot
+}$$
+
+Finally, the somewhat-controversial law of the excluded middle\index{law of the excluded middle}, which actually does not hold in general in Coq, though many developments postulate it as an extra axiom (which we take advantage of in our own Coq proof here).
+We write negation $\neg \phi$ as shorthand for $\phi \Rightarrow \bot$.
+$$\infer{\Gamma \vdash \phi \lor \neg \phi}{}$$
+
+This style of inductive relation definition is called \emph{natural deduction}\index{natural deduction}.
+We write $\vdash \phi$ as shorthand for $\cdot \vdash \phi$, for an empty context.
+
+Note the fundamental new twist introduced compared to last section's language: it is no longer the case that the top-level connective of the goal formula gives us a small set of connective-specific rules that are the only we need to consider applying.
+Instead, we may need to combine the hypothesis rule with elimination rules, taking advantage of assumptions.
+The power of inductive relation definitions is clearer here, since we couldn't simply use a recursive function over formulas to express that kind of pattern explicitly.
+
+A simple interpreter sets the stage for proving soundness and completeness.
+The most important extension to the interpreter is that it now takes in a valuation $v$, just like in the previous chapter, though now the valuation maps variables to truth values, not numbers.
+\begin{eqnarray*}
+  \denote{p}v &=& \msel{v}{p} \\
+  \denote{\top}v &=& \top \\
+  \denote{\bot}v &=& \bot \\
+  \denote{\phi_1 \land \phi_2}v &=& \denote{\phi_1}v \land \denote{\phi_2}v \\
+  \denote{\phi_1 \lor \phi_2}v &=& \denote{\phi_1}v \lor \denote{\phi_2}v \\
+  \denote{\phi_1 \Rightarrow \phi_2}v &=& \denote{\phi_1}v \Rightarrow \denote{\phi_2}v
+\end{eqnarray*}
+
+\begin{theorem}[Soundness]
+  If $\vdash \phi$, then $\denote{\phi}v$ for any $v$.
+\end{theorem}
+\begin{proof}
+  By appeal to Lemma \ref{valid_interp'}.
+\end{proof}
+
+\begin{lemma}\label{valid_interp'}
+  If $\Gamma \vdash \phi$, and if we have $\denote{\phi'}v$ for every $\phi' \in \Gamma$, then $\denote{\phi}v$.
+\end{lemma}
+\begin{proof}
+  By induction on the proof of $\Gamma \vdash \phi$, using propositional logic in the metalanguage to plumb together the case proofs.
+\end{proof}
+
+The other direction, completeness, is quite a bit more involved, and indeed its Coq proofs strays outside the range of what is reasonable to ask students to construct at this point in the book, but it makes for an interesting exercise.
+The basic idea is to do a proof by exhaustive case analysis over the truth values of all propositional variables $p$ that appear in a formula.
+
+\begin{theorem}[Completeness]
+  If $\denote{\phi}v$ for all $v$, then $\vdash \phi$.
+\end{theorem}
+\begin{proof}
+  By appeal to Lemma \ref{interp_valid'}.
+\end{proof}
+
+Say that a context $\Gamma$ and a valuation $v$ are \emph{compatible} if they agree on the truth of any variable included in both.
+That is, when $p \in \Gamma$, we have $v(p) = \top$; and when $\neg p \in \Gamma$, we have $v(p) = \bot$.
+
+\begin{lemma}\label{interp_valid'}
+  Given context $\Gamma$ and formula $\phi$, if
+  \begin{itemize}
+  \item there is no variable $p$ such that both $p \in \Gamma$ and $\neg p \in \Gamma$, and
+  \item for any valuation $v$ compatible with $\Gamma$, we have $\denote{p}v$,
+  \end{itemize}
+  then $\Gamma \vdash \phi$.
+\end{lemma}
+\begin{proof}
+  By induction on the set of variables $p$ appearing in $\phi$ such that neither $p \in \Gamma$ nor $\neg p \in \Gamma$.
+  If that set is empty, we appeal directly to Lemma \ref{interp_valid''}.
+  Otherwise, choose some variable $p$ in $\phi$ that hasn't yet been assigned a truth value in $\Gamma$.
+  Combine excluded middle on $p$ with the $\lor$ elimination rule of $\vdash$ to do a case split, so that it now suffices to prove both $\push{p}{\Gamma} \vdash \phi$ and $\push{\neg p}{\Gamma} \vdash \phi$.
+  Each case can be proved by direct appeal to the induction hypothesis, since assigning $p$ a truth value in $\Gamma$ shrinks the set we induct over.
+\end{proof}
+
+We write $\denote{\phi}\Gamma$ to denote interpreting $\phi$ in a valuation that assigns $\top$ to exactly those variables that appear directly in $\Gamma$.
+
+\begin{lemma}\label{interp_valid''}
+  Given context $\Gamma$ and formula $\phi$, if
+  \begin{itemize}
+  \item for every variable $p$ appearing in $\phi$, we have either $p \in \Gamma$ or $\neg p \in \Gamma$; and
+  \item there is no variable $p$ such that both $p \in \Gamma$ and $\neg p \in \Gamma$
+  \end{itemize}
+  then if $\denote{\phi}\Gamma$, then $\Gamma \vdash p$, otherwise $\Gamma \vdash \neg p$.
+\end{lemma}
+\begin{proof}
+  By induction on $\phi$, with tedious combination of propositional logic in the metalanguage and in the rules of $\vdash$.
+  Inductive cases make several appeals to Lemma \ref{valid_weaken}, and it is important that the base case for variables $p$ is able to assume that either $p$ or $\neg p$ appears in $\Gamma$.
+\end{proof}
+
+\begin{lemma}[Weakening]\label{valid_weaken}\index{weakening}
+  If $\Gamma \vdash \phi$, and $\Gamma'$ includes a superset of the formulas from $\Gamma$, then $\Gamma' \vdash \phi$.
+\end{lemma}
+\begin{proof}
+  By induction on the proof of $\Gamma \vdash \phi$.
 \end{proof}
 
 
@@ -2751,7 +2956,7 @@ We need to prove a whole set of bothersome special-case inversion lemmas by indu
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Lambda Calculus and Simple Type Safety}
+\chapter{Lambda Calculus and Simple Type Safety}\label{types}
 
 We'll now take a break from the imperative language we've been studying for the last three chapters, instead looking at a classic sort of small language that distills the essence of \emph{functional} programming\index{functional programming}.
 That's the language paradigm that we've been using throughout this book, as we coded executable versions of algorithms.

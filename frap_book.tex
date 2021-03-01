@@ -977,7 +977,7 @@ Specifically, when we defined $P$ inductively and want to conclude $Q$ from it, 
 We transform each rule into one obligation within the induction, by replacing $P$ with $Q$ in the conclusion, in addition to taking each premise $P(e)$ and pairing it with a new premise $Q(e)$ (an \emph{induction hypothesis}\index{induction hypothesis}).
 
 Our example of $\mathsf{favorites}$ is a degenerate inductive definition whose principle requires no induction hypotheses.  Thus, to prove $\forall x. \; \favs{x} \Rightarrow Q(x)$, we must establish the following.
-$$\infer{Q(7)}{}
+$$\infer{Q(17)}{}
 \quad \infer{Q(23)}{}
 \quad \infer{Q(42)}{}$$
 
@@ -1206,7 +1206,7 @@ $$\infer{\Gamma \vdash \top}{}
 \quad \infer{\Gamma \vdash \phi_1 \lor \phi_2}{
   \Gamma \vdash \phi_1
 }
-\quad \infer{\vdash \phi_1 \lor \phi_2}{
+\quad \infer{\Gamma \vdash \phi_1 \lor \phi_2}{
   \Gamma \vdash \phi_2
 }$$
 

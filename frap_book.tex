@@ -1269,8 +1269,10 @@ The most important extension to the interpreter is that it now takes in a valuat
   \denote{\phi_1 \Rightarrow \phi_2}v &=& \denote{\phi_1}v \Rightarrow \denote{\phi_2}v
 \end{eqnarray*}
 
+To indicate that $\phi$ is a \emph{tautology}\index{tautology} (that is, true under any values of the variables), we write $\denote{\phi}$, as a kind of abuse of notation expanding to $\forall v. \; \denote{\phi}v$.
+
 \begin{theorem}[Soundness]
-  If $\vdash \phi$, then $\denote{\phi}v$ for any $v$.
+  If $\vdash \phi$, then $\denote{\phi}$.
 \end{theorem}
 \begin{proof}
   By appeal to Lemma \ref{valid_interp'}.
@@ -1287,7 +1289,7 @@ The other direction, completeness, is quite a bit more involved, and indeed its 
 The basic idea is to do a proof by exhaustive case analysis over the truth values of all propositional variables $p$ that appear in a formula.
 
 \begin{theorem}[Completeness]
-  If $\denote{\phi}v$ for all $v$, then $\vdash \phi$.
+  If $\denote{\phi}$, then $\vdash \phi$.
 \end{theorem}
 \begin{proof}
   By appeal to Lemma \ref{interp_valid'}.

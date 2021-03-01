@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 19: Process Algebra and Behavioral Refinement
+  * Chapter 20: Process Algebra and Behavioral Refinement
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 8: Lambda Calculus and Simple Type Soundness
+  * Chapter 11: Lambda Calculus and Simple Type Soundness
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

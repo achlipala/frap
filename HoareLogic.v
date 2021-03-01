@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 12: Hoare Logic: Verifying Imperative Programs
+  * Chapter 13: Hoare Logic: Verifying Imperative Programs
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

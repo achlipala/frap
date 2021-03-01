@@ -15,6 +15,27 @@ Proof.
 Admitted.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (** * Transitive closure of relations *)
 
 Inductive tc {A} (R : A -> A -> Prop) : A -> A -> Prop :=
@@ -47,6 +68,26 @@ Proof.
 Admitted.
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (** * Permutation *)
 
 (* Lifted from the Coq standard library: *)
@@ -76,6 +117,29 @@ Theorem Permutation_app : forall A (ls1 ls1' ls2 ls2' : list A),
     -> Permutation (ls1 ++ ls2) (ls1' ++ ls2').
 Proof.
 Admitted.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 (** * Simple propositional logic *)
@@ -131,6 +195,40 @@ Admitted.
 Theorem valid_commuter_bwd : forall p, valid (commuter p) -> valid p.
 Proof.
 Admitted.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

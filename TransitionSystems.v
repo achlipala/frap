@@ -30,8 +30,8 @@ Inductive fact_state :=
  * not use recursion).  After the colon, we give a type that expresses which
  * additional arguments exist, followed by [Prop] for "proposition."
  * Putting this inductive definition in [Prop] is what marks it as a predicate.
- * Our prior definitions have implicitly been in [Set], the normal universe
- * of mathematical objects. *)
+ * Our prior definitions (at least before the RuleInduction chapter) have
+ * implicitly been in [Set], the normal universe of mathematical objects. *)
 Inductive fact_init (original_input : nat) : fact_state -> Prop :=
 | FactInit : fact_init original_input (WithAccumulator original_input 1).
 
@@ -63,8 +63,8 @@ Theorem trc_trans : forall {A} (R : A -> A -> Prop) x y, trc R x y
     -> trc R x z.
 Proof.
   induct 1; simplify.
-  (* Note how we pass a *number* to [induct], to ask for induction on
-   * *the first hypothesis in the theorem statement*. *)
+  (* Note how, as in last chapter, we pass a *number* to [induct], to ask for
+   * induction on *the first hypothesis in the theorem statement*. *)
 
   assumption.
   (* [assumption]: prove a conclusion that matches some hypothesis exactly. *)

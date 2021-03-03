@@ -951,7 +951,7 @@ c \arrow{r}{^n\ldots} \arrow{d}{\denote{\ldots}} & ^nc \arrow{d}{\denote{\ldots}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Inductive Relations and Rule Induction}
+\chapter{Inductive Relations and Rule Induction}\label{rule_induction}
 
 We should pause here to consider another crucial mathematical tool that is not in common use outside the study of semantics but which will be essential for almost all language semantics we define from here on.
 That tool is similar to the inductive \emph{set} or \emph{type} definitions we met in Chapter \ref{syntax}.
@@ -1341,7 +1341,7 @@ We write $\denote{\phi}\Gamma$ to denote interpreting $\phi$ in a valuation that
 
 \chapter{Transition Systems and Invariants}
 
-For simple programming languages where programs always terminate, it is often most convenient to formalize them using interpreters, as in the last chapter.
+For simple programming languages where programs always terminate, it is often most convenient to formalize them using interpreters, as in Chapter \ref{interpreters}.
 However, many important languages don't fall into that category, and for them we need different techniques.
 Nontermination isn't always a bug; for instance, we expect a network server to run indefinitely.
 We still need to be able to talk about the correct behavior of programs that run forever, by design.
@@ -1491,11 +1491,11 @@ First, we use Theorem \ref{invariant_induction} to deduce that $I$ is an invaria
 Then, we choose the very same $I'$ that we warned above is not an inductive invariant, but which is fairly easily shown to be a superset of $I$.
 Therefore, by Theorem \ref{invariant_weaken}, $I'$ is also an invariant of $\mathcal F$, and Theorem \ref{factorial_ok} follows quite directly from that fact, as $I'$ is essentially a restatement of Theorem \ref{factorial_ok}.
 
-\section{Rule Induction}
+\section{Rule Induction Applied}
 
-Another crucial reasoning technique was hidden within the elided proof of Theorem \ref{invariant_induction}.
-That technique is \emph{rule induction}\index{rule induction}, which generalizes inversion just as normal structural induction generalizes case analysis.
-As an example, consider again the definition of transitive-reflexive closure by inference rules.
+Recall the technique of rule induction\index{rule induction} from last chapter.
+We made stealthy use of it in the elided proof of Theorem \ref{invariant_induction}, and looking more into the details can give us more practice with rule induction.
+Consider again the definition of transitive-reflexive closure by inference rules (which is very close to the definition of transitive closure from last chapter).
 $$\infer{s \to^* s}{}
 \quad \infer{s \to^* s''}{
   s \to s'
@@ -1505,7 +1505,7 @@ $$\infer{s \to^* s}{}
 The relation $\to^*$ is a subset of $S \times S$.
 Imagine that we want to prove that some relation $P$ holds of all pairs of states, where the first can reach the second.
 That is, we want to prove $\forall s, s'. \; (s \to^* s') \Rightarrow P(s, s')$, where $\Rightarrow$ is logical implication.
-We can actually derive a suitable induction principle, in the same way that we produced structural induction principles from definitions of inductive datatypes.
+Following last chapter's recipe, we can derive a suitable induction principle.
 We modify each defining rule of $\to^*$, replacing its conclusion with a use of $P$ and adding a $P$ induction hypothesis for each recursive premise.
 $$\infer{P(s, s)}{}
 \quad \infer{P(s, s'')}{
@@ -1530,10 +1530,6 @@ As a simpler example than the invariant-induction theorem, consider transitivity
 \end{proof}
 
 This sort of proof really is easier to follow in Coq code, so we especially encourage the reader to consult the mechanized version here!
-
-In general, any inductive definition of a predicate, via a set of inference rules, implies a rule-induction principle.
-We will meet many such definitions throughout the book, and we will apply rule induction to most of them.
-It is valuable to understand basically how the rule-induction principle of a definition is read off from its original rules, but it is also true that Coq comes up with these principles automatically.
 
 
 \section{An Example with a Concurrent Program}

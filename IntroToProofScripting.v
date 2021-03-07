@@ -220,7 +220,7 @@ Proof.
   apply Inc2Inv; assumption.
 Qed.
 
-(* OK, HERE is where prove the main theorem.  This source file doesn't leave a
+(* OK, HERE is where we prove the main theorem.  This source file doesn't leave a
  * record of the trail of intermediate, less-automated versions, but we develop
  * it step-by-step in class. *)
 
@@ -483,9 +483,9 @@ Goal False.
   length (1 :: 2 :: 3 :: nil) ltac:(fun n => pose n).
 Abort.
 
-(* However, it's not always convenient to use continuation passing style
+(* However, it's not always convenient to use continuation-passing style
  * everywhere, so cool kids use the following hack to sneak side effects
- * into otherwise functional Ltac code: *)
+ * into otherwise functional Ltac code. *)
 Module Import WithPrintingFixedWithoutContinuations.
   Ltac length ls :=
     let __ := match constr:(Set) with
@@ -793,7 +793,7 @@ Section t6.
     apply H2.
     exact H.
     exact p.
-    (* In two weeks, we'll meet [eauto], which can do these last steps
+    (* Next week, we'll meet [eauto], which can do these last steps
      * automatically. *)
   Qed.
 End t6.

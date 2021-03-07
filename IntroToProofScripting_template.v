@@ -157,7 +157,7 @@ Proof.
   apply Inc2Inv; assumption.
 Qed.
 
-(* OK, HERE is where prove the main theorem. *)
+(* OK, HERE is where we prove the main theorem. *)
 
 Theorem increment2_invariant_ok : invariantFor increment2_sys increment2_invariant.
 Proof.

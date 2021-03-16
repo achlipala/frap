@@ -173,7 +173,7 @@ Inductive eval (var : nat) : exp -> nat -> Prop :=
   -> eval var e2 n2
   -> eval var (Plus e1 e2) (n1 + n2).
 
-Hint Constructors eval : core.
+Local Hint Constructors eval : core.
 
 Example eval1 : forall var, eval var (Plus Var (Plus (Const 8) Var)) (var + (8 + var)).
 Proof.

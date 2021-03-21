@@ -15,7 +15,7 @@ Set Implicit Arguments.
  * albeit on a simpler language and with simpler compiler phases.  We'll stick
  * to transformations from the source language to itself, since that's enough to
  * illustrate the big ideas.  Here's the object language that we'll use, which
- * is _almost_ the same as from Chapter 7. *)
+ * is _almost_ the same as from Chapter 8. *)
 
 Inductive arith : Set :=
 | Const (n : nat)
@@ -36,7 +36,7 @@ Inductive cmd :=
  * interesting differences between the behaviors of different nonterminating
  * programs.  A correct compiler should preserve these differences. *)
 
-(* The next span of notations and definitions is the same as from Chapter 7. *)
+(* The next span of notations and definitions is the same as from Chapter 8. *)
 
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.
@@ -127,7 +127,7 @@ Inductive generate : valuation * cmd -> list (option nat) -> Prop :=
   -> generate vc' ns
   -> generate vc (Some n :: ns).
 
-Hint Constructors plug step0 cstep generate : core.
+Local Hint Constructors plug step0 cstep generate : core.
 
 (* Notice that [generate] is defined so that, for any two of a starting state's
  * traces, one is a prefix of the other.  The same wouldn't necessarily hold if
@@ -179,8 +179,8 @@ Example month_boundaries_in_days :=
  * because the program does not terminate, generating new output infinitely
  * often. *)
 
-Hint Extern 1 (interp _ _ = _) => simplify; equality : core.
-Hint Extern 1 (interp _ _ <> _) => simplify; equality : core.
+Local Hint Extern 1 (interp _ _ = _) => simplify; equality : core.
+Local Hint Extern 1 (interp _ _ <> _) => simplify; equality : core.
 
 Theorem first_few_values :
   generate ($0, month_boundaries_in_days) [Some 28; Some 56].
@@ -318,7 +318,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve peel_cseq : core.
+Local Hint Resolve peel_cseq : core.
 
 Lemma plug_deterministic : forall v C c1 c2, plug C c1 c2
   -> forall l vc1, step0 (v, c1) l vc1
@@ -500,7 +500,7 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve plug_cfoldExprs1 : core.
+Local Hint Resolve plug_cfoldExprs1 : core.
 
 (* The main correctness property! *)
 Theorem cfoldExprs_ok : forall v c,
@@ -594,7 +594,7 @@ Proof.
   invert H4.
 Qed.
 
-Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip : core.
+Local Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip : core.
 
 (* You might have noticed that our old notion of simulation doesn't apply to the
  * new optimization.  The reason is that, because the optimized program skips
@@ -767,9 +767,9 @@ Section simulation_skipping.
   Qed.
 End simulation_skipping.
 
-Hint Extern 1 (_ < _) => linear_arithmetic : core.
-Hint Extern 1 (_ >= _) => linear_arithmetic : core.
-Hint Extern 1 (_ <> _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ < _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ >= _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <> _) => linear_arithmetic : core.
 
 (* We will need to do some bookkeeping of [n] values.  This function is the
  * trick, as we only need to skip steps based on removing [If]s from the code.
@@ -817,7 +817,7 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve plug_cfold1 : core.
+Local Hint Resolve plug_cfold1 : core.
 
 Lemma plug_samefold : forall C c1 c1',
     plug C c1 c1'
@@ -829,7 +829,7 @@ Proof.
   f_equal; eauto.
 Qed.
 
-Hint Resolve plug_samefold : core.
+Local Hint Resolve plug_samefold : core.
 
 Lemma plug_countIfs : forall C c1 c1',
     plug C c1 c1'
@@ -841,13 +841,13 @@ Proof.
   apply IHplug in H5; linear_arithmetic.
 Qed.
 
-Hint Resolve plug_countIfs : core.
+Local Hint Resolve plug_countIfs : core.
 
-Hint Extern 1 (interp ?e _ = _) =>
+Local Hint Extern 1 (interp ?e _ = _) =>
   match goal with
   | [ H : cfoldArith e = _ |- _ ] => rewrite <- cfoldArith_ok; rewrite H
   end : core.
-Hint Extern 1 (interp ?e _ <> _) =>
+Local Hint Extern 1 (interp ?e _ <> _) =>
   match goal with
   | [ H : cfoldArith e = _ |- _ ] => rewrite <- cfoldArith_ok; rewrite H
   end : core.
@@ -1320,7 +1320,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_add_tempVar_bwd_prime agree_refl : core.
+Local Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_add_tempVar_bwd_prime agree_refl : core.
 
 (* And here are two more unremarkable lemmas. *)
 
@@ -1333,7 +1333,7 @@ Proof.
   eauto 6.
 Qed.
 
-Hint Resolve silent_csteps_front : core.
+Local Hint Resolve silent_csteps_front : core.
 
 Lemma tempVar_contra : forall n1 n2,
     tempVar n1 = tempVar n2
@@ -1344,7 +1344,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve tempVar_contra : core.
+Local Hint Resolve tempVar_contra : core.
 
 Lemma self_prime_contra : forall s,
     (s ++ "'")%string = s -> False.
@@ -1352,7 +1352,7 @@ Proof.
   induct s; simplify; equality.
 Qed.
 
-Hint Resolve self_prime_contra : core.
+Local Hint Resolve self_prime_contra : core.
 
 (* We've now proved all properties of [tempVar] that we need, so let's ask Coq
  * not to reduce applications of it anymore, to keep goals simpler. *)
@@ -1560,7 +1560,7 @@ Proof.
   induct 1; bool; auto.
 Qed.
 
-Hint Immediate noUnderscore_plug : core.
+Local Hint Immediate noUnderscore_plug : core.
 
 Lemma silent_csteps_plug : forall C c1 c1',
     plug C c1 c1'
@@ -1571,7 +1571,7 @@ Proof.
   induct 1; invert 1; eauto.
 Qed.
 
-Hint Resolve silent_csteps_plug : core.
+Local Hint Resolve silent_csteps_plug : core.
 
 Fixpoint flattenContext (C : context) : context :=
   match C with
@@ -1585,7 +1585,7 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve plug_flatten : core.
+Local Hint Resolve plug_flatten : core.
 
 Lemma plug_total : forall c C, exists c', plug C c c'.
 Proof.
@@ -1604,7 +1604,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve plug_cstep : core.
+Local Hint Resolve plug_cstep : core.
 
 Lemma step0_noUnderscore : forall v c l v' c',
     step0 (v, c) l (v', c')
@@ -1616,7 +1616,7 @@ Proof.
   reflexivity.
 Qed.
 
-Hint Resolve step0_noUnderscore : core.
+Local Hint Resolve step0_noUnderscore : core.
 
 Fixpoint noUnderscoreContext (C : context) : bool :=
   match C with
@@ -1643,7 +1643,7 @@ Proof.
   rewrite H4, H3; reflexivity.
 Qed.
 
-Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd : core.
+Local Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd : core.
 
 (* Finally, the main correctness theorem. *)
 Lemma flatten_ok : forall v c,

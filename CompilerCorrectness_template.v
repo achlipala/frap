@@ -101,7 +101,7 @@ Inductive generate : valuation * cmd -> list (option nat) -> Prop :=
   -> generate vc' ns
   -> generate vc (Some n :: ns).
 
-Hint Constructors plug step0 cstep generate : core.
+Local Hint Constructors plug step0 cstep generate : core.
 
 Definition traceInclusion (vc1 vc2 : valuation * cmd) :=
   forall ns, generate vc1 ns -> generate vc2 ns.
@@ -131,8 +131,8 @@ Example month_boundaries_in_days :=
     done
   done.
 
-Hint Extern 1 (interp _ _ = _) => simplify; equality : core.
-Hint Extern 1 (interp _ _ <> _) => simplify; equality : core.
+Local Hint Extern 1 (interp _ _ = _) => simplify; equality : core.
+Local Hint Extern 1 (interp _ _ <> _) => simplify; equality : core.
 
 Theorem first_few_values :
   generate ($0, month_boundaries_in_days) [Some 28; Some 56].
@@ -251,7 +251,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve peel_cseq : core.
+Local Hint Resolve peel_cseq : core.
 
 Lemma plug_deterministic : forall v C c1 c2, plug C c1 c2
   -> forall l vc1, step0 (v, c1) l vc1
@@ -439,7 +439,7 @@ Proof.
   invert H4.
 Qed.
 
-Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip : core.
+Local Hint Resolve silent_generate_fwd silent_generate_bwd generate_Skip : core.
 
 Section simulation_skipping.
   Variable R : nat -> valuation * cmd -> valuation * cmd -> Prop.
@@ -593,9 +593,9 @@ Section simulation_skipping.
   Qed.
 End simulation_skipping.
 
-Hint Extern 1 (_ < _) => linear_arithmetic : core.
-Hint Extern 1 (_ >= _) => linear_arithmetic : core.
-Hint Extern 1 (_ <> _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ < _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ >= _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <> _) => linear_arithmetic : core.
 
 Lemma cfold_ok : forall v c,
     (v, c) =| (v, cfold c).
@@ -1062,7 +1062,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_add_tempVar_bwd_prime agree_refl : core.
+Local Hint Resolve agree_add agree_add_tempVar_fwd agree_add_tempVar_bwd agree_add_tempVar_bwd_prime agree_refl : core.
 
 Lemma silent_csteps_front : forall c v1 v2 c1 c2,
     silent_cstep^* (v1, c1) (v2, c2)
@@ -1073,7 +1073,7 @@ Proof.
   eauto 6.
 Qed.
 
-Hint Resolve silent_csteps_front : core.
+Local Hint Resolve silent_csteps_front : core.
 
 Lemma tempVar_contra : forall n1 n2,
     tempVar n1 = tempVar n2
@@ -1084,7 +1084,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve tempVar_contra : core.
+Local Hint Resolve tempVar_contra : core.
 
 Lemma self_prime_contra : forall s,
     (s ++ "'")%string = s -> False.
@@ -1092,7 +1092,7 @@ Proof.
   induct s; simplify; equality.
 Qed.
 
-Hint Resolve self_prime_contra : core.
+Local Hint Resolve self_prime_contra : core.
 
 Opaque tempVar.
 
@@ -1270,7 +1270,7 @@ Proof.
   induct 1; bool; auto.
 Qed.
 
-Hint Immediate noUnderscore_plug.
+Local Hint Immediate noUnderscore_plug.
 
 Lemma silent_csteps_plug : forall C c1 c1',
     plug C c1 c1'
@@ -1281,7 +1281,7 @@ Proof.
   induct 1; invert 1; eauto.
 Qed.
 
-Hint Resolve silent_csteps_plug.
+Local Hint Resolve silent_csteps_plug.
 
 Fixpoint flattenContext (C : context) : context :=
   match C with
@@ -1295,7 +1295,7 @@ Proof.
   induct 1; simplify; eauto.
 Qed.
 
-Hint Resolve plug_flatten.
+Local Hint Resolve plug_flatten.
 
 Lemma plug_total : forall c C, exists c', plug C c c'.
 Proof.
@@ -1314,7 +1314,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve plug_cstep.
+Local Hint Resolve plug_cstep.
 
 Lemma step0_noUnderscore : forall v c l v' c',
     step0 (v, c) l (v', c')
@@ -1326,7 +1326,7 @@ Proof.
   reflexivity.
 Qed.
 
-Hint Resolve step0_noUnderscore.
+Local Hint Resolve step0_noUnderscore.
 
 Fixpoint noUnderscoreContext (C : context) : bool :=
   match C with
@@ -1353,7 +1353,7 @@ Proof.
   rewrite H4, H3; reflexivity.
 Qed.
 
-Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd.
+Local Hint Resolve noUnderscore_plug_context noUnderscore_plug_fwd.
 
 Lemma flatten_ok : forall v c,
     noUnderscore c = true

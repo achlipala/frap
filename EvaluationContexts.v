@@ -186,17 +186,18 @@ Module Stlc.
 
   Local Hint Resolve preservation0 : core.
 
-  Lemma generalize_plug : forall e1 C e1',
-    plug C e1 e1'
-    -> forall e2 e2', plug C e2 e2'
-      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
-      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
+  Lemma preservation' : forall C e1 e1',
+      plug C e1 e1'
+      -> forall e2 e2' t, plug C e2 e2'
+      -> step0 e1 e2
+      -> hasty $0 e1' t
+      -> hasty $0 e2' t.
   Proof.
     induct 1; t.
   Qed.
 
-  Local Hint Resolve generalize_plug : core.
-
+  Local Hint Resolve preservation' : core.
+  
   Lemma preservation : forall e1 e2,
     step e1 e2
     -> forall t, hasty $0 e1 t

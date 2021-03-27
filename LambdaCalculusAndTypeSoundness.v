@@ -54,7 +54,7 @@ Module Ulc.
   | Value : forall x e, value (Abs x e).
   (* We're cheating a bit here, *assuming* that the term is also closed. *)
 
-  Hint Constructors eval value.
+  Local Hint Constructors eval value : core.
 
   (* Every value executes to itself. *)
   Theorem value_eval : forall v,
@@ -64,7 +64,7 @@ Module Ulc.
     invert 1; eauto.
   Qed.
 
-  Hint Resolve value_eval.
+  Local Hint Resolve value_eval : core.
 
   (* Conversely, let's prove that [eval] only produces values. *)
   Theorem eval_value : forall e v,
@@ -74,7 +74,7 @@ Module Ulc.
     induct 1; eauto.
   Qed.
 
-  Hint Resolve eval_value.
+  Local Hint Resolve eval_value : core.
 
   (* Some notations, to let us write more normal-looking lambda terms *)
   Coercion Var : var >-> exp.
@@ -343,7 +343,7 @@ Module Ulc.
     -> plug c (subst v x e) e2
     -> step e1 e2.
 
-  Hint Constructors plug step.
+  Local Hint Constructors plug step : core.
 
   (* Here we now go through a proof of equivalence between big- and small-step
    * semantics, though we won't spend any further commentary on it. *)
@@ -360,7 +360,7 @@ Module Ulc.
     invert H0; eauto.
   Qed.
 
-  Hint Resolve step_eval''.
+  Local Hint Resolve step_eval'' : core.
 
   Lemma step_eval' : forall e1 e2,
     step e1 e2
@@ -370,7 +370,7 @@ Module Ulc.
     invert 1; simplify; eauto.
   Qed.
 
-  Hint Resolve step_eval'.
+  Local Hint Resolve step_eval' : core.
 
   Theorem step_eval : forall e v,
     step^* e v
@@ -413,7 +413,7 @@ Module Ulc.
     induct 2; simplify; eauto.
   Qed.
 
-  Hint Resolve compose_ok.
+  Local Hint Resolve compose_ok : core.
 
   Lemma step_plug : forall e1 e2,
     step e1 e2
@@ -448,7 +448,7 @@ Module Ulc.
     assumption.
   Qed.
 
-  Hint Resolve stepStar_plug eval_value.
+  Local Hint Resolve stepStar_plug eval_value : core.
 
   Theorem eval_step : forall e v,
     eval e v
@@ -494,49 +494,33 @@ Module Stlc.
       | App e2' e2'' => App (subst e1 x e2') (subst e1 x e2'')
     end.
 
-  (* Evaluation contexts; note that we added cases for [Plus]. *)
-  Inductive context : Set :=
-  | Hole : context
-  | Plus1 : context -> exp -> context
-  | Plus2 : exp -> context -> context
-  | App1 : context -> exp -> context
-  | App2 : exp -> context -> context.
+  (* Small-step, call-by-value evaluation *)
 
-  (* Plugging an expression into a context *)
-  Inductive plug : context -> exp -> exp -> Prop :=
-  | PlugHole : forall e, plug Hole e e
-  | PlugPlus1 : forall e e' C e2,
-    plug C e e'
-    -> plug (Plus1 C e2) e (Plus e' e2)
-  | PlugPlus2 : forall e e' v1 C,
-    value v1
-    -> plug C e e'
-    -> plug (Plus2 v1 C) e (Plus v1 e')
-  | PlugApp1 : forall e e' C e2,
-    plug C e e'
-    -> plug (App1 C e2) e (App e' e2)
-  | PlugApp2 : forall e e' v1 C,
-    value v1
-    -> plug C e e'
-    -> plug (App2 v1 C) e (App v1 e').
-
-  (* Small-step, call-by-value evaluation, using our evaluation contexts *)
-
-  (* First: the primitive reductions *)
-  Inductive step0 : exp -> exp -> Prop :=
-  | Beta : forall x e v,
-    value v
-    -> step0 (App (Abs x e) v) (subst v x e)
-  | Add : forall n1 n2,
-    step0 (Plus (Const n1) (Const n2)) (Const (n1 + n2)).
-
-  (* Then: running them in context *)
   Inductive step : exp -> exp -> Prop :=
-  | StepRule : forall C e1 e2 e1' e2',
-    plug C e1 e1'
-    -> plug C e2 e2'
-    -> step0 e1 e2
-    -> step e1' e2'.
+  (* These rules show the real action of the semantics. *)
+  | Beta : forall x e v,
+      value v
+      -> step (App (Abs x e) v) (subst v x e)
+  | Add : forall n1 n2,
+      step (Plus (Const n1) (Const n2)) (Const (n1 + n2))
+  (* Then we have a bunch of bureaucratic, repetitive rules encoding evaluation
+   * order.  See next lecture for how to streamline this part, but for now note
+   * that the [value] premises below are crucial to enforce a single order of
+   * evaluation. *)
+  | App1 : forall e1 e1' e2,
+      step e1 e1'
+      -> step (App e1 e2) (App e1' e2)
+  | App2 : forall v e2 e2',
+      value v
+      -> step e2 e2'
+      -> step (App v e2) (App v e2')
+  | Plus1 : forall e1 e1' e2,
+      step e1 e1'
+      -> step (Plus e1 e2) (Plus e1' e2)
+  | Plus2 : forall v e2 e2',
+      value v
+      -> step e2 e2'
+      -> step (Plus v e2) (Plus v e2').
 
   (* It's easy to wrap everything as a transition system. *)
   Definition trsys_of (e : exp) := {|
@@ -573,7 +557,7 @@ Module Stlc.
     -> hasty G e2 t1
     -> hasty G (App e1 e2) t2.
 
-  Hint Constructors value plug step0 step hasty.
+  Local Hint Constructors value step hasty : core.
 
   (* Some notation to make it more pleasant to write programs *)
   Infix "-->" := Fun (at level 60, right associativity).
@@ -640,40 +624,31 @@ Module Stlc.
     | [ H1 : value e2, H2 : hasty $0 e2 _ |- _ ] => invert H1; invert H2
     end.
     exists (Const (n + n0)).
-    eapply StepRule with (C := Hole).
-    eauto.
-    eauto.
     constructor.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
     end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
-    end.
     right.
-    eauto.
+    exists (x ^+^ e2).
+    constructor.
+    assumption.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
     end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
-    end.
     right.
-    eauto.
+    exists (e1 ^+^ x).
+    apply Plus2.
+    assumption.
+    assumption.
 
     match goal with
-    | [ H : exists x, step e1 _ |- _ ] => invert H
-    end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
+    | [ H : exists x, _ |- _ ] => invert H
     end.
     right.
-    exists (Plus x e2).
-    eapply StepRule with (C := Plus1 C e2).
-    eauto.
-    eauto.
+    exists (x ^+^ e2).
+    constructor.
     assumption.
 
     left.
@@ -686,41 +661,33 @@ Module Stlc.
     | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
     end.
     exists (subst e2 x e0).
-    eapply StepRule with (C := Hole).
-    eauto.
-    eauto.
     constructor.
     assumption.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
     end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
-    end.
     right.
-    eauto.
+    exists (x @ e2).
+    constructor.
+    assumption.
 
     match goal with
     | [ H : exists x, _ |- _ ] => invert H
     end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
-    end.
     right.
-    eauto.
+    exists (e1 @ x).
+    constructor.
+    assumption.
+    assumption.
 
     match goal with
     | [ H : exists x, step e1 _ |- _ ] => invert H
     end.
-    match goal with
-    | [ H : step _ _ |- _ ] => invert H
-    end.
     right.
     exists (App x e2).
-    eapply StepRule with (C := App1 C e2).
-    eauto.
-    eauto.
+    constructor.
+
     assumption.
   Qed.
 
@@ -819,92 +786,45 @@ Module Stlc.
     eapply IHhasty2; equality.
   Qed.
 
-  (* We're almost ready for the other main property.  Let's prove it first
-   * for the more basic [step0] relation: steps preserve typing. *)
-  Lemma preservation0 : forall e1 e2,
-    step0 e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
-  Proof.
-    invert 1; simplify.
-
-    invert H.
-    invert H4.
-    eapply substitution.
-    eassumption.
-    assumption.
-
-    invert H.
-    constructor.
-  Qed.
-
-  (* We also need this key property, essentially saying that, if [e1] and [e2] are
-   * "type-equivalent," then they remain "type-equivalent" after wrapping the same
-   * context around both. *)
-  Lemma generalize_plug : forall e1 C e1',
-    plug C e1 e1'
-    -> forall e2 e2', plug C e2 e2'
-      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
-      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
-  Proof.
-    induct 1; simplify.
-
-    invert H.
-    apply H0.
-    assumption.
-
-    invert H0.
-    invert H2.
-    constructor.
-    eapply IHplug.
-    eassumption.
-    assumption.
-    assumption.
-    assumption.
-
-    invert H1.
-    invert H3.
-    constructor.
-    assumption.
-    eapply IHplug.
-    eassumption.
-    assumption.
-    assumption.
-
-    invert H0.
-    invert H2.
-    econstructor.
-    eapply IHplug.
-    eassumption.
-    assumption.
-    eassumption.
-    assumption.
-
-    invert H1.
-    invert H3.
-    econstructor.
-    eassumption.
-    eapply IHplug.
-    eassumption.
-    assumption.
-    eassumption.
-  Qed.
-
   (* OK, now we're almost done.  Full steps really do preserve typing! *)
   Lemma preservation : forall e1 e2,
     step e1 e2
     -> forall t, hasty $0 e1 t
       -> hasty $0 e2 t.
   Proof.
-    invert 1; simplify.
+    induct 1; simplify.
 
-    eapply generalize_plug with (e1' := e1).
-    eassumption.
-    eassumption.
-    simplify.
-    eapply preservation0.
+    invert H0.
+    invert H4.
+    eapply substitution.
     eassumption.
     assumption.
+    
+    invert H.
+    constructor.
+
+    invert H0.
+    econstructor.
+    apply IHstep.
+    eassumption.
+    assumption.
+
+    invert H1.
+    econstructor.
+    eassumption.
+    apply IHstep.
+    assumption.
+
+    invert H0.
+    constructor.
+    apply IHstep.
+    assumption.
+    assumption.
+
+    invert H1.
+    constructor.
+    assumption.
+    apply IHstep.
     assumption.
   Qed.
 
@@ -946,11 +866,9 @@ Module Stlc.
              | [ |- context[?x ==v ?y] ] => cases (x ==v y)
              | [ H : Some _ = Some _ |- _ ] => invert H
 
-             | [ H : step _ _ |- _ ] => invert H
-             | [ H : step0 _ _ |- _ ] => invert1 H
+             | [ H : step _ _ |- _ ] => invert1 H
              | [ H : hasty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
              | [ H : hasty _ _ _ |- _ ] => invert1 H
-             | [ H : plug _ _ _ |- _ ] => invert1 H
              end; subst.
 
   Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 6.
@@ -963,7 +881,7 @@ Module Stlc.
     induct 1; t.
   Qed.
 
-  Hint Resolve weakening_override.
+  Local Hint Resolve weakening_override : core.
 
   Lemma weakening_snazzy : forall G e t,
     hasty G e t
@@ -973,7 +891,7 @@ Module Stlc.
     induct 1; t.
   Qed.
 
-  Hint Resolve weakening_snazzy.
+  Local Hint Resolve weakening_snazzy : core.
 
   (* Replacing a typing context with an equal one has no effect (useful to guide
    * proof search as a hint). *)
@@ -985,7 +903,7 @@ Module Stlc.
     t.
   Qed.
 
-  Hint Resolve hasty_change.
+  Local Hint Resolve hasty_change : core.
 
   Lemma substitution_snazzy : forall G x t' e t e',
     hasty (G $+ (x, t')) e t
@@ -995,38 +913,17 @@ Module Stlc.
     induct 1; t.
   Qed.
 
-  Hint Resolve substitution_snazzy.
-
-  Lemma preservation0_snazzy : forall e1 e2,
-    step0 e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
-  Proof.
-    invert 1; t.
-  Qed.
-
-  Hint Resolve preservation0_snazzy.
-
-  Lemma generalize_plug_snazzy : forall e1 C e1',
-    plug C e1 e1'
-    -> forall e2 e2', plug C e2 e2'
-      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
-      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
-  Proof.
-    induct 1; t.
-  Qed.
-
-  Hint Resolve generalize_plug_snazzy.
+  Local Hint Resolve substitution_snazzy : core.
 
   Lemma preservation_snazzy : forall e1 e2,
     step e1 e2
     -> forall t, hasty $0 e1 t
       -> hasty $0 e2 t.
   Proof.
-    invert 1; t.
+    induct 1; t.
   Qed.
 
-  Hint Resolve progress_snazzy preservation_snazzy.
+  Local Hint Resolve progress_snazzy preservation_snazzy : core.
 
   Theorem safety_snazzy : forall e t, hasty $0 e t
     -> invariantFor (trsys_of e)

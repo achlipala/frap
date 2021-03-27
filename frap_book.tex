@@ -3115,19 +3115,23 @@ A hallmark of a Turing-complete language is that it can host an interpreter for 
 
 \section{Small-Step Semantics}
 
-$\lambda$-calculus is also straightforward to formalize with a small-step semantics\index{small-step operational semantics} and evaluation contexts\index{evaluation contexts}, following the method of Section \ref{eval_contexts}.
+$\lambda$-calculus is also straightforward to formalize with a small-step semantics\index{small-step operational semantics}.
 One might argue that the technique is even simpler for $\lambda$-calculus, since we must deal only with expressions, not also imperative variable valuations.
-$$\begin{array}{rrcl}
-  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C
-\end{array}$$
-Note the one subtlety: the last form of evaluation context requires the term in a function position to be a \emph{value}.
-This innocuous-looking restriction enforces \emph{call-by-value evaluation order}\index{call-by-value}, where, upon encountering a function application, we must first evaluate the function, then evaluate the argument, and only then call the function.
-Tweaks to the definition of $C$ produce other evaluation orders, like \emph{call-by-name}\index{call-by-name}, but we will say no more about those alternatives.
 
-We assume a standard definition of what it means to plug an expression into the hole in a context, and now we can give the sole small-step evaluation rule for basic $\lambda$-calculus, conventionally called the \emph{$\beta$-reduction} rule\index{$\beta$-reduction}.
 \encoding
-$$\infer{\smallstep{\plug{C}{(\lambda x. \; e) \; v}}{\plug{C}{\subst{e}{x}{v}}}}{}$$
-That is, we find a suitable position within the expression where a $\lambda$-expression is applied to a value, and we replace that position with the appropriate substitution result.
+The crucial rule is for \emph{$\beta$-reduction}\index{$\beta$-reduction}, which explains the behavior of function applications in terms of substitution.
+$$\infer{\smallstep{(\lambda x. \; e) \; v}{\subst{e}{x}{v}}}{}$$
+Note the one subtlety: the function argument is required to be a \emph{value}.
+This innocuous-looking restriction helps enforce \emph{call-by-value evaluation order}\index{call-by-value}, where, upon encountering a function application, we must first evaluate the function, then evaluate the argument, and only then call the function.
+
+Two more rules complete the semantics and the characterization of call-by-value.
+$$\infer{\smallstep{e_1 \; e_2}{e'_1 \; e_2}}{
+  \smallstep{e_1}{e'_1}
+}
+\quad \infer{\smallstep{v \; e_2}{v \; e'_2}}{
+  \smallstep{e_2}{e'_2}
+}$$
+Note again from the second rule that we are only allowed to move on to evaluating the function argument after the function is fully evaluated.
 
 Following a very similar outline to what we used in Chapter \ref{operational_semantics}, we establish equivalence between the two semantics for $\lambda$-calculus.
 
@@ -3158,20 +3162,17 @@ $$\begin{array}{rrcl}
 We've added natural numbers as a primitive feature, supported via constants and addition.
 Numbers may be intermixed with functions, and we may, for instance, write first-class functions that take numbers as input or return numbers.
 
-Our language of evaluation contexts expands a bit.
-$$\begin{array}{rrcl}
-  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C \mid C + e \mid v + C
-\end{array}$$
-
-Now we want to define two kinds of basic small steps, so it is worth defining a separate relation for them.
-Here we face a classic nuisance in writing rules that combine explicit syntax with standard mathematical operators, and we write $+$ for the syntactic construct and $\textbf{+}$ for the mathematical addition operator.
-$$\infer{\smallstepo{(\lambda x. \; e) \; v}{\subst{e}{x}{v}}}{}
-\quad \infer{\smallstepo{n + m}{n \textbf{+} m}}{}$$
-
-Here is the overall step rule.
-$$\infer{\smallstep{\plug{C}{e}}{\plug{C}{e'}}}{
-  \smallstepo{e}{e'}
+We add two new bureaucratic rules for addition, mirroring those for function application.
+$$\infer{\smallstep{e_1 + e_2}{e'_1 + e_2}}{
+  \smallstep{e_1}{e'_1}
+}
+\quad \infer{\smallstep{v + e_2}{v + e'_2}}{
+  \smallstep{e_2}{e'_2}
 }$$
+
+One more rule for addition is called for.
+Here we face a classic nuisance in writing rules that combine explicit syntax with standard mathematical operators, and we write $+$ for the syntactic construct and $\textbf{+}$ for the mathematical addition operator.
+$$\infer{\smallstep{n + m}{n \textbf{+} m}}{}$$
 
 What would be a useful property to prove about our new expressions?
 For one thing, we don't want them to ``crash,'' as in the expression $(\lambda x. \; x) + 7$ that tries to add a function and a number.
@@ -3243,25 +3244,11 @@ We work our way through a suite of standard lemmas to support that invariant pro
   By induction on the derivation of $\hasty{\Gamma, x: \tau'}{e}{\tau}$, with appeal to Lemma \ref{weakening}.
 \end{proof}
 
-\begin{lemma}\label{preservation0}
-  If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
-\end{lemma}
-\begin{proof}
-  By inversion on the derivation of $\smallstepo{e}{e'}$, with appeal to Lemma \ref{substitution}.
-\end{proof}
-
-\begin{lemma}\label{generalize_plug}
-  If any type of $e_1$ is also a type of $e_2$, then any type of $\plug{C}{e_1}$ is also a type of $\plug{C}{e_2}$.
-\end{lemma}
-\begin{proof}
-  By induction on the structure of $C$.
-\end{proof}
-
 \begin{lemma}[Preservation]\label{preservation}
   If $\smallstep{e_1}{e_2}$ and $\hasty{}{e_1}{\tau}$, then $\hasty{}{e_2}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstep{e_1}{e_2}$, with appeal to Lemmas \ref{preservation0} and \ref{generalize_plug}.
+  By induction on the derivation of $\smallstep{e_1}{e_2}$.
 \end{proof}
 
 \invariants

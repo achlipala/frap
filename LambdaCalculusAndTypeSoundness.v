@@ -306,68 +306,53 @@ Module Ulc.
   Qed.
 
 
-  (** * Small-step semantics with evaluation contexts *)
+  (** * Small-step semantics *)
 
-  (* We can also port to this setting our small-step semantics style based on
-   * evaluation contexts. *)
+  (* We can also port to this setting our small-step semantics style. *)
 
-  Inductive context : Set :=
-  | Hole : context
-  | App1 : context -> exp -> context
-  | App2 : exp -> context -> context.
-
-  Inductive plug : context -> exp -> exp -> Prop :=
-  | PlugHole : forall e,
-    plug Hole e e
-  | PlugApp1 : forall c e1 e2 e,
-    plug c e1 e
-    -> plug (App1 c e2) e1 (App e e2)
-  | PlugApp2 : forall c e1 e2 e,
-    value e1
-    -> plug c e2 e
-    -> plug (App2 e1 c) e2 (App e1 e).
-  (* Subtle point: the [value] hypothesis right above enforces a well-formedness
-   * condition on contexts that may actually be plugged.  We don't allow
-   * skipping over a lefthand subterm of an application when that term has
-   * evaluation work left to do.  This condition is the essence of
-   * *call-by-value* instead of other evaluation strategies.  Details are
-   * largely beyond our scope here. *)
-
-  (* Compared to the small-step contextual semantics from two chapters back, we
-   * skip a [step0] relation, since function application (called "beta
-   * reduction") is the only option here. *)
+  (* Function application (called "beta reduction") is the big rule here. *)
   Inductive step : exp -> exp -> Prop :=
-  | ContextBeta : forall c x e v e1 e2,
+  | ContextBeta : forall x e v,
     value v
-    -> plug c (App (Abs x e) v) e1
-    -> plug c (subst v x e) e2
-    -> step e1 e2.
+    -> step (App (Abs x e) v) (subst v x e)
 
-  Local Hint Constructors plug step : core.
+  (* However, we also need bureaucractic rules for pushing evaluation inside
+   * applications. *)
+  | App1 : forall e1 e1' e2,
+      step e1 e1'
+      -> step (App e1 e2) (App e1' e2)
+  | App2 : forall v e2 e2',
+      value v
+      -> step e2 e2'
+      -> step (App v e2) (App v e2').
+  (* Note how that last rule enforces a deterministic evaluation order!
+   * We call it *call-by-value*. *)
+
+  Local Hint Constructors step : core.
 
   (* Here we now go through a proof of equivalence between big- and small-step
    * semantics, though we won't spend any further commentary on it. *)
-
-  Lemma step_eval'' : forall v c x e e1 e2 v0,
-    value v
-    -> plug c (App (Abs x e) v) e1
-    -> plug c (subst v x e) e2
-    -> eval e2 v0
-    -> eval e1 v0.
-  Proof.
-    induct c; invert 2; invert 1; simplify; eauto.
-    invert H0; eauto.
-    invert H0; eauto.
-  Qed.
-
-  Local Hint Resolve step_eval'' : core.
 
   Lemma step_eval' : forall e1 e2,
     step e1 e2
     -> forall v, eval e2 v
       -> eval e1 v.
   Proof.
-    invert 1; simplify; eauto.
+    induct 1; simplify; eauto.
+
+    invert H0.
+    econstructor.
+    apply IHstep.
+    eassumption.
+    eassumption.
+    assumption.
+
+    invert H1.
+    econstructor.
+    eassumption.
+    apply IHstep.
+    eassumption.
+    assumption.
   Qed.
 
   Local Hint Resolve step_eval' : core.
@@ -380,75 +365,22 @@ Module Ulc.
     induct 1; eauto.
   Qed.
 
-  Lemma plug_functional : forall C e e1,
-      plug C e e1
-      -> forall e2, plug C e e2
-                    -> e1 = e2.
+  Local Hint Resolve eval_value : core.
+
+  Theorem step_app1 : forall e1 e1' e2,
+    step^* e1 e1'
+    -> step^* (App e1 e2) (App e1' e2).
   Proof.
-    induct 1; invert 1; simplify; try f_equal; eauto.
+    induct 1; eauto.
   Qed.
 
-  Lemma plug_mirror : forall C e e', plug C e e'
-    -> forall e1, exists e1', plug C e1 e1'.
+  Theorem step_app2 : forall e2 e2' v,
+    value v
+    -> step^* e2 e2'
+    -> step^* (App v e2) (App v e2').
   Proof.
-    induct 1; simplify; eauto.
-
-    specialize (IHplug e0); first_order; eauto.
-
-    specialize (IHplug e0); first_order; eauto.
-  Qed.    
-
-  Fixpoint compose (C1 C2 : context) : context :=
-    match C2 with
-    | Hole => C1
-    | App1 C2' e => App1 (compose C1 C2') e
-    | App2 v C2' => App2 v (compose C1 C2')
-    end.
-
-  Lemma compose_ok : forall C1 C2 e1 e2 e3,
-      plug C1 e1 e2
-      -> plug C2 e2 e3
-      -> plug (compose C1 C2) e1 e3.
-  Proof.
-    induct 2; simplify; eauto.
+    induct 2; eauto.
   Qed.
-
-  Local Hint Resolve compose_ok : core.
-
-  Lemma step_plug : forall e1 e2,
-    step e1 e2
-    -> forall C e1' e2', plug C e1 e1'
-                         -> plug C e2 e2'
-                         -> step e1' e2'.
-  Proof.
-    invert 1; simplify; eauto.
-  Qed.
-
-  Lemma stepStar_plug : forall e1 e2,
-    step^* e1 e2
-    -> forall C e1' e2', plug C e1 e1'
-                         -> plug C e2 e2'
-                         -> step^* e1' e2'.
-  Proof.
-    induct 1; simplify.
-
-    assert (e1' = e2') by (eapply plug_functional; eassumption).
-    subst.
-    constructor.
-
-    assert (exists y', plug C y y') by eauto using plug_mirror.
-    invert H3.
-    eapply step_plug in H.
-    econstructor.
-    eassumption.
-    eapply IHtrc.
-    eassumption.
-    assumption.
-    eassumption.
-    assumption.
-  Qed.
-
-  Local Hint Resolve stepStar_plug eval_value : core.
 
   Theorem eval_step : forall e v,
     eval e v
@@ -457,10 +389,16 @@ Module Ulc.
     induct 1; eauto.
 
     eapply trc_trans.
-    eapply stepStar_plug with (e1 := e1) (e2 := Abs x e1') (C := App1 Hole e2); eauto.
+    apply step_app1.
+    eassumption.
     eapply trc_trans.
-    eapply stepStar_plug with (e1 := e2) (e2 := v2) (C := App2 (Abs x e1') Hole); eauto.
+    eapply step_app2.
+    constructor.
+    eassumption.
+    econstructor.
+    constructor.
     eauto.
+    assumption.
   Qed.
 End Ulc.
 

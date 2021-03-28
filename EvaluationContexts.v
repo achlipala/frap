@@ -111,13 +111,6 @@ Module Stlc.
 
   Local Hint Constructors value plug step0 step hasty : core.
 
-  Infix "-->" := Fun (at level 60, right associativity).
-  Coercion Const : nat >-> exp.
-  Infix "^+^" := Plus (at level 50).
-  Coercion Var : var >-> exp.
-  Notation "\ x , e" := (Abs x e) (at level 51).
-  Infix "@" := App (at level 49, left associativity).
-
   (** * Now we adapt the automated proof of type soundness. *)
 
   Ltac t0 := match goal with
@@ -451,13 +444,6 @@ Module StlcPairs.
 
   Local Hint Constructors value plug step0 step hasty : core.
 
-  Infix "-->" := Fun (at level 60, right associativity).
-  Coercion Const : nat >-> exp.
-  Infix "^+^" := Plus (at level 50).
-  Coercion Var : var >-> exp.
-  Notation "\ x , e" := (Abs x e) (at level 51).
-  Infix "@" := App (at level 49, left associativity).
-
   Ltac t0 := match goal with
              | [ H : ex _ |- _ ] => invert H
              | [ H : _ /\ _ |- _ ] => invert H
@@ -760,13 +746,6 @@ Module StlcSums.
 
   Local Hint Constructors value plug step0 step hasty : core.
 
-  Infix "-->" := Fun (at level 60, right associativity).
-  Coercion Const : nat >-> exp.
-  Infix "^+^" := Plus (at level 50).
-  Coercion Var : var >-> exp.
-  Notation "\ x , e" := (Abs x e) (at level 51).
-  Infix "@" := App (at level 49, left associativity).
-
   Ltac t0 := match goal with
              | [ H : ex _ |- _ ] => invert H
              | [ H : _ /\ _ |- _ ] => invert H
@@ -881,3 +860,415 @@ Module StlcSums.
     apply invariant_induction; simplify; eauto; equality.
   Qed.
 End StlcSums.
+
+
+(** * Mutable Variables *)
+
+(* Let's show how to add in another classic language feature, showing off how
+ * abstracting with the idea of evaluation contexts saves us a lot of effort
+ * adapting old definitions.  So far, variables have been read-only, but we can
+ * easily enough make them mutable.  The types of some of our relations will
+ * change, but surprisingly much will remain intact. *)
+
+Module StlcMutable.
+  Inductive exp : Set :=
+  | Var (x : var)
+  | Const (n : nat)
+  | Plus (e1 e2 : exp)
+  | Abs (x : var) (e1 : exp)
+  | App (e1 e2 : exp)
+  | Pair (e1 e2 : exp)
+  | Fst (e1 : exp)
+  | Snd (e2 : exp)
+  | Inl (e1 : exp)
+  | Inr (e2 : exp)
+  | Match (e' : exp) (x1 : var) (e1 : exp) (x2 : var) (e2 : exp)
+
+  (* New cases: *)
+  | GetVar (x : var)
+  | SetVar (x : var) (e : exp).
+  (* Note that we are distinguishing between mutable and immutable variables,
+   * keeping the latter to bind in [Abs] and [Match]. *)
+
+  Inductive value : exp -> Prop :=
+  | VConst : forall n, value (Const n)
+  | VAbs : forall x e1, value (Abs x e1)
+  | VPair : forall v1 v2, value v1 -> value v2 -> value (Pair v1 v2)
+  | VInl : forall v, value v -> value (Inl v)
+  | VInr : forall v, value v -> value (Inr v).
+
+  Fixpoint subst (e1 : exp) (x : string) (e2 : exp) : exp :=
+    match e2 with
+      | Var y => if y ==v x then e1 else Var y
+      | Const n => Const n
+      | Plus e2' e2'' => Plus (subst e1 x e2') (subst e1 x e2'')
+      | Abs y e2' => Abs y (if y ==v x then e2' else subst e1 x e2')
+      | App e2' e2'' => App (subst e1 x e2') (subst e1 x e2'')
+      | Pair e2' e2'' => Pair (subst e1 x e2') (subst e1 x e2'')
+      | Fst e2' => Fst (subst e1 x e2')
+      | Snd e2' => Snd (subst e1 x e2')
+      | Inl e2' => Inl (subst e1 x e2')
+      | Inr e2' => Inr (subst e1 x e2')
+      | Match e2' x1 e21 x2 e22 => Match (subst e1 x e2')
+                                         x1 (if x1 ==v x then e21 else subst e1 x e21)
+                                         x2 (if x2 ==v x then e22 else subst e1 x e22)
+      | GetVar y => GetVar y
+      | SetVar y e2' => SetVar y (subst e1 x e2')
+    end.
+
+  Inductive context : Set :=
+  | Hole : context
+  | Plus1 : context -> exp -> context
+  | Plus2 : exp -> context -> context
+  | App1 : context -> exp -> context
+  | App2 : exp -> context -> context
+  | Pair1 : context -> exp -> context
+  | Pair2 : exp -> context -> context
+  | Fst1 : context -> context
+  | Snd1 : context -> context
+  | Inl1 : context -> context
+  | Inr1 : context -> context
+  | Match1 : context -> var -> exp -> var -> exp -> context
+  (* New case: *)
+  | SetVar1 : var -> context -> context.
+                        
+  Inductive plug : context -> exp -> exp -> Prop :=
+  | PlugHole : forall e, plug Hole e e
+  | PlugPlus1 : forall e e' C e2,
+    plug C e e'
+    -> plug (Plus1 C e2) e (Plus e' e2)
+  | PlugPlus2 : forall e e' v1 C,
+    value v1
+    -> plug C e e'
+    -> plug (Plus2 v1 C) e (Plus v1 e')
+  | PlugApp1 : forall e e' C e2,
+    plug C e e'
+    -> plug (App1 C e2) e (App e' e2)
+  | PlugApp2 : forall e e' v1 C,
+    value v1
+    -> plug C e e'
+    -> plug (App2 v1 C) e (App v1 e')
+  | PlugPair1 : forall e e' C e2,
+    plug C e e'
+    -> plug (Pair1 C e2) e (Pair e' e2)
+  | PlugPair2 : forall e e' v1 C,
+    value v1
+    -> plug C e e'
+    -> plug (Pair2 v1 C) e (Pair v1 e')
+  | PlugFst1 : forall e e' C,
+    plug C e e'
+    -> plug (Fst1 C) e (Fst e')
+  | PlugSnd1 : forall e e' C,
+    plug C e e'
+    -> plug (Snd1 C) e (Snd e')
+  | PlugInl1 : forall e e' C,
+    plug C e e'
+    -> plug (Inl1 C) e (Inl e')
+  | PlugInr1 : forall e e' C,
+    plug C e e'
+    -> plug (Inr1 C) e (Inr e')
+  | PluMatch1 : forall e e' C x1 e1 x2 e2,
+    plug C e e'
+    -> plug (Match1 C x1 e1 x2 e2) e (Match e' x1 e1 x2 e2)
+  
+   (* Our new plugging rules *)            
+  | PluSetVar1 : forall x e e' C,
+      plug C e e'
+      -> plug (SetVar1 x C) e (SetVar x e').
+
+  Definition valuation := fmap var exp.
+  
+  Inductive step0 : valuation * exp -> valuation * exp -> Prop :=
+  | Beta : forall env x e v,
+    value v
+    -> step0 (env, App (Abs x e) v) (env, subst v x e)
+  | Add : forall env n1 n2,
+      step0 (env, Plus (Const n1) (Const n2)) (env, Const (n1 + n2))
+  | FstPair : forall env v1 v2,
+      value v1
+      -> value v2
+      -> step0 (env, Fst (Pair v1 v2)) (env, v1)
+  | SndPair : forall env v1 v2,
+      value v1
+      -> value v2
+      -> step0 (env, Snd (Pair v1 v2)) (env, v2)
+  | MatchInl : forall env v x1 e1 x2 e2,
+      value v
+      -> step0 (env, Match (Inl v) x1 e1 x2 e2) (env, subst v x1 e1)
+  | MatchInr : forall env v x1 e1 x2 e2,
+      value v
+      -> step0 (env, Match (Inr v) x1 e1 x2 e2) (env, subst v x2 e2)
+  | Read : forall env x v,
+      env $? x = Some v
+      -> step0 (env, GetVar x) (env, v)
+  | Overwrite : forall env x v,
+      value v
+      -> step0 (env, SetVar x v) (env $+ (x, v), v).
+
+  Inductive step : valuation * exp -> valuation * exp -> Prop :=
+  | StepRule : forall C env1 e1 env2 e2 e1' e2',
+    plug C e1 e1'
+    -> plug C e2 e2'
+    -> step0 (env1, e1) (env2, e2)
+    -> step (env1, e1') (env2, e2').
+
+  Definition trsys_of (env : valuation) (e : exp) := {|
+    Initial := {(env, e)};
+    Step := step
+  |}.
+
+
+  Inductive type :=
+  | Nat
+  | Fun (dom ran : type)
+  | Prod (t1 t2 : type)
+  | Sum (t1 t2 : type).
+
+  (* Now there will be two typing contexts, one for mutable variables and one
+   * for immutable. *)
+  Inductive hasty (M : fmap var type) : fmap var type -> exp -> type -> Prop :=
+  | HtVar : forall G x t,
+    G $? x = Some t
+    -> hasty M G (Var x) t
+  | HtConst : forall G n,
+    hasty M G (Const n) Nat
+  | HtPlus : forall G e1 e2,
+    hasty M G e1 Nat
+    -> hasty M G e2 Nat
+    -> hasty M G (Plus e1 e2) Nat
+  | HtAbs : forall G x e1 t1 t2,
+    hasty M (G $+ (x, t1)) e1 t2
+    -> hasty M G (Abs x e1) (Fun t1 t2)
+  | HtApp : forall G e1 e2 t1 t2,
+    hasty M G e1 (Fun t1 t2)
+    -> hasty M G e2 t1
+    -> hasty M G (App e1 e2) t2
+  | HtPair : forall G e1 e2 t1 t2,
+    hasty M G e1 t1
+    -> hasty M G e2 t2
+    -> hasty M G (Pair e1 e2) (Prod t1 t2)
+  | HtFst : forall G e1 t1 t2,
+    hasty M G e1 (Prod t1 t2)
+    -> hasty M G (Fst e1) t1
+  | HtSnd : forall G e1 t1 t2,
+    hasty M G e1 (Prod t1 t2)
+    -> hasty M G (Snd e1) t2
+  | HtInl : forall G e1 t1 t2,
+      hasty M G e1 t1
+      -> hasty M G (Inl e1) (Sum t1 t2)
+  | HtInr : forall G e1 t1 t2,
+      hasty M G e1 t2
+      -> hasty M G (Inr e1) (Sum t1 t2)
+  | HtMatch : forall G e t1 t2 x1 e1 x2 e2 t,
+      hasty M G e (Sum t1 t2)
+      -> hasty M (G $+ (x1, t1)) e1 t
+      -> hasty M (G $+ (x2, t2)) e2 t
+      -> hasty M G (Match e x1 e1 x2 e2) t
+
+  (* New cases: *)
+  | HtGetVar : forall G x t,
+      M $? x = Some t
+      -> hasty M G (GetVar x) t
+  | HtSetVar : forall G x e t,
+      M $? x = Some t
+      -> hasty M G e t
+      -> hasty M G (SetVar x e) t.
+               
+  Local Hint Constructors value plug step0 step hasty : core.
+
+  (* Let's characterize what makes a typing context and a variable valuation
+   * compatible. *)
+  Definition compatible (M : fmap var type) (env : valuation) :=
+    forall x t, M $? x = Some t
+                -> exists v, env $? x = Some v
+                             /\ hasty M $0 v t.
+  
+  Ltac t0 := match goal with
+             | [ H : ex _ |- _ ] => invert H
+             | [ H : _ /\ _ |- _ ] => invert H
+             | [ |- context[?x ==v ?y] ] => cases (x ==v y)
+             | [ H : Some _ = Some _ |- _ ] => invert H
+
+             | [ H : step _ _ |- _ ] => invert H
+             | [ H : step0 _ _ |- _ ] => invert1 H
+             (* Add a few extra underscores below, for new [hasty] argument. *)
+             | [ H : hasty _ _ ?e _, H' : value ?e |- _ ] => invert H'; invert H; []
+             | [ H : hasty _ _ ?e _, H' : value ?e |- _ ] => invert H'; invert H; [|]
+
+             | [ H : hasty _ _ _ _ |- _ ] => invert1 H
+             | [ H : plug _ _ _ |- _ ] => invert1 H
+
+             (* New cases: *)
+             | [ H1 : compatible ?M ?env, H2 : ?M $? ?x = Some _ |- _ ] =>
+               (assert (exists v, env $? x = Some v) by eauto; fail 1)
+               || (pose proof (H1 _ _ H2); first_order)
+             | [ H1 : forall env, compatible ?M env -> _, H2 : compatible ?M _ |- _ ] =>
+               specialize (H1 _ H2); first_order
+             end; subst.
+
+  Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 7.
+  
+  Lemma progress : forall M e t,
+    hasty M $0 e t
+    -> forall env, compatible M env
+    -> value e
+    \/ exists st', step (env, e) st'.
+  Proof.
+    induct 1; t.
+  Qed.
+
+  Lemma weakening_override : forall (G G' : fmap var type) x t,
+    (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
+    -> (forall x' t', G $+ (x, t) $? x' = Some t'
+                      -> G' $+ (x, t) $? x' = Some t').
+  Proof.
+    simplify.
+    cases (x ==v x'); simplify; eauto.
+  Qed.
+
+  Local Hint Resolve weakening_override : core.
+
+  Lemma weakening : forall M G e t, hasty M G e t
+    -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+      -> hasty M G' e t.
+  Proof.
+    induct 1; t.
+  Qed.
+
+  Local Hint Resolve weakening : core.
+
+  Lemma hasty_change : forall M G e t,
+    hasty M G e t
+    -> forall G', G' = G
+      -> hasty M G' e t.
+  Proof.
+    t.
+  Qed.
+
+  Local Hint Resolve hasty_change : core.
+
+  Lemma substitution : forall M G x t' e t e',
+    hasty M (G $+ (x, t')) e t
+    -> hasty M $0 e' t'
+    -> hasty M G (subst e' x e) t.
+  Proof.
+    induct 1; t.
+  Qed.
+
+  Local Hint Resolve substitution : core.
+
+  Lemma compatible_bind : forall M env x v t,
+      compatible M env
+      -> M $? x = Some t
+      -> hasty M $0 v t
+      -> compatible M (env $+ (x, v)).
+  Proof.
+    unfold compatible; first_order.
+    cases (x ==v x0); subst; simplify.
+    rewrite H0 in H2.
+    invert H2.
+    eauto.
+    apply H in H0; first_order.
+  Qed.
+
+  Local Hint Resolve compatible_bind : core.
+
+  Lemma compatible_hasty : forall M env x v t,
+      compatible M env
+      -> env $? x = Some v
+      -> M $? x = Some t
+      -> hasty M $0 v t.
+  Proof.
+    t.
+    specialize (H _ _ H1); first_order.
+    rewrite H0 in H.
+    invert H.
+    assumption.
+  Qed.
+
+  Local Hint Immediate compatible_hasty : core.
+  
+  Lemma preservation0_exp : forall M env1 e1 env2 e2,
+    step0 (env1, e1) (env2, e2)
+    -> forall t, hasty M $0 e1 t
+      -> compatible M env1
+      -> hasty M $0 e2 t.
+  Proof.
+    invert 1; t.
+  Qed.
+
+  Lemma preservation0_env : forall M env1 e1 env2 e2,
+    step0 (env1, e1) (env2, e2)
+    -> forall t, hasty M $0 e1 t
+      -> compatible M env1
+      -> compatible M env2.
+  Proof.
+    invert 1; t.
+  Qed.
+
+  Local Hint Resolve preservation0_exp preservation0_env : core.
+
+  Lemma preservation'_exp : forall M C e1 e1',
+      plug C e1 e1'
+      -> forall e2 e2' t env1 env2, plug C e2 e2'
+      -> step0 (env1, e1) (env2, e2)
+      -> hasty M $0 e1' t
+      -> compatible M env1
+      -> hasty M $0 e2' t.
+  Proof.
+    induct 1; t.
+  Qed.
+
+  Local Hint Resolve preservation'_exp : core.
+  
+  Lemma preservation'_env' : forall M C e1 e1',
+      plug C e1 e1'
+      -> forall t e2 env1 env2, step0 (env1, e1) (env2, e2)
+      -> hasty M $0 e1' t
+      -> compatible M env1
+      -> compatible M env2.
+  Proof.
+    induct 1; t.
+  Qed.
+
+  Lemma preservation'_env : forall M C e1 e1' t e2 env1 env2,
+      step0 (env1, e1) (env2, e2)
+      -> plug C e1 e1'
+      -> hasty M $0 e1' t
+      -> compatible M env1
+      -> compatible M env2.
+  Proof.
+    simplify; eapply preservation'_env' with (e2 := e2); eauto.
+  Qed.
+
+  Local Hint Immediate preservation'_env : core.
+  
+  Lemma preservation : forall M env1 e1 env2 e2,
+    step (env1, e1) (env2, e2)
+    -> forall t, hasty M $0 e1 t
+      -> compatible M env1
+      -> hasty M $0 e2 t /\ compatible M env2.
+  Proof.
+    invert 1; t.
+  Qed.
+
+  Local Hint Resolve progress preservation : core.
+
+  Theorem safety : forall M env e t, hasty M $0 e t
+    -> compatible M env
+    -> invariantFor (trsys_of env e)
+                    (fun st => value (snd st)
+                               \/ exists st', step st st').
+  Proof.
+    simplify.
+    apply invariant_weaken with (invariant1 := fun st => hasty M $0 (snd st) t /\ compatible M (fst st)); eauto.
+    apply invariant_induction; simplify.
+    propositional; subst; auto.
+    invert H1.
+    cases s; cases s'; simplify.
+    eauto.
+    propositional.
+    cases s; simplify.
+    eauto.
+  Qed.
+End StlcMutable.

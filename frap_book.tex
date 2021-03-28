@@ -3272,170 +3272,125 @@ In this case, invariant $I(e) = \; \hasty{}{e}{\tau}$ is that crucial insight, i
 
 \chapter{More on Evaluation Contexts}\label{ectx}
 
-\section{Small-Step Semantics}
+In Chapter \ref{operational_semantics}, we met \emph{evaluation contexts}\index{evaluation contexts}, a strange little way of formalizing the idea ``the next place in a program where a step will happen.''
+Though we showed off how easy they make it to add concurrency to a language, the payoff from this style may still not have been clear.
+In this chapter, we continue the theme of showing how evaluation contexts make it easy to \emph{add new features to a formal semantics with very concise descriptions}.
+That is, the game will be to continue extending a language definition \emph{modularly}, leaving unchanged as much of our old definitions and proofs as possible.
+Many of the concise conventions we adopt here do require explicit expansion in the associated Coq code, though fancier Coq frameworks would obviate that requirement as well.
 
-$\lambda$-calculus is also straightforward to formalize with a small-step semantics\index{small-step operational semantics} and evaluation contexts\index{evaluation contexts}, following the method of Section \ref{eval_contexts}.
-One might argue that the technique is even simpler for $\lambda$-calculus, since we must deal only with expressions, not also imperative variable valuations.
-$$\begin{array}{rrcl}
-  \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C
-\end{array}$$
-Note the one subtlety: the last form of evaluation context requires the term in a function position to be a \emph{value}.
-This innocuous-looking restriction enforces \emph{call-by-value evaluation order}\index{call-by-value}, where, upon encountering a function application, we must first evaluate the function, then evaluate the argument, and only then call the function.
-Tweaks to the definition of $C$ produce other evaluation orders, like \emph{call-by-name}\index{call-by-name}, but we will say no more about those alternatives.
+\section{Last Chapter's Example Revisited}
 
-We assume a standard definition of what it means to plug an expression into the hole in a context, and now we can give the sole small-step evaluation rule for basic $\lambda$-calculus, conventionally called the \emph{$\beta$-reduction} rule\index{$\beta$-reduction}.
-\encoding
-$$\infer{\smallstep{\plug{C}{(\lambda x. \; e) \; v}}{\plug{C}{\subst{e}{x}{v}}}}{}$$
-That is, we find a suitable position within the expression where a $\lambda$-expression is applied to a value, and we replace that position with the appropriate substitution result.
-
-Following a very similar outline to what we used in Chapter \ref{operational_semantics}, we establish equivalence between the two semantics for $\lambda$-calculus.
-
-\begin{theorem}
-  If $\smallsteps{e}{v}$, then $\bigstep{e}{v}$.
-\end{theorem}
-
-\begin{theorem}
-  If $\bigstep{e}{v}$, then $\smallsteps{e}{v}$.
-\end{theorem}
-
-There are a few proof subtleties beyond what we encountered before, and the Coq formalization may be worth reading, to see those details.
-
-Again as before, we have a natural way to build a transition system from any $\lambda$-term $e$, where $\mathcal L$ is the set of $\lambda$-terms.
-We define $\mathbb T(e) = \angled{\mathcal L, \{e\}, \to}$.
-The next section gives probably the most celebrated $\lambda$-calculus result based on the transition-system perspective.
-
-
-\section{Simple Types and Their Soundness}
-
-Let's spruce up the language with some more constructs.
-$$\begin{array}{rrcl}
-  \textrm{Variables} & x &\in& \mathsf{Strings} \\
-  \textrm{Numbers} & n &\in& \mathbb N \\
-  \textrm{Expressions} & e &::=& n \mid e + e \mid x \mid \lambda x. \; e \mid e \; e \\
-  \textrm{Values} & v &::=& n \mid \lambda x. \; e
-\end{array}$$
-We've added natural numbers as a primitive feature, supported via constants and addition.
-Numbers may be intermixed with functions, and we may, for instance, write first-class functions that take numbers as input or return numbers.
-
-Our language of evaluation contexts expands a bit.
+Let's begin by recasting last chapter's typed $\lambda$-calculus with numbers, using evaluation contexts.
+We introduce this grammar of contexts.
 $$\begin{array}{rrcl}
   \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C \mid C + e \mid v + C
 \end{array}$$
+Note the one subtlety, same as we encountered last chapter in a different place: the third and fifth forms of evaluation context require the first operand to be a \emph{value}.
+Again we enforce \emph{call-by-value evaluation order}\index{call-by-value}.
+Tweaks to the definition of $C$ produce other evaluation orders, like \emph{call-by-name}\index{call-by-name}, but we will say no more about those alternatives.
 
-Now we want to define two kinds of basic small steps, so it is worth defining a separate relation for them.
-Here we face a classic nuisance in writing rules that combine explicit syntax with standard mathematical operators, and we write $+$ for the syntactic construct and $\textbf{+}$ for the mathematical addition operator.
+Two rules explain the primitive steps.
+They should look familiar from last chapter's more direct small-step semantics.
 $$\infer{\smallstepo{(\lambda x. \; e) \; v}{\subst{e}{x}{v}}}{}
 \quad \infer{\smallstepo{n + m}{n \textbf{+} m}}{}$$
 
-Here is the overall step rule.
+\encoding
+As we will throughout this chapter, we assume a standard definition of what it means to plug an expression into the hole in a context, and now we can give the top-level small-step evaluation rule.
 $$\infer{\smallstep{\plug{C}{e}}{\plug{C}{e'}}}{
   \smallstepo{e}{e'}
 }$$
 
-What would be a useful property to prove about our new expressions?
-For one thing, we don't want them to ``crash,'' as in the expression $(\lambda x. \; x) + 7$ that tries to add a function and a number.
-No rule of the semantics knows what to do with that case, but it also isn't a value, so we shouldn't consider it as finished with evaluation.
-Define an expression as \emph{stuck}\index{stuck term} when it is not a value and it cannot take a small step.
-For ``reasonable'' expressions $e$, we should be able to prove that it is an invariant of $\mathbb T(e)$ that no expression is ever stuck.
-
-To define ``reasonable,'' we formalize the popular idea of a static type system.
-Every expression will be assigned a type, capturing which sorts of contexts it may legally be dropped into.
-Our language of types is simple.
-\abstraction
-$$\begin{array}{rrcl}
-  \textrm{Types} & \tau &::=& \mathbb N \mid \tau \to \tau
-\end{array}$$
-We have trees of function-space constructors, where all the leaves are instances of the natural-number type $\mathbb N$.
-Note that, with type assignment, we have yet another case of \emph{abstraction}, approximating a potentially complex expression with a type that only records enough information to rule out crashes.
-
-To assign types to closed terms, we must recursively define what it means for an open term to have a type.
-To that end, we use \emph{typing contexts}\index{typing context} $\Gamma$, finite maps from variables to types.
-To mimic standard notation, we write $\Gamma, x : \tau$ as shorthand for $\mupd{\Gamma}{x}{\tau}$, overriding of key $x$ with value $\tau$ in $\Gamma$.
-Now we define typing as a three-place relation, written $\hasty{\Gamma}{e}{\tau}$, to indicate that, assuming $\Gamma$ as an assignment of types to $e$'s free variables, we conclude that $e$ has type $\tau$.
-
-We define the relation inductively, with one case per syntactic construct.
-\modularity
-$$\infer{\hasty{\Gamma}{x}{\tau}}{
-  \msel{\Gamma}{x} = \tau
-}
-\quad \infer{\hasty{\Gamma}{n}{\mathbb N}}{}
-\quad \infer{\hasty{\Gamma}{e_1 + e_2}{\mathbb N}}{
-    \hasty{\Gamma}{e_1}{\mathbb N}
-    & \hasty{\Gamma}{e_2}{\mathbb N}
-}$$
-$$\infer{\hasty{\Gamma}{\lambda x. \; e}{\tau_1 \to \tau_2}}{
-  \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
-}
-\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\tau_2}}{
-  \hasty{\Gamma}{e_1}{\tau_1 \to \tau_2}
-  & \hasty{\Gamma}{e_2}{\tau_1}
-}$$
-
-We write $\hasty{}{e}{\tau}$ as shorthand for $\hasty{\mempty}{e}{\tau}$, meaning that closed term $e$ has type $\tau$, with no typing context required.
-Note that this style of typing rules provides another instance of \emph{modularity}, since we can separately type-check different subexpressions of a large expression, using just their types to coordinate expectations among subexpressions.
-
-It should be an invariant of $\mathbb T(e)$ that every reachable expression has the same type as the original, so long as the original was well-typed.
-This observation is the key to proving that it is also an invariant that no reachable expression is stuck, using a proof technique called \emph{the syntactic approach to type soundness}\index{syntactic approach to type soundness}, which turns out to be just another instance of our general toolbox for invariant proofs.
-
-We work our way through a suite of standard lemmas to support that invariant proof.
-
-\begin{lemma}[Progress]\label{progress}
-  If $\hasty{}{e}{\tau}$, then $e$ isn't stuck.
-\end{lemma}
-\begin{proof}
-  By induction on the derivation of $\hasty{}{e}{\tau}$.
-\end{proof}
-
-\begin{lemma}[Weakening]\label{weakening}
-  If $\hasty{\Gamma}{e}{\tau}$ and every mapping in $\Gamma$ is also included in $\Gamma'$, then $\hasty{\Gamma'}{e}{\tau}$.
-\end{lemma}
-\begin{proof}
-  By induction on the derivation of $\hasty{\Gamma}{e}{\tau}$.
-\end{proof}
-
-\begin{lemma}[Substitution]\label{substitution}
-  If $\hasty{\Gamma, x : \tau'}{e}{\tau}$ and $\hasty{}{e'}{\tau'}$, then $\hasty{\Gamma}{\subst{e}{x}{e'}}{\tau}$.
-\end{lemma}
-\begin{proof}
-  By induction on the derivation of $\hasty{\Gamma, x: \tau'}{e}{\tau}$, with appeal to Lemma \ref{weakening}.
-\end{proof}
+Last chapter's type-system definition may be reused unchanged.
+We just need to make a small modification to the sequence of results leading to type soundness.
 
 \begin{lemma}\label{preservation0}
   If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstepo{e}{e'}$, with appeal to Lemma \ref{substitution}.
+  By inversion on the derivation of $\smallstepo{e}{e'}$.
 \end{proof}
 
-\begin{lemma}\label{generalize_plug}
-  If any type of $e_1$ is also a type of $e_2$, then any type of $\plug{C}{e_1}$ is also a type of $\plug{C}{e_2}$.
+\begin{lemma}\label{preservation_prime}
+  If $\smallstepo{e_1}{e_2}$ and $\hasty{}{C[e_1]}{\tau}$, then $\hasty{}{C[e_2]}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By induction on the structure of $C$.
+  By induction on the structure of $C$, with appeal to Lemma \ref{preservation0}.
 \end{proof}
 
 \begin{lemma}[Preservation]\label{preservation}
   If $\smallstep{e_1}{e_2}$ and $\hasty{}{e_1}{\tau}$, then $\hasty{}{e_2}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstep{e_1}{e_2}$, with appeal to Lemmas \ref{preservation0} and \ref{generalize_plug}.
+  By inversion on the derivation of $\smallstep{e_1}{e_2}$, with appeal to Lemma \ref{preservation_prime}.
 \end{proof}
 
-\invariants
-\begin{theorem}[Type Soundness]
-  If $\hasty{}{e}{\tau}$, then $\neg \textrm{stuck}$ is an invariant of $\mathbb T(e)$.
-\end{theorem}
-\begin{proof}
-  First, we strengthen the invariant to $I(e) = \; \hasty{}{e}{\tau}$, justifying the implication by Lemma \ref{progress}, Progress.
-  Then we apply invariant induction, where the base case is trivial.
-  The induction step is a direct match for Lemma \ref{preservation}, Preservation.
-\end{proof}
+\section{Product Types}
 
-The syntactic approach to type soundness is often presented as a proof technique in isolation, but what we see here is that it follows very directly from our general invariant proof technique.
-Usually syntactic type soundness is presented as fundamentally about proving Progress and Preservation conditions.
-The Progress condition maps to invariant strengthening, and the Preservation condition maps to invariant induction, which we have used in almost every invariant proof so far.
-Since the basic proof structure matches our standard one, the main insight is the usual one: a good choice of a strengthened invariant.
-In this case, invariant $I(e) = \; \hasty{}{e}{\tau}$ is that crucial insight, including the original design of the set of types and the typing relation.
+Let's see some examples of how easy it is to add new features to our language, starting with \emph{product types}\index{product types}, or pair types\index{pair types}.
+The name ``product types'' comes from ``Cartesian product.''\index{Cartesian product}
+We indicate extension of existing grammars by beginning definitions with $\ldots$, and we indicate extension of existing inductive predicates just by listing new rules.
+$$\begin{array}{rrcl}
+  \textrm{Expressions} & e &::=& \ldots \mid (e, e) \mid \pi_1(e) \mid \pi_2(e) \\
+  \textrm{Values} & v &::=& \ldots \mid (v, v) \\
+  \textrm{Contexts} & C &::=& \ldots \mid (C, e) \mid (v, C) \mid \pi_1(C) \mid \pi_2(C) \\
+  \textrm{Types} & \tau &::=& \ldots \mid \tau \times \tau
+\end{array}$$
+
+Operator $\pi_i$ is for projecting\index{projection (from pairs)} the $i$th element of a pair.
+Two new small-step rules finish the explanation of projection behavior.
+$$\infer{\smallstepo{\pi_1((v_1, v_2))}{v_1}}{}
+\quad \infer{\smallstepo{\pi_2((v_1, v_2))}{v_2}}{}$$
+
+Finally, we can extend our type system with one new rule per expression kind.
+$$\infer{\hasty{\Gamma}{(e_1, e_2)}{\tau_1 \times \tau_2}}{
+  \hasty{\Gamma}{e_1}{\tau_1}
+  & \hasty{\Gamma}{e_2}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{\pi_1(e)}{\tau_1}}{
+  \hasty{\Gamma}{e}{\tau_1 \times \tau_2}
+}
+\quad \infer{\hasty{\Gamma}{\pi_2(e)}{\tau_2}}{
+  \hasty{\Gamma}{e}{\tau_1 \times \tau_2}
+}$$
+
+And that's the complete, unambiguous specification of this new feature!
+The type-soundness proof adapts very naturally.
+In fact, in the Coq code, almost exactly the same proof script as before keeps doing the job, a theme we will see continue throughout the chapter.
+
+\section{Sum Types}
+
+\newcommand{\inl}[1]{\mathsf{inl}(#1)}
+\newcommand{\inr}[1]{\mathsf{inr}(#1)}
+\newcommand{\match}[5]{\mathsf{match} \; #1 \; \mathsf{with} \; \inl{#2} \Rightarrow #3 \mid \inr{#4} \Rightarrow #5}
+
+Next on our tour is \emph{sum types}\index{sum types}, otherwise known as \emph{variants}\index{variants} or \emph{disjoint unions}\index{disjoint unions}.
+An element of the sum type $\tau_1 + \tau_2$ is either a $\tau_1$ or a $\tau_2$, and we indicate which with constructor functions $\mathsf{inl}$ and $\mathsf{inr}$.
+$$\begin{array}{rrcl}
+  \textrm{Expressions} & e &::=& \ldots \mid \inl{e} \mid \inr{e} \mid (\match{e}{x}{e}{x}{e}) \\
+  \textrm{Values} & v &::=& \ldots \mid \inl{v} \mid \inr{v} \\
+  \textrm{Contexts} & C &::=& \ldots \mid (\match{C}{x}{e}{x}{e}) \\
+  \textrm{Types} & \tau &::=& \ldots \mid \tau + \tau
+\end{array}$$
+
+The $\mathsf{match}$ form, following pattern-matching in Coq and other languages, accounts for most of the syntactic complexity.
+Two new small-step rules explain its behavior.
+$$\infer{\smallstepo{(\match{\inl{v}}{x_1}{e_1}{x_2}{e_2})}{\subst{v}{x_1}{e_1}}}{}$$
+$$\infer{\smallstepo{(\match{\inr{v}}{x_1}{e_1}{x_2}{e_2})}{\subst{v}{x_2}{e_2}}}{}$$
+
+And the typing rules:
+$$\infer{\hasty{\Gamma}{\inl{e}}{\tau_1 + \tau_2}}{
+  \hasty{\Gamma}{e}{\tau_1}
+}
+\quad \infer{\hasty{\Gamma}{\inr{e}}{\tau_1 + \tau_2}}{
+  \hasty{\Gamma}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{(\match{e}{x_1}{e_1}{x_2}{e_2})}{\tau}}{
+  \hasty{\Gamma}{e}{\tau_1 + \tau_2}
+  & \hasty{\Gamma, x_1 : \tau_1}{e_1}{\tau}
+  & \hasty{\Gamma, x_2 : \tau_2}{e_2}{\tau}
+}$$
+
+Again, the automated type-soundness proof adapts with minimal modification.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

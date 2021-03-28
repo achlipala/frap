@@ -3361,21 +3361,21 @@ In fact, in the Coq code, almost exactly the same proof script as before keeps d
 
 \newcommand{\inl}[1]{\mathsf{inl}(#1)}
 \newcommand{\inr}[1]{\mathsf{inr}(#1)}
-\newcommand{\match}[5]{\mathsf{match} \; #1 \; \mathsf{with} \; \inl{#2} \Rightarrow #3 \mid \inr{#4} \Rightarrow #5}
+\newcommand{\match}[5]{(\mathsf{match} \; #1 \; \mathsf{with} \; \inl{#2} \Rightarrow #3 \mid \inr{#4} \Rightarrow #5)}
 
 Next on our tour is \emph{sum types}\index{sum types}, otherwise known as \emph{variants}\index{variants} or \emph{disjoint unions}\index{disjoint unions}.
 An element of the sum type $\tau_1 + \tau_2$ is either a $\tau_1$ or a $\tau_2$, and we indicate which with constructor functions $\mathsf{inl}$ and $\mathsf{inr}$.
 $$\begin{array}{rrcl}
-  \textrm{Expressions} & e &::=& \ldots \mid \inl{e} \mid \inr{e} \mid (\match{e}{x}{e}{x}{e}) \\
+  \textrm{Expressions} & e &::=& \ldots \mid \inl{e} \mid \inr{e} \mid \match{e}{x}{e}{x}{e} \\
   \textrm{Values} & v &::=& \ldots \mid \inl{v} \mid \inr{v} \\
-  \textrm{Contexts} & C &::=& \ldots \mid (\match{C}{x}{e}{x}{e}) \\
+  \textrm{Contexts} & C &::=& \ldots \mid \match{C}{x}{e}{x}{e} \\
   \textrm{Types} & \tau &::=& \ldots \mid \tau + \tau
 \end{array}$$
 
 The $\mathsf{match}$ form, following pattern-matching in Coq and other languages, accounts for most of the syntactic complexity.
 Two new small-step rules explain its behavior.
-$$\infer{\smallstepo{(\match{\inl{v}}{x_1}{e_1}{x_2}{e_2})}{\subst{v}{x_1}{e_1}}}{}$$
-$$\infer{\smallstepo{(\match{\inr{v}}{x_1}{e_1}{x_2}{e_2})}{\subst{v}{x_2}{e_2}}}{}$$
+$$\infer{\smallstepo{\match{\inl{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{v}{x_1}{e_1}}}{}$$
+$$\infer{\smallstepo{\match{\inr{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{v}{x_2}{e_2}}}{}$$
 
 And the typing rules:
 $$\infer{\hasty{\Gamma}{\inl{e}}{\tau_1 + \tau_2}}{
@@ -3384,13 +3384,151 @@ $$\infer{\hasty{\Gamma}{\inl{e}}{\tau_1 + \tau_2}}{
 \quad \infer{\hasty{\Gamma}{\inr{e}}{\tau_1 + \tau_2}}{
   \hasty{\Gamma}{e}{\tau_2}
 }
-\quad \infer{\hasty{\Gamma}{(\match{e}{x_1}{e_1}{x_2}{e_2})}{\tau}}{
+\quad \infer{\hasty{\Gamma}{\match{e}{x_1}{e_1}{x_2}{e_2}}{\tau}}{
   \hasty{\Gamma}{e}{\tau_1 + \tau_2}
   & \hasty{\Gamma, x_1 : \tau_1}{e_1}{\tau}
   & \hasty{\Gamma, x_2 : \tau_2}{e_2}{\tau}
 }$$
 
 Again, the automated type-soundness proof adapts with minimal modification.
+
+\section{Exceptions}
+
+\newcommand{\throw}[1]{\mathsf{throw}(#1)}
+\newcommand{\catch}[3]{(\mathsf{try} \; #1 \; \mathsf{catch} \; #2 \Rightarrow #3)}
+
+Next, let's see how to model \emph{exceptions}\index{exceptions}, a good representative of control-flow-heavy language features.
+For simplicity, we will encode exception values themselves as natural numbers.
+The action is in how exceptions are thrown and caught.
+$$\begin{array}{rrcl}
+  \textrm{Expressions} & e &::=& \ldots \mid \throw{e} \mid \catch{e}{x}{e} \\
+  \textrm{Contexts} & C &::=& \ldots \mid \throw{C} \mid \catch{C}{x}{e} \\
+\end{array}$$
+
+We also introduce metavariable $C^-$ to stand for an evaluation context that does not use the constructor for $\mathsf{catch}$ and is not just a hole $\Box$ (though it must contain a $\Box$).
+It is handy to express the idea of exceptions \emph{bubbling up} to the nearest enclosing $\mathsf{catch}$ constructs.
+Specifically, here are three rules to define exception behavior.
+$$\infer{\smallstepo{\catch{v}{x}{e}}{v}}{}
+\quad \infer{\smallstepo{\catch{\throw{v}}{x}{e}}{\subst{v}{x}{e}}}{}
+\quad \infer{\smallstepo{C^-[\throw{v}]}{\throw{v}}}{}$$
+
+And the typing rules, where the biggest twist is that a $\mathsf{throw}$ expression can have any type, since it never terminates normally:
+$$\infer{\hasty{\Gamma}{\throw{e}}{\tau}}{
+  \hasty{\Gamma}{e}{\mathbb N}
+}
+\quad \infer{\hasty{\Gamma}{\catch{e}{x_1}{e_1}}{\tau}}{
+  \hasty{\Gamma}{e}{\tau}
+  & \hasty{\Gamma, x_1 : \mathbb N}{e_1}{\tau}
+}$$
+
+Most of the automated type-soundness proof adapts, but we do need to make one nontrivial change: extending the primary safety invariant, since now there are well-typed states that are neither values nor able to step.
+An \emph{uncaught exception}\index{uncaught exceptions} is the new potential outcome of an execution.
+Therefore, the invariant we prove (with related fix-ups to a lemma statement or two) is:
+$$I(e) = \textrm{$e$ is a value} \lor (\exists n : \mathbb N. \; e = \throw{n}) \lor (\exists e'. \; \smallstep{e}{e'})$$
+
+It is worth pausing here to reflect on what we did \emph{not} need to do.
+Though we added a new kind of side effect, we did not need to modify a single rule dealing with preexisting features.
+The open-ended abstraction of evaluation contexts helped us plan ahead for side effects without foreseeing them precisely.
+For instance, it was critical that we could refer to a restricted context $C^-$ to consider exception bubbling past \emph{any} of the prior features for which we defined order-of-evaluation rules.
+
+\section{Mutable Variables}
+
+Let's now consider another side effect and how we can add it without having to modify existing rules.
+This one we will build on the lambda calculus with products and sums, not trying to harmonize it with exceptions.
+We also keep the existing immutable variables and add new syntactic features for mutable variables.
+$$\begin{array}{rrcl}
+  \textrm{Mutable variables} & X \\
+  \textrm{Expressions} & e &::=& \ldots \mid X \mid X \leftarrow e \\
+  \textrm{Contexts} & C &::=& \ldots \mid X \leftarrow C
+\end{array}$$
+
+\newcommand{\smallstepw}[2]{#1 \to_1 #2}
+
+We keep the $\rightarrow_0$ relation defined previously and define on top of it $\rightarrow_1$ that works on states that contain variable valuations $\sigma$ (as we have used before to model imperative languages).
+$$\infer{\smallstepw{(\sigma, e_1)}{(\sigma, e_2)}}{
+  \smallstepo{e_1}{e_2}
+}
+\quad \infer{\smallstepw{(\sigma, X)}{(\sigma, v)}}{
+  \sigma(X) = v
+}
+\quad \infer{\smallstepw{(\sigma, X \leftarrow v)}{(\mupd{\sigma}{X}{v}, v)}}{
+}$$
+
+We define an alternative top-level small-step relation:
+$$\infer{\smallstep{(\sigma, \plug{C}{e})}{(\sigma', \plug{C}{e'})}}{
+  \smallstepw{(\sigma, e)}{(\sigma', e')}
+}$$
+Note how planning ahead and modularizing our order-of-operations rules via context plugging allows us to reuse the same rules, even in the presence of mutable-variable valuations.
+
+\newcommand{\rhasty}[4]{#1; #2 \vdash #3 : #4}
+
+We ``cheat'' a bit and extend our typing judgment to take an extra argument, so a typing fact looks like $\rhasty{\Delta}{\Gamma}{e}{\tau}$.
+The new context $\Delta$ assigns types to mutable variables, and it stays fixed throughout a program's execution.
+We implicitly edit each prior typing rule to thread $\Delta$ through unchanged, and we add the two crucial new ones:
+$$\infer{\rhasty{\Delta}{\Gamma}{X}{\tau}}{
+  \Delta(X) = \tau
+}
+\quad \infer{\rhasty{\Delta}{\Gamma}{X \leftarrow e}{\tau}}{
+  \Delta(X) = \tau
+  & \rhasty{\Delta}{\Gamma}{e}{\tau}
+}$$
+
+We have to make moderate edits to the central lemma statements.
+One frequent ingredient is a compatibility relation $\Delta \simeq \sigma$, indicating that any variable given a type $\tau$ in $\Delta$ is also assigned a $\tau$-typed value in $\sigma$.
+Then we can adapt the type-preservation proof as follows.
+(The progress proof works essentially the same as before.)
+
+\begin{lemma}\label{mutable_preservation0}
+  If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
+\end{lemma}
+\begin{proof}
+  By inversion on the derivation of $\smallstepo{e}{e'}$.
+\end{proof}
+
+\begin{lemma}\label{preservation1}
+  If $\smallstepw{(\sigma, e)}{(\sigma', e')}$, $\rhasty{\Delta}{\mempty}{e}{\tau}$, and $\Delta \simeq \sigma$, then $\rhasty{\Delta}{\mempty}{e'}{\tau}$ and $\Delta \simeq \sigma'$.
+\end{lemma}
+\begin{proof}
+  By inversion on the derivation of $\smallstepw{(\sigma, e)}{(\sigma', e')}$, with appeal to Lemma \ref{mutable_preservation0}.
+\end{proof}
+
+\begin{lemma}\label{mutable_preservation_prime}
+  If $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, $\rhasty{\Delta}{\mempty}{C[e_1]}{\tau}$, and $\Delta \simeq \sigma_1$, then $\rhasty{\Delta}{}{C[e_2]}{\tau}$ and $\Delta \simeq \sigma_2$.
+\end{lemma}
+\begin{proof}
+  By induction on the structure of $C$, with appeal to Lemma \ref{preservation1}.
+\end{proof}
+
+\begin{lemma}[Preservation]\label{mutable_preservation}
+  If $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, $\rhasty{\Delta}{}{e_1}{\tau}$, and $\Delta \simeq \sigma_1$, then $\rhasty{\Delta}{\mempty}{e_2}{\tau}$ and $\Delta \simeq \sigma_2$.
+\end{lemma}
+\begin{proof}
+  By inversion on the derivation of $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, with appeal to Lemma \ref{mutable_preservation_prime}.
+\end{proof}
+
+Everything can be brought together in type-safety proof with a strengthened invariant that also asserts the $\simeq$ relation, just as in the various statements of preservation.
+
+\section{Concurrency Again}
+
+Mutable variables provide a means for communication between threads, so we can bring concurrency to our language with remarkably little effort.
+We choose a \emph{concurrent pair}\index{concurrent pair operator} operator, which builds a pair through simultaneous evaluation of the expressions for the two elements.
+$$\begin{array}{rrcl}
+  \textrm{Expressions} & e &::=& \ldots \mid e || e \\
+  \textrm{Contexts} & C &::=& \ldots \mid C || e \mid e || C
+\end{array}$$
+
+As when we looked at adding concurrency to an imperative language, note that we introduce nondeterminism by allowing evaluation to proceed on \emph{either} side of the parallel composition $||$, on any given step.
+One new small-step rule explains what to do when both sides are fully evaluated.
+$$\infer{\smallstepo{v_1 || v_2}{(v_1, v_2)}}{}$$
+
+The typing rule is straightforward:
+$$\infer{\rhasty{\Delta}{\Gamma}{e_1 || e_2}{\tau_1 \times \tau_2}}{
+  \rhasty{\Delta}{\Gamma}{e_1}{\tau_1}
+  & \rhasty{\Delta}{\Gamma}{e_2}{\tau_2}
+}$$
+
+After this change, literally the same Coq proof script as before establishes type soundness.
+That's a pretty strong demonstration of modularity in semantics.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3524,8 +3662,6 @@ That's enough notation to let us state type soundness, which is indeed provable.
 \end{theorem}
 
 However, we will need to develop some more machinery to let us state the strengthened invariant that makes the proof go through.
-
-\newcommand{\rhasty}[4]{#1; #2 \vdash #3 : #4}
 
 The trouble with our typing rules is that they disallow location constants, but those constants \emph{will} arise in intermediate states of program execution.
 To prepare for them, we introduce \emph{heap typings}\index{heap typings} $\Sigma$, partial functions from locations to types.

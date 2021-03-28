@@ -3304,10 +3304,10 @@ Last chapter's type-system definition may be reused unchanged.
 We just need to make a small modification to the sequence of results leading to type soundness.
 
 \begin{lemma}\label{preservation0}
-  If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
+  If $\smallstepo{e_1}{e_2}$ and $\hasty{}{e_1}{\tau}$, then $\hasty{}{e_2}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstepo{e}{e'}$.
+  By inversion on the derivation of $\smallstepo{e_1}{e_2}$.
 \end{proof}
 
 \begin{lemma}\label{preservation_prime}
@@ -3374,8 +3374,8 @@ $$\begin{array}{rrcl}
 
 The $\mathsf{match}$ form, following pattern-matching in Coq and other languages, accounts for most of the syntactic complexity.
 Two new small-step rules explain its behavior.
-$$\infer{\smallstepo{\match{\inl{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{v}{x_1}{e_1}}}{}$$
-$$\infer{\smallstepo{\match{\inr{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{v}{x_2}{e_2}}}{}$$
+$$\infer{\smallstepo{\match{\inl{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{e_1}{x_1}{v}}}{}$$
+$$\infer{\smallstepo{\match{\inr{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{e_2}{x_2}{v}}}{}$$
 
 And the typing rules:
 $$\infer{\hasty{\Gamma}{\inl{e}}{\tau_1 + \tau_2}}{
@@ -3409,7 +3409,7 @@ We also introduce metavariable $C^-$ to stand for an evaluation context that doe
 It is handy to express the idea of exceptions \emph{bubbling up} to the nearest enclosing $\mathsf{catch}$ constructs.
 Specifically, here are three rules to define exception behavior.
 $$\infer{\smallstepo{\catch{v}{x}{e}}{v}}{}
-\quad \infer{\smallstepo{\catch{\throw{v}}{x}{e}}{\subst{v}{x}{e}}}{}
+\quad \infer{\smallstepo{\catch{\throw{v}}{x}{e}}{\subst{e}{x}{v}}}{}
 \quad \infer{\smallstepo{C^-[\throw{v}]}{\throw{v}}}{}$$
 
 And the typing rules, where the biggest twist is that a $\mathsf{throw}$ expression can have any type, since it never terminates normally:
@@ -3479,17 +3479,17 @@ Then we can adapt the type-preservation proof as follows.
 (The progress proof works essentially the same as before.)
 
 \begin{lemma}\label{mutable_preservation0}
-  If $\smallstepo{e}{e'}$ and $\hasty{}{e}{\tau}$, then $\hasty{}{e'}{\tau}$.
+  If $\smallstepo{e_1}{e_2}$ and $\hasty{}{e_1}{\tau}$, then $\hasty{}{e_2}{\tau}$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstepo{e}{e'}$.
+  By inversion on the derivation of $\smallstepo{e_1}{e_2}$.
 \end{proof}
 
 \begin{lemma}\label{preservation1}
-  If $\smallstepw{(\sigma, e)}{(\sigma', e')}$, $\rhasty{\Delta}{\mempty}{e}{\tau}$, and $\Delta \simeq \sigma$, then $\rhasty{\Delta}{\mempty}{e'}{\tau}$ and $\Delta \simeq \sigma'$.
+  If $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, $\rhasty{\Delta}{\mempty}{e_1}{\tau}$, and $\Delta \simeq \sigma_1$, then $\rhasty{\Delta}{\mempty}{e_2}{\tau}$ and $\Delta \simeq \sigma_2$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstepw{(\sigma, e)}{(\sigma', e')}$, with appeal to Lemma \ref{mutable_preservation0}.
+  By inversion on the derivation of $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, with appeal to Lemma \ref{mutable_preservation0}.
 \end{proof}
 
 \begin{lemma}\label{mutable_preservation_prime}
@@ -3500,10 +3500,10 @@ Then we can adapt the type-preservation proof as follows.
 \end{proof}
 
 \begin{lemma}[Preservation]\label{mutable_preservation}
-  If $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, $\rhasty{\Delta}{}{e_1}{\tau}$, and $\Delta \simeq \sigma_1$, then $\rhasty{\Delta}{\mempty}{e_2}{\tau}$ and $\Delta \simeq \sigma_2$.
+  If $\smallstep{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, $\rhasty{\Delta}{}{e_1}{\tau}$, and $\Delta \simeq \sigma_1$, then $\rhasty{\Delta}{\mempty}{e_2}{\tau}$ and $\Delta \simeq \sigma_2$.
 \end{lemma}
 \begin{proof}
-  By inversion on the derivation of $\smallstepw{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, with appeal to Lemma \ref{mutable_preservation_prime}.
+  By inversion on the derivation of $\smallstep{(\sigma_1, e_1)}{(\sigma_2, e_2)}$, with appeal to Lemma \ref{mutable_preservation_prime}.
 \end{proof}
 
 Everything can be brought together in type-safety proof with a strengthened invariant that also asserts the $\simeq$ relation, just as in the various statements of preservation.
@@ -3511,7 +3511,7 @@ Everything can be brought together in type-safety proof with a strengthened inva
 \section{Concurrency Again}
 
 Mutable variables provide a means for communication between threads, so we can bring concurrency to our language with remarkably little effort.
-We choose a \emph{concurrent pair}\index{concurrent pair operator} operator, which builds a pair through simultaneous evaluation of the expressions for the two elements.
+We choose a \emph{concurrent pairing}\index{concurrent pairing} operator, which builds a pair through simultaneous evaluation of the expressions for the two elements.
 $$\begin{array}{rrcl}
   \textrm{Expressions} & e &::=& \ldots \mid e || e \\
   \textrm{Contexts} & C &::=& \ldots \mid C || e \mid e || C

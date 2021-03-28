@@ -977,39 +977,46 @@ Module StlcMutable.
       -> plug (SetVar1 x C) e (SetVar x e').
 
   Definition valuation := fmap var exp.
-  
-  Inductive step0 : valuation * exp -> valuation * exp -> Prop :=
-  | Beta : forall env x e v,
+
+  Inductive step0 : exp -> exp -> Prop :=
+  | Beta : forall x e v,
     value v
-    -> step0 (env, App (Abs x e) v) (env, subst v x e)
-  | Add : forall env n1 n2,
-      step0 (env, Plus (Const n1) (Const n2)) (env, Const (n1 + n2))
-  | FstPair : forall env v1 v2,
+    -> step0 (App (Abs x e) v) (subst v x e)
+  | Add : forall n1 n2,
+      step0 (Plus (Const n1) (Const n2)) (Const (n1 + n2))
+  | FstPair : forall v1 v2,
       value v1
       -> value v2
-      -> step0 (env, Fst (Pair v1 v2)) (env, v1)
-  | SndPair : forall env v1 v2,
+      -> step0 (Fst (Pair v1 v2)) v1
+  | SndPair : forall v1 v2,
       value v1
       -> value v2
-      -> step0 (env, Snd (Pair v1 v2)) (env, v2)
-  | MatchInl : forall env v x1 e1 x2 e2,
+      -> step0 (Snd (Pair v1 v2)) v2
+  | MatchInl : forall v x1 e1 x2 e2,
       value v
-      -> step0 (env, Match (Inl v) x1 e1 x2 e2) (env, subst v x1 e1)
-  | MatchInr : forall env v x1 e1 x2 e2,
+      -> step0 (Match (Inl v) x1 e1 x2 e2) (subst v x1 e1)
+  | MatchInr : forall v x1 e1 x2 e2,
       value v
-      -> step0 (env, Match (Inr v) x1 e1 x2 e2) (env, subst v x2 e2)
+      -> step0 (Match (Inr v) x1 e1 x2 e2) (subst v x2 e2).
+
+  (* We build an intermediate relation on top of [step0], allowing for
+   * consultation of the mutable-variable valuation. *)
+  Inductive step1 : valuation * exp -> valuation * exp -> Prop :=
+  | Lift : forall env e1 e2,
+    step0 e1 e2
+    -> step1 (env, e1) (env, e2)
   | Read : forall env x v,
       env $? x = Some v
-      -> step0 (env, GetVar x) (env, v)
+      -> step1 (env, GetVar x) (env, v)
   | Overwrite : forall env x v,
       value v
-      -> step0 (env, SetVar x v) (env $+ (x, v), v).
-
+      -> step1 (env, SetVar x v) (env $+ (x, v), v).
+  
   Inductive step : valuation * exp -> valuation * exp -> Prop :=
   | StepRule : forall C env1 e1 env2 e2 e1' e2',
     plug C e1 e1'
     -> plug C e2 e2'
-    -> step0 (env1, e1) (env2, e2)
+    -> step1 (env1, e1) (env2, e2)
     -> step (env1, e1') (env2, e2').
 
   Definition trsys_of (env : valuation) (e : exp) := {|
@@ -1074,7 +1081,7 @@ Module StlcMutable.
       -> hasty M G e t
       -> hasty M G (SetVar x e) t.
                
-  Local Hint Constructors value plug step0 step hasty : core.
+  Local Hint Constructors value plug step0 step1 step hasty : core.
 
   (* Let's characterize what makes a typing context and a variable valuation
    * compatible. *)
@@ -1187,9 +1194,19 @@ Module StlcMutable.
   Qed.
 
   Local Hint Immediate compatible_hasty : core.
+
+  Lemma preservation0 : forall M e1 e2,
+    step0 e1 e2
+    -> forall t, hasty M $0 e1 t
+      -> hasty M $0 e2 t.
+  Proof.
+    invert 1; t.
+  Qed.
+
+  Local Hint Resolve preservation0 : core.
   
-  Lemma preservation0_exp : forall M env1 e1 env2 e2,
-    step0 (env1, e1) (env2, e2)
+  Lemma preservation1_exp : forall M env1 e1 env2 e2,
+    step1 (env1, e1) (env2, e2)
     -> forall t, hasty M $0 e1 t
       -> compatible M env1
       -> hasty M $0 e2 t.
@@ -1197,8 +1214,8 @@ Module StlcMutable.
     invert 1; t.
   Qed.
 
-  Lemma preservation0_env : forall M env1 e1 env2 e2,
-    step0 (env1, e1) (env2, e2)
+  Lemma preservation1_env : forall M env1 e1 env2 e2,
+    step1 (env1, e1) (env2, e2)
     -> forall t, hasty M $0 e1 t
       -> compatible M env1
       -> compatible M env2.
@@ -1206,12 +1223,12 @@ Module StlcMutable.
     invert 1; t.
   Qed.
 
-  Local Hint Resolve preservation0_exp preservation0_env : core.
+  Local Hint Resolve preservation1_exp preservation1_env : core.
 
   Lemma preservation'_exp : forall M C e1 e1',
       plug C e1 e1'
       -> forall e2 e2' t env1 env2, plug C e2 e2'
-      -> step0 (env1, e1) (env2, e2)
+      -> step1 (env1, e1) (env2, e2)
       -> hasty M $0 e1' t
       -> compatible M env1
       -> hasty M $0 e2' t.
@@ -1223,7 +1240,7 @@ Module StlcMutable.
   
   Lemma preservation'_env' : forall M C e1 e1',
       plug C e1 e1'
-      -> forall t e2 env1 env2, step0 (env1, e1) (env2, e2)
+      -> forall t e2 env1 env2, step1 (env1, e1) (env2, e2)
       -> hasty M $0 e1' t
       -> compatible M env1
       -> compatible M env2.
@@ -1232,7 +1249,7 @@ Module StlcMutable.
   Qed.
 
   Lemma preservation'_env : forall M C e1 e1' t e2 env1 env2,
-      step0 (env1, e1) (env2, e2)
+      step1 (env1, e1) (env2, e2)
       -> plug C e1 e1'
       -> hasty M $0 e1' t
       -> compatible M env1
@@ -1399,44 +1416,49 @@ Module StlcConcur.
 
   Definition valuation := fmap var exp.
   
-  Inductive step0 : valuation * exp -> valuation * exp -> Prop :=
-  | Beta : forall env x e v,
+  Inductive step0 : exp -> exp -> Prop :=
+  | Beta : forall x e v,
     value v
-    -> step0 (env, App (Abs x e) v) (env, subst v x e)
-  | Add : forall env n1 n2,
-      step0 (env, Plus (Const n1) (Const n2)) (env, Const (n1 + n2))
-  | FstPair : forall env v1 v2,
+    -> step0 (App (Abs x e) v) (subst v x e)
+  | Add : forall n1 n2,
+      step0 (Plus (Const n1) (Const n2)) (Const (n1 + n2))
+  | FstPair : forall v1 v2,
       value v1
       -> value v2
-      -> step0 (env, Fst (Pair v1 v2)) (env, v1)
-  | SndPair : forall env v1 v2,
+      -> step0 (Fst (Pair v1 v2)) v1
+  | SndPair : forall v1 v2,
       value v1
       -> value v2
-      -> step0 (env, Snd (Pair v1 v2)) (env, v2)
-  | MatchInl : forall env v x1 e1 x2 e2,
+      -> step0 (Snd (Pair v1 v2)) v2
+  | MatchInl : forall v x1 e1 x2 e2,
       value v
-      -> step0 (env, Match (Inl v) x1 e1 x2 e2) (env, subst v x1 e1)
-  | MatchInr : forall env v x1 e1 x2 e2,
+      -> step0 (Match (Inl v) x1 e1 x2 e2) (subst v x1 e1)
+  | MatchInr : forall v x1 e1 x2 e2,
       value v
-      -> step0 (env, Match (Inr v) x1 e1 x2 e2) (env, subst v x2 e2)
-  | Read : forall env x v,
-      env $? x = Some v
-      -> step0 (env, GetVar x) (env, v)
-  | Overwrite : forall env x v,
-      value v
-      -> step0 (env, SetVar x v) (env $+ (x, v), v)
+      -> step0 (Match (Inr v) x1 e1 x2 e2) (subst v x2 e2)
 
   (* New case: *)
-  | ParDone : forall env v1 v2,
+  | ParDone : forall v1 v2,
       value v1
       -> value v2
-      -> step0 (env, Par v1 v2) (env, Pair v1 v2).
+      -> step0 (Par v1 v2) (Pair v1 v2).
+
+  Inductive step1 : valuation * exp -> valuation * exp -> Prop :=
+  | Lift : forall env e1 e2,
+    step0 e1 e2
+    -> step1 (env, e1) (env, e2)
+  | Read : forall env x v,
+      env $? x = Some v
+      -> step1 (env, GetVar x) (env, v)
+  | Overwrite : forall env x v,
+      value v
+      -> step1 (env, SetVar x v) (env $+ (x, v), v).
                
   Inductive step : valuation * exp -> valuation * exp -> Prop :=
   | StepRule : forall C env1 e1 env2 e2 e1' e2',
     plug C e1 e1'
     -> plug C e2 e2'
-    -> step0 (env1, e1) (env2, e2)
+    -> step1 (env1, e1) (env2, e2)
     -> step (env1, e1') (env2, e2').
 
   Definition trsys_of (env : valuation) (e : exp) := {|
@@ -1503,7 +1525,7 @@ Module StlcConcur.
       -> hasty M G e2 t2
       -> hasty M G (Par e1 e2) (Prod t1 t2).
                
-  Local Hint Constructors value plug step0 step hasty : core.
+  Local Hint Constructors value plug step0 step1 step hasty : core.
 
   Definition compatible (M : fmap var type) (env : valuation) :=
     forall x t, M $? x = Some t
@@ -1613,8 +1635,18 @@ Module StlcConcur.
 
   Local Hint Immediate compatible_hasty : core.
   
-  Lemma preservation0_exp : forall M env1 e1 env2 e2,
-    step0 (env1, e1) (env2, e2)
+  Lemma preservation0 : forall M e1 e2,
+    step0 e1 e2
+    -> forall t, hasty M $0 e1 t
+      -> hasty M $0 e2 t.
+  Proof.
+    invert 1; t.
+  Qed.
+
+  Local Hint Resolve preservation0 : core.
+  
+  Lemma preservation1_exp : forall M env1 e1 env2 e2,
+    step1 (env1, e1) (env2, e2)
     -> forall t, hasty M $0 e1 t
       -> compatible M env1
       -> hasty M $0 e2 t.
@@ -1622,8 +1654,8 @@ Module StlcConcur.
     invert 1; t.
   Qed.
 
-  Lemma preservation0_env : forall M env1 e1 env2 e2,
-    step0 (env1, e1) (env2, e2)
+  Lemma preservation1_env : forall M env1 e1 env2 e2,
+    step1 (env1, e1) (env2, e2)
     -> forall t, hasty M $0 e1 t
       -> compatible M env1
       -> compatible M env2.
@@ -1631,12 +1663,12 @@ Module StlcConcur.
     invert 1; t.
   Qed.
 
-  Local Hint Resolve preservation0_exp preservation0_env : core.
+  Local Hint Resolve preservation1_exp preservation1_env : core.
 
   Lemma preservation'_exp : forall M C e1 e1',
       plug C e1 e1'
       -> forall e2 e2' t env1 env2, plug C e2 e2'
-      -> step0 (env1, e1) (env2, e2)
+      -> step1 (env1, e1) (env2, e2)
       -> hasty M $0 e1' t
       -> compatible M env1
       -> hasty M $0 e2' t.
@@ -1648,7 +1680,7 @@ Module StlcConcur.
   
   Lemma preservation'_env' : forall M C e1 e1',
       plug C e1 e1'
-      -> forall t e2 env1 env2, step0 (env1, e1) (env2, e2)
+      -> forall t e2 env1 env2, step1 (env1, e1) (env2, e2)
       -> hasty M $0 e1' t
       -> compatible M env1
       -> compatible M env2.
@@ -1657,7 +1689,7 @@ Module StlcConcur.
   Qed.
 
   Lemma preservation'_env : forall M C e1 e1' t e2 env1 env2,
-      step0 (env1, e1) (env2, e2)
+      step1 (env1, e1) (env2, e2)
       -> plug C e1 e1'
       -> hasty M $0 e1' t
       -> compatible M env1

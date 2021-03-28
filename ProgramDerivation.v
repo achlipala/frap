@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 17: Deriving Programs from Specifications
+  * Chapter 18: Deriving Programs from Specifications
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Some material borrowed from Fiat <http://plv.csail.mit.edu/fiat/> *)

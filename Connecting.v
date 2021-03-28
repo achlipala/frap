@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 16: Connecting to Real-World Programming Languages and Platforms
+  * Chapter 17: Connecting to Real-World Programming Languages and Platforms
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 

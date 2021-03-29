@@ -1285,7 +1285,7 @@ To indicate that $\phi$ is a \emph{tautology}\index{tautology} (that is, true un
   By induction on the proof of $\Gamma \vdash \phi$, using propositional logic in the metalanguage to plumb together the case proofs.
 \end{proof}
 
-The other direction, completeness, is quite a bit more involved, and indeed its Coq proofs strays outside the range of what is reasonable to ask students to construct at this point in the book, but it makes for an interesting exercise.
+The other direction, completeness, is quite a bit more involved, and indeed its Coq proof strays outside the range of what is reasonable to ask students to construct at this point in the book, but it makes for an interesting exercise.
 The basic idea is to do a proof by exhaustive case analysis over the truth values of all propositional variables $p$ that appear in a formula.
 
 \begin{theorem}[Completeness]
@@ -1322,7 +1322,7 @@ We write $\denote{\phi}\Gamma$ to denote interpreting $\phi$ in a valuation that
   \item for every variable $p$ appearing in $\phi$, we have either $p \in \Gamma$ or $\neg p \in \Gamma$; and
   \item there is no variable $p$ such that both $p \in \Gamma$ and $\neg p \in \Gamma$
   \end{itemize}
-  then if $\denote{\phi}\Gamma$, then $\Gamma \vdash p$, otherwise $\Gamma \vdash \neg p$.
+  then if $\denote{\phi}\Gamma$, then $\Gamma \vdash \phi$, otherwise $\Gamma \vdash \neg \phi$.
 \end{lemma}
 \begin{proof}
   By induction on $\phi$, with tedious combination of propositional logic in the metalanguage and in the rules of $\vdash$.

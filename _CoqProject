@@ -41,6 +41,7 @@ SubsetTypes_template.v
 SubsetTypes.v
 LambdaCalculusAndTypeSoundness_template.v
 LambdaCalculusAndTypeSoundness.v
+EvaluationContexts_template.v
 EvaluationContexts.v
 DependentInductiveTypes_template.v
 DependentInductiveTypes.v

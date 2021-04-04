@@ -3431,7 +3431,7 @@ Though we added a new kind of side effect, we did not need to modify a single ru
 The open-ended abstraction of evaluation contexts helped us plan ahead for side effects without foreseeing them precisely.
 For instance, it was critical that we could refer to a restricted context $C^-$ to consider exception bubbling past \emph{any} of the prior features for which we defined order-of-evaluation rules.
 
-\section{Mutable Variables}
+\section{Mutable Variables\label{mutable_variables}}
 
 Let's now consider another side effect and how we can add it without having to modify existing rules.
 This one we will build on the lambda calculus with products and sums, not trying to harmonize it with exceptions.
@@ -3535,8 +3535,8 @@ That's a pretty strong demonstration of modularity in semantics.
 
 \chapter{Types and Mutation}
 
-The syntactic approach to type soundness continues to apply to \emph{impure} functional languages, which combine imperative side effects with first-class functions.
-We'll study the general domain through its most common exemplar: $\lambda$-calculus with \emph{mutable references}\index{mutable references}\index{references}.
+As we glimpsed last chapter, the syntactic approach to type soundness continues to apply to \emph{impure} functional languages, which combine imperative side effects with first-class functions.
+We'll study the general domain through its most common exemplar: $\lambda$-calculus with \emph{mutable references}\index{mutable references}\index{references}, which generalize the mutable variables that we modeled in Section \ref{mutable_variables}.
 
 \section{Simply Typed Lambda Calculus with Mutable References}
 
@@ -3544,7 +3544,7 @@ We'll study the general domain through its most common exemplar: $\lambda$-calcu
 \newcommand{\readref}[1]{!#1}
 \newcommand{\writeref}[2]{#1 := #2}
 
-Here is an extension of the lambda-calculus syntax from last chapter, with additions underlined.
+Here is an extension of the lambda-calculus syntax from Chapter \ref{types}, with additions underlined.
 $$\begin{array}{rrcl}
   \textrm{Variables} & x &\in& \mathsf{Strings} \\
   \textrm{Numbers} & n &\in& \mathbb N \\
@@ -3567,7 +3567,7 @@ $$\elet{r}{\newref{0}}{\writeref{r}{\; \readref{r} + 1}; \readref{r}}$$
 
 This program (1) allocates a new reference $r$ storing the value 0; (2) increments $r$'s value by 1; and (3) returns the new $r$ value, which is 1.
 
-To be more formal about the meanings of all programs, we extend the operational semantics from last chapter.
+To be more formal about the meanings of all programs, we extend the operational semantics from the start of last chapter.
 First, we add some new kinds of evaluation contexts.
 $$\begin{array}{rrcl}
   \textrm{Evaluation contexts} & C &::=& \Box \mid C \; e \mid v \; C \mid C + e \mid v + C \\
@@ -3575,7 +3575,7 @@ $$\begin{array}{rrcl}
 \end{array}$$
 
 Next we define the basic reduction steps of the language.
-In contrast to last chapter's semantics for pure $\lambda$-calculus, here we work with states that include not just expressions but also \emph{heaps}\index{heaps} $h$, partial functions from references to their current stored values.
+Similarly to in Section \ref{mutable_variables}, we work with states that include not just expressions but also \emph{heaps}\index{heaps} $h$, partial functions from references to their current stored values.
 We begin by copying over the two basic-step rules from last chapter, threading through the heap $h$ unchanged.
 $$\infer{\smallstepo{(h, (\lambda x. \; e) \; v)}{(h, \subst{e}{x}{v})}}{}
 \quad \infer{\smallstepo{(h, n + m)}{(h, n \textbf{+} m)}}{}$$
@@ -3779,7 +3779,7 @@ The final premise says that we have actually done some useful work: the new heap
 
 It may not be clear why we must include the last premise.
 The reason has to do with our formulation of type safety, by saying that programs never get \emph{stuck}.
-We defined that $e$ is \emph{stuck} if it is not a value, but it also can't take a step.
+We defined that $e$ is \emph{stuck} if it is not a value but it also can't take a step.
 If we omitted from the garbage-collection rule the premise $h' \neq h$, then this rule would \emph{always} apply, for any term, simply by setting $h' = h$.
 That is, \emph{no} term would ever be stuck, and type safety would be meaningless!
 Since the rule also requires that $h'$ be \emph{no larger than} $h$ (with the second premise), additionally requiring $h' \neq h$ forces $h'$ to \emph{shrink}, garbage-collecting at least one location.

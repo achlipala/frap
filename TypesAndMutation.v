@@ -205,7 +205,7 @@ Module References.
 
       -> heapty ht h.
                  
-  Hint Constructors value plug step0 step hasty heapty : core.
+  Global Hint Constructors value plug step0 step hasty heapty : core.
 
 
   (* Perhaps surprisingly, this language admits well-typed, nonterminating
@@ -222,7 +222,7 @@ Module References.
     repeat (econstructor; simplify).
   Qed.
 
-  Hint Resolve lookup_add_eq : core.
+  Global Hint Resolve lookup_add_eq : core.
 
   Ltac loopy := propositional; subst; simplify;
     repeat match goal with
@@ -293,7 +293,7 @@ Module References.
 
   Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 7.
 
-  Hint Extern 2 (exists _ : _ * _, _) => eexists (_ $+ (_, _), _) : core.
+  Global Hint Extern 2 (exists _ : _ * _, _) => eexists (_ $+ (_, _), _) : core.
 
   (* Progress is quite straightforward. *)
   Lemma progress : forall ht h, heapty ht h
@@ -323,7 +323,7 @@ Module References.
     cases (x ==v x'); simplify; eauto.
   Qed.
 
-  Hint Resolve weakening_override : core.
+  Global Hint Resolve weakening_override : core.
 
   Lemma weakening : forall H G e t,
     hasty H G e t
@@ -333,7 +333,7 @@ Module References.
     induct 1; t.
   Qed.
 
-  Hint Resolve weakening : core.
+  Global Hint Resolve weakening : core.
 
   Lemma hasty_change : forall H G e t,
     hasty H G e t
@@ -343,7 +343,7 @@ Module References.
     t.
   Qed.
 
-  Hint Resolve hasty_change : core.
+  Global Hint Resolve hasty_change : core.
 
   Lemma substitution : forall H G x t' e t e',
     hasty H (G $+ (x, t')) e t
@@ -353,7 +353,7 @@ Module References.
     induct 1; t.
   Qed.
 
-  Hint Resolve substitution : core.
+  Global Hint Resolve substitution : core.
 
   (* A new property: expanding the heap typing preserves typing. *)
   Lemma heap_weakening : forall H G e t,
@@ -364,7 +364,7 @@ Module References.
     induct 1; t.
   Qed.
 
-  Hint Resolve heap_weakening : core.
+  Global Hint Resolve heap_weakening : core.
 
   (* A property about extending heap typings *)
   Lemma heap_override : forall H h k t t0 l,
@@ -378,7 +378,7 @@ Module References.
     apply H2 in H0; t.
   Qed.
 
-  Hint Resolve heap_override : core.
+  Global Hint Resolve heap_override : core.
 
   (* A higher-level property, stated via [heapty] *)
   Lemma heapty_extend : forall H h l t v,
@@ -398,7 +398,7 @@ Module References.
     linear_arithmetic.
   Qed.
 
-  Hint Resolve heapty_extend : core.
+  Global Hint Resolve heapty_extend : core.
 
   (* The old cases of preservation proceed as before, and we need to fiddle with
    * the heap in the new cases.  Note a crucial change to the theorem statement:
@@ -444,7 +444,7 @@ Module References.
     assumption.
   Qed.
 
-  Hint Resolve preservation0 : core.
+  Global Hint Resolve preservation0 : core.
 
   (* This lemma gets more complicated, too, to accommodate heap typings. *)
   Lemma generalize_plug : forall H e1 C e1',
@@ -481,7 +481,7 @@ Module References.
     eauto.
   Qed.
 
-  Hint Resolve progress preservation : core.
+  Global Hint Resolve progress preservation : core.
 
   (* We'll need this fact for the base case of invariant induction. *)
   Lemma heapty_empty : heapty $0 $0.
@@ -489,7 +489,7 @@ Module References.
     exists 0; t.
   Qed.
 
-  Hint Resolve heapty_empty : core.
+  Global Hint Resolve heapty_empty : core.
 
   (* Now there isn't much more to the proof of type safety.  The crucial overall
    * insight is a strengthened invariant that quantifies existentially over a
@@ -592,7 +592,7 @@ Module GarbageCollection.
 
     -> step (h, e) (h', e).
 
-  Hint Constructors step : core.
+  Global Hint Constructors step : core.
 
   Definition trsys_of (e : exp) := {|
     Initial := {($0, e)};
@@ -631,10 +631,10 @@ Module GarbageCollection.
     assumption.
   Qed.
 
-  Hint Resolve reachableLocFromExp_trans : core.
-  Hint Extern 1 (_ \in _) => simplify; solve [ sets ] : core.
-  Hint Extern 1 (_ \subseteq _) => simplify; solve [ sets ] : core.
-  Hint Constructors reachableLoc reachableLocFromExp : core.
+  Global Hint Resolve reachableLocFromExp_trans : core.
+  Global Hint Extern 1 (_ \in _) => simplify; solve [ sets ] : core.
+  Global Hint Extern 1 (_ \subseteq _) => simplify; solve [ sets ] : core.
+  Global Hint Constructors reachableLoc reachableLocFromExp : core.
 
   (* Typing is preserved by moving to a heap typing that only needs to preserve
    * the mappings for *reachable* locations. *)
@@ -730,7 +730,7 @@ Module GarbageCollection.
     equality.
   Qed.
 
-  Hint Resolve progress preservation : core.
+  Global Hint Resolve progress preservation : core.
 
   (* The safety proof itself is anticlimactic, looking the same as before. *)
   Theorem safety : forall e t, hasty $0 $0 e t

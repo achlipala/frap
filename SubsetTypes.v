@@ -216,10 +216,8 @@ Definition pred_strong4 : forall (n : nat), n > 0 -> {m : nat | n = S m}.
    * to [False_rec], and the second subgoal comes from the second underscore
    * passed to [exist].  In the first case, we see that, though we bound the
    * proof variable with an underscore, it is still available in our proof
-   * context.  It is hard to refer to underscore-named variables in manual
-   * proofs, but automation makes short work of them.  Both subgoals are easy to
-   * discharge that way, so let us back up and ask to prove all subgoals
-   * automatically. *)
+   * context.  Both subgoals are easy to discharge, so let us back up and ask to
+   * prove all subgoals automatically. *)
 
   Undo.
   refine (fun n =>
@@ -271,6 +269,10 @@ Compute pred_strong5 two_gt0.
  * a program value indicating which of two propositions is true. *)
 
 Print sumbool.
+
+(* We have been using this type family behind the scenes for various equality
+ * checks, for instance: *)
+Check "x" ==v "y".
 
 (* Here, the constructors of [sumbool] have types written in terms of a
  * registered notation for [sumbool], such that the result type of each
@@ -534,7 +536,7 @@ Notation "e1 ;; e2" := (if e1 then e2 else ??)
  * [hasType] proof obligation, and [eauto] makes short work of them when we add
  * [hasType]'s constructors as hints. *)
 
-Hint Constructors hasType.
+Local Hint Constructors hasType.
 
 Definition typeCheck : forall e : exp, {{t | hasType e t}}.
   refine (fix F (e : exp) : {{t | hasType e t}} :=
@@ -587,7 +589,7 @@ Qed.
 (* Now we can define the type-checker.  Its type expresses that it only fails on
  * untypable expressions. *)
 
-Hint Resolve hasType_det.
+Local Hint Resolve hasType_det.
 (* The lemma [hasType_det] will also be useful for proving proof obligations
  * with contradictory contexts. *)
 

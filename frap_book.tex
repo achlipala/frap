@@ -3903,7 +3903,6 @@ We call any such fact a \emph{Hoare triple}\index{Hoare triple}, and the overall
 
 \encoding
 A first rule for $\skipe$ is easy: anything that was true before is also true after.
-
 $$\infer{\hoare{P}{\skipe}{P}}{}$$
 
 A rule for assignment is slightly more involved: to state what we know is true after, we recall that there existed a prestate satisfying the precondition, which then evolved into the poststate in the expected way.
@@ -4045,7 +4044,7 @@ $$\infer{\smallstep{(h, v, \assert{a})}{(h, v, \skipe)}}{
 Even an infinite-looping program must satisfy its $\mathsf{assert}$ commands, every time it passes one of them.
 For that reason, it's interesting to consider how to show that a command never gets stuck on a false assertion.
 We work up to that result with a few intermediate ones.
-First, we define \emph{stuck} much the same way as in the last two chapters: a state $(h, v, c)$ is stuck if $c$ is not $\skipe$, but there is also nowhere to step to from this state.
+First, we define \emph{stuck} much the same way as in the last three chapters: a state $(h, v, c)$ is stuck if $c$ is not $\skipe$, but there is also nowhere to step to from this state.
 An example of a stuck state would be one beginning with an $\mathsf{assert}$ of an assertion that does not hold on $h$ and $v$.
 In fact, we can prove that any other state is unstuck, though we won't bother here.
 

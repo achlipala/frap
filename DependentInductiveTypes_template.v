@@ -91,14 +91,14 @@ Fixpoint cfold t (e : exp t) : exp t :=
     | Plus e1 e2 =>
       let e1' := cfold e1 in
       let e2' := cfold e2 in
-      match e1', e2' return exp Nat with
+      match e1', e2' with
         | NConst n1, NConst n2 => NConst (n1 + n2)
         | _, _ => Plus e1' e2'
       end
     | Eq e1 e2 =>
       let e1' := cfold e1 in
       let e2' := cfold e2 in
-      match e1', e2' return exp Bool with
+      match e1', e2' with
         | NConst n1, NConst n2 => BConst (if eq_nat_dec n1 n2 then true else false)
         | _, _ => Eq e1' e2'
       end
@@ -107,7 +107,7 @@ Fixpoint cfold t (e : exp t) : exp t :=
     | And e1 e2 =>
       let e1' := cfold e1 in
       let e2' := cfold e2 in
-      match e1', e2' return exp Bool with
+      match e1', e2' with
         | BConst b1, BConst b2 => BConst (b1 && b2)
         | _, _ => And e1' e2'
       end
@@ -487,7 +487,7 @@ Ltac substring :=
              destruct N; simplify
          end; try linear_arithmetic; eauto; try equality.
 
-Hint Resolve le_n_S : core.
+Local Hint Resolve le_n_S : core.
 
 Lemma substring_le : forall s n m,
   length (substring n m s) <= m.
@@ -521,7 +521,7 @@ Proof.
   induct s1; substring.
 Qed.
 
-Hint Resolve length_emp append_emp substring_le substring_split length_app1 : core.
+Local Hint Resolve length_emp append_emp substring_le substring_split length_app1 : core.
 
 Lemma substring_app_fst : forall s2 s1 n,
   length s1 = n
@@ -540,7 +540,7 @@ Proof.
   induct s1; simplify; subst; simplify; auto.
 Qed.
 
-Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
+Local Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
 
 (* BOREDOM'S END! *)
 
@@ -563,7 +563,7 @@ End sumbool_and.
 
 Infix "&&" := sumbool_and (at level 40, left associativity).
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 
 Section split.
   Variables P1 P2 : string -> Prop.
@@ -863,7 +863,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve app_cong : core.
+Local Hint Resolve app_cong : core.
 
 Definition matches : forall P (r : regexp P) s, {P s} + {~ P s}.
   refine (fix F P (r : regexp P) s : {P s} + {~ P s} :=

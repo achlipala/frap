@@ -61,7 +61,7 @@ Fixpoint eval (e : exp) (h : heap) (v : valuation) : nat :=
   end.
 
 (* Meaning of Boolean expressions *)
-Fixpoint beval (b : bexp) (h : heap) (v : valuation) : bool :=
+Definition beval (b : bexp) (h : heap) (v : valuation) : bool :=
   match b with
   | Equal e1 e2 => if eval e1 h v ==n eval e2 h v then true else false
   | Less e1 e2 => if eval e2 h v <=? eval e1 h v then false else true
@@ -385,10 +385,10 @@ Proof.
   ht.
 Qed.
 
-Hint Resolve leq_f : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
-Hint Extern 1 (_ < _) => linear_arithmetic : core.
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Resolve leq_f : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ < _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 (* We also register [linear_arithmetic] as a step to try during proof search. *)
 
 (* These invariants are fairly hairy, but probably the best way to understand
@@ -472,7 +472,7 @@ Inductive step : heap * valuation * cmd -> heap * valuation * cmd -> Prop :=
   a h v
   -> step (h, v, Assert a) (h, v, Skip).
 
-Hint Constructors step : core.
+Local Hint Constructors step : core.
 
 Definition trsys_of (st : heap * valuation * cmd) := {|
   Initial := {st};

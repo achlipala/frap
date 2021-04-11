@@ -264,10 +264,10 @@ Proof.
   ht.
 Qed.
 
-Hint Resolve leq_f : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
-Hint Extern 1 (_ < _) => linear_arithmetic : core.
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Resolve leq_f : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ < _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 (* We also register [linear_arithmetic] as a step to try during proof search. *)
 
 Theorem selectionSort_ok :
@@ -324,7 +324,7 @@ Inductive step : heap * valuation * cmd -> heap * valuation * cmd -> Prop :=
   a h v
   -> step (h, v, Assert a) (h, v, Skip).
 
-Hint Constructors step : core.
+Local Hint Constructors step : core.
 
 Definition trsys_of (st : heap * valuation * cmd) := {|
   Initial := {st};

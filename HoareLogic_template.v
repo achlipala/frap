@@ -162,19 +162,11 @@ Notation "'when' b 'then' then_ 'else' else_ 'done'" := (If_ b then_ else_) (at 
 Notation "{{ I }} 'while' b 'loop' body 'done'" := (While_ I b body) (at level 75).
 Notation "'assert' {{ I }}" := (Assert I) (at level 75).
 Delimit Scope cmd_scope with cmd.
-
-Infix "+" := plus : reset_scope.
-Infix "-" := Init.Nat.sub : reset_scope.
-Infix "*" := mult : reset_scope.
-Infix "=" := eq : reset_scope.
-Infix "<" := lt : reset_scope.
-Delimit Scope reset_scope with reset.
-Open Scope reset_scope.
 (* END macros *)
 
 (* We should draw some attention to the next notation, which defines special
  * lambdas for writing assertions. *)
-Notation "h & v ~> e" := (fun h v => e%reset) (at level 85, v at level 0).
+Notation "h & v ~> e" := (fun h v => e%nat%type) (at level 85, v at level 0).
 
 (* And here's the classic notation for Hoare triples. *)
 Notation "{{ P }} c {{ Q }}" := (hoare_triple P c%cmd Q) (at level 90, c at next level).

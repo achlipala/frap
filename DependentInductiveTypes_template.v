@@ -540,7 +540,7 @@ Proof.
   induct s1; simplify; subst; simplify; auto.
 Qed.
 
-Local Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
+Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
 
 (* BOREDOM'S END! *)
 
@@ -635,7 +635,7 @@ Proof.
   induct s; substring.
 Qed.
 
-Hint Extern 1 (String _ _ = String _ _) => f_equal : core.
+Local Hint Extern 1 (String _ _ = String _ _) => f_equal : core.
 
 Lemma substring_stack : forall s n2 m1 m2,
   m1 <= m2

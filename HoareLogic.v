@@ -398,8 +398,7 @@ Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
 Theorem selectionSort_ok :
   {{_&_ ~> True}}
     "i" <- 0;;
-    {{h&v ~> v $! "i" <= v $! "n"
-        /\ (forall i j, i < j < v $! "i" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j))
+    {{h&v ~> (forall i j, i < j < v $! "i" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j))
         /\ (forall i j, i < v $! "i" -> v $! "i" <= j < v $! "n" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j)) }}
     while "i" < "n" loop
       "j" <- "i"+1;;

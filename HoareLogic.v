@@ -215,9 +215,15 @@ Qed.
  * rules.  Some other obligations are generated, generally of implications
  * between assertions, and [ht] also makes a best effort to solve those. *)
 
-Ltac ht1 := apply HtSkip || apply HtAssign || apply HtWrite || eapply HtSeq
-            || eapply HtIf || eapply HtWhile || eapply HtAssert
-            || eapply HtStrengthenPost.
+Ltac ht1 :=
+  match goal with
+  | [  |- {{ _ }} _ {{ ?P }} ] =>
+    tryif is_evar P then
+      apply HtSkip || apply HtAssign || apply HtWrite || eapply HtSeq
+      || eapply HtIf || eapply HtWhile || eapply HtAssert
+    else
+      eapply HtStrengthenPost
+  end.
 
 Ltac t := cbv beta; propositional; subst;
           repeat match goal with

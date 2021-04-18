@@ -14,8 +14,8 @@ Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 3
 Definition heap := fmap nat nat.
 Definition assertion := heap -> Prop.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 
@@ -494,6 +494,7 @@ Module Deep.
     eauto.
   Qed.
 End Deep.
+
 (* We use Coq's *extraction* feature to produce OCaml versions of our deeply
  * embedded programs.  Then we can run them using OCaml intepreters, which are
  * able to take advantage of the side effects built into OCaml, as a
@@ -838,6 +839,7 @@ Module Deeper.
 End Deeper.
 
 Extraction "Deeper.ml" Deeper.index_of.
+
 
 (** * Adding the possibility of program failure *)
 
@@ -1270,7 +1272,7 @@ Module DeeperWithFail.
     apply IHls; linear_arithmetic.
   Qed.
 
-  Hint Resolve le_max : core.
+  Local Hint Resolve le_max : core.
 
   (* Finally, a short proof of [array_max], appealing mostly to the generic
    * proof of [heapfold] *)

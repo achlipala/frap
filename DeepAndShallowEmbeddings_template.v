@@ -9,8 +9,8 @@ Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 3
 Definition heap := fmap nat nat.
 Definition assertion := heap -> Prop.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 
@@ -1085,7 +1085,7 @@ Module DeeperWithFail.
     apply IHls; linear_arithmetic.
   Qed.
 
-  Hint Resolve le_max : core.
+  Local Hint Resolve le_max : core.
 
   Theorem array_max_ok : forall ls : list nat,
     {{ h ~> forall i, i < length ls -> h $! i = nth_default 0 ls i}}

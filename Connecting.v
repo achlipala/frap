@@ -110,7 +110,7 @@ Proof.
   intros; apply (shatter_word a).
 Qed.
 
-Hint Resolve shatter_word_0 : core.
+Local Hint Resolve shatter_word_0 : core.
 
 Require Import Coq.Logic.Eqdep_dec.
 
@@ -182,7 +182,7 @@ End BIT_WIDTH.
 (** * A modification of last chapter's language, to use words instead of naturals *)
 
 (* There actually isn't much to say about this language and its separation
- * logic.  We are almost just copying and pasting word operations for [nat]
+ * logic.  We are almost just copying and pasting with word operations for [nat]
  * operations.  Also, we drop failure and dynamic memory allocation, since they
  * would just distract from the main point. *)
 
@@ -314,7 +314,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
       t.
     Qed.
 
-    Hint Resolve split_empty_bwd' : core.
+    Local Hint Resolve split_empty_bwd' : core.
 
     Theorem extra_lift : forall (P : Prop) p,
       P
@@ -457,7 +457,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     unfold star, himp in *; simp; eauto 7.
   Qed.
 
-  Hint Constructors hoare_triple : core.
+  Global Hint Constructors hoare_triple : core.
 
   Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
     hoare_triple P (Bind c1 c2) Q
@@ -658,7 +658,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     unfold ptsto; reflexivity.
   Qed.
 
-  Hint Constructors step : core.
+  Global Hint Constructors step : core.
 
   Lemma progress : forall {result} (c : cmd result) P Q,
       hoare_triple P c Q
@@ -2732,7 +2732,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     equality.
   Qed.
 
-  Hint Constructors eval DE.step : core.
+  Local Hint Constructors eval DE.step : core.
 
   Lemma translate_exp_sound' : forall V v e,
       translate_exp V v e
@@ -2751,7 +2751,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     induct 1; simplify; eauto.
   Qed.
 
-  Hint Resolve translate_exp_sound translate_exp_sound' : core.
+  Local Hint Resolve translate_exp_sound translate_exp_sound' : core.
 
   Lemma not_stuck_loop : forall V (c : cmd (wrd * wrd)) s,
       translate (rt := TwoWords) translate_loop_body V c s

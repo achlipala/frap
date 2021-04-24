@@ -4592,7 +4592,7 @@ We also go into more detail on one avant-garde approach, of verified compilation
 \section{Where Does the Buck Stop?}
 
 For any system where we really care about correctness (or its special case of security\index{security}), it is common to delineate a \emph{trusted code base (TCB)}\index{trusted code base}\index{TCB}: the parts of the system where bugs could invalidate correctness.
-By implication, system components outside the TCB can be arbitarily buggy without endangering correctness.
+By implication, system components outside the TCB can be arbitrarily buggy without endangering correctness.
 
 When we use Coq, the Coq proof checker itself is in the TCB.
 Implicitly, all the infrastructure below the proof checker is also trusted.
@@ -4623,7 +4623,7 @@ Oversimplifying a bit, we are considering what is the ``last level'' of a proof 
 The easiest ``last level'' connection is via \emph{extraction}\index{extraction}, which translates Gallina programs into functional programs in languages like OCaml\index{OCaml}, Haskell\index{Haskell}, and Scheme\index{Scheme}.
 Other proof assistants than Coq tend to include similar extraction facilities.
 When the formal object of study is already a purely functional program, extraction is a very natural fit.
-Its main downside are TCB size and performance.
+Its main downsides are TCB size and performance.
 On the TCB front, a variety of compilers, including the one for extraction itself, remain trusted.
 On the performance front, it is often possible to make a functional program run much faster or use much less memory by translating it to, say, a C program that doesn't rely on garbage collection.
 
@@ -4671,7 +4671,7 @@ These connections across languages may enlarge the TCB significantly, but we can
 
 We may also want to give modules first-class status in Coq and prove the correctness of linking mechanisms.
 In concert with verified compilers\index{compiler verification}, possibilities open up to do linking across languages without expanding the TCB.
-All languages can be compiled to some common format, like assembly language, and the compiled version of each libary can be given a specification in a common logical format, like a particular Hoare logic.
+All languages can be compiled to some common format, like assembly language, and the compiled version of each library can be given a specification in a common logical format, like a particular Hoare logic.
 With all the pieces in place, we wind up with the semantics of the common language in the TCB, but the compilers and all aspects of their source languages stay outside the TCB.
 
 
@@ -4772,7 +4772,6 @@ More involved and raising new complications is the rule for loops; see the Coq c
 \begin{proof}
   In other words, every execution of the target-language system can be mimicked by one of the source-language system, where the states are connected throughout by some relation that we choose.
   A good choice is the relation $\sim$ defined by this inference rule.
-
   $$\infer{(h, v \uplus v', s) \sim (h, c)}{
     \dscomp{v}{c}{s}
   }$$
@@ -4784,7 +4783,6 @@ More involved and raising new complications is the rule for loops; see the Coq c
   Actually, we need to modify our translation judgment so that it also applies to ``silly'' intermediate states of execution in the target language.
   For instance, we wind up with $\skipe$s that are quickly stepped away, yet those configurations must be related to source configurations by $\sim$.
   Here is one example of the extra rules that we need to add to make our induction hypothsis strong enough.
-
   $$\infer{\dscomp{v}{x \leftarrow \mt{Return} \; n; c(x)}{\mt{skip}; s}}{
     v(y) = n
     & \dscomp{v}{c(n)}{s}

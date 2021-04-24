@@ -12,8 +12,8 @@ Set Asymmetric Patterns.
 
 Definition heap := fmap nat nat.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -376,7 +376,7 @@ Proof.
   unfold star, himp in *; simp; eauto 7.
 Qed.
 
-Hint Constructors hoare_triple : core.
+Local Hint Constructors hoare_triple : core.
 
 Lemma invert_Bind : forall {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
   hoare_triple P (Bind c1 c2) Q
@@ -785,7 +785,7 @@ Proof.
   eauto using deallocate_None.
 Qed.
 
-Hint Constructors step : core.
+Local Hint Constructors step : core.
 
 Lemma progress : forall {result} (c : cmd result) P Q,
     hoare_triple P c Q
@@ -1313,7 +1313,7 @@ Proof.
   simp.
 Qed.
 
-Hint Resolve move_along : core.
+Local Hint Resolve move_along : core.
 
 Theorem length_ok : forall p ls,
   {{linkedList p ls}}

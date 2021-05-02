@@ -5013,7 +5013,7 @@ New component $l$ is a \emph{lockset}\index{lockset}, recording which locks are 
 $$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
   \smallstep{(h, l, c_1)}{(h', l', c'_1)}
 }
-\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, k, c_2(v))}}{}$$
+\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, l, c_2(v))}}{}$$
 
 $$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; \msel{h}{a})}}{}
 \quad \infer{\smallstep{(h, l, \mt{Write} \; a \; v)}{(\mupd{h}{a}{v}, l, \mt{Return} \; 0)}}{}$$
@@ -5222,7 +5222,6 @@ The whole thing is wrapped up into transition systems as $\mathbb T_C(h, l, c_1,
 
 Our proof of soundness for this reduction will depend on having some constant upper bound on program execution time.
 This relation computes a conservative overapproximation.
-
 $$\infer{\tof{\mt{Return} \; r}{n}}{}
 \quad \infer{\tof{\mt{Fail}}{n}}{}
 \quad \infer{\tof{\mt{Read} \; a}{n+1}}{}

@@ -26,7 +26,7 @@ Set Asymmetric Patterns.
 
 (* Proving that particular natural-number constants are even is certainly
  * something we would rather have happen automatically.  The Ltac-programming
- * techniques that we learned last week make it easy to implement such a
+ * techniques that we learned previously make it easy to implement such a
  * procedure. *)
 
 Inductive isEven : nat -> Prop :=
@@ -136,7 +136,7 @@ Unset Printing All.
 
 Theorem even_255 : isEven 255.
 Proof.
-  (*prove_even_reflective.*)
+  Fail prove_even_reflective.
 Abort.
 (* Coq reports that [reflexivity] can't prove [false = true], which makes
  * perfect sense! *)
@@ -166,7 +166,6 @@ Print true_galore.
  * to case-analyze a [Prop] in any way in Gallina.  We must _reify_ [Prop] into
  * some type that we _can_ analyze.  This inductive type is a good candidate: *)
 
-(* begin thide *)
 Inductive taut : Set :=
 | TautTrue : taut
 | TautAnd : taut -> taut -> taut
@@ -368,7 +367,7 @@ Section monoid.
 
   (* We can make short work of theorems like this one: *)
 
-  Theorem t1 : forall a b c d, a + b + c + d = a + (b + c) + d.
+  Theorem t1 : forall a b c d, a + b + c + e + d = a + (b + c) + d.
   Proof.
     simplify; monoid.
 
@@ -596,8 +595,8 @@ Section my_tauto.
    * module of the standard library, which (unsurprisingly) presents a view of
    * lists as sets. *)
 
-  (* The [eq_nat_dec] below is a richly typed equality test on [nat]s.  We'll
-   * get to the ideas behind it in a later class. *)
+  (* The [eq_nat_dec] below is a richly typed equality test on [nat]s.
+   * See SubsetTypes.v for a review. *)
   Definition add (s : set propvar) (v : propvar) := set_add eq_nat_dec v s.
 
   (* We define what it means for all members of a variable set to represent

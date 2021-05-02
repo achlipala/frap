@@ -13,8 +13,8 @@ Set Asymmetric Patterns.
 Notation "m $! k" := (match m $? k with Some n => n | None => O end) (at level 30).
 Definition heap := fmap nat nat.
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 
 (** * An object language with shared-memory concurrency *)
@@ -25,7 +25,7 @@ Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
  * theoretical benefits; we'll start with the most venerable style, shared
  * memory. *)
 
-(* We'll build on the mixed-embedding languages from the last two chapter. 
+(* We'll build on the mixed-embedding languages from the last two chapters.
  * Let's simplify the encoding by only working with commands that generate
  * [nat]. *)
 Inductive cmd :=
@@ -95,9 +95,9 @@ Definition trsys_of (h : heap) (l : locks) (c : cmd) := {|
  * technique.  Recall that model checking is all about reducing a problem to a
  * reachability question in a finite-state system.  Our programs here have the
  * (perhaps surprising!) property that termination is guaranteed, for any
- * initial state, regardless of how the scheduler behaves.  Therefore, all
- * programs of this language are finite-state and thus, in principle, amenable
- * to model checking!  (We were careful to leave out looping constructs.)
+ * initial state, regardless of how the scheduler behaves.  However,
+ * counterintuitively, program execution does *not* need to be finite-state,
+ * and thus amenable to model checking, though we will stick to examples that are.
  * Let's define a simple two-thread program and model-check it. *)
 
 (* Throughout this file, we'll only be verifying that no thread could ever reach
@@ -204,7 +204,7 @@ Definition trsys_ofL (h : heap) (l : locks) (c : cmd) := {|
 
 (* Now we prove some basic facts; commentary resumes before [step_runLocal]. *)
 
-Hint Constructors step stepL : core.
+Local Hint Constructors step stepL : core.
 
 Lemma run_Return : forall h l r h' l' c,
   step^* (h, l, Return r) (h', l', c)
@@ -266,7 +266,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve StepBindRecur_star StepParRecur1_star StepParRecur2_star : core.
+Local Hint Resolve StepBindRecur_star StepParRecur1_star StepParRecur2_star : core.
 
 Lemma runLocal_idem : forall c, runLocal (runLocal c) = runLocal c.
 Proof.
@@ -725,7 +725,7 @@ Proof.
   first_order; eauto.
 Qed.
 
-Hint Constructors summarize : core.
+Local Hint Constructors summarize : core.
 
 (* The next two lemmas show that, once a summary is accurate for a command, it
  * remains accurate throughout the whole execution lifetime of the command. *)
@@ -805,7 +805,7 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Constructors boundRunningTime : core.
+Local Hint Constructors boundRunningTime : core.
 
 (* Key property: taking a step of execution lowers the running-time bound. *)
 Lemma boundRunningTime_step : forall c n h l h' l',
@@ -843,7 +843,7 @@ Qed.
 
 (* Here we get a bit naughty and begin to depend on *classical logic*, as with
  * the *law of the excluded middle*: [forall P, P \/ ~P].  You may not have
- * noticed that we've never applied that principle explicitly so far! *)
+ * noticed that we've rarely applied that principle explicitly so far! *)
 
 (* A very useful property: when a command has bounded running time, any
  * execution starting from that command can be *completed* to one ending in a
@@ -1032,7 +1032,7 @@ Inductive stepsi : nat -> heap * locks * cmd -> heap * locks * cmd -> Prop :=
     -> stepsi i st2 st3
     -> stepsi (S i) st1 st3.
 
-Hint Constructors stepsi : core.
+Local Hint Constructors stepsi : core.
 
 Theorem steps_stepsi : forall st1 st2,
     step^* st1 st2
@@ -1041,7 +1041,7 @@ Proof.
   induct 1; first_order; eauto.
 Qed.
 
-Hint Constructors stepC : core.
+Local Hint Constructors stepC : core.
 
 (* The next few lemmas are quite technical.  Commentary resumes for
  * [translate_trace]. *)
@@ -1412,7 +1412,7 @@ Proof.
 
   (* We computed an inexact running time.  By filling in zeroes for some
    * existential variables, we commit to a concrete bound. *)
-  Grab Existential Variables.
+  Unshelve.
   exact 0.
   exact 0.
   exact 0.

@@ -327,7 +327,7 @@ Inductive RefineMethods {state1 state2} (R : state1 -> state2 -> Prop)
     -> RefineMethods R (MethodsCons {| MethodName := name; MethodBody := f1 |} ms1)
                        (MethodsCons {| MethodName := name; MethodBody := f2 |} ms2).
 
-Hint Constructors RefineMethods : core.
+Local Hint Constructors RefineMethods : core.
 
 (* When does [adt2] refine [adt1]?  When there exists a simulation relation,
  * with respect to which the constructors and methods all satisfy the usual
@@ -360,7 +360,7 @@ Definition split_counter := ADT {
   and method "value"[[self, _]] = ret (self, fst self + snd self)
 }.
 
-Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => simplify; linear_arithmetic : core.
 
 (* Here is why the new implementation is correct. *)
 Theorem split_counter_ok : adt_refine counter split_counter.
@@ -393,7 +393,7 @@ Proof.
   subst; eauto.
 Qed.
 
-Hint Immediate RefineMethods_refl : core.
+Local Hint Immediate RefineMethods_refl : core.
 
 Theorem refine_refl : forall names (adt1 : adt names),
     adt_refine adt1 adt1.
@@ -422,7 +422,7 @@ Proof.
   first_order.
 Qed.
 
-Hint Resolve RefineMethods_trans : core.
+Local Hint Resolve RefineMethods_trans : core.
 
 Theorem refine_trans : forall names (adt1 adt2 adt3 : adt names),
     adt_refine adt1 adt2
@@ -497,7 +497,7 @@ Proof.
   simplify; subst; eauto.
 Qed.
 
-Hint Resolve ReplaceMethod_ok : core.
+Local Hint Resolve ReplaceMethod_ok : core.
 
 (* It is OK to replace a method body if the new refines the old as a [comp]. *)
 Theorem refine_method : forall state name (oldbody newbody : state -> nat -> comp (state * nat))
@@ -553,7 +553,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve RepChangeMethods_ok : core.
+Local Hint Resolve RepChangeMethods_ok : core.
 
 Theorem refine_rep : forall state1 state2 (absfunc : state2 -> state1)
                             names (ms1 : methods state1 names) (ms2 : methods state2 names)
@@ -627,7 +627,7 @@ Definition derived_counter : sig (adt_refine counter).
 
   refine_finish.
 Defined.
-  
+
 Eval simpl in proj1_sig derived_counter.
 
 
@@ -688,7 +688,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve CachingMethods_ok : core.
+Local Hint Resolve CachingMethods_ok : core.
 
 Theorem refine_cache : forall state name (func : state -> nat)
                             names (ms1 : methods state names) (ms2 : methods (state * nat) names)

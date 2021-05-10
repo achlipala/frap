@@ -9,8 +9,8 @@ Set Asymmetric Patterns.
 Notation heap := (fmap nat nat).
 Notation locks := (set nat).
 
-Hint Extern 1 (_ <= _) => linear_arithmetic : core.
-Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
+Local Hint Extern 1 (_ <= _) => linear_arithmetic : core.
+Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -187,7 +187,7 @@ Module Import S <: SEP.
     t.
   Qed.
 
-  Hint Resolve split_empty_bwd' : core.
+  Local Hint Resolve split_empty_bwd' : core.
 
   Theorem extra_lift : forall (P : Prop) p,
     P
@@ -483,7 +483,7 @@ Proof.
   apply try_me_first_easy.
 Qed.
 
-Hint Resolve try_ptsto_first : core.
+Local Hint Resolve try_ptsto_first : core.
 
 
 (** ** The nonzero shared counter *)
@@ -752,7 +752,7 @@ Qed.
 
 (** * Soundness proof *)
 
-Hint Resolve himp_refl : core.
+Local Hint Resolve himp_refl : core.
 
 Lemma invert_Return : forall linvs {result : Set} (r : result) P Q,
   hoare_triple linvs P (Return r) Q
@@ -767,7 +767,7 @@ Proof.
   rewrite IHhoare_triple; eauto.
 Qed.
 
-Hint Constructors hoare_triple : core.
+Local Hint Constructors hoare_triple : core.
 
 Lemma invert_Bind : forall linvs {result' result} (c1 : cmd result') (c2 : result' -> cmd result) P Q,
   hoare_triple linvs P (Bind c1 c2) Q

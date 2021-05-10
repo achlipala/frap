@@ -5377,7 +5377,7 @@ $$\begin{array}{rrcl}
 $$\infer{\smallstep{(h, l, x \leftarrow c_1; c_2(x))}{(h', l', x \leftarrow c'_1; c_2(x))}}{
   \smallstep{(h, l, c_1)}{(h', l', c'_1)}
 }
-\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, k, c_2(v))}}{}$$
+\quad \infer{\smallstep{(h, l, x \leftarrow \mt{Return} \; v; c_2(x))}{(h, l, c_2(v))}}{}$$
 
 $$\infer{\smallstep{(h, l, \mt{Loop} \; i \; f)}{(h, l, x \leftarrow f(i); \mt{match} \; x \; \mt{with} \; \mt{Done}(a) \Rightarrow \mt{Return} \; a \mid \mt{Again}(a) \Rightarrow \mt{Loop} \; a \; f)}}{}$$
 

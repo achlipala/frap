@@ -36,7 +36,7 @@ Inductive type :=
 (* This type applies to a process that begins by sending a value of type [A]
  * over channel [ch], then continuing according to type [t]. *)
 
-| TRecv (ch : channel) (A : Type) (t :  type)
+| TRecv (ch : channel) (A : Type) (t : type)
 (* This type is the dual of the last one: the process begins by receiving a
  * value of type [A] from channel [ch]. *)
 
@@ -128,7 +128,7 @@ Definition trsys_of pr := {|
 (* Note: here we force silent steps, so that all channel communication is
  * internal. *)
 
-Hint Constructors hasty : core.
+Global Hint Constructors hasty : core.
 
 (* The next two lemmas state some inversions that connect stepping and
  * typing. *)
@@ -347,7 +347,7 @@ Definition trsys_of pr := {|
   Step := lstepSilent
 |}.
 
-Hint Constructors hasty : core.
+Global Hint Constructors hasty : core.
 
 Lemma input_typed : forall pr ch A v pr',
     lstep pr (Action (Input {| Channel := ch; TypeOf := A; Value := v |})) pr'
@@ -515,7 +515,7 @@ Definition trsys_of pr := {|
   Step := lstepSilent
 |}.
 
-Hint Constructors hasty : core.
+Global Hint Constructors hasty : core.
 
 (* We prove that the type system rules out fancier constructs. *)
 
@@ -546,7 +546,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate hasty_not_Block hasty_not_Dup hasty_not_Par : core.
+Global Hint Immediate hasty_not_Block hasty_not_Dup hasty_not_Par : core.
 
 (* Next, we characterize how channels must be mapped, given typing of a
  * process. *)
@@ -605,7 +605,7 @@ Inductive typed_multistate party (channels : channel -> parties party) (t : type
     -> typed_multistate channels t ps pr2
     -> typed_multistate channels t (p :: ps) (pr1 || pr2).
 
-Hint Constructors typed_multistate : core.
+Global Hint Constructors typed_multistate : core.
 
 (* This fancier typing judgment gets a fancier tactic for type-checking. *)
 
@@ -652,7 +652,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate no_silent_steps : core.
+Global Hint Immediate no_silent_steps : core.
 
 Lemma complementarity_forever_done : forall party (channels : _ -> parties party) pr pr',
   lstep pr Silent pr'
@@ -676,7 +676,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate mayNotSend_really : core.
+Global Hint Immediate mayNotSend_really : core.
 
 Lemma may_not_output : forall (party : Type) pr pr' ch (A : Type) (v : A),
     lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
@@ -692,7 +692,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Immediate may_not_output : core.
+Global Hint Immediate may_not_output : core.
 
 Lemma output_is_legit : forall (party : Type) pr pr' ch (A : Type) (v : A),
     lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
@@ -815,7 +815,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Local Hint Immediate hasty_relax : core.
+Global Hint Immediate hasty_relax : core.
 
 Lemma complementarity_preserve_unused : forall party (channels : _ -> parties party)
                                                pr ch (A : Type) (t : A -> _) all_parties,
@@ -1058,7 +1058,7 @@ Inductive inert : proc -> Prop :=
     -> inert pr2
     -> inert (pr1 || pr2).
 
-Hint Constructors inert : core.
+Global Hint Constructors inert : core.
 
 (* Now a few more fiddly lemmas.  See you again at the [Theorem]. *)
 
@@ -1070,7 +1070,7 @@ Proof.
   invert H; eauto.
 Qed.
 
-Hint Immediate typed_multistate_inert : core.
+Global Hint Immediate typed_multistate_inert : core.
 
 Lemma deadlock_find_receiver : forall party (channels : _ -> parties party) all_parties
                                       ch (A : Type) (k : A -> _) pr,
@@ -1420,7 +1420,7 @@ Inductive mayTouch : proc -> channel -> Prop :=
     mayTouch pr1 ch
     -> mayTouch (Dup pr1) ch.
 
-Hint Constructors mayTouch : core.
+Global Hint Constructors mayTouch : core.
 
 Import BasicTwoParty Multiparty.
 
@@ -1435,7 +1435,7 @@ Proof.
     end.
 Qed.
 
-Hint Immediate lstep_mayTouch : core.
+Global Hint Immediate lstep_mayTouch : core.
 
 Lemma Input_mayTouch : forall pr ch (A : Type) (v : A) pr',
     lstep pr (Action (Input {| Channel := ch; Value := v |})) pr'
@@ -1451,7 +1451,7 @@ Proof.
   induct 1; eauto.
 Qed.
 
-Hint Immediate Input_mayTouch Output_mayTouch : core.
+Global Hint Immediate Input_mayTouch Output_mayTouch : core.
 
 Lemma independent_execution : forall pr1 pr2 pr,
   lstepSilent^* (pr1 || pr2) pr

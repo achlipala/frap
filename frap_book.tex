@@ -5607,7 +5607,7 @@ In the \emph{synchronous}\index{synchronous message passing} or \emph{rendezvous
 The threads of the two complementary operations \emph{rendezvous} and pass the message in one atomic step.
 
 Packages of semantics and proof techniques for such languages are often called \emph{process algebras}\index{process algebra}, as they support an algebraic style of reasoning about the source code of message-passing programs.
-That is, we prove laws very similar to the familiar equations of algebra, and use those laws to ``rewrite'' inside larger processes, by replacing their subprocesses with others we have shown suitably equivalent.
+That is, we prove laws very similar to the familiar equations of algebra and use those laws to ``rewrite'' inside larger processes, by replacing their subprocesses with others we have shown suitably equivalent.
 It's a powerful technique for highly modular proofs, which we develop in the rest of this chapter for one concrete synchronous language.
 Well-known process algebras include the $\pi$-calculus\index{$\pi$-calculus} and the Calculus of Communicating Systems\index{Calculus of Communicating Systems}; the one we focus on is idiosyncratic and designed partly to make the Coq proofs manageable.
 
@@ -5722,7 +5722,6 @@ Instead, we formalize refinement via \emph{simulation}, very similarly to how we
 
 Intuitively, $R$ is a simulation when, starting in a pair of related processes, any step on the left can be matched by a step on the right, taking us back into $R$.
 The conditions are naturally illustrated with commuting diagrams\index{commuting diagram}.
-
 \[
 \begin{tikzcd}
 p_1 \arrow{r}{R} \arrow{d}{\forall \longrightarrow} & p_2 \arrow{d}{\exists \longrightarrow^*} \\

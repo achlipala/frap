@@ -13,24 +13,27 @@ The main narrative, also present in the book PDF, presents standard program-proo
 * Chapter 3: `DataAbstraction.v`
 * Chapter 4: `Interpreters.v`
   * `FirstClassFunctions.v`: functions as data; continuations and continuation-passing style
-* Chapter 5: `TransitionSystems.v`
+* Chapter 5: `RuleInduction.v`
+* Chapter 6: `TransitionSystems.v`
   * `IntroToProofScripting.v`: writing scripts to find proofs in Coq
-* Chapter 6: `ModelChecking.v`
+* Chapter 7: `ModelChecking.v`
   * `ProofByReflection.v`: writing verified proof procedures in Coq
-* Chapter 7: `OperationalSemantics.v`
+* Chapter 8: `OperationalSemantics.v`
   * `LogicProgramming.v`: 'eauto' and friends, to automate proofs via logic programming
-* Chapter 8: `AbstractInterpretation.v`
-* Chapter 9: `CompilerCorrectness.v`
-* Chapter 10: `LambdaCalculusAndTypeSoundness.v`
-* Chapter 11: `TypesAndMutation.v`
-* Chapter 12: `HoareLogic.v`
-* Chapter 13: `DeepAndShallowEmbeddings.v`
-* Chapter 14: `SeparationLogic.v`
-* Chapter 15: `Connecting.v`
-* Chapter 16: `ProgramDerivation.v`
-* Chapter 17: `SharedMemory.v`
-* Chapter 18: `ConcurrentSeparationLogic.v`
-* Chapter 19: `MessagesAndRefinement.v`
+* Chapter 9: `AbstractInterpretation.v`
+* Chapter 10: `CompilerCorrectness.v`
+* Chapter 11: `LambdaCalculusAndTypeSoundness.v`
+* Chapter 12: `EvaluationContexts.v`
+* Chapter 13: `TypesAndMutation.v`
+* Chapter 14: `HoareLogic.v`
+* Chapter 15: `DeepAndShallowEmbeddings.v`
+* Chapter 16: `SeparationLogic.v`
+* Chapter 17: `Connecting.v`
+* Chapter 18: `ProgramDerivation.v`
+* Chapter 19: `SharedMemory.v`
+* Chapter 20: `ConcurrentSeparationLogic.v`
+* Chapter 21: `MessagesAndRefinement.v`
+* Chapter 22: `SessionTypes.v`
 
 There are also two supplementary files that are independent of the main narrative, for introducing programming with dependent types, a distinctive Coq feature that we neither use nor recommend for the problem sets, but which many students find interesting (and useful in other contexts).
 * `SubsetTypes.v`: a first introduction to dependent types by attaching predicates to normal types (used after `CompilerCorrectness.v` in the last course offering)

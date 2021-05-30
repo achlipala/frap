@@ -5388,10 +5388,10 @@ $$\infer{\smallstep{(h, l, \mt{Read} \; a)}{(h, l, \mt{Return} \; v)}}{
   \msel{h}{a} = v
 }$$
 
-$$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, \mt{Return} \; a)}}{
+$$\infer{\smallstep{(h, l, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, l, \mt{Return} \; a)}}{
   \dom{h} \cap [a, a+n) = \emptyset
 }
-\quad \infer{\smallstep{(h, \mt{Free} \; a \; n)}{(h - [a, a+n), \mt{Return} \; ())}}{
+\quad \infer{\smallstep{(h, l, \mt{Free} \; a \; n)}{(h - [a, a+n), l, \mt{Return} \; ())}}{
 }$$
 
 $$\infer{\smallstep{(h, l, \mt{Lock} \; a)}{(h, l \cup \{a\}, \mt{Return} \; ())}}{

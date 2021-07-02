@@ -5053,7 +5053,7 @@ One simply follows all the edges in the graph determined by a transition system,
 For our object language in this chapter, a good safety property is that commands are \emph{not about to fail}, formalized as:
 \begin{eqnarray*}
   \natf{\mt{Fail}} &=& \bot \\
-  \natf{x \leftarrow c_1; c_x(x)} &=& \natf{c_1} \\
+  \natf{x \leftarrow c_1; c_2(x)} &=& \natf{c_1} \\
   \natf{c_1 || c_2} &=& \natf{c_1} \land \natf{c_2} \\
   \natf{\_} &=& \top
 \end{eqnarray*}

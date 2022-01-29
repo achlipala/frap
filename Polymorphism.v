@@ -448,7 +448,6 @@ Inductive statement : Set :=
  * almost-natural-looking embedded programs in Coq. *)
 Coercion Const : nat >-> expression.
 Coercion Var : string >-> expression.
-(*Declare Scope embedded_scope.*)
 Infix "+" := Plus : embedded_scope.
 Infix "-" := Minus : embedded_scope.
 Infix "*" := Times : embedded_scope.
@@ -542,7 +541,7 @@ Compute listifyStatement factorial.
 (* At this point, I can't resist switching to a more automated proof style,
  * though still a pretty tame one. *)
 
-Hint Rewrite length_app.
+Local Hint Rewrite length_app.
 
 Lemma length_listifyExpression : forall e,
     length (listifyExpression e) = varsInExpression e.
@@ -550,7 +549,7 @@ Proof.
   induct e; simplify; linear_arithmetic.
 Qed.
 
-Hint Rewrite length_listifyExpression.
+Local Hint Rewrite length_listifyExpression.
 
 Theorem length_listifyStatement : forall s,
     length (listifyStatement s) = varsInStatement s.
@@ -595,7 +594,7 @@ Proof.
   induct ls1; simplify; equality.
 Qed.
 
-Hint Rewrite swedishList_app.
+Local Hint Rewrite swedishList_app.
 
 Lemma listifyExpression_swedishExpression : forall e,
     listifyExpression (swedishExpression e) = swedishList (listifyExpression e).
@@ -603,7 +602,7 @@ Proof.
   induct e; simplify; equality.
 Qed.
 
-Hint Rewrite listifyExpression_swedishExpression.
+Local Hint Rewrite listifyExpression_swedishExpression.
 
 Lemma listifyStatement_swedishStatement : forall s,
     listifyStatement (swedishStatement s) = swedishList (listifyStatement s).

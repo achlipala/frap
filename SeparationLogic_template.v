@@ -371,7 +371,6 @@ Proof.
   simp.
   cancel; auto.
   subst; cancel.
-  cancel; auto.
 Qed.
 
 Theorem HtRead'' : forall p P R,
@@ -393,6 +392,8 @@ Proof.
   constructor.
   simp.
   cancel.
+  subst.
+  assumption.
 Qed.
 
 
@@ -984,7 +985,7 @@ Proof.
   repeat rewrite lookup_join2 by (simp; sets); reflexivity.
   unfold disjoint in *; simp.
   cases (a0 ==n a); simp.
-  apply H1 with (a0 := a).
+  apply H1 with (a := a).
   unfold heap1; simp.
   equality.
   assumption.

@@ -1144,7 +1144,7 @@ Module FindDuplicates (FS : FINITE_SET).
 
     invert H0.
     exfalso.
-    apply H with (x3 := x).
+    apply H with (x := x).
     exists x0.
     exists x1.
     exists x2.

@@ -454,3 +454,8 @@ Ltac unfold_recurse f k :=
    linear_arithmetic). *)
 Arguments N.mul: simpl never.
 Arguments N.add: simpl never.
+
+Definition IF_then_else (p q1 q2 : Prop) :=
+  (p /\ q1) \/ (~p /\ q2).
+  
+Notation "'IF' p 'then' q1 'else' q2" := (IF_then_else p q1 q2) (at level 95).

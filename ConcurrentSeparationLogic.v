@@ -426,7 +426,6 @@ Proof.
   simp.
   cancel; auto.
   subst; cancel.
-  cancel; auto.
 Qed.
 
 Theorem HtRead'' : forall linvs p P R,
@@ -448,6 +447,8 @@ Proof.
   constructor.
   simp.
   cancel.
+  subst.
+  assumption.
 Qed.
 
 Ltac basic := apply HtReturn' || eapply HtWrite || eapply HtAlloc || eapply HtFree

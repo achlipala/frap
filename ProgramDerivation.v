@@ -375,7 +375,7 @@ Proof.
     | [ H : (_, _) = (_, _) |- _ ] => invert H
     end; eauto.
 
-  Grab Existential Variables.
+  Unshelve.
   exact 0.
 Qed.
 

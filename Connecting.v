@@ -582,6 +582,8 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     constructor.
     simp.
     cancel.
+    subst.
+    assumption.
   Qed.
 
   Transparent heq himp lift star exis ptsto.
@@ -651,7 +653,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     repeat rewrite lookup_join2 by (simp; sets); reflexivity.
     unfold disjoint in *; simp.
     cases (weq a0 a); simp.
-    apply H1 with (a0 := a).
+    apply H1 with (a := a).
     unfold heap1; simp.
     equality.
     assumption.
@@ -817,7 +819,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     simp.
     cancel; auto.
     subst; cancel.
-    cancel; auto.
   Qed.
 
   Theorem HtRead'' : forall p P R,
@@ -2666,7 +2667,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     rewrite lookup_join2 by (eapply lookup_None_dom; simplify; eauto).
     eassumption.
 
-    Grab Existential Variables.
+    Unshelve.
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
@@ -3159,7 +3160,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     eexists.
     repeat econstructor.
 
-    Grab Existential Variables.
+    Unshelve.
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
     exact (^0) || exact (Return (^0)).
@@ -3312,8 +3313,6 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     step.
     simp.
     step.
-    cancel.
-    subst.
     cancel.
   Qed.
 

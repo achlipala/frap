@@ -657,7 +657,7 @@ Module Deeper.
                             end).
     cases (r ==n needle); ht.
     cases (i ==n acc); simp.
-    apply H3 with (i0 := i); auto.
+    apply H3 with (i := i); auto.
   Qed.
 
   (* The single-stepping interpreter forms the basis for defining transition

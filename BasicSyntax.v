@@ -206,7 +206,7 @@ Module ArithWithVariables.
    * We use an infix operator [==v] for equality tests on strings.
    * It has a somewhat funny and very expressive type,
    * whose details we will try to gloss over.
-   * (To dig into it more on your own, the appropriate keyword is "dependent types.") *)
+   * (We later return to them in SubsetTypes.v.) *)
   Fixpoint substitute (inThis : arith) (replaceThis : var) (withThis : arith) : arith :=
     match inThis with
     | Const _ => inThis
@@ -469,7 +469,7 @@ Module ArithWithVariables.
     linear_arithmetic.
   Qed.
 
-  Hint Rewrite n_times_0.
+  Local Hint Rewrite n_times_0.
   (* Registering rewrite hints will get [simplify] to apply them for us
    * automatically! *)
 

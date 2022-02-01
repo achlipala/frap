@@ -586,7 +586,7 @@ Module PropositionalWithImplication.
   Lemma interp_valid'' : forall p hyps,
       (forall x, In x (varsOf p) -> hyps (Var x) \/ hyps (Not (Var x)))
       -> (forall x, hyps (Var x) -> ~hyps (Not (Var x)))
-      -> IF interp (fun x => hyps (Var x)) p
+      -> IFF interp (fun x => hyps (Var x)) p
          then valid hyps p
          else valid hyps (Not p).
   Proof.
@@ -612,18 +612,18 @@ Module PropositionalWithImplication.
     excluded_middle (interp (fun x => hyps (Var x)) p2).
     left; propositional.
     apply ValidAndIntro.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
     unfold IF_then_else in H3; propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
     unfold IF_then_else in H3; propositional.
     right; propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -637,7 +637,7 @@ Module PropositionalWithImplication.
     apply ValidHyp.
     propositional.
     right; propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -654,7 +654,7 @@ Module PropositionalWithImplication.
     excluded_middle (interp (fun x => hyps (Var x)) p1).
     left; propositional.
     apply ValidOrIntro1.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -662,7 +662,7 @@ Module PropositionalWithImplication.
     excluded_middle (interp (fun x => hyps (Var x)) p2).
     left; propositional.
     apply ValidOrIntro2.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -672,7 +672,7 @@ Module PropositionalWithImplication.
     apply ValidOrElim with p1 p2.
     apply ValidHyp.
     propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -683,7 +683,7 @@ Module PropositionalWithImplication.
     propositional.
     apply ValidHyp.
     propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -699,7 +699,7 @@ Module PropositionalWithImplication.
     excluded_middle (interp (fun x => hyps (Var x)) p2).
     left; propositional.
     apply ValidImplyIntro.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -709,12 +709,12 @@ Module PropositionalWithImplication.
     propositional.
     right; propositional.
     apply ValidImplyIntro.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
     unfold IF_then_else in H3; propositional.
-    assert (IF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p2 then valid hyps p2 else valid hyps (Not p2)).
     apply IHp2; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -731,7 +731,7 @@ Module PropositionalWithImplication.
     propositional.
     left; propositional.
     apply ValidImplyIntro.
-    assert (IF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p1 then valid hyps p1 else valid hyps (Not p1)).
     apply IHp1; propositional.
     apply H.
     apply in_or_app; propositional.
@@ -759,7 +759,7 @@ Module PropositionalWithImplication.
     induct leftToDo; simplify.
 
     rewrite app_nil_r in H.
-    assert (IF interp (fun x : var => hyps (Var x)) p then valid hyps p else valid hyps (Not p)).
+    assert (IFF interp (fun x : var => hyps (Var x)) p then valid hyps p else valid hyps (Not p)).
     apply interp_valid''; first_order.
     unfold IF_then_else in H4; propositional.
     exfalso.

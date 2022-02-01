@@ -1219,7 +1219,7 @@ Transparent heq himp lift star exis ptsto.
 
 (* Guarded predicates *)
 Definition guarded (P : Prop) (p : hprop) : hprop :=
-  fun h => IF P then p h else emp%sep h.
+  fun h => IFF P then p h else emp%sep h.
 
 Infix "===>" := guarded : sep_scope.
 

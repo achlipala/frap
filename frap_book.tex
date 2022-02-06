@@ -711,7 +711,6 @@ We apply the following notations throughout the book: \\
 
 As the name advertises, finite maps are functions with finite domains, where the domain may be expanded by each extension operation.
 Two axioms explain the essential interactions of the basic operators.
-
 $$\infer{\msel{\mupd{m}{k}{v}}{k} = v}{}
 \quad
 \infer{\msel{\mupd{m}{k_1}{v}}{k_2} = m(k_2)}{
@@ -723,7 +722,7 @@ $$\infer{\msel{\mupd{m}{k}{v}}{k} = v}{}
 With these operators in hand, we can write a semantics for arithmetic expressions.
 This is a recursive function that \emph{maps variable valuations to numbers}.
 We write $\denote{e}$ for the meaning of $e$; this notation is often referred to as \emph{Oxford brackets}\index{Oxford brackets}.
-Recall that we allow notations like this as syntactic sugar for arbitrary functions, even when giving the equations that define those functions.
+Recall that we allow this kind of notation as syntactic sugar for arbitrary functions, even when giving the equations that define those functions.
 We write $v$ for a valuation (finite map).
 \encoding
 \begin{eqnarray*}
@@ -758,7 +757,6 @@ We can prove a key compatibility property of these two recursive functions.
 
 That is, in some sense, the operations of interpretation and substitution \emph{commute} with each other.
 That intuition gives rise to the common notion of a \emph{commuting diagram}\index{commuting diagram}, like the one below for this particular example.
-
 \[
 \begin{tikzcd}
 (e, v) \arrow{r}{\subst{\ldots}{x}{e'}} \arrow{d}{\mupd{\ldots}{x}{\denote{e'}v}} & (\subst{e}{x}{e'}, v) \arrow{d}{\denote{\ldots}} \\
@@ -916,7 +914,7 @@ We'll write $\opt{\ldots}$ for this and other optimizations, which move neither 
 
 Note that, when multiple defining equations apply to some function input, by convention we apply the \emph{earliest} equation that matches.
 
-Let's prove that this optimization preserves program behavior; that is, we prove that it is \emph{semantics preserving}\index{semantics preservation}.
+Let's prove that this optimization preserves program behavior; that is, we prove that it is \emph{semantics-preserving}\index{semantics preservation}.
 
 \begin{theorem}\label{unroll}
   $\denote{\opt{c}}v = \denote{c}v$.
@@ -925,7 +923,6 @@ Let's prove that this optimization preserves program behavior; that is, we prove
 It all looks so straightforward from that statement, doesn't it?
 Indeed, there actually isn't so much work to do to prove this theorem.
 We can also present it as a commuting diagram much like the prior one.
-
 \[
 \begin{tikzcd}
 c \arrow{r}{\opt{\ldots}} \arrow{dr}{\denote{\ldots}} & \opt{c} \arrow{d}{\denote{\ldots}} \\
@@ -933,14 +930,13 @@ c \arrow{r}{\opt{\ldots}} \arrow{dr}{\denote{\ldots}} & \opt{c} \arrow{d}{\denot
 \end{tikzcd}
 \]
 
-The statement of Theorem \ref{unroll} happens to already be in the right form to do induction directly, but we need a helper lemma, capturing the interaction of $^nc$ and the semantics.
+The statement of Theorem \ref{unroll} happens to be already in the right form to do induction directly, but we need a helper lemma, capturing the interaction of $^nc$ and the semantics.
 
 \begin{lemma}
   $\denote{^nc} = \denote{c}^n$.
 \end{lemma}
 
 Let us end the chapter with the commuting-diagram version of the lemma statement.
-
 \[
 \begin{tikzcd}
 c \arrow{r}{^n\ldots} \arrow{d}{\denote{\ldots}} & ^nc \arrow{d}{\denote{\ldots}} \\

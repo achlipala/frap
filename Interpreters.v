@@ -220,7 +220,7 @@ Proof.
    * an induction hypothesis.  Let's ask Coq to search its library for lemmas
    * that would justify such a rewrite, giving a pattern with wildcards, to
    * specify the essential structure that the rewrite should match. *)
-  SearchRewrite ((_ ++ _) ++ _).
+  Search ((_ ++ _) ++ _).
   (* Ah, we see just the one! *)
   rewrite app_assoc_reverse.
   rewrite IHe1.
@@ -251,8 +251,8 @@ Proof.
 
   (* To match the form of our lemma, we need to replace [compile e] with
    * [compile e ++ nil], adding a "pointless" concatenation of the empty list.
-   * [SearchRewrite] again helps us find a library lemma. *)
-  SearchRewrite (_ ++ nil).
+   * [Search] again helps us find a library lemma. *)
+  Search (_ ++ nil).
   rewrite (app_nil_end (compile e)).
   (* Note that we can use [rewrite] with explicit values of the first few
    * quantified variables of a lemma.  Otherwise, [rewrite] picks an

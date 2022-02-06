@@ -229,6 +229,9 @@ Ltac cases E :=
   ((repeat match type of E with
            | _ \/ _ => destruct E as [E | E]
            end)
+   || (match type of E with
+       | N => destruct E using indN
+       end)
    || (is_var E; destruct E)
    || match type of E with
       | {_} + {_} => destruct E

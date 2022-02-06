@@ -85,7 +85,7 @@ Definition absint_complete (a : absint) :=
                   -> a.(Represents) n z.
 
 (* Let's ask [eauto] to try all of the above soundness rules automatically. *)
-Hint Resolve TopSound ConstSound AddSound SubtractSound MultiplySound
+Local Hint Resolve TopSound ConstSound AddSound SubtractSound MultiplySound
      AddMonotone SubtractMonotone MultiplyMonotone
      JoinSoundLeft JoinSoundRight : core.
 
@@ -155,7 +155,7 @@ Proof.
   exists (x + 1); linear_arithmetic.
 Qed.
 
-Hint Resolve isEven_0 isEven_1 isEven_S_Even isEven_S_Odd : core.
+Local Hint Resolve isEven_0 isEven_1 isEven_S_Even isEven_S_Odd : core.
 
 (* END SPAN OF BORING THEOREMS ABOUT PARITY. *)
 
@@ -218,7 +218,7 @@ Inductive parity_rep : nat -> parity -> Prop :=
 | PrEither : forall n,
   parity_rep n Either.
 
-Hint Constructors parity_rep : core.
+Local Hint Constructors parity_rep : core.
 
 (* Putting it all together: *)
 Definition parity_absint := {|
@@ -242,7 +242,7 @@ Proof.
   invert IHn; eauto.
 Qed.
 
-Hint Resolve parity_const_sound : core.
+Local Hint Resolve parity_const_sound : core.
 
 Lemma even_not_odd :
   (forall n, parity_rep n Even -> parity_rep n Odd)
@@ -270,7 +270,7 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Resolve even_not_odd odd_not_even : core.
+Local Hint Resolve even_not_odd odd_not_even : core.
 
 Lemma parity_join_complete : forall n x y,
   parity_rep n (parity_join x y)
@@ -283,7 +283,7 @@ Proof.
   propositional; eauto using odd_notEven.
 Qed.
 
-Hint Resolve parity_join_complete : core.
+Local Hint Resolve parity_join_complete : core.
 
 (* The final proof uses some automation that we won't explain, to descend down
  * to the hearts of the interesting cases. *)
@@ -446,7 +446,7 @@ Inductive flow_insensitive_step a (c : cmd) : astate a -> astate a -> Prop :=
   (x, e) \in assignmentsOf c
   -> flow_insensitive_step c s (merge_astate s (s $+ (x, absint_interp e s))).
 
-Hint Constructors flow_insensitive_step : core.
+Local Hint Constructors flow_insensitive_step : core.
 
 Definition flow_insensitive_trsys a (s : astate a) (c : cmd) := {|
   Initial := {s};
@@ -477,7 +477,7 @@ Inductive Rinsensitive a (c : cmd) : valuation * cmd -> astate a -> Prop :=
   -> assignmentsOf c' \subseteq assignmentsOf c
   -> Rinsensitive c (v, c') s.
 
-Hint Constructors Rinsensitive : core.
+Local Hint Constructors Rinsensitive : core.
 
 (* A helpful decomposition property for compatibility *)
 Lemma insensitive_compatible_add : forall a (s : astate a) v x na n,
@@ -508,7 +508,7 @@ Proof.
   eauto.
 Qed.
 
-Hint Resolve insensitive_compatible_add absint_interp_ok : core.
+Local Hint Resolve insensitive_compatible_add absint_interp_ok : core.
 
 (* With that, let's show that the flow-insensitive version of a program
  * *simulates* the original program, w.r.t. any sound abstract
@@ -598,7 +598,7 @@ Proof.
   cases (s $? x); equality.
 Qed.
 
-Hint Resolve subsumed_refl : core.
+Local Hint Resolve subsumed_refl : core.
 
 Lemma subsumed_use : forall a (s s' : astate a) x n t0 t,
   s $? x = Some t0
@@ -626,7 +626,7 @@ Proof.
   equality.
 Qed.
 
-Hint Resolve subsumed_use subsumed_use_empty : core.
+Local Hint Resolve subsumed_use subsumed_use_empty : core.
 
 Lemma subsumed_trans : forall a (s1 s2 s3 : astate a),
   subsumed s1 s2
@@ -651,7 +651,7 @@ Proof.
   invert H0; eauto.
 Qed.
 
-Hint Resolve subsumed_merge_left : core.
+Local Hint Resolve subsumed_merge_left : core.
 
 Lemma subsumed_merge_both : forall a, absint_sound a
   -> absint_complete a
@@ -681,7 +681,7 @@ Proof.
   specialize (H0 x0); eauto.
 Qed.
 
-Hint Resolve subsumed_add : core.
+Local Hint Resolve subsumed_add : core.
 
 (* A key property of interpreting expressions abstractly: it's *monotone*, in
  * the sense that moving up to a less precise [astate] leads to a less precise
@@ -698,7 +698,7 @@ Proof.
   cases (s $? x); eauto.
 Qed.
 
-Hint Resolve absint_interp_monotone : core.
+Local Hint Resolve absint_interp_monotone : core.
 
 (* [runAllAssignments] also respects the subsumption order, in going from inputs
  * to outputs. *)
@@ -710,7 +710,7 @@ Proof.
   induct 2; simplify; eauto using subsumed_trans.
 Qed.    
 
-Hint Resolve runAllAssignments_monotone : core.
+Local Hint Resolve runAllAssignments_monotone : core.
 
 (* The output of [runAllAssignments] subsumes every state reachable by running a
  * single command. *)
@@ -971,7 +971,7 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve compatible_add : core.
+Local Hint Resolve compatible_add : core.
 
 (* A similar result follows about soundness of expression interpretation. *)
 Theorem absint_interp_ok2 : forall a, absint_sound a
@@ -989,7 +989,7 @@ Proof.
   assumption.
 Qed.
 
-Hint Resolve absint_interp_ok2 : core.
+Local Hint Resolve absint_interp_ok2 : core.
 
 (* The new type of invariant we calculate as we go: a map from commands to
  * [astate]s.  The idea is that we populate this map with the commands that show
@@ -1082,7 +1082,7 @@ Inductive abs_step a : astate a * cmd -> astate a * cmd -> Prop :=
   -> ss $? c' = Some s'
   -> abs_step (s, c) (s', c').
 
-Hint Constructors abs_step : core.
+Local Hint Constructors abs_step : core.
 
 Definition absint_trsys a (c : cmd) := {|
   Initial := {($0, c)};
@@ -1096,7 +1096,7 @@ Inductive Rabsint a : valuation * cmd -> astate a * cmd -> Prop :=
   compatible s v
   -> Rabsint (v, c) (s, c).
 
-Hint Constructors abs_step Rabsint : core.
+Local Hint Constructors abs_step Rabsint : core.
 
 Theorem absint_simulates : forall a v c,
   absint_sound a
@@ -1166,7 +1166,7 @@ Proof.
   unfold subsumeds; simplify; eauto.
 Qed.
 
-Hint Resolve subsumeds_refl : core.
+Local Hint Resolve subsumeds_refl : core.
 
 Lemma subsumeds_add : forall a (ss1 ss2 : astates a) c s1 s2,
   subsumeds ss1 ss2
@@ -1178,7 +1178,7 @@ Proof.
   invert H1; eauto.
 Qed.
 
-Hint Resolve subsumeds_add : core.
+Local Hint Resolve subsumeds_add : core.
 
 Lemma subsumeds_empty : forall a (ss : astates a),
   subsumeds $0 ss.
@@ -1389,7 +1389,7 @@ Proof.
   simplify; cases y; equality.
 Qed.
 
-Hint Resolve merge_astates_fok_parity merge_astates_fok2_parity : core.
+Local Hint Resolve merge_astates_fok_parity merge_astates_fok2_parity : core.
 
 (* Our second corral of tactics for the day, automating iteration *)
 Ltac interpret_simpl := unfold merge_astates, merge_astate;
@@ -1590,7 +1590,7 @@ Record interval_rep (n : nat) (i : interval) : Prop := {
                  end
 }.
 
-Hint Constructors interval_rep : core.
+Local Hint Constructors interval_rep : core.
 
 (* Test if an interval contains any values. *)
 Definition impossible (x : interval) :=
@@ -1653,7 +1653,7 @@ Proof.
   rewrite H, H0; equality.
 Qed.
 
-Hint Rewrite interval_join_impossible1 interval_join_impossible2 interval_join_possible
+Local Hint Rewrite interval_join_impossible1 interval_join_impossible2 interval_join_possible
      using assumption.
 
 (* We'll reuse this function to define both addition and multiplication.
@@ -1705,7 +1705,7 @@ Proof.
   cases (impossible y); simplify; equality.
 Qed.
 
-Hint Rewrite interval_combine_possible_fwd using assumption.
+Local Hint Rewrite interval_combine_possible_fwd using assumption.
 
 Definition interval_subtract (x y : interval) :=
   if impossible x || impossible y then
@@ -1747,7 +1747,7 @@ Proof.
   cases (impossible y); simplify; equality.
 Qed.
 
-Hint Rewrite interval_subtract_possible_fwd using assumption.
+Local Hint Rewrite interval_subtract_possible_fwd using assumption.
 
 Definition interval_absint := {|
   Top := {| Lower := 0; Upper := None |};
@@ -1760,7 +1760,7 @@ Definition interval_absint := {|
   Represents := interval_rep
 |}.
 
-Hint Resolve mult_le_compat : core. (* Theorem from Coq standard library *)
+Local Hint Resolve mult_le_compat : core. (* Theorem from Coq standard library *)
 
 (* When one interval implies another, and the first is possible, we can deduce
  * arithmetic relationships betwen their respective bounds. *)
@@ -1859,7 +1859,7 @@ Proof.
   transitivity (a' * b'); eauto.
 Qed.
 
-Hint Immediate mult_bound1 mult_bound2 : core.
+Local Hint Immediate mult_bound1 mult_bound2 : core.
 
 (* Now a bruiser of an automated proof, covering all the cases to show that this
  * abstraction is sound. *)
@@ -1914,7 +1914,7 @@ Proof.
   simplify; cases y; equality.
 Qed.
 
-Hint Resolve merge_astates_fok_interval merge_astates_fok2_interval : core.
+Local Hint Resolve merge_astates_fok_interval merge_astates_fok2_interval : core.
 
 (* The same kind of lemma we've proved for finishing off each proof by abstract
  * interpretation so far *)
@@ -1937,7 +1937,7 @@ Proof.
   equality.
 Qed.
 
-Hint Rewrite min_l min_r max_l max_r using linear_arithmetic.
+Local Hint Rewrite min_l min_r max_l max_r using linear_arithmetic.
 
 (* Let's see which intervals are computed for this program. *)
 Definition interval_test :=
@@ -2047,7 +2047,7 @@ Proof.
   rewrite H, H0; equality.
 Qed.
 
-Hint Rewrite interval_widen_impossible1 interval_widen_impossible2 interval_widen_possible
+Local Hint Rewrite interval_widen_impossible1 interval_widen_impossible2 interval_widen_possible
      using assumption.
 
 Definition interval_absint_widening := {|
@@ -2109,7 +2109,7 @@ Proof.
   simplify; cases y; equality.
 Qed.
 
-Hint Resolve merge_astates_fok_interval_widening merge_astates_fok2_interval_widening : core.
+Local Hint Resolve merge_astates_fok_interval_widening merge_astates_fok2_interval_widening : core.
 
 Lemma final_lower_widening : forall (s s' : astate interval_absint_widening) v x l,
   compatible s v

@@ -19,6 +19,8 @@ Theorem favorites_below_50 : forall n, my_favorite_numbers n -> n < 50.
 Proof.
   simplify.
   invert H.
+  (* [invert]: case analysis on which rules may have been used to prove an
+   *           instance of an inductive predicate *)
   linear_arithmetic.
   linear_arithmetic.
   linear_arithmetic.
@@ -82,6 +84,8 @@ Theorem lt_lt' : forall n m, n < m -> lt' n m.
 Proof.
   simplify.
   replace m with (S (m - n - 1) + n) by linear_arithmetic.
+  (* [replace]: change a subterm into another one, adding an obligation to prove
+   *            equality of the two. *)
   apply lt_lt''.
 Qed.
 
@@ -260,6 +264,8 @@ Module SimplePropositional.
     apply ValidTruth.
 
     propositional.
+    (* [propositional]: simplify goal according to the rules of propositional
+     *                  logic, a decidable theory. *)
 
     propositional.
     apply ValidAnd.

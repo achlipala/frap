@@ -12,7 +12,7 @@ Set Implicit Arguments.
 (** * Ltac Programming Basics *)
 
 (* We have already seen a few examples of Ltac programs, without much explanation.
- * Ltac is the proof scripting language built into Coq.  Actually, every
+ * Ltac is the proof-scripting language built into Coq.  Actually, every
  * primitive step in our proofs has been a (degenerate, small) Ltac program.
  * Let's take a bottom-up look at more Ltac features.
  *
@@ -245,7 +245,7 @@ Qed.
 (* In class, we develop our own implementation of [propositional] one feature
  * at a time, but here's just the final product.  To understand it, we print
  * the definitions of the logical connectives.  Interestingly enough, they are
- * special cases of the machinery we met last time for inductive relations! *)
+ * special cases of the machinery we met previously for inductive relations! *)
 
 Print True.
 Print False.
@@ -485,7 +485,7 @@ Abort.
 
 (* However, it's not always convenient to use continuation-passing style
  * everywhere, so cool kids use the following hack to sneak side effects
- * into otherwise functional Ltac code. *)
+ * into otherwise-functional Ltac code. *)
 Module Import WithPrintingFixedWithoutContinuations.
   Ltac length ls :=
     let __ := match constr:(Set) with
@@ -502,6 +502,7 @@ Goal False.
   let n := length (1 :: 2 :: 3 :: nil) in
   pose n.
 Abort.
+
 
 (** * Recursive Proof Search *)
 

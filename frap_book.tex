@@ -1458,7 +1458,7 @@ Let's define a suitable invariant for factorial.
 \end{eqnarray*}
 
 It is an almost-routine exercise to prove that $I$ really is an invariant, using Theorem \ref{invariant_induction}.
-The key new ingredient we need is \emph{inversion}, a principle for deducing which inference rules may have been used to prove a fact.
+The key new ingredient we need is \emph{inversion}, a principle for deducing which inference rules may have been used to prove a fact.\index{inversion}
 
 For instance, at one point in the proof, we need to draw a conclusion from a premise $s \in \mathcal F_0$, meaning that $s$ is an initial state.
 By inversion, because set $\mathcal F_0$ is defined by a single inference rule, that rule must have been used to conclude the premise, so it must be that $s = \mathsf{WithAccumulator}(n_0, 1)$.
@@ -1544,6 +1544,7 @@ Consider \texttt{global} as a variable shared across all threads, while each thr
 The meaning of \texttt{lock()} and \texttt{unlock()} is as usual\index{locks}, where at most one thread can hold the lock at once, claiming it via \texttt{lock()} and relinquishing it via \texttt{unlock()}.
 When variable \texttt{global} is initialized to 0 and $n$ threads run this code at once and all terminate, we expect that \texttt{global} finishes with value $n$.
 Of course, bugs in this program, like forgetting to include the locking, could lead to all sorts of wrong answers, with any value between 1 and $n$ possible with the right demonic thread interleaving.
+(Here ``demonic'' refers to consideration of worst-case behavior, with respect to the desired correctness property.)\index{demonic choice}
 
 \encoding
 To prove that we got the program right, let's formalize it as a transition system.  First, our state set:
@@ -1561,11 +1562,9 @@ We will account for the value of variable \texttt{global} separately, in a way t
 In particular, we will define a transition system for a single thread as $\mathcal L = \angled{(\mathbb N \times \mathbb B) \times P, \mathcal L_0, \to_{\mathcal L}}$.
 We define the state to include not only the thread-local state $P$ but also the value of \texttt{global} (in $\mathbb N$) and whether the lock is currently taken (in $\mathbb B$, the Booleans, with values $\top$ [true] and $\bot$ [false]).
 There is one designated initial state.
-
 $$\infer{((0, \bot), \mathsf{Lock}) \in \mathcal L_0}{}$$
 
 Four inference rules explain the four transitions between program counters that a single thread can make, reading and writing shared state as needed.
-
 $$\infer{((g, \bot), \mathsf{Lock}) \to_{\mathcal L} ((g, \top), \mathsf{Read})}{}
 \quad \infer{((g, \ell), \mathsf{Read}) \to_{\mathcal L} ((g, \ell), \mathsf{Write}(g))}{}$$
 $$\infer{((g, \ell), \mathsf{Write}(n)) \to_{\mathcal L} ((n+1, \ell), \mathsf{Unlock})}{}

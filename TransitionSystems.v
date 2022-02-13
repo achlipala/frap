@@ -411,17 +411,14 @@ Definition increment2_sys := parallel increment_sys increment_sys.
  * added to the shared counter so far. *)
 Definition contribution_from (pr : increment_program) : nat :=
   match pr with
-  | Unlock => 1
-  | Done => 1
+  | Unlock | Done => 1
   | _ => 0
   end.
 
 (* Second big idea: the program counter also tells us whether a thread holds the lock. *)
 Definition has_lock (pr : increment_program) : bool :=
   match pr with
-  | Read => true
-  | Write _ => true
-  | Unlock => true
+  | Read | Write _ | Unlock => true
   | _ => false
   end.
 
@@ -435,11 +432,9 @@ Definition shared_from_private (pr1 pr2 : increment_program) :=
  * e.g. that they shouldn't both be in the critical section at once. *)
 Definition instruction_ok (self other : increment_program) :=
   match self with
-  | Lock => True
-  | Read => has_lock other = false
+  | Lock | Done => True
+  | Read | Unlock => has_lock other = false
   | Write n => has_lock other = false /\ n = contribution_from other
-  | Unlock => has_lock other = false
-  | Done => True
   end.
 
 (** Now we have the ingredients to state the invariant. *)

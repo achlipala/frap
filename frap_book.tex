@@ -483,7 +483,6 @@ So-called \emph{client code}\index{client code} that relies on queues shouldn't 
 We should be able to formulate ``queue'' as an \emph{abstract data type}\index{abstract data type}, hiding implementation details.
 In the setting of pure functional programming, as in Coq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g. interfaces\index{interface} in Java\index{Java}.
 Type $\mt{t}(\alpha)$ stands for queues holding data values in some type $\alpha$.
-
 \begin{eqnarray*}
   \mt{t}(\alpha) &:& \mt{Set} \\
   \mt{empty} &:& \mt{t}(\alpha) \\
@@ -501,19 +500,16 @@ In normal programming, we stop at this level of detail in defining an abstract d
 However, when we're after formal correctness proofs, we must enrich data types with \emph{specifications}\index{specifications} or ``specs.''\index{specs}  
 One prominent spec style is \emph{algebraic}\index{algebraic specifications}: write out a set of \emph{laws}, quantified equalities that use the operations of the data type.
 For queues, here are two reasonable laws.
-
 $$\begin{array}{l}
   \mt{dequeue}(\mt{empty}) = \cdot \\
   \forall q. \; \mt{dequeue}(q) = \cdot \Rightarrow q = \mt{empty} \\
 \end{array}$$
 
 Actually, the inference-rule notation from last chapter also makes algebraic laws more readable, so here is a restatement.
-
 $$\infer{\mt{dequeue}(\mt{empty}) = \cdot}{}
 \quad \infer{q = \mt{empty}}{\mt{dequeue}(q) = \cdot}$$
 
 One more rule suffices to give a complete characterization of behavior, with the familiar math notation for piecewise functions\index{piecewise functions}.
-
 $$\infer{\mt{dequeue}(\mt{enqueue}(q, x)) = \begin{cases}
     (\mt{empty}, x), & \mt{dequeue}(q) = \cdot \\
     (\mt{enqueue}(q', x), y), & \mt{dequeue}(q) = (q', y)
@@ -628,7 +624,6 @@ Here is how we revise our type signature for queues.
 \end{eqnarray*}
 
 And here are the revised axioms.
-
 $$\infer{\mt{rep}(\mt{empty}) = []}{}
 \quad \infer{\mt{rep}(\mt{enqueue}(q, x)) = \concat{[x]}{\mt{rep}(q)}}{}$$
 
@@ -648,7 +643,6 @@ Here's another classic abstract data type: finite sets\index{finite sets}, where
 \end{eqnarray*}
 
 A few laws characterize expected behavior, with $\top$ and $\bot$ the respective elements ``true'' and ``false'' of $\mathbb B$.
-
 $$\infer{\mt{member}(\mt{empty}, k) = \bot}{}
 \quad \infer{\mt{member}(\mt{add}(s, k), k) = \top}{}
 \quad \infer{\mt{member}(\mt{add}(s, k_1), k_2) = \mt{member}(s, k_2)}{k_1 \neq k_2}$$

@@ -74,8 +74,8 @@ Module Algebraic.
     (* Note that we use identifier [list] alone as a first-class type family,
      * without specifying a parameter explicitly. *)
 
-    (* We follow the convention of enqueuing onto the front of lists and
-     * dequeuing from the back, so the first two operations are just the first
+    (* We follow the convention of enqueuing onto the fronts of lists and
+     * dequeuing from the backs, so the first two operations are just the first
      * two constructors of [list]. *)
     Definition empty A : t A := nil.
     Definition enqueue A (q : t A) (x : A) : t A := x :: q.
@@ -502,7 +502,7 @@ Module AlgebraicWithEquivalenceRelation.
       | x :: dq => Some ({| EnqueueHere := q.(EnqueueHere);
                             DequeueHere := dq |}, x)
       | [] =>
-        (* Out of dequeuable elements.  Reverse enqueued elements
+        (* Ran out of dequeuable elements.  Reverse enqueued elements
          * and transfer to the other stack. *)
         match rev q.(EnqueueHere) with
         | [] => None
@@ -1166,7 +1166,7 @@ Module Type FINITE_SET.
 End FINITE_SET.
 
 (* We want a generic implementation of finite sets, as found in the standard
- * libaries of languages like Java.  However, not just any key set will do.
+ * libraries of languages like Java.  However, not just any key set will do.
  * We need enough computable operations.  One sufficient operation is an
  * equality test. *)
 Module Type SET_WITH_EQUALITY.

@@ -238,7 +238,7 @@ Qed.
 
 (* BEGIN CODE THAT WILL NOT BE EXPLAINED IN DETAIL! *)
 
-Hint Rewrite fact_init_is.
+Local Hint Rewrite fact_init_is.
 
 Ltac model_check_done :=
   apply MscDone; apply prove_oneStepClosure; simplify; propositional; subst;
@@ -508,7 +508,7 @@ Qed.
 
 (* We ask Coq to remember this lemma as a hint, which will be used by the
  * model-checking tactics that we refrain from explaining in detail. *)
-Hint Rewrite add2_init_is.
+Local Hint Rewrite add2_init_is.
 
 (* Now, let's verify the original system. *)
 Theorem add2_ok :

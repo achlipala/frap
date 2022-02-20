@@ -1782,14 +1782,12 @@ For our purposes, the key pay-off from this connection is that we may translate 
 We can apply this theorem to the two example programs from earlier in the section, now imagining that we run two parallel-thread copies of each program, using last chapter's approach to modeling threads with transition systems.
 The concrete system can be represented with thread-local states $\{\mathsf{Read}\} \cup \{\mathsf{Write}(n) \mid n \in \mathbb N\}$ and the abstract system with $\{\mathsf{BRead}\} \cup \{\mathsf{BWrite}(b) \mid b \in \mathbb B\}$, for the Booleans $\mathbb B$.
 We define compatibility between local states.
-
 $$\infer{\mathsf{Read} \sim \mathsf{BRead}}{}
 \quad \infer{\mathsf{Write}(n) \sim \mathsf{BWrite}(b)}{
   n \; \textrm{even} \Leftrightarrow b = \mathsf{true}
 }$$
 
 We also define the overall state simulation relation $R$, which also covers state shared by threads.
-
 $$\infer{(n, (\ell_1, \ell_2)) \; R \; (b, (\ell'_1, \ell'_2))}{
   (n \; \textrm{even} \Leftrightarrow b = \mathsf{true})
   & \ell_1 \sim \ell'_1

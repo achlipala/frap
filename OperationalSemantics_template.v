@@ -360,7 +360,7 @@ Qed.
 (* Automated proofs used here, if only to save time in class.
  * See book code for more manual proofs, too. *)
 
-Hint Constructors trc step eval : core.
+Local Hint Constructors trc step eval : core.
 
 Theorem big_small : forall v c v', eval v c v'
   -> step^* (v, c) (v', Skip).
@@ -430,8 +430,8 @@ Proof.
   assumption.
 Qed.
 
-Hint Constructors isEven : core.
-Hint Resolve isEven_minus2 isEven_plus : core.
+Local Hint Constructors isEven : core.
+Local Hint Resolve isEven_minus2 isEven_plus : core.
 
 Definition my_loop :=
   while "n" loop
@@ -581,7 +581,7 @@ Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
 
 (* We can prove equivalence between the two formulations. *)
 
-Hint Constructors plug step0 cstep : core.
+Local Hint Constructors plug step0 cstep : core.
 
 Theorem step_cstep : forall v c v' c',
   step (v, c) (v', c')
@@ -710,7 +710,7 @@ Definition prog :=
   || ("b" <- "n";;
       "n" <- "b" + 1).
 
-Hint Constructors plug step0 cstep : core.
+Local Hint Constructors plug step0 cstep : core.
 
 (* The naive "expected" answer is attainable. *)
 Theorem correctAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)

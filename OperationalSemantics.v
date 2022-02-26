@@ -463,7 +463,7 @@ Module Simple.
   (* Bonus material: here's how to make these proofs much more automatic.  We
    * won't explain the features being used here. *)
 
-  Hint Constructors trc step eval : core.
+  Local Hint Constructors trc step eval : core.
 
   Lemma step_star_Seq_snazzy : forall v c1 c2 v' c1',
     step^* (v, c1) (v', c1')
@@ -473,7 +473,7 @@ Module Simple.
     cases y; eauto.
   Qed.
 
-  Hint Resolve step_star_Seq_snazzy : core.
+  Local Hint Resolve step_star_Seq_snazzy : core.
 
   Theorem big_small_snazzy : forall v c v', eval v c v'
     -> step^* (v, c) (v', Skip).
@@ -491,7 +491,7 @@ Module Simple.
            end; eauto.
   Qed.
 
-  Hint Resolve small_big''_snazzy : core.
+  Local Hint Resolve small_big''_snazzy : core.
 
   Lemma small_big'_snazzy : forall v c v' c', step^* (v, c) (v', c')
                                               -> forall v'', eval v' c' v''
@@ -501,7 +501,7 @@ Module Simple.
     cases y; eauto.
   Qed.
 
-  Hint Resolve small_big'_snazzy : core.
+  Local Hint Resolve small_big'_snazzy : core.
 
   Theorem small_big_snazzy : forall v c v', step^* (v, c) (v', Skip)
                                      -> eval v c v'.
@@ -688,8 +688,8 @@ Module Simple.
   Qed.
 
   (* That manual proof was quite a pain.  Here's a bonus automated proof. *)
-  Hint Constructors isEven : core.
-  Hint Resolve isEven_minus2 isEven_plus : core.
+  Local Hint Constructors isEven : core.
+  Local Hint Resolve isEven_minus2 isEven_plus : core.
 
   Lemma manually_proved_invariant'_snazzy : forall n,
     isEven n
@@ -866,7 +866,7 @@ Module Simple.
   (* Bonus material: here's how to make these proofs much more automatic.  We
    * won't explain the features being used here. *)
 
-  Hint Constructors plug step0 cstep : core.
+  Local Hint Constructors plug step0 cstep : core.
 
   Theorem step_cstep_snazzy : forall v c v' c',
     step (v, c) (v', c')
@@ -877,7 +877,7 @@ Module Simple.
                      end; eauto.
   Qed.
 
-  Hint Resolve step_cstep_snazzy : core.
+  Local Hint Resolve step_cstep_snazzy : core.
 
   Lemma step0_step_snazzy : forall v c v' c',
     step0 (v, c) (v', c')
@@ -886,7 +886,7 @@ Module Simple.
     invert 1; eauto.
   Qed.
 
-  Hint Resolve step0_step_snazzy : core.
+  Local Hint Resolve step0_step_snazzy : core.
 
   Lemma cstep_step'_snazzy : forall C c0 c,
     plug C c0 c
@@ -899,7 +899,7 @@ Module Simple.
                                end; eauto.
   Qed.
 
-  Hint Resolve cstep_step'_snazzy : core.
+  Local Hint Resolve cstep_step'_snazzy : core.
 
   Theorem cstep_step_snazzy : forall v c v' c',
     cstep (v, c) (v', c')
@@ -961,6 +961,7 @@ Module Simple.
     eassumption.
   Qed.
 End Simple.
+
 
 (** * Example of how easy it is to add concurrency to a contextual semantics *)
 
@@ -1044,7 +1045,7 @@ Module Concurrent.
     || ("b" <- "n";;
         "n" <- "b" + 1).
 
-  Hint Constructors plug step0 cstep : core.
+  Local Hint Constructors plug step0 cstep : core.
 
   (* The naive "expected" answer is attainable. *)
   Theorem correctAnswer : forall n, exists v, cstep^* ($0 $+ ("n", n), prog) (v, Skip)
@@ -1149,7 +1150,7 @@ Module Concurrent.
     step (v, c2) (v', c2')
     -> step (v, Parallel c1 c2) (v', Parallel c1 c2').
 
-  Hint Constructors step : core.
+  Local Hint Constructors step : core.
 
   (* Now, an automated proof of equivalence.  Actually, it's *exactly* the same
    * proof we used for the old feature set! *)
@@ -1163,7 +1164,7 @@ Module Concurrent.
                      end; eauto.
   Qed.
 
-  Hint Resolve step_cstep : core.
+  Local Hint Resolve step_cstep : core.
 
   Lemma step0_step : forall v c v' c',
     step0 (v, c) (v', c')
@@ -1172,7 +1173,7 @@ Module Concurrent.
     invert 1; eauto.
   Qed.
 
-  Hint Resolve step0_step : core.
+  Local Hint Resolve step0_step : core.
 
   Lemma cstep_step' : forall C c0 c,
     plug C c0 c
@@ -1185,7 +1186,7 @@ Module Concurrent.
                                end; eauto.
   Qed.
 
-  Hint Resolve cstep_step' : core.
+  Local Hint Resolve cstep_step' : core.
 
   Theorem cstep_step : forall v c v' c',
     cstep (v, c) (v', c')

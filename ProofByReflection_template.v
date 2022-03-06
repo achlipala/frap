@@ -171,7 +171,7 @@ Proof.
 
   apply multiStepClosure_ok.
   simplify.
-  (* Here we'll see that the Frap libary uses slightly different, optimized
+  (* Here we'll see that the Frap library uses slightly different, optimized
    * versions of the model-checking relations.  For instance, [multiStepClosure]
    * takes an extra set argument, the _worklist_ recording newly discovered
    * states.  There is no point in following edges out of states that were

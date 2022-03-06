@@ -50,7 +50,7 @@ Unset Printing All.
  * theorem.  This Ltac procedure always works (at least on machines with
  * infinite resources), but it has a serious drawback, which we see when we
  * print the proof it generates that 256 is even.  The final proof term has
- * length super-linear in the input value, which we reveal with
+ * length superlinear in the input value, which we reveal with
  * [Set Printing All], to disable all syntactic niceties and show every node of
  * the internal proof AST.  The problem is that each [Even_SS] application needs
  * a choice of [n], and we wind up giving every even number from 0 to 254 in
@@ -59,7 +59,7 @@ Unset Printing All.
  * It is also unfortunate not to have static-typing guarantees that our tactic
  * always behaves appropriately.  Other invocations of similar tactics might
  * fail with dynamic type errors, and we would not know about the bugs behind
- * these errors until we happened to attempt to prove complex enough goals.
+ * these errors until we happened to attempt to prove complex-enough goals.
  *
  * The techniques of proof by reflection address both complaints.  We will be
  * able to write proofs like in the example above with constant size overhead
@@ -290,9 +290,9 @@ Section monoid.
 
   Fixpoint mdenote (me : mexp) : A :=
     match me with
-      | Ident => e
-      | Var v => v
-      | Op me1 me2 => mdenote me1 + mdenote me2
+    | Ident => e
+    | Var v => v
+    | Op me1 me2 => mdenote me1 + mdenote me2
     end.
 
   (* We will normalize expressions by flattening them into lists, via
@@ -301,17 +301,17 @@ Section monoid.
 
   Fixpoint mldenote (ls : list A) : A :=
     match ls with
-      | nil => e
-      | x :: ls' => x + mldenote ls'
+    | nil => e
+    | x :: ls' => x + mldenote ls'
     end.
 
   (* The flattening function itself is easy to implement. *)
 
   Fixpoint flatten (me : mexp) : list A :=
     match me with
-      | Ident => []
-      | Var x => [x]
-      | Op me1 me2 => flatten me1 ++ flatten me2
+    | Ident => []
+    | Var x => [x]
+    | Op me1 me2 => flatten me1 ++ flatten me2
     end.
 
   (* This function has a straightforward correctness proof in terms of our
@@ -344,12 +344,12 @@ Section monoid.
 
   Ltac reify me :=
     match me with
-      | e => Ident
-      | ?me1 + ?me2 =>
+    | e => Ident
+    | ?me1 + ?me2 =>
         let r1 := reify me1 in
         let r2 := reify me2 in
-          constr:(Op r1 r2)
-      | _ => constr:(Var me)
+        constr:(Op r1 r2)
+    | _ => constr:(Var me)
     end.
 
   (* The final [monoid] tactic works on goals that equate two monoid terms.  We
@@ -358,11 +358,11 @@ Section monoid.
 
   Ltac monoid :=
     match goal with
-      | [ |- ?me1 = ?me2 ] =>
+    | [ |- ?me1 = ?me2 ] =>
         let r1 := reify me1 in
         let r2 := reify me2 in
           change (mdenote r1 = mdenote r2);
-            apply monoid_reflect; simplify
+          apply monoid_reflect; simplify
     end.
 
   (* We can make short work of theorems like this one: *)
@@ -416,7 +416,7 @@ Proof.
 
   apply multiStepClosure_ok.
   simplify.
-  (* Here we'll see that the Frap libary uses slightly different, optimized
+  (* Here we'll see that the Frap library uses slightly different, optimized
    * versions of the model-checking relations.  For instance, [multiStepClosure]
    * takes an extra set argument, the _worklist_ recording newly discovered
    * states.  There is no point in following edges out of states that were
@@ -604,8 +604,8 @@ Section my_tauto.
 
   Fixpoint allTrue (s : set propvar) : Prop :=
     match s with
-      | nil => True
-      | v :: s' => atomics v /\ allTrue s'
+    | nil => True
+    | v :: s' => atomics v /\ allTrue s'
     end.
 
   Theorem allTrue_add : forall v s,

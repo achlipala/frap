@@ -110,7 +110,7 @@ Inductive cstep : valuation * cmd -> option nat -> valuation * cmd -> Prop :=
 
 (* To characterize correct compilation, it is helpful to define a relation to
  * capture which output _traces_ a command might generate.  Note that, for us, a
- * trace is a list of output values and/or terminating markers.  We drop silent
+ * trace is a list of output values and/or termination markers.  We drop silent
  * labels as we run, and we use [Some n] for outputting of [n] and [None] for
  * termination. *)
 Inductive generate : valuation * cmd -> list (option nat) -> Prop :=
@@ -463,7 +463,7 @@ Section simulation.
     unfold traceInclusion; eauto using simulation_bwd'.
   Qed.
 
-  (* Put them together and we have trace equivalence. *)
+  (* Put them together, and we have trace equivalence. *)
 
   Theorem simulation : forall vc1 vc2, R vc1 vc2
     -> vc1 =| vc2.
@@ -861,7 +861,7 @@ Proof.
   apply simulation_skipping with (R := fun n vc1 vc2 => fst vc1 = fst vc2
                                                         /\ snd vc2 = cfold (snd vc1)
                                                         /\ countIfs (snd vc1) < n)
-                                   (n := S (countIfs c));
+                                 (n := S (countIfs c));
     simplify; propositional; auto.
 
   invert H0; simplify; subst.
@@ -1053,11 +1053,11 @@ Fixpoint flatten (c : cmd) : cmd :=
 (* Here's what it does on our example. *)
 Compute flatten month_boundaries_in_days.
 
-(* The alert reader may noticed that, yet again, we picked a transformation that
- * our existing simulation relations can't handle directly, at least if we put
- * the original system on the left and the compiled version on the right.  Now
- * we need a single step on the left to be matched by _one or more_ steps on the
- * right. *)
+(* The alert reader may have noticed that, yet again, we picked a transformation
+ * that our existing simulation relations can't handle directly, at least if we
+ * put the original system on the left and the compiled version on the right.
+ * Now we need a single step on the left to be matched by _one or more_ steps on
+ * the right. *)
 Section simulation_multiple.
   (* At least we can remove that pesky numeric parameter of [R]. *)
   Variable R : valuation * cmd -> valuation * cmd -> Prop.

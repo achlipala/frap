@@ -20,7 +20,7 @@ Module Type S.
   Infix "$-" := remove (at level 50, left associativity).
   Infix "$++" := join (at level 50, left associativity).
   Infix "$?" := lookup (at level 50, no associativity).
-  Infix "$<=" := includes (at level 90).
+  Infix "$<=" := includes (at level 75).
 
   Parameter dom : forall A B, fmap A B -> set A.
 

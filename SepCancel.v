@@ -82,7 +82,7 @@ Module Make(Import S : SEP).
     transitivity proved by heq_trans
     as heq_rel.
 
-  Instance himp_heq_mor : Proper (heq ==> heq ==> iff) himp.
+  Global Instance himp_heq_mor : Proper (heq ==> heq ==> iff) himp.
   Proof.
     hnf; intros; hnf; intros.
     apply himp_heq in H; apply himp_heq in H0.
@@ -104,7 +104,7 @@ Module Make(Import S : SEP).
     auto using star_cancel.
   Qed.
 
-  Instance exis_iff_morphism (A : Type) :
+  Global Instance exis_iff_morphism (A : Type) :
     Proper (pointwise_relation A heq ==> heq) (@exis A).
   Proof.
     hnf; intros; apply himp_heq; intuition.
@@ -120,7 +120,7 @@ Module Make(Import S : SEP).
     apply himp_heq in H0; intuition eauto.
   Qed.
 
-  Instance exis_imp_morphism (A : Type) :
+  Global Instance exis_imp_morphism (A : Type) :
     Proper (pointwise_relation A himp ==> himp) (@exis A).
   Proof.
     hnf; intros.

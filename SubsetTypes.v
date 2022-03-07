@@ -536,7 +536,7 @@ Notation "e1 ;; e2" := (if e1 then e2 else ??)
  * [hasType] proof obligation, and [eauto] makes short work of them when we add
  * [hasType]'s constructors as hints. *)
 
-Local Hint Constructors hasType.
+Local Hint Constructors hasType : core.
 
 Definition typeCheck : forall e : exp, {{t | hasType e t}}.
   refine (fix F (e : exp) : {{t | hasType e t}} :=
@@ -589,7 +589,7 @@ Qed.
 (* Now we can define the type-checker.  Its type expresses that it only fails on
  * untypable expressions. *)
 
-Local Hint Resolve hasType_det.
+Local Hint Resolve hasType_det : core.
 (* The lemma [hasType_det] will also be useful for proving proof obligations
  * with contradictory contexts. *)
 

@@ -1091,7 +1091,7 @@ Proof.
   induct s; substring.
 Qed.
 
-Hint Rewrite substring_all substring_none.
+Local Hint Rewrite substring_all substring_none.
 
 Lemma substring_split : forall s m,
   substring 0 m s ++ substring m (length s - m) s = s.
@@ -1115,7 +1115,7 @@ Proof.
   rewrite IHs1; auto.
 Qed.
 
-Hint Rewrite <- minus_n_O.
+Local Hint Rewrite <- minus_n_O.
 
 Lemma substring_app_snd : forall s2 s1 n,
   length s1 = n
@@ -1124,7 +1124,7 @@ Proof.
   induct s1; simplify; subst; simplify; auto.
 Qed.
 
-Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
+Local Hint Rewrite substring_app_fst substring_app_snd using solve [trivial].
 
 (* BOREDOM'S END! *)
 
@@ -1227,7 +1227,7 @@ Proof.
   induct s; substring.
 Qed.
 
-Hint Rewrite app_empty_end.
+Local Hint Rewrite app_empty_end.
 
 Lemma substring_self : forall s n,
   n <= 0
@@ -1243,8 +1243,8 @@ Proof.
   induct s; substring.
 Qed.
 
-Hint Rewrite substring_self substring_empty using linear_arithmetic.
-Hint Rewrite substring_split.
+Local Hint Rewrite substring_self substring_empty using linear_arithmetic.
+Local Hint Rewrite substring_split.
 
 Lemma substring_split' : forall s n m,
   substring n m s ++ substring (n + m) (length s - (n + m)) s
@@ -1308,7 +1308,7 @@ Proof.
   simplify; cases m; simplify; eauto using substring_suffix_emp'.
 Qed.
 
-Hint Rewrite substring_stack substring_stack' substring_suffix using linear_arithmetic.
+Local Hint Rewrite substring_stack substring_stack' substring_suffix using linear_arithmetic.
 
 Lemma minus_minus : forall n m1 m2,
   m1 + m2 <= n
@@ -1322,7 +1322,7 @@ Proof.
   linear_arithmetic.
 Qed.
 
-Hint Rewrite minus_minus plus_n_Sm' using linear_arithmetic.
+Local Hint Rewrite minus_minus plus_n_Sm' using linear_arithmetic.
 
 (* BOREDOM VANQUISHED! *)
 

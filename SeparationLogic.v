@@ -181,7 +181,7 @@ Module Import S <: SEP.
     t.
   Qed.
 
-  Hint Resolve split_empty_bwd' : core.
+  Local Hint Resolve split_empty_bwd' : core.
 
   Theorem extra_lift : forall (P : Prop) p,
     P
@@ -1161,8 +1161,8 @@ Proof.
                          end; cancel.
 Qed.
 
-Hint Rewrite <- rev_alt.
-Hint Rewrite rev_involutive.
+Local Hint Rewrite <- rev_alt.
+Local Hint Rewrite rev_involutive.
 
 (* Let's hide the definition of [linkedList], so that we *only* reason about it
  * via the two lemmas we just proved. *)
@@ -1302,8 +1302,8 @@ Qed.
 Opaque linkedList linkedListSegment.
 
 (* A few algebraic properties of list operations: *)
-Hint Rewrite <- app_assoc.
-Hint Rewrite app_length app_nil_r.
+Local Hint Rewrite <- app_assoc.
+Local Hint Rewrite app_length app_nil_r.
 
 (* We tie a few of them together into this lemma. *)
 Lemma move_along : forall A (ls : list A) x2 x1 x0 x,

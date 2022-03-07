@@ -316,7 +316,7 @@ Proof.
   simplify; subst; auto.
 Qed.
 
-Hint Rewrite <- minus_n_O.
+Local Hint Rewrite <- minus_n_O.
 
 Lemma fact_rec : forall n,
   n > 0
@@ -325,7 +325,7 @@ Proof.
   simplify; cases n; simplify; linear_arithmetic.
 Qed.
 
-Hint Rewrite fact_base fact_rec using linear_arithmetic.
+Local Hint Rewrite fact_base fact_rec using linear_arithmetic.
 
 (* Note the careful choice of loop invariant below.  It may look familiar from
  * earlier chapters' proofs! *)

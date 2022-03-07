@@ -165,7 +165,7 @@ Module Import S <: SEP.
     t.
   Qed.
 
-  Hint Resolve split_empty_bwd' : core.
+  Global Hint Resolve split_empty_bwd' : core.
 
   Theorem extra_lift : forall (P : Prop) p,
     P
@@ -398,7 +398,7 @@ Qed.
 
 
 (* Fancy theorem to help us rewrite within preconditions and postconditions *)
-Instance hoare_triple_morphism : forall A,
+Local Instance hoare_triple_morphism : forall A,
   Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
 Proof.
   Transparent himp.
@@ -542,8 +542,8 @@ Proof.
                          end; cancel.
 Qed.
 
-Hint Rewrite <- rev_alt.
-Hint Rewrite rev_involutive.
+Local Hint Rewrite <- rev_alt.
+Local Hint Rewrite rev_involutive.
 
 (* Let's hide the definition of [linkedList], so that we *only* reason about it
  * via the two lemmas we just proved. *)
@@ -590,8 +590,8 @@ Admitted.
 (* ** Computing the length of a linked list *)
 
 (* A few algebraic properties of list operations: *)
-Hint Rewrite <- app_assoc.
-Hint Rewrite app_length app_nil_r.
+Local Hint Rewrite <- app_assoc.
+Local Hint Rewrite app_length app_nil_r.
 
 (* We tie a few of them together into this lemma. *)
 Lemma move_along : forall A (ls : list A) x2 x1 x0 x,

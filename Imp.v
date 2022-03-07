@@ -90,7 +90,7 @@ Inductive step : valuation * cmd -> valuation * cmd -> Prop :=
   interp e v = 0
   -> step (v, While e body) (v, Skip).
 
-Hint Constructors trc step eval : core.
+Global Hint Constructors trc step eval : core.
 
 Lemma step_star_Seq : forall v c1 c2 v' c1',
   step^* (v, c1) (v', c1')
@@ -100,7 +100,7 @@ Proof.
   cases y; eauto.
 Qed.
 
-Hint Resolve step_star_Seq : core.
+Global Hint Resolve step_star_Seq : core.
 
 Theorem big_small : forall v c v', eval v c v'
   -> step^* (v, c) (v', Skip).
@@ -118,7 +118,7 @@ Proof.
          end; eauto.
 Qed.
 
-Hint Resolve small_big'' : core.
+Global Hint Resolve small_big'' : core.
 
 Lemma small_big' : forall v c v' c', step^* (v, c) (v', c')
                                      -> forall v'', eval v' c' v''
@@ -128,7 +128,7 @@ Proof.
   cases y; eauto.
 Qed.
 
-Hint Resolve small_big' : core.
+Global Hint Resolve small_big' : core.
 
 Theorem small_big : forall v c v', step^* (v, c) (v', Skip)
                                    -> eval v c v'.
@@ -176,7 +176,7 @@ Inductive cstep : valuation * cmd -> valuation * cmd -> Prop :=
   -> plug C c' c2
   -> cstep (v, c1) (v', c2).
 
-Hint Constructors plug step0 cstep : core.
+Global Hint Constructors plug step0 cstep : core.
 
 Theorem step_cstep : forall v c v' c',
   step (v, c) (v', c')
@@ -187,7 +187,7 @@ Proof.
                    end; eauto.
 Qed.
 
-Hint Resolve step_cstep : core.
+Global Hint Resolve step_cstep : core.
 
 Lemma step0_step : forall v c v' c',
   step0 (v, c) (v', c')
@@ -196,7 +196,7 @@ Proof.
   invert 1; eauto.
 Qed.
 
-Hint Resolve step0_step : core.
+Global Hint Resolve step0_step : core.
 
 Lemma cstep_step' : forall C c0 c,
   plug C c0 c
@@ -209,7 +209,7 @@ Proof.
                              end; eauto.
 Qed.
 
-Hint Resolve cstep_step' : core.
+Global Hint Resolve cstep_step' : core.
 
 Theorem cstep_step : forall v c v' c',
   cstep (v, c) (v', c')

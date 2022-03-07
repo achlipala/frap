@@ -769,7 +769,7 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
     cases s; simp; eauto.
   Qed.
 
-  Instance hoare_triple_morphism : forall A,
+  Local Instance hoare_triple_morphism : forall A,
     Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
   Proof.
     Transparent himp.
@@ -874,8 +874,8 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
                            end; cancel.
   Qed.
 
-  Hint Rewrite <- rev_alt.
-  Hint Rewrite rev_involutive.
+  Local Hint Rewrite <- rev_alt.
+  Local Hint Rewrite rev_involutive.
 
   Opaque linkedList.
 

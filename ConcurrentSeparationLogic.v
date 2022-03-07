@@ -474,7 +474,7 @@ Ltac use H := (eapply use_lemma; [ eapply H | cancel; auto ])
 Ltac heq := intros; apply himp_heq; split.
 
 (* Fancy theorem to help us rewrite within preconditions and postconditions *)
-Instance hoare_triple_morphism : forall linvs A,
+Local Instance hoare_triple_morphism : forall linvs A,
   Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple linvs A).
 Proof.
   Transparent himp.

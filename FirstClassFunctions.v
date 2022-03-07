@@ -354,7 +354,7 @@ Proof.
   trivial.
 Qed.
 
-Hint Rewrite dnot_dnot.
+Global Hint Rewrite dnot_dnot.
 
 Lemma map_identity : forall A (f : A -> A) (ls : list A),
     (forall x, x = f x)
@@ -363,7 +363,7 @@ Proof.
   induct ls; simplify; equality.
 Qed.
 
-Hint Rewrite map_identity map_map using assumption.
+Global Hint Rewrite map_identity map_map using assumption.
 
 Lemma map_same : forall A B (f1 f2 : A -> B) ls,
     (forall x, f1 x = f2 x)
@@ -399,9 +399,9 @@ Proof.
   apply filter_same; assumption.
 Qed.
 
-Hint Resolve List_map_same List_filter_same : core.
+Global Hint Resolve List_map_same List_filter_same : core.
 
-Hint Extern 5 (_ = match _ with Bool _ => _ | _ => _ end) =>
+Global Hint Extern 5 (_ = match _ with Bool _ => _ | _ => _ end) =>
     match goal with
     | [ H : forall x : dyn, _ |- _ ] => rewrite <- H
     end : core.
@@ -493,7 +493,7 @@ Proof.
   induct d; simplify; linear_arithmetic.
 Qed.
 
-Hint Immediate dsize_positive : core.
+Global Hint Immediate dsize_positive : core.
 
 Lemma sum_map_monotone : forall A (f1 f2 : A -> nat) ds,
     (forall x, f1 x <= f2 x)

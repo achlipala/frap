@@ -133,17 +133,17 @@ Module Type S.
     lookup (restrict P m) k = Some v
     -> P k.
 
-  Hint Extern 1 => match goal with
+  Global Hint Extern 1 => match goal with
                      | [ H : lookup (empty _ _) _ = Some _ |- _ ] =>
                        rewrite lookup_empty in H; discriminate
                    end : core.
 
-  Hint Resolve includes_lookup includes_add empty_includes : core.
+  Global Hint Resolve includes_lookup includes_add empty_includes : core.
 
-  Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
+  Global Hint Rewrite lookup_empty lookup_add_eq lookup_add_ne lookup_remove_eq lookup_remove_ne
        lookup_merge lookup_restrict_true lookup_restrict_false using congruence.
 
-  Hint Rewrite dom_empty dom_add.
+  Global Hint Rewrite dom_empty dom_add.
 
   Ltac maps_equal :=
     apply fmap_ext; intros;
@@ -152,17 +152,17 @@ Module Type S.
           | [ |- context[lookup (add _ ?k _) ?k' ] ] => destruct (classic (k = k')); subst
         end).
 
-  Hint Extern 3 (_ = _) => maps_equal : core.
+  Global Hint Extern 3 (_ = _) => maps_equal : core.
 
   Axiom lookup_split : forall A B (m : fmap A B) k v k' v',
     (m $+ (k, v)) $? k' = Some v'
     -> (k' <> k /\ m $? k' = Some v') \/ (k' = k /\ v' = v).
 
-  Hint Rewrite merge_empty1 merge_empty2 using solve [ eauto 1 ].
-  Hint Rewrite merge_empty1_alt merge_empty2_alt using congruence.
+  Global Hint Rewrite merge_empty1 merge_empty2 using solve [ eauto 1 ].
+  Global Hint Rewrite merge_empty1_alt merge_empty2_alt using congruence.
 
-  Hint Rewrite merge_add1 using solve [ eauto | unfold Sets.In; autorewrite with core in *; simpl in *; try (normalize_set; simpl); intuition congruence ].
-  Hint Rewrite merge_add1_alt using solve [ congruence | unfold Sets.In; autorewrite with core in *; simpl in *; try (normalize_set; simpl); intuition congruence ].
+  Global Hint Rewrite merge_add1 using solve [ eauto | unfold Sets.In; autorewrite with core in *; simpl in *; try (normalize_set; simpl); intuition congruence ].
+  Global Hint Rewrite merge_add1_alt using solve [ congruence | unfold Sets.In; autorewrite with core in *; simpl in *; try (normalize_set; simpl); intuition congruence ].
 
   Axiom includes_intro : forall K V (m1 m2 : fmap K V),
       (forall k v, m1 $? k = Some v -> m2 $? k = Some v)
@@ -267,9 +267,9 @@ Module Type S.
       -> disjoint h3 h2.
   End splitting.
 
-  Hint Immediate disjoint_comm split_comm : core.
-  Hint Immediate split_empty_bwd disjoint_hemp disjoint_hemp' split_assoc1 split_assoc2 : core.
-  Hint Immediate disjoint_assoc1 disjoint_assoc2 split_join split_disjoint disjoint_assoc3 : core.
+  Global Hint Immediate disjoint_comm split_comm : core.
+  Global Hint Immediate split_empty_bwd disjoint_hemp disjoint_hemp' split_assoc1 split_assoc2 : core.
+  Global Hint Immediate disjoint_assoc1 disjoint_assoc2 split_join split_disjoint disjoint_assoc3 : core.
 End S.
 
 Module M : S.

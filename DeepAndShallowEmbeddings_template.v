@@ -14,7 +14,7 @@ Local Hint Extern 1 (@eq nat _ _) => linear_arithmetic : core.
 
 Example h0 : heap := $0 $+ (0, 2) $+ (1, 1) $+ (2, 8) $+ (3, 6).
 
-Hint Rewrite max_l max_r using linear_arithmetic : core.
+Local Hint Rewrite max_l max_r using linear_arithmetic : core.
 
 Ltac simp := repeat (simplify; subst; propositional;
                      try match goal with
@@ -1044,7 +1044,7 @@ Module DeeperWithFail.
     reflexivity.
   Qed.
 
-  Hint Rewrite firstn_nochange fold_left_firstn using linear_arithmetic : core.
+  Local Hint Rewrite firstn_nochange fold_left_firstn using linear_arithmetic : core.
 
   Theorem heapfold_ok : forall {A : Set} (init : A) combine
                                (ls : list nat) (f : A -> nat -> A),

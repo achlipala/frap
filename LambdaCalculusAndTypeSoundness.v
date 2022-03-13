@@ -312,7 +312,7 @@ Module Ulc.
 
   (* Function application (called "beta reduction") is the big rule here. *)
   Inductive step : exp -> exp -> Prop :=
-  | ContextBeta : forall x e v,
+  | Beta : forall x e v,
     value v
     -> step (App (Abs x e) v) (subst v x e)
 

@@ -279,7 +279,7 @@ Module Ulc.
   (** * Small-step semantics *)
 
   Inductive step : exp -> exp -> Prop :=
-  | ContextBeta : forall x e v,
+  | Beta : forall x e v,
     value v
     -> step (App (Abs x e) v) (subst v x e)
 

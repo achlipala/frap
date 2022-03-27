@@ -3567,7 +3567,7 @@ We begin by copying over the two basic-step rules from last chapter, threading t
 $$\infer{\smallstepo{(h, (\lambda x. \; e) \; v)}{(h, \subst{e}{x}{v})}}{}
 \quad \infer{\smallstepo{(h, n + m)}{(h, n \textbf{+} m)}}{}$$
 
-To write out the rules that are specific to references, it's helpful to extend our language syntax with a form that will never appear in original programs, but which does show up at intermediate execution steps.
+To write out the rules that are specific to references, it's helpful to extend our language syntax with a form that will never appear in original programs but which does show up at intermediate execution steps.
 In particular, let's add an expression form for \emph{locations}\index{locations}, the runtime values of references, and let's say that locations also count as values.
 $$\begin{array}{rrcl}
   \textrm{Locations} & \ell &\in& \mathbb N \\
@@ -3600,7 +3600,7 @@ As a small exercise for the reader, it may be worth using this judgment to deriv
 Even fixing the empty heap in the starting state, there is some nondeterminism in which final heap it returns: the possibilities are all the single-location heaps, mapping their single locations to value 1.
 It is natural to allow this nondeterminism in allocation, since typical memory allocators in real systems don't give promises about predictability in the addresses that they return.
 However, we will be able to prove that, for instance, any program returning a number \emph{gives the same answer, independently of nondeterministic choices made by the allocator}.
-That property is not true in programming languages like C\index{C programming language} that are not \emph{memory safe}\index{memory safety}, as they allow arithmetic and comparisons on pointers\index{pointers}, the closest C equivalent of our references.
+That property is not true in programming languages like C\index{C programming language} that are not \emph{memory-safe}\index{memory safety}, as they allow arithmetic and comparisons on pointers\index{pointers}, the closest C equivalent of our references.
 
 
 \section{Type Soundness}

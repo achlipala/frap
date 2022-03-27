@@ -16,8 +16,8 @@ Set Asymmetric Patterns.
 
 Definition pred (n : nat) : nat :=
   match n with
-    | O => O
-    | S n' => n'
+  | O => O
+  | S n' => n'
   end.
 
 Extraction pred.
@@ -124,8 +124,8 @@ Notation "[|| x ||]" := (inleft _ [x]).
 (** * Monadic Notations *)
 
 Notation "x <- e1 ; e2" := (match e1 with
-                             | Unknown => ??
-                             | Found x _ => e2
+                            | Unknown => ??
+                            | Found x _ => e2
                            end)
 (right associativity, at level 60).
 
@@ -145,8 +145,8 @@ Admitted.
 
 
 Notation "x <-- e1 ; e2" := (match e1 with
-                               | inright _ => !!
-                               | inleft (exist x _) => e2
+                             | inright _ => !!
+                             | inleft (exist x _) => e2
                              end)
 (right associativity, at level 60).
 

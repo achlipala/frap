@@ -47,8 +47,8 @@ Qed.
 
 Definition pred_strong1 (n : nat) : n > 0 -> nat :=
   match n with
-    | O => fun pf : 0 > 0 => match zgtz pf with end
-    | S n' => fun _ => n'
+  | O => fun pf : 0 > 0 => match zgtz pf with end
+  | S n' => fun _ => n'
   end.
 
 (* We expand the type of [pred] to include a _proof_ that its argument [n] is
@@ -76,8 +76,8 @@ Compute pred_strong1 two_gt0.
 
 Fail Definition pred_strong1' (n : nat) (pf : n > 0) : nat :=
   match n with
-    | O => match zgtz pf with end
-    | S n' => n'
+  | O => match zgtz pf with end
+  | S n' => n'
   end.
 
 (* The term [zgtz pf] fails to type-check.  Somehow the type checker has failed
@@ -99,8 +99,8 @@ Fail Definition pred_strong1' (n : nat) (pf : n > 0) : nat :=
 
 Definition pred_strong1' (n : nat) : n > 0 -> nat :=
   match n return n > 0 -> nat with
-    | O => fun pf : 0 > 0 => match zgtz pf with end
-    | S n' => fun _ => n'
+  | O => fun pf : 0 > 0 => match zgtz pf with end
+  | S n' => fun _ => n'
   end.
 
 (* By making explicit the functional relationship between value [n] and the
@@ -134,8 +134,8 @@ Locate "{ _ : _ | _ }".
 
 Definition pred_strong2 (s : {n : nat | n > 0} ) : nat :=
   match s with
-    | exist O pf => match zgtz pf with end
-    | exist (S n') _ => n'
+  | exist O pf => match zgtz pf with end
+  | exist (S n') _ => n'
   end.
 
 (* To build a value of a subset type, we use the [exist] constructor, and the
@@ -165,8 +165,8 @@ Extraction pred_strong2.
 
 Definition pred_strong3 (s : {n : nat | n > 0}) : {m : nat | proj1_sig s = S m} :=
   match s return {m : nat | proj1_sig s = S m} with
-    | exist 0 pf => match zgtz pf with end
-    | exist (S n') pf => exist _ n' (eq_refl _)
+  | exist 0 pf => match zgtz pf with end
+  | exist (S n') pf => exist _ n' (eq_refl _)
   end.
 
 Compute pred_strong3 (exist _ 2 two_gt0).
@@ -197,8 +197,8 @@ Extraction pred_strong3.
 Definition pred_strong4 : forall (n : nat), n > 0 -> {m : nat | n = S m}.
   refine (fun n =>
     match n with
-      | O => fun _ => False_rec _ _
-      | S n' => fun _ => exist _ n' _
+    | O => fun _ => False_rec _ _
+    | S n' => fun _ => exist _ n' _
     end).
 
   (* We build [pred_strong4] using tactic-based proving, beginning with a
@@ -222,8 +222,8 @@ Definition pred_strong4 : forall (n : nat), n > 0 -> {m : nat | n = S m}.
   Undo.
   refine (fun n =>
     match n with
-      | O => fun _ => False_rec _ _
-      | S n' => fun _ => exist _ n' _
+    | O => fun _ => False_rec _ _
+    | S n' => fun _ => exist _ n' _
     end); equality || linear_arithmetic.
 Defined.
 
@@ -252,8 +252,8 @@ Notation "[ e ]" := (exist _ e _).
 Definition pred_strong5 : forall (n : nat), n > 0 -> {m : nat | n = S m}.
   refine (fun n =>
     match n with
-      | O => fun _ => !
-      | S n' => fun _ => [n']
+    | O => fun _ => !
+    | S n' => fun _ => [n']
     end); equality || linear_arithmetic.
 Defined.
 
@@ -297,9 +297,9 @@ Notation "'Reduce' x" := (if x then Yes else No) (at level 50).
 Definition eq_nat_dec : forall n m : nat, {n = m} + {n <> m}.
   refine (fix f (n m : nat) : {n = m} + {n <> m} :=
     match n, m with
-      | O, O => Yes
-      | S n', S m' => Reduce (f n' m')
-      | _, _ => No
+    | O, O => Yes
+    | S n', S m' => Reduce (f n' m')
+    | _, _ => No
     end); equality.
 Defined.
 
@@ -349,8 +349,8 @@ Section In_dec.
   Definition In_dec : forall (x : A) (ls : list A), {In x ls} + {~ In x ls}.
     refine (fix f (x : A) (ls : list A) : {In x ls} + {~ In x ls} :=
       match ls with
-	| nil => No
-	| x' :: ls' => A_eq_dec x x' || f x ls'
+      | nil => No
+      | x' :: ls' => A_eq_dec x x' || f x ls'
       end); simplify; equality.
   Defined.
 End In_dec.
@@ -391,8 +391,8 @@ Notation "[| x |]" := (Found _ x _).
 Definition pred_strong7 : forall n : nat, {{m | n = S m}}.
   refine (fun n =>
     match n return {{m | n = S m}} with
-      | O => ??
-      | S n' => [|n'|]
+    | O => ??
+    | S n' => [|n'|]
     end); trivial.
 Defined.
 
@@ -422,8 +422,8 @@ Notation "[|| x ||]" := (inleft _ [x]).
 Definition pred_strong8 : forall n : nat, {m : nat | n = S m} + {n = 0}.
   refine (fun n =>
     match n with
-      | O => !!
-      | S n' => [||n'||]
+    | O => !!
+    | S n' => [||n'||]
     end); trivial.
 Defined.
 
@@ -466,8 +466,8 @@ Defined.
  * similarly straightforward version of this function. *)
 
 Notation "x <-- e1 ; e2" := (match e1 with
-                               | inright _ => !!
-                               | inleft (exist x _) => e2
+                             | inright _ => !!
+                             | inleft (exist x _) => e2
                              end)
 (right associativity, at level 60).
 
@@ -541,20 +541,20 @@ Local Hint Constructors hasType : core.
 Definition typeCheck : forall e : exp, {{t | hasType e t}}.
   refine (fix F (e : exp) : {{t | hasType e t}} :=
     match e return {{t | hasType e t}} with
-      | Nat _ => [|TNat|]
-      | Plus e1 e2 =>
-        t1 <- F e1;
-        t2 <- F e2;
-        eq_type_dec t1 TNat;;
-        eq_type_dec t2 TNat;;
-        [|TNat|]
-      | Bool _ => [|TBool|]
-      | And e1 e2 =>
-        t1 <- F e1;
-        t2 <- F e2;
-        eq_type_dec t1 TBool;;
-        eq_type_dec t2 TBool;;
-        [|TBool|]
+    | Nat _ => [|TNat|]
+    | Plus e1 e2 =>
+      t1 <- F e1;
+      t2 <- F e2;
+      eq_type_dec t1 TNat;;
+      eq_type_dec t2 TNat;;
+      [|TNat|]
+    | Bool _ => [|TBool|]
+    | And e1 e2 =>
+      t1 <- F e1;
+      t2 <- F e2;
+      eq_type_dec t1 TBool;;
+      eq_type_dec t2 TBool;;
+      [|TBool|]
     end); subst; eauto.
 Defined.
 

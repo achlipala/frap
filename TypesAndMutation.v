@@ -311,7 +311,7 @@ Module References.
     end.
   Qed.
 
-  (* Now, a series of lemmas essentially copied from original type-soundness
+  (* Now, a series of lemmas essentially copied from the original type-soundness
    * proof. *)
 
   Lemma weakening_override : forall (G G' : fmap var type) x t,

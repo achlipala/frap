@@ -515,13 +515,13 @@ Admitted.
  * memory. *)
 Fixpoint linkedList (p : nat) (ls : list nat) :=
   match ls with
-    | nil => [| p = 0 |]
-      (* An empty list is associated with a null pointer and no memory
-       * contents. *)
-    | x :: ls' => [| p <> 0 |]
-                  * exists p', p |--> [x; p'] * linkedList p' ls'
-      (* A nonempty list is associated with a nonnull pointer and a two-cell
-       * struct, which points to a further list. *)
+  | nil => [| p = 0 |]
+    (* An empty list is associated with a null pointer and no memory
+     * contents. *)
+  | x :: ls' => [| p <> 0 |]
+                * exists p', p |--> [x; p'] * linkedList p' ls'
+    (* A nonempty list is associated with a nonnull pointer and a two-cell
+     * struct, which points to a further list. *)
   end%sep.
 
 (* The definition of [linkedList] is recursive in the list.  Let's also prove

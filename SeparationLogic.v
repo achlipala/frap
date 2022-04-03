@@ -908,7 +908,7 @@ Proof.
 Qed.
 
 (* Fancy theorem to help us rewrite within preconditions and postconditions *)
-Instance hoare_triple_morphism : forall A,
+Global Instance hoare_triple_morphism : forall A,
   Proper (heq ==> eq ==> (eq ==> heq) ==> iff) (@hoare_triple A).
 Proof.
   Transparent himp.
@@ -1133,13 +1133,13 @@ Qed.
  * memory. *)
 Fixpoint linkedList (p : nat) (ls : list nat) :=
   match ls with
-    | nil => [| p = 0 |]
-      (* An empty list is associated with a null pointer and no memory
-       * contents. *)
-    | x :: ls' => [| p <> 0 |]
-                  * exists p', p |--> [x; p'] * linkedList p' ls'
-      (* A nonempty list is associated with a nonnull pointer and a two-cell
-       * struct, which points to a further list. *)
+  | nil => [| p = 0 |]
+    (* An empty list is associated with a null pointer and no memory
+     * contents. *)
+  | x :: ls' => [| p <> 0 |]
+                * exists p', p |--> [x; p'] * linkedList p' ls'
+    (* A nonempty list is associated with a nonnull pointer and a two-cell
+     * struct, which points to a further list. *)
   end%sep.
 
 (* The definition of [linkedList] is recursive in the list.  Let's also prove
@@ -1266,8 +1266,8 @@ Qed.
  * *list segments* that end with some pointer beside null. *)
 Fixpoint linkedListSegment (p : nat) (ls : list nat) (q : nat) :=
   match ls with
-    | nil => [| p = q |]
-    | x :: ls' => [| p <> 0 |] * exists p', p |--> [x; p'] * linkedListSegment p' ls' q
+  | nil => [| p = q |]
+  | x :: ls' => [| p <> 0 |] * exists p', p |--> [x; p'] * linkedListSegment p' ls' q
   end%sep.
 
 (* Next, two [linkedListSegment] lemmas analogous to those for [linkedList]

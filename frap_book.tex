@@ -4989,7 +4989,7 @@ $$\begin{array}{rrcl}
   \textrm{Commands} & c &::=& \mt{Fail} \mid \mt{Return} \; v \mid x \leftarrow c; c \mid \mt{Read} \; a \mid \mt{Write} \; a \; v \mid \mt{Lock} \; a \mid \mt{Unlock} \; a \mid c || c
 \end{array}$$
 
-In addition to the basic structure of the languages from the last two chapters, we have three features specific to concurrency.
+In addition to the basic structure of the languages from Chapters \ref{embeddings} and \ref{seplog}, we have three features specific to concurrency.
 We follow the common ``threads and locks''\index{locks} style of synchronization, with commands $\mt{Lock} \; a$ and $\mt{Unlock} \; a$ for acquiring and releasing locks, respectively.
 We also have $c_1 || c_2$ for running commands $c_1$ and $c_2$ in parallel, giving a scheduler free reign to interleave their atomic steps.
 
@@ -5180,7 +5180,7 @@ Given a next atomic action and a summary of another thread, it is now easy to de
 
 \newcommand{\pors}[1]{\mt{porSafe}(#1)}
 
-With these ingredients, we can define a predicate $\mt{porSafe}$ that figures out when a state is eligible for the partial-order reduction optimization, which is to force the first thread to run next, ignoring the other threads for now.
+With these ingredients, we can define a predicate $\mt{porSafe}$ that figures out when a state is eligible for the partial-order-reduction optimization, which is to force the first thread to run next, ignoring the other threads for now.
 In working out the formal details, we will confine ourselves to commands $c_1 || c_2$ with distinguished ``first threads'' $c_1$, though everything can be generalized to other settings (and doing that generalization could be a worthwhile exercise for the reader, though it requires a lot of logical bookkeeping).
 This optimization is only safe when the first thread can take a step and when that step commutes with any action that other threads (combined into $c_2$) might perform.
 Formally, we define $\pors{h, l, c_1, c_2, s}$ as follows, where $s$ should be a valid summary of $c_2$.
@@ -5243,7 +5243,7 @@ With these ingredients, we can state the reduction theorem.
 \begin{proof}
   Setting $c = c_1 || c_2$, we assume for the sake of contradiction that there exists some derivation $\smallsteps{(h, l, c)}{(h', l', c')}$, where $\neg \natf{h', l', c'}$.
   First, since $c$ runs in bounded time, by Lemma \ref{completion}, we can \emph{complete} that execution to continue running to some $(h'', l'', c'')$, which is a stuck state.
-  By Lemma \ref{stillFailing}, $\neg \natf{h'', l'', c''}$.
+  By Lemma \ref{stillFailing}, $\neg \natf{c''}$.
   Next, we conclude that there exists $i$ such that $(h, l, c) \to^i (h'', l'', c'')$.
   By Lemma \ref{translate_trace}, there exist $h'''$, $l'''$, and $c'''$ where $\smallstepsC{(h, l, c_1 || c_2)}{s}{(h''', l''', c''')}$ and $\neg \natf{c'''}$.
   These facts contradict our assumption that $\mt{natf}$ is an invariant of $\mathbb T_C(h, l, c_1, c_2, s)$.
@@ -5308,7 +5308,7 @@ A good liveness property for that system could be that, whenever the producer en
 Our general treatment of partial-order reduction is parameterized on some property $\phi$ over states, and it may be safety, liveness, or a combination of the two.
 
 Every state $s$ of the transition system has an associated set $\mathcal E(s)$ of identifiers for threads that are enabled to run in $s$.
-The partial-order reduction optimization conceptually is based on picking a function $\mathcal A$, mapping each state $s$ to an \emph{ample set}\index{ample sets} $\mathcal A(s)$ of threads to consider in state-space exploration.
+The partial-order-reduction optimization conceptually is based on picking a function $\mathcal A$, mapping each state $s$ to an \emph{ample set}\index{ample sets} $\mathcal A(s)$ of threads to consider in state-space exploration.
 A few eligibility criteria apply, for every state $s$.
 
 \begin{description}

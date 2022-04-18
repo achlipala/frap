@@ -524,7 +524,7 @@ Definition commutes (c : cmd) (s : summary) : Prop :=
   end.
 
 (* Now the new semantics: *)
-Inductive stepC (s : summary)  : heap * locks * cmd -> heap * locks * cmd -> Prop :=
+Inductive stepC (s : summary) : heap * locks * cmd -> heap * locks * cmd -> Prop :=
 
 (* It is always OK to let the first thread run. *)
 | StepFirst : forall h l c1 h' l' c1' c2,

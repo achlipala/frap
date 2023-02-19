@@ -352,7 +352,7 @@ Ltac notHyp P :=
  * levels out from where we are.  [first] applies the first tactic that does not
  * fail. *)
 
-(* This tactic adds a fact to the context, only if it is not not already
+(* This tactic adds a fact to the context, only if it is not already
  * present. *)
 
 Ltac extend pf :=

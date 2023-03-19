@@ -477,25 +477,25 @@ Module Stlc.
    * (not to be confused with evaluation contexts) to map free variables to
    * their types.  Free variables are those that don't refer to enclosing [Abs]
    * binders. *)
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2.
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2.
 
-  Local Hint Constructors value step hasty : core.
+  Local Hint Constructors value step has_ty : core.
 
   (* Some notation to make it more pleasant to write programs *)
   Infix "-->" := Fun (at level 60, right associativity).
@@ -507,22 +507,22 @@ Module Stlc.
 
   (* Some examples of typed programs *)
 
-  Example one_plus_one : hasty $0 (1 ^+^ 1) Nat.
+  Example one_plus_one : has_ty $0 (1 ^+^ 1) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example add : hasty $0 (\"n", \"m", "n" ^+^ "m") (Nat --> Nat --> Nat).
+  Example add : has_ty $0 (\"n", \"m", "n" ^+^ "m") (Nat --> Nat --> Nat).
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example eleven : hasty $0 ((\"n", \"m", "n" ^+^ "m") @ 7 @ 4) Nat.
+  Example eleven : has_ty $0 ((\"n", \"m", "n" ^+^ "m") @ 7 @ 4) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example seven_the_long_way : hasty $0 ((\"x", "x") @ (\"x", "x") @ 7) Nat.
+  Example seven_the_long_way : has_ty $0 ((\"x", "x") @ (\"x", "x") @ 7) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
@@ -542,7 +542,7 @@ Module Stlc.
   (* Now we're ready for the first of the two key properties to establish that
    * invariant: well-typed programs are never stuck. *)
   Lemma progress : forall e t,
-    hasty $0 e t
+    has_ty $0 e t
     -> unstuck e.
   Proof.
     unfold unstuck; induct 1; simplify; try equality.
@@ -556,10 +556,10 @@ Module Stlc.
     (* Some automation is needed here to maintain compatibility with
      * name generation in different Coq versions. *)
     match goal with
-    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    | [ H1 : value e1, H2 : has_ty $0 e1 _ |- _ ] => invert H1; invert H2
     end.
     match goal with
-    | [ H1 : value e2, H2 : hasty $0 e2 _ |- _ ] => invert H1; invert H2
+    | [ H1 : value e2, H2 : has_ty $0 e2 _ |- _ ] => invert H1; invert H2
     end.
     exists (Const (n + n0)).
     constructor.
@@ -596,7 +596,7 @@ Module Stlc.
 
     right.
     match goal with
-    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    | [ H1 : value e1, H2 : has_ty $0 e1 _ |- _ ] => invert H1; invert H2
     end.
     exists (subst e2 x e0).
     constructor.
@@ -643,9 +643,9 @@ Module Stlc.
   (* This lemma lets us transplant a typing derivation into a new context that
    * includes the old one. *)
   Lemma weakening : forall G e t,
-    hasty G e t
+    has_ty G e t
     -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
     induct 1; simplify.
 
@@ -656,28 +656,28 @@ Module Stlc.
     constructor.
 
     constructor.
-    apply IHhasty1.
+    apply IHhas_ty1.
     assumption.
-    apply IHhasty2.
+    apply IHhas_ty2.
     assumption.
 
     constructor.
-    apply IHhasty.
+    apply IHhas_ty.
     apply weakening_override.
     assumption.
 
     econstructor.
-    apply IHhasty1.
+    apply IHhas_ty1.
     assumption.
-    apply IHhasty2.
+    apply IHhas_ty2.
     assumption.
   Qed.
 
   (* Replacing a variable with a properly typed term preserves typing. *)
   Lemma substitution : forall G x t' e t e',
-    hasty (G $+ (x, t')) e t
-    -> hasty $0 e' t'
-    -> hasty G (subst e' x e) t.
+    has_ty (G $+ (x, t')) e t
+    -> has_ty $0 e' t'
+    -> has_ty G (subst e' x e) t.
   Proof.
     induct 1; simplify.
 
@@ -697,8 +697,8 @@ Module Stlc.
     constructor.
 
     constructor.
-    eapply IHhasty1; equality.
-    eapply IHhasty2; equality.
+    eapply IHhas_ty1; equality.
+    eapply IHhas_ty2; equality.
 
     cases (x0 ==v x).
 
@@ -715,20 +715,20 @@ Module Stlc.
     assumption.
 
     constructor.
-    eapply IHhasty.
+    eapply IHhas_ty.
     maps_equal.
     assumption.
 
     econstructor.
-    eapply IHhasty1; equality.
-    eapply IHhasty2; equality.
+    eapply IHhas_ty1; equality.
+    eapply IHhas_ty2; equality.
   Qed.
 
   (* OK, now we're almost done.  Full steps really do preserve typing! *)
   Lemma preservation : forall e1 e2,
     step e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
+    -> forall t, has_ty $0 e1 t
+      -> has_ty $0 e2 t.
   Proof.
     induct 1; simplify.
 
@@ -770,7 +770,7 @@ Module Stlc.
    * presented from scratch as a proof technique, it turns out that the two key
    * properties, progress and preservation, are just instances of the same methods
    * we've been applying all along with invariants of transition systems! *)
-  Theorem safety : forall e t, hasty $0 e t
+  Theorem safety : forall e t, has_ty $0 e t
     -> invariantFor (trsys_of e) unstuck.
   Proof.
     simplify.
@@ -778,7 +778,7 @@ Module Stlc.
     (* Step 1: strengthen the invariant.  In particular, the typing relation is
      * exactly the right stronger invariant!  Our progress theorem proves the
      * required invariant inclusion. *)
-    apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t).
+    apply invariant_weaken with (invariant1 := fun e' => has_ty $0 e' t).
 
     (* Step 2: apply invariant induction, whose induction step turns out to match
      * our preservation theorem exactly! *)
@@ -805,14 +805,14 @@ Module Stlc.
              | [ H : Some _ = Some _ |- _ ] => invert H
 
              | [ H : step _ _ |- _ ] => invert1 H
-             | [ H : hasty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
-             | [ H : hasty _ _ _ |- _ ] => invert1 H
+             | [ H : has_ty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
+             | [ H : has_ty _ _ _ |- _ ] => invert1 H
              end; subst.
 
   Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 6.
 
   Lemma progress_snazzy : forall e t,
-    hasty $0 e t
+    has_ty $0 e t
     -> value e
     \/ (exists e' : exp, step e e').
   Proof.
@@ -822,9 +822,9 @@ Module Stlc.
   Local Hint Resolve weakening_override : core.
 
   Lemma weakening_snazzy : forall G e t,
-    hasty G e t
+    has_ty G e t
     -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
     induct 1; t.
   Qed.
@@ -833,20 +833,20 @@ Module Stlc.
 
   (* Replacing a typing context with an equal one has no effect (useful to guide
    * proof search as a hint). *)
-  Lemma hasty_change : forall G e t,
-    hasty G e t
+  Lemma has_ty_change : forall G e t,
+    has_ty G e t
     -> forall G', G' = G
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
     t.
   Qed.
 
-  Local Hint Resolve hasty_change : core.
+  Local Hint Resolve has_ty_change : core.
 
   Lemma substitution_snazzy : forall G x t' e t e',
-    hasty (G $+ (x, t')) e t
-    -> hasty $0 e' t'
-    -> hasty G (subst e' x e) t.
+    has_ty (G $+ (x, t')) e t
+    -> has_ty $0 e' t'
+    -> has_ty G (subst e' x e) t.
   Proof.
     induct 1; t.
   Qed.
@@ -855,21 +855,21 @@ Module Stlc.
 
   Lemma preservation_snazzy : forall e1 e2,
     step e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
+    -> forall t, has_ty $0 e1 t
+      -> has_ty $0 e2 t.
   Proof.
     induct 1; t.
   Qed.
 
   Local Hint Resolve progress_snazzy preservation_snazzy : core.
 
-  Theorem safety_snazzy : forall e t, hasty $0 e t
+  Theorem safety_snazzy : forall e t, has_ty $0 e t
     -> invariantFor (trsys_of e)
                     (fun e' => value e'
                                \/ exists e'', step e' e'').
   Proof.
     simplify.
-    apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t); eauto.
+    apply invariant_weaken with (invariant1 := fun e' => has_ty $0 e' t); eauto.
     apply invariant_induction; simplify; eauto; equality.
   Qed.
 End Stlc.

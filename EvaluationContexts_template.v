@@ -80,25 +80,25 @@ Module Stlc.
   | Nat                  (* Numbers *)
   | Fun (dom ran : type) (* Functions *).
 
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2.
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2.
 
-  Local Hint Constructors value plug step0 step hasty : core.
+  Local Hint Constructors value plug step0 step has_ty : core.
 
   (** * Now we adapt the automated proof of type soundness. *)
 
@@ -110,15 +110,15 @@ Module Stlc.
 
              | [ H : step _ _ |- _ ] => invert H
              | [ H : step0 _ _ |- _ ] => invert1 H
-             | [ H : hasty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
-             | [ H : hasty _ _ _ |- _ ] => invert1 H
+             | [ H : has_ty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H
+             | [ H : has_ty _ _ _ |- _ ] => invert1 H
              | [ H : plug _ _ _ |- _ ] => invert1 H
              end; subst.
 
   Ltac t := simplify; propositional; repeat (t0; simplify); try equality; eauto 6.
 
   Lemma progress : forall e t,
-    hasty $0 e t
+    has_ty $0 e t
     -> value e
     \/ (exists e' : exp, step e e').
   Proof.
@@ -137,29 +137,29 @@ Module Stlc.
   Local Hint Resolve weakening_override : core.
 
   Lemma weakening : forall G e t,
-    hasty G e t
+    has_ty G e t
     -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
     induct 1; t.
   Qed.
 
   Local Hint Resolve weakening : core.
 
-  Lemma hasty_change : forall G e t,
-    hasty G e t
+  Lemma has_ty_change : forall G e t,
+    has_ty G e t
     -> forall G', G' = G
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
     t.
   Qed.
 
-  Local Hint Resolve hasty_change : core.
+  Local Hint Resolve has_ty_change : core.
 
   Lemma substitution : forall G x t' e t e',
-    hasty (G $+ (x, t')) e t
-    -> hasty $0 e' t'
-    -> hasty G (subst e' x e) t.
+    has_ty (G $+ (x, t')) e t
+    -> has_ty $0 e' t'
+    -> has_ty G (subst e' x e) t.
   Proof.
     induct 1; t.
   Qed.
@@ -168,8 +168,8 @@ Module Stlc.
 
   Lemma preservation0 : forall e1 e2,
     step0 e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
+    -> forall t, has_ty $0 e1 t
+      -> has_ty $0 e2 t.
   Proof.
     invert 1; t.
   Qed.
@@ -180,8 +180,8 @@ Module Stlc.
       plug C e1 e1'
       -> forall e2 e2' t, plug C e2 e2'
       -> step0 e1 e2
-      -> hasty $0 e1' t
-      -> hasty $0 e2' t.
+      -> has_ty $0 e1' t
+      -> has_ty $0 e2' t.
   Proof.
     induct 1; t.
   Qed.
@@ -190,21 +190,21 @@ Module Stlc.
   
   Lemma preservation : forall e1 e2,
     step e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
+    -> forall t, has_ty $0 e1 t
+      -> has_ty $0 e2 t.
   Proof.
     invert 1; t.
   Qed.
 
   Local Hint Resolve progress preservation : core.
 
-  Theorem safety : forall e t, hasty $0 e t
+  Theorem safety : forall e t, has_ty $0 e t
     -> invariantFor (trsys_of e)
                     (fun e' => value e'
                                \/ exists e'', step e' e'').
   Proof.
     simplify.
-    apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t); eauto.
+    apply invariant_weaken with (invariant1 := fun e' => has_ty $0 e' t); eauto.
     apply invariant_induction; simplify; eauto; equality.
   Qed.
 
@@ -390,33 +390,33 @@ Module StlcPairs.
   | Fun (dom ran : type)
   | Prod (t1 t2 : type) (* "Prod" for "product," as in Cartesian product *).
 
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2
   | HtPair : forall G e1 e2 t1 t2,
-    hasty G e1 t1
-    -> hasty G e2 t2
-    -> hasty G (Pair e1 e2) (Prod t1 t2)
+    has_ty G e1 t1
+    -> has_ty G e2 t2
+    -> has_ty G (Pair e1 e2) (Prod t1 t2)
   | HtFst : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Fst e1) t1
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Fst e1) t1
   | HtSnd : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Snd e1) t2.
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Snd e1) t2.
 
   (* Let's copy and paste the type-soundness proof from above and adapt it. *)
 End StlcPairs.
@@ -567,46 +567,46 @@ Module StlcSums.
   (* New case: *)
   | Sum (t1 t2 : type).
 
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2
   | HtPair : forall G e1 e2 t1 t2,
-    hasty G e1 t1
-    -> hasty G e2 t2
-    -> hasty G (Pair e1 e2) (Prod t1 t2)
+    has_ty G e1 t1
+    -> has_ty G e2 t2
+    -> has_ty G (Pair e1 e2) (Prod t1 t2)
   | HtFst : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Fst e1) t1
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Fst e1) t1
   | HtSnd : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Snd e1) t2
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Snd e1) t2
 
   (* New cases: *)
   | HtInl : forall G e1 t1 t2,
-      hasty G e1 t1
-      -> hasty G (Inl e1) (Sum t1 t2)
+      has_ty G e1 t1
+      -> has_ty G (Inl e1) (Sum t1 t2)
   | HtInr : forall G e1 t1 t2,
-      hasty G e1 t2
-      -> hasty G (Inr e1) (Sum t1 t2)
+      has_ty G e1 t2
+      -> has_ty G (Inr e1) (Sum t1 t2)
   | HtMatch : forall G e t1 t2 x1 e1 x2 e2 t,
-      hasty G e (Sum t1 t2)
-      -> hasty (G $+ (x1, t1)) e1 t
-      -> hasty (G $+ (x2, t2)) e2 t
-      -> hasty G (Match e x1 e1 x2 e2) t.
+      has_ty G e (Sum t1 t2)
+      -> has_ty (G $+ (x1, t1)) e1 t
+      -> has_ty (G $+ (x2, t2)) e2 t
+      -> has_ty G (Match e x1 e1 x2 e2) t.
 
   (* Type-soundness proof here *)
 End StlcSums.
@@ -777,53 +777,53 @@ Module StlcExceptions.
   | Prod (t1 t2 : type)
   | Sum (t1 t2 : type).
 
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2
   | HtPair : forall G e1 e2 t1 t2,
-    hasty G e1 t1
-    -> hasty G e2 t2
-    -> hasty G (Pair e1 e2) (Prod t1 t2)
+    has_ty G e1 t1
+    -> has_ty G e2 t2
+    -> has_ty G (Pair e1 e2) (Prod t1 t2)
   | HtFst : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Fst e1) t1
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Fst e1) t1
   | HtSnd : forall G e1 t1 t2,
-    hasty G e1 (Prod t1 t2)
-    -> hasty G (Snd e1) t2
+    has_ty G e1 (Prod t1 t2)
+    -> has_ty G (Snd e1) t2
   | HtInl : forall G e1 t1 t2,
-      hasty G e1 t1
-      -> hasty G (Inl e1) (Sum t1 t2)
+      has_ty G e1 t1
+      -> has_ty G (Inl e1) (Sum t1 t2)
   | HtInr : forall G e1 t1 t2,
-      hasty G e1 t2
-      -> hasty G (Inr e1) (Sum t1 t2)
+      has_ty G e1 t2
+      -> has_ty G (Inr e1) (Sum t1 t2)
   | HtMatch : forall G e t1 t2 x1 e1 x2 e2 t,
-      hasty G e (Sum t1 t2)
-      -> hasty (G $+ (x1, t1)) e1 t
-      -> hasty (G $+ (x2, t2)) e2 t
-      -> hasty G (Match e x1 e1 x2 e2) t
+      has_ty G e (Sum t1 t2)
+      -> has_ty (G $+ (x1, t1)) e1 t
+      -> has_ty (G $+ (x2, t2)) e2 t
+      -> has_ty G (Match e x1 e1 x2 e2) t
 
   (* New cases: *)
   | HtThrow : forall G e1 t,
-      hasty G e1 Nat
-      -> hasty G (Throw e1) t
+      has_ty G e1 Nat
+      -> has_ty G (Throw e1) t
   | HtCatch : forall G e x1 e1 t,
-      hasty G e t
-      -> hasty (G $+ (x1, Nat)) e1 t
-      -> hasty G (Catch e x1 e1) t.
+      has_ty G e t
+      -> has_ty (G $+ (x1, Nat)) e1 t
+      -> has_ty G (Catch e x1 e1) t.
 End StlcExceptions.
 
 (** * Mutable Variables *)
@@ -991,53 +991,53 @@ Module StlcMutable.
 
   (* Now there will be two typing contexts, one for mutable variables and one
    * for immutable. *)
-  Inductive hasty (M : fmap var type) : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty (M : fmap var type) : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty M G (Var x) t
+    -> has_ty M G (Var x) t
   | HtConst : forall G n,
-    hasty M G (Const n) Nat
+    has_ty M G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty M G e1 Nat
-    -> hasty M G e2 Nat
-    -> hasty M G (Plus e1 e2) Nat
+    has_ty M G e1 Nat
+    -> has_ty M G e2 Nat
+    -> has_ty M G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty M (G $+ (x, t1)) e1 t2
-    -> hasty M G (Abs x e1) (Fun t1 t2)
+    has_ty M (G $+ (x, t1)) e1 t2
+    -> has_ty M G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty M G e1 (Fun t1 t2)
-    -> hasty M G e2 t1
-    -> hasty M G (App e1 e2) t2
+    has_ty M G e1 (Fun t1 t2)
+    -> has_ty M G e2 t1
+    -> has_ty M G (App e1 e2) t2
   | HtPair : forall G e1 e2 t1 t2,
-    hasty M G e1 t1
-    -> hasty M G e2 t2
-    -> hasty M G (Pair e1 e2) (Prod t1 t2)
+    has_ty M G e1 t1
+    -> has_ty M G e2 t2
+    -> has_ty M G (Pair e1 e2) (Prod t1 t2)
   | HtFst : forall G e1 t1 t2,
-    hasty M G e1 (Prod t1 t2)
-    -> hasty M G (Fst e1) t1
+    has_ty M G e1 (Prod t1 t2)
+    -> has_ty M G (Fst e1) t1
   | HtSnd : forall G e1 t1 t2,
-    hasty M G e1 (Prod t1 t2)
-    -> hasty M G (Snd e1) t2
+    has_ty M G e1 (Prod t1 t2)
+    -> has_ty M G (Snd e1) t2
   | HtInl : forall G e1 t1 t2,
-      hasty M G e1 t1
-      -> hasty M G (Inl e1) (Sum t1 t2)
+      has_ty M G e1 t1
+      -> has_ty M G (Inl e1) (Sum t1 t2)
   | HtInr : forall G e1 t1 t2,
-      hasty M G e1 t2
-      -> hasty M G (Inr e1) (Sum t1 t2)
+      has_ty M G e1 t2
+      -> has_ty M G (Inr e1) (Sum t1 t2)
   | HtMatch : forall G e t1 t2 x1 e1 x2 e2 t,
-      hasty M G e (Sum t1 t2)
-      -> hasty M (G $+ (x1, t1)) e1 t
-      -> hasty M (G $+ (x2, t2)) e2 t
-      -> hasty M G (Match e x1 e1 x2 e2) t
+      has_ty M G e (Sum t1 t2)
+      -> has_ty M (G $+ (x1, t1)) e1 t
+      -> has_ty M (G $+ (x2, t2)) e2 t
+      -> has_ty M G (Match e x1 e1 x2 e2) t
 
   (* New cases: *)
   | HtGetVar : forall G x t,
       M $? x = Some t
-      -> hasty M G (GetVar x) t
+      -> has_ty M G (GetVar x) t
   | HtSetVar : forall G x e t,
       M $? x = Some t
-      -> hasty M G e t
-      -> hasty M G (SetVar x e) t.
+      -> has_ty M G e t
+      -> has_ty M G (SetVar x e) t.
 End StlcMutable.
 
 (** * Concurrency *)
@@ -1218,57 +1218,57 @@ Module StlcConcur.
   | Prod (t1 t2 : type)
   | Sum (t1 t2 : type).
 
-  Inductive hasty (M : fmap var type) : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty (M : fmap var type) : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty M G (Var x) t
+    -> has_ty M G (Var x) t
   | HtConst : forall G n,
-    hasty M G (Const n) Nat
+    has_ty M G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty M G e1 Nat
-    -> hasty M G e2 Nat
-    -> hasty M G (Plus e1 e2) Nat
+    has_ty M G e1 Nat
+    -> has_ty M G e2 Nat
+    -> has_ty M G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty M (G $+ (x, t1)) e1 t2
-    -> hasty M G (Abs x e1) (Fun t1 t2)
+    has_ty M (G $+ (x, t1)) e1 t2
+    -> has_ty M G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty M G e1 (Fun t1 t2)
-    -> hasty M G e2 t1
-    -> hasty M G (App e1 e2) t2
+    has_ty M G e1 (Fun t1 t2)
+    -> has_ty M G e2 t1
+    -> has_ty M G (App e1 e2) t2
   | HtPair : forall G e1 e2 t1 t2,
-    hasty M G e1 t1
-    -> hasty M G e2 t2
-    -> hasty M G (Pair e1 e2) (Prod t1 t2)
+    has_ty M G e1 t1
+    -> has_ty M G e2 t2
+    -> has_ty M G (Pair e1 e2) (Prod t1 t2)
   | HtFst : forall G e1 t1 t2,
-    hasty M G e1 (Prod t1 t2)
-    -> hasty M G (Fst e1) t1
+    has_ty M G e1 (Prod t1 t2)
+    -> has_ty M G (Fst e1) t1
   | HtSnd : forall G e1 t1 t2,
-    hasty M G e1 (Prod t1 t2)
-    -> hasty M G (Snd e1) t2
+    has_ty M G e1 (Prod t1 t2)
+    -> has_ty M G (Snd e1) t2
   | HtInl : forall G e1 t1 t2,
-      hasty M G e1 t1
-      -> hasty M G (Inl e1) (Sum t1 t2)
+      has_ty M G e1 t1
+      -> has_ty M G (Inl e1) (Sum t1 t2)
   | HtInr : forall G e1 t1 t2,
-      hasty M G e1 t2
-      -> hasty M G (Inr e1) (Sum t1 t2)
+      has_ty M G e1 t2
+      -> has_ty M G (Inr e1) (Sum t1 t2)
   | HtMatch : forall G e t1 t2 x1 e1 x2 e2 t,
-      hasty M G e (Sum t1 t2)
-      -> hasty M (G $+ (x1, t1)) e1 t
-      -> hasty M (G $+ (x2, t2)) e2 t
-      -> hasty M G (Match e x1 e1 x2 e2) t
+      has_ty M G e (Sum t1 t2)
+      -> has_ty M (G $+ (x1, t1)) e1 t
+      -> has_ty M (G $+ (x2, t2)) e2 t
+      -> has_ty M G (Match e x1 e1 x2 e2) t
   | HtGetVar : forall G x t,
       M $? x = Some t
-      -> hasty M G (GetVar x) t
+      -> has_ty M G (GetVar x) t
   | HtSetVar : forall G x e t,
       M $? x = Some t
-      -> hasty M G e t
-      -> hasty M G (SetVar x e) t
+      -> has_ty M G e t
+      -> has_ty M G (SetVar x e) t
 
   (* New cases: *)
   | HtPar : forall G e1 t1 e2 t2,
-      hasty M G e1 t1
-      -> hasty M G e2 t2
-      -> hasty M G (Par e1 e2) (Prod t1 t2).
+      has_ty M G e1 t1
+      -> has_ty M G e2 t2
+      -> has_ty M G (Par e1 e2) (Prod t1 t2).
 
   (* Type-soundness proof *)
 End StlcConcur.

@@ -419,25 +419,25 @@ Module Stlc.
   | Nat                  (* Numbers *)
   | Fun (dom ran : type) (* Functions *).
 
-  Inductive hasty : fmap var type -> exp -> type -> Prop :=
+  Inductive has_ty : fmap var type -> exp -> type -> Prop :=
   | HtVar : forall G x t,
     G $? x = Some t
-    -> hasty G (Var x) t
+    -> has_ty G (Var x) t
   | HtConst : forall G n,
-    hasty G (Const n) Nat
+    has_ty G (Const n) Nat
   | HtPlus : forall G e1 e2,
-    hasty G e1 Nat
-    -> hasty G e2 Nat
-    -> hasty G (Plus e1 e2) Nat
+    has_ty G e1 Nat
+    -> has_ty G e2 Nat
+    -> has_ty G (Plus e1 e2) Nat
   | HtAbs : forall G x e1 t1 t2,
-    hasty (G $+ (x, t1)) e1 t2
-    -> hasty G (Abs x e1) (Fun t1 t2)
+    has_ty (G $+ (x, t1)) e1 t2
+    -> has_ty G (Abs x e1) (Fun t1 t2)
   | HtApp : forall G e1 e2 t1 t2,
-    hasty G e1 (Fun t1 t2)
-    -> hasty G e2 t1
-    -> hasty G (App e1 e2) t2.
+    has_ty G e1 (Fun t1 t2)
+    -> has_ty G e2 t1
+    -> has_ty G (App e1 e2) t2.
 
-  Local Hint Constructors value step hasty : core.
+  Local Hint Constructors value step has_ty : core.
 
   (* Some notation to make it more pleasant to write programs *)
   Infix "-->" := Fun (at level 60, right associativity).
@@ -449,22 +449,22 @@ Module Stlc.
 
   (* Some examples of typed programs *)
 
-  Example one_plus_one : hasty $0 (1 ^+^ 1) Nat.
+  Example one_plus_one : has_ty $0 (1 ^+^ 1) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example add : hasty $0 (\"n", \"m", "n" ^+^ "m") (Nat --> Nat --> Nat).
+  Example add : has_ty $0 (\"n", \"m", "n" ^+^ "m") (Nat --> Nat --> Nat).
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example eleven : hasty $0 ((\"n", \"m", "n" ^+^ "m") @ 7 @ 4) Nat.
+  Example eleven : has_ty $0 ((\"n", \"m", "n" ^+^ "m") @ 7 @ 4) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
 
-  Example seven_the_long_way : hasty $0 ((\"x", "x") @ (\"x", "x") @ 7) Nat.
+  Example seven_the_long_way : has_ty $0 ((\"x", "x") @ (\"x", "x") @ 7) Nat.
   Proof.
     repeat (econstructor; simplify).
   Qed.
@@ -476,7 +476,7 @@ Module Stlc.
     \/ (exists e' : exp, step e e').
 
   Lemma progress : forall e t,
-    hasty $0 e t
+    has_ty $0 e t
     -> value e
     \/ (exists e' : exp, step e e').
   Proof.
@@ -484,23 +484,23 @@ Module Stlc.
 
   (* Replacing a typing context with an equal one has no effect (useful to guide
    * proof search as a hint). *)
-  Lemma hasty_change : forall G e t,
-    hasty G e t
+  Lemma has_ty_change : forall G e t,
+    has_ty G e t
     -> forall G', G' = G
-      -> hasty G' e t.
+      -> has_ty G' e t.
   Proof.
   Admitted.
 
-  Local Hint Resolve hasty_change : core.
+  Local Hint Resolve has_ty_change : core.
 
   Lemma preservation : forall e1 e2,
     step e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
+    -> forall t, has_ty $0 e1 t
+      -> has_ty $0 e2 t.
   Proof.
   Admitted.
 
-  Theorem safety : forall e t, hasty $0 e t
+  Theorem safety : forall e t, has_ty $0 e t
     -> invariantFor (trsys_of e) unstuck.
   Proof.
     simplify.
@@ -508,7 +508,7 @@ Module Stlc.
     (* Step 1: strengthen the invariant.  In particular, the typing relation is
      * exactly the right stronger invariant!  Our progress theorem proves the
      * required invariant inclusion. *)
-    apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t).
+    apply invariant_weaken with (invariant1 := fun e' => has_ty $0 e' t).
 
     (* Step 2: apply invariant induction, whose induction step turns out to match
      * our preservation theorem exactly! *)

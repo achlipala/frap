@@ -457,7 +457,7 @@ Proof.
   (* A nasty error message greets us!  The book's [cases] tactic could be
    * extended to handle this case, but we don't generally need to do case
    * analysis on dependently typed values, outside the one excursion of this
-   * "bonus" source file.  Still, the book defines a tactic [dep_case] that
+   * "bonus" source file.  Still, the book defines a tactic [dep_cases] that
    * mostly appeals to built-in tactic [dependent destruction]. *)
 
   dep_cases (cfold e1).

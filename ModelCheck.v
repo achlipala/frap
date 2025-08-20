@@ -1,4 +1,5 @@
-Require Import Invariant Relations Sets Classical.
+From Stdlib Require Import Classical.
+Require Import Invariant Relations Sets.
 
 Set Implicit Arguments.
 

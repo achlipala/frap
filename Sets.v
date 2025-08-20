@@ -1,4 +1,4 @@
-Require Import Bool Classical FunctionalExtensionality List.
+From Stdlib Require Import Bool Classical FunctionalExtensionality List.
 
 Set Implicit Arguments.
 
@@ -123,11 +123,13 @@ Section properties.
 
   Variables ss1 ss2 : list A.
 
+  Hint Resolve in_or_app in_app_or : core.
+  
   Theorem union_constant : constant ss1 \cup constant ss2 = constant (ss1 ++ ss2).
   Proof.
     unfold constant, union; simpl.
 
-    apply sets_equal; simpl; intuition.
+    apply sets_equal; simpl; intuition eauto.
   Qed.
 End properties.
 
@@ -154,7 +156,7 @@ Theorem removeDups_fwd : forall A x (ls ls' : list A),
   -> List.In x ls
   -> List.In x ls'.
 Proof.
-  induction 1; simpl; intuition.
+  induction 1; simpl; intuition auto.
   subst; eauto.
 Qed.
 
@@ -163,7 +165,7 @@ Theorem removeDups_bwd : forall A x (ls ls' : list A),
   -> List.In x ls'
   -> List.In x ls.
 Proof.
-  induction 1; simpl; intuition.
+  induction 1; simpl; intuition auto.
 Qed.
 
 Theorem removeDups_ok : forall A (ls ls' : list A),
@@ -217,7 +219,7 @@ Theorem doSubtract_fwd : forall A x (ls ls0 ls' : list A),
   -> ~List.In x ls0
   -> List.In x ls'.
 Proof.
-  induction 1; simpl; intuition.
+  induction 1; simpl; intuition auto.
   subst; eauto.
   tauto.
 Qed.
@@ -227,7 +229,7 @@ Theorem doSubtract_bwd1 : forall A x (ls ls0 ls' : list A),
   -> List.In x ls'
   -> List.In x ls.
 Proof.
-  induction 1; simpl; intuition.
+  induction 1; simpl; intuition auto.
 Qed.
 
 Theorem doSubtract_bwd2 : forall A x (ls ls0 ls' : list A),
@@ -236,7 +238,7 @@ Theorem doSubtract_bwd2 : forall A x (ls ls0 ls' : list A),
   -> List.In x ls0
   -> False.
 Proof.
-  induction 1; simpl; intuition.
+  induction 1; simpl; intuition auto.
   subst; eauto.
 Qed.
 
@@ -287,7 +289,7 @@ Ltac unifyTails :=
 
 (** * But wait... there's a reflective way to do some of this, too. *)
 
-Require Import Arith.
+From Stdlib Require Import Arith.
 Import List ListNotations.
 
 Section setexpr.
@@ -364,27 +366,27 @@ Section setexpr.
   Lemma member_ok : forall n ns,
       if member n ns then In n ns else ~In n ns.
   Proof.
-    induction ns; simpl; intuition.
+    induction ns; simpl; intuition auto.
     case_eq (n =? a); simpl; intros.
-    apply beq_nat_true in H; auto.
-    apply beq_nat_false in H.
-    destruct (member n ns); intuition.
+    apply Nat.eqb_eq in H; auto.
+    apply Nat.eqb_neq in H.
+    destruct (member n ns); intuition auto.
   Qed.
 
   Lemma In_dedup_fwd : forall n ns,
       In n (dedup ns)
       -> In n ns.
   Proof.
-    induction ns; simpl; intuition.
+    induction ns; simpl; intuition auto.
     pose proof (member_ok a (dedup ns)).
-    destruct (member a (dedup ns)); simpl in *; intuition.
+    destruct (member a (dedup ns)); simpl in *; intuition auto.
   Qed.
 
   Lemma In_dedup_bwd : forall n ns,
       In n ns
       -> In n (dedup ns).
   Proof.
-    induction ns; simpl; intuition.
+    induction ns; simpl; intuition auto.
     pose proof (member_ok a (dedup ns)).
     destruct (member a (dedup ns)); simpl in *; intuition congruence.
     pose proof (member_ok a (dedup ns)).
@@ -394,7 +396,7 @@ Section setexpr.
   Lemma constant_dedup : forall (f : _ -> A) vs,
       constant (map f (dedup vs)) = constant (map f vs).
   Proof.
-    induction vs; simpl; intuition.
+    induction vs; simpl; intuition auto.
     pose proof (member_ok a (dedup vs)).
     case_eq (member a (dedup vs)); intro.
     rewrite IHvs.
@@ -403,7 +405,7 @@ Section setexpr.
     apply sets_equal.
     unfold constant.
     simpl.
-    intuition.
+    intuition auto.
     apply in_map_iff.
     eauto.
     simpl.
@@ -417,17 +419,17 @@ Section setexpr.
   Proof.
     induction ns1; simpl; intros.
 
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
 
     pose proof (member_ok a ns2).
     destruct (member a ns2).
     rewrite IHns1.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     right.
     eapply in_map_iff; eauto.
 
     simpl.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     change (In x (map f (setmerge ns1 ns2))) with ((fun x => In x (map f (setmerge ns1 ns2))) x) in H1.
     rewrite IHns1 in H1.
     tauto.
@@ -449,42 +451,42 @@ Section setexpr.
     apply constant_dedup.
 
     unfold interp_normal_form; simpl.
-    destruct env; sets ltac:(simpl in *; intuition).
+    destruct env; sets ltac:(simpl in *; intuition auto).
 
     unfold interp_normal_form in *; simpl in *.
     destruct (Other (normalize_setexpr e1)), (Other (normalize_setexpr e2)).
     destruct env.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     rewrite <- IHe1.
     rewrite <- IHe2.
     rewrite constant_map_setmerge.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     destruct env.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     rewrite constant_map_setmerge.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     destruct env.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     rewrite constant_map_setmerge.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     destruct env.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
     rewrite constant_map_setmerge.
     rewrite <- IHe1.
     rewrite <- IHe2.
-    sets ltac:(simpl in *; intuition).
+    sets ltac:(simpl in *; intuition auto).
   Qed.
 
   Fixpoint included (ns1 ns2 : list nat) : bool :=
@@ -521,15 +523,15 @@ Section setexpr.
     subst nf1.
     subst nf2.
     unfold interp_normal_form.
-    destruct (Other (normalize_setexpr e1)), (Other (normalize_setexpr e2)); intuition.
+    destruct (Other (normalize_setexpr e1)), (Other (normalize_setexpr e2)); intuition auto.
     destruct env; trivial.
-    apply andb_true_iff in H; intuition.
+    apply andb_true_iff in H; intuition auto.
     specialize (included_true _ _ H0).
     specialize (included_true _ _ H1).
     clear H0 H1.
     intros.
     apply sets_equal.
-    unfold constant; simpl; intuition.
+    unfold constant; simpl; intuition auto.
     apply in_map_iff.
     apply in_map_iff in H1.
     firstorder.
@@ -578,12 +580,12 @@ Ltac quote E env k :=
   end.
 
 Ltac sets_cbv := cbv beta iota zeta delta [interp_normal_form normalize_setexpr nth_default
-                                           setmerge Elements Other nth_error map dedup member beq_nat orb
+                                           setmerge Elements Other nth_error map dedup member Nat.eqb orb
                                            andb included].
 
 Ltac sets_cbv_in H := cbv beta iota zeta delta [interp_normal_form normalize_setexpr nth_default
-                                                                   setmerge Elements Other nth_error map dedup member beq_nat orb
-                                                                   andb included] in H.
+                                                setmerge Elements Other nth_error map dedup member Nat.eqb orb
+                                                andb included] in H.
                      
 Ltac normalize_set :=
   match goal with
@@ -608,3 +610,23 @@ Ltac compare_sets :=
       apply compare_sets; sets_cbv; reflexivity
     end
   end.
+
+Ltac unfold_until_constant t :=
+  let rec go u :=
+    lazymatch u with
+    | constant ?l => constr:(l)
+    | _ => let u' := eval red in u in unfold_until_constant u'
+    end in
+  go t.
+
+(* A conservative tactic that confirms its two arguments are *different* finite
+ * sets, by checking that they have different lengths. *)
+Ltac sets_different set1 set2 :=
+  let set1 := unfold_until_constant set1 in
+  let set2 := unfold_until_constant set2 in
+  let len1 := eval simpl in (List.length set1) in
+    let len2 := eval simpl in (List.length set2) in
+      match len1 with
+      | len2 => fail 2
+      | _ => idtac
+      end.

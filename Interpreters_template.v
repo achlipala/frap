@@ -245,7 +245,7 @@ Example factorial_ugly :=
 
 (* Ouch; that code is hard to read.  Let's introduce some notations to make the
  * concrete syntax more palatable.  We won't explain the general mechanisms on
- * display here, but see the Coq manual for details, or try to reverse-engineer
+ * display here, but see the Rocq manual for details, or try to reverse-engineer
  * them from our examples. *)
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.

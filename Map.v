@@ -1,4 +1,5 @@
-Require Import Classical Sets ClassicalEpsilon FunctionalExtensionality.
+From Stdlib Require Import Classical ClassicalEpsilon FunctionalExtensionality.
+Require Import Sets.
 
 Set Implicit Arguments.
 

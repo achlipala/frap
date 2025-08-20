@@ -557,7 +557,7 @@ Module StlcPairs.
 End StlcPairs.
 
 (* Next, the dual feature of *variants*, corresponding to the following type
- * family from Coq's standard library. *)
+ * family from Rocq's standard library. *)
 
 Print sum.
 

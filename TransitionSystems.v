@@ -18,7 +18,7 @@ Fixpoint fact (n : nat) : nat :=
   end.
 
 (* But let's reformulate factorial relationally, as an example to explore
- * treatment of inductive relations in Coq.  First, these are the states of our
+ * treatment of inductive relations in Rocq.  First, these are the states of our
  * state machine. *)
 Inductive fact_state :=
 | AnswerIs (answer : nat)

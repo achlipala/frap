@@ -1,6 +1,6 @@
 Require Import Frap.
-Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
-Require Import Eqdep.
+From Stdlib Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
+From Stdlib Require Import Eqdep.
 
 Set Warnings "-cannot-define-projection".
 

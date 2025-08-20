@@ -1432,7 +1432,7 @@ Module NatRangeSet (*<: FINITE_SET with Definition key := nat*).
     apply Compare_dec.leb_complete in Heq.
     rewrite Compare_dec.leb_correct_conv.
     equality.
-    unfold key in *. (* Tricky step!  Coq needs to see that we are really working with numbers. *)
+    unfold key in *. (* Tricky step!  Rocq needs to see that we are really working with numbers. *)
     linear_arithmetic.
     rewrite Compare_dec.leb_correct by linear_arithmetic.
     equality.

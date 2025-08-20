@@ -45,7 +45,7 @@ Fixpoint eval (e : exp) (h : heap) (v : valuation) : nat :=
   end.
 
 (* Meaning of Boolean expressions *)
-Fixpoint beval (b : bexp) (h : heap) (v : valuation) : bool :=
+Definition beval (b : bexp) (h : heap) (v : valuation) : bool :=
   match b with
   | Equal e1 e2 => if eval e1 h v ==n eval e2 h v then true else false
   | Less e1 e2 => if eval e2 h v <=? eval e1 h v then false else true

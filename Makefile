@@ -16,7 +16,7 @@ lib: Makefile.coq
 	$(MAKE) -f Makefile.coq Frap.vo AbstractInterpret.vo SepCancel.vo
 
 Makefile.coq: Makefile _CoqProject *.v
-	coq_makefile -f _CoqProject -o Makefile.coq
+	rocq makefile -f _CoqProject -o Makefile.coq
 
 clean:: Makefile.coq
 	$(MAKE) -f Makefile.coq clean

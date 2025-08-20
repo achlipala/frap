@@ -328,7 +328,6 @@ Lemma HtStrengthen : forall {result} (c : cmd result) P Q (Q' : _ -> assertion),
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : assertion),
@@ -338,7 +337,6 @@ Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : assertion),
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 
@@ -591,7 +589,7 @@ Admitted.
 
 (* A few algebraic properties of list operations: *)
 Local Hint Rewrite <- app_assoc.
-Local Hint Rewrite app_length app_nil_r.
+Local Hint Rewrite length_app List.app_nil_r.
 
 (* We tie a few of them together into this lemma. *)
 Lemma move_along : forall A (ls : list A) x2 x1 x0 x,
@@ -712,10 +710,6 @@ Lemma invert_Read : forall a P Q,
                /\ forall r, a |-> r * R r ===> Q r.
 Proof.
   induct 1; simp; eauto.
-
-  exists R; simp.
-  cancel; auto.
-  cancel; auto.
 
   apply unit_not_nat in x0; simp.
 

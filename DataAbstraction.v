@@ -16,7 +16,7 @@ Set Implicit Arguments.
  * details in a way that client code can't observe.  Then that client code can
  * mix and match implementations of some well-specified functionality.
  *
- * As part of our quick tour through effective Coq programming, we will dwell on
+ * As part of our quick tour through effective Rocq programming, we will dwell on
  * patterns for data abstraction, including how to state it formally, from the
  * perspectives of both libraries and client code. *)
 
@@ -92,7 +92,7 @@ Module Algebraic.
         end
       end.
 
-    (* Applying our experience so far with Coq proofs, the algebraic laws are
+    (* Applying our experience so far with Rocq proofs, the algebraic laws are
      * unremarkable to establish. *)
 
     Theorem dequeue_empty : forall A, dequeue (empty A) = None.
@@ -141,7 +141,7 @@ Module Algebraic.
    * enqueuing at the back and dequeuing from the front. *)
   Module ReversedListQueue : QUEUE.
     Definition t : Set -> Set := list.
-    (* Still the same internal queue type, but note that Coq's type system
+    (* Still the same internal queue type, but note that Rocq's type system
      * prevents client code from knowing that fact!  [t] appears *opaque*
      * or *abstract* from the outside, as we'll see shortly. *)
 
@@ -194,9 +194,9 @@ Module Algebraic.
   End ReversedListQueue.
 
   (* Let's take a look at some client code that is agnostic to queue
-   * implementation details.  We have been using Coq's *module system*, inspired
+   * implementation details.  We have been using Rocq's *module system*, inspired
    * by those of the ML programming languages, to encode interfaces and
-   * implementations.  Coq also adopts from ML the idea of *functors*, or
+   * implementations.  Rocq also adopts from ML the idea of *functors*, or
    * functions from modules to modules. *)
   Module DelayedSum (Q : QUEUE).
     (* The code in this scope may refer to some unknown implementation [Q] of
@@ -1158,7 +1158,7 @@ Module Type FINITE_SET.
       -> member (add s k1) k2 = member s k2.
 
   Axiom decidable_equality : forall a b : key, a = b \/ a <> b.
-  (* This last axiom may be a bit surprising.  Coq is so oriented toward
+  (* This last axiom may be a bit surprising.  Rocq is so oriented toward
    * computation that we don't assume the *law of the excluded middle*, which
    * says that every proposition is either true or false.  Instead, we prove
    * specific instances as needed.  But feel free to ignore this point for
@@ -1624,7 +1624,7 @@ Module NatRangeSet <: FINITE_SET with Definition key := nat.
     apply Compare_dec.leb_complete in Heq.
     rewrite Compare_dec.leb_correct_conv.
     equality.
-    unfold key in *. (* Tricky step!  Coq needs to see that we are really working with numbers. *)
+    unfold key in *. (* Tricky step!  Rocq needs to see that we are really working with numbers. *)
     linear_arithmetic.
     rewrite Compare_dec.leb_correct by linear_arithmetic.
     equality.

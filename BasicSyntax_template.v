@@ -19,7 +19,7 @@ Fixpoint size (e : arith) : nat :=
   | Times e1 e2 => 1 + size e1 + size e2
   end.
 
-(* Here's how to run a program (evaluate a term) in Coq. *)
+(* Here's how to run a program (evaluate a term) in Rocq. *)
 Compute size ex1.
 Compute size ex2.
 

@@ -1310,7 +1310,7 @@ Proof.
   eauto 10.
 Qed.
 
-Require Import Classical.
+From Stdlib Require Import Classical.
 
 (* This theorem brings it all together, to reduce one invariant-proof problem to
  * another that uses the optimized semantics. *)

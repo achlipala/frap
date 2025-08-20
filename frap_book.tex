@@ -31,7 +31,7 @@
 \begin{abstract}
   \emph{Briefly}, this book is about an approach to bringing software engineering up to speed with more traditional engineering disciplines, providing a mathematical foundation for rigorous analysis of realistic computer systems. As civil engineers apply their mathematical canon to reach high certainty that bridges will not fall down, the software engineer should apply a different canon to argue that programs behave properly. As other engineering disciplines have their computer-aided-design tools, computer science has proof assistants, IDEs for logical arguments. We will learn how to apply these tools to certify that programs behave as expected.
 
-  \emph{More specifically}: Introductions to two intertangled subjects: the Coq proof assistant, a tool for machine-checked mathematical theorem proving; and formal logical reasoning about the correctness of programs.
+  \emph{More specifically}: Introductions to two intertangled subjects: the Rocq proof assistant, a tool for machine-checked mathematical theorem proving; and formal logical reasoning about the correctness of programs.
 \end{abstract}
 
 \maketitle
@@ -84,8 +84,8 @@ In this early version, you get to take the author's word for it that we are abou
 However, one overarching element of our strategy is important enough to deserve to be called out here.
 We will study a variety of different approaches for formalizing what a program should do and for proving that a program does what it should.
 At every step, we will pay close attention to the \emph{common foundation} that underlies everything.
-For one thing, we will be proving all of our theorems with the Coq proof assistant\footnote{The author only makes an effort to keep the associated Coq code working with the latest Coq version, which is 8.16 as of this writing.}, a powerful framework for writing and machine-checking proofs.
-Coq itself is based on a relatively small set of core features, much like a well-designed programming language, and in both we build up increasingly sophisticated abstractions as libraries.
+For one thing, we will be proving all of our theorems with the Rocq proof assistant\footnote{The author only makes an effort to keep the associated Rocq code working with the latest Rocq version, which is 9.0.0 as of this writing.  One recent complication is the renaming of this tool from ``Coq'' to ``Rocq.''}, a powerful framework for writing and machine-checking proofs.
+Rocq itself is based on a relatively small set of core features, much like a well-designed programming language, and in both we build up increasingly sophisticated abstractions as libraries.
 Those features can be thought of as the core of all mathematical reasoning.
 
 We will also apply a recipe specific to program proof.
@@ -125,14 +125,14 @@ There really is a huge amount of commonality across everything that we'll study,
 It is quite important to be literate in the standard notational conventions, which are almost always implemented with \index{\LaTeX{}}\LaTeX{}, and we stick entirely to that kind of notation in this book.
 However, we follow another, much less usual convention: while we give theorem and lemma statements, we rarely give their proofs.
 The reason is that the author and many other researchers today feel that proofs on paper have outlived their usefulness.
-Instead, the proofs are all found in the parallel world of the accompanying Coq source code.
+Instead, the proofs are all found in the parallel world of the accompanying Rocq source code.
 
-That is, each chapter of this book has a corresponding Coq source file, distributed with the general book source code.
-The Coq sources are heavily commented and may even, in many cases, be feasible to read without also reading the book chapters.
-More importantly, the Coq sources aren't just meant to be \emph{read}.
+That is, each chapter of this book has a corresponding Rocq source file, distributed with the general book source code.
+The Rocq sources are heavily commented and may even, in many cases, be feasible to read without also reading the book chapters.
+More importantly, the Rocq sources aren't just meant to be \emph{read}.
 They are meant to be \emph{executed}.
 We suggest stepping through them interactively, seeing intermediate states of proofs as appropriate.
-The book proper can be read without the Coq sources, to learn the standard background material of program proof; and the Coq sources can be read without the book proper, to learn a particular concrete realization of those ideas.
+The book proper can be read without the Rocq sources, to learn the standard background material of program proof; and the Rocq sources can be read without the book proper, to learn a particular concrete realization of those ideas.
 However, they go better together.
 
 
@@ -201,13 +201,13 @@ $$\infer{n \in \mathsf{Exp}}{
 The general reading of an inference rule is: \textbf{if} all the facts above the horizontal line are true, \textbf{then} the fact below the line is true, too.
 The rule implicitly needs to hold for \emph{all} values of the \emph{metavariables}\index{metavariable} (like $n$ and $e_1$) that appear within it; we can model them more explicitly with a sort of top-level universal quantification.
 Newcomers to semantics often react negatively to seeing this style of definition, but very quickly it becomes apparent as a remarkably compact notation for expressing many concepts.
-Think of it as a domain-specific programming language for mathematical definitions, an analogy that becomes quite concrete in the associated Coq code!
+Think of it as a domain-specific programming language for mathematical definitions, an analogy that becomes quite concrete in the associated Rocq code!
 
 \section{Abstract Syntax}
 
 After that brief interlude with concrete syntax, we now drop all formal treatment of it, for the rest of the book!
 Instead, we concern ourselves with \emph{abstract syntax}\index{abstract syntax}, the real heart of language definitions.
-Now programs are \emph{abstract syntax trees}\index{abstract syntax tree} (\emph{ASTs}\index{AST}), corresponding to inductive type definitions in Coq or algebraic datatype\index{algebraic datatype} definitions in Haskell\index{Haskell}.
+Now programs are \emph{abstract syntax trees}\index{abstract syntax tree} (\emph{ASTs}\index{AST}), corresponding to inductive type definitions in Rocq or algebraic datatype\index{algebraic datatype} definitions in Haskell\index{Haskell}.
 Such types can be defined by enumerating their \emph{constructor}\index{constructor} functions with types.
 \encoding
 \begin{eqnarray*}
@@ -240,7 +240,7 @@ $$\infer{\mathsf{Const}(n) \in \mathsf{Exp}}{
 Actually, semanticists get tired of writing such verbose descriptions, so proofs on paper tend to use exactly the sort of notation that we associated with concrete syntax.
 The trick is mental desugaring of the concrete-syntax notation into abstract syntax!
 We will generally not dwell on the particularities of that process.
-Instead, we repeatedly illustrate it by example, using Coq code that starts with abstract syntax, accompanied by \LaTeX{}-based ``code'' in this book that applies concrete syntax freely.
+Instead, we repeatedly illustrate it by example, using Rocq code that starts with abstract syntax, accompanied by \LaTeX{}-based ``code'' in this book that applies concrete syntax freely.
 
 Abstract syntax is handy for writing \emph{recursive definitions}\index{recursive definition} of functions.
 Here is one in the clausal\index{clausal function definition} style of Haskell\index{Haskell}.
@@ -254,7 +254,7 @@ Here is one in the clausal\index{clausal function definition} style of Haskell\i
 It is important that we include \emph{one clause per constructor of the inductive type}.
 Otherwise, the function would not be \emph{total}\index{total function}.
 We also need to be careful to ensure \emph{termination}\index{termination of recursive definitions}, by making recursive calls only on the arguments of the constructors.
-This termination criterion, adopted by Coq, is called \emph{primitive recursion}\index{primitive recursion}.
+This termination criterion, adopted by Rocq, is called \emph{primitive recursion}\index{primitive recursion}.
 
 \newcommand{\size}[1]{{\left \lvert #1 \right \rvert}}
 
@@ -326,7 +326,7 @@ To see induction in action, we prove a theorem giving a sanity check on our two 
 \end{proof}
 
 That sort of minimalist proof often surprises and frustrates newcomers.
-Our position here is that proof checking is an activity fit for machines, not people, so we will leave out gory details, which are to be found in the accompanying Coq code, for this theorem and many others associated with this chapter.
+Our position here is that proof checking is an activity fit for machines, not people, so we will leave out gory details, which are to be found in the accompanying Rocq code, for this theorem and many others associated with this chapter.
 Actually, even published proofs on paper tend to use ``proofs'' as brief as the one above, relying on the reader's experience to ``fill in the blanks''!
 Unsurprisingly, fairly often there are logical errors in such arguments, leading to acceptance of bogus theorems.
 For that reason, we stick to machine-checked proofs here, using the book chapters to introduce concepts, reasoning principles, and statements of key theorems and lemmas.
@@ -352,11 +352,11 @@ Actually, multiplication is prohibited outright, but we allow multiplication by 
 Propositions are formed out of equality and less-than tests on terms, and we also have the Boolean negation (``not'') operator $\neg$ and conjunction (``and'') operator $\land$.
 This set of propositional\index{propositional logic} operators is enough to encode the other usual inequality and propositional operators, so we allow them, too, as convenient shorthands.
 
-Using decidable theories in a proof assistant like Coq, it is important to understand how a theory may apply to formulas that don't actually satisfy its grammar literally.
+Using decidable theories in a proof assistant like Rocq, it is important to understand how a theory may apply to formulas that don't actually satisfy its grammar literally.
 For instance, we may want to prove $f(x) - f(x) = 0$, for some fancy function $f$ well outside the grammar above.
 However, we only need to introduce a new variable $y$, defined with the equation $y = f(x)$, to arrive at a new goal $y - y = 0$.
 A linear-arithmetic procedure makes short work of this goal, and we may then derive the original goal by substituting back in for $y$.
-Coq's tactics based on decidable theories do all that hard work for us.
+Rocq's tactics based on decidable theories do all that hard work for us.
 
 \medskip
 
@@ -417,7 +417,7 @@ For instance, by the semiring theory, we can prove $x(y + z) = xy + xz$, while l
 
 \section{Simplification and Rewriting}
 
-While we leave most proof details to the accompanying Coq code, it does seem important to introduce two key principles that are often implicit in proofs on paper.
+While we leave most proof details to the accompanying Rocq code, it does seem important to introduce two key principles that are often implicit in proofs on paper.
 
 The first is \emph{algebraic simplification}\index{algebraic simplification}, where we apply the defining equations of a recursive definition to simplify a goal.
 For example, recall that our definition of expression size included this clause.
@@ -465,11 +465,11 @@ The quoted remark could just as well be in Spanish instead of English, in which 
 
 \chapter{Data Abstraction}\label{adt}
 
-All of the fully formal proofs in this book are worked out only in associated Coq code.
-Therefore, before proceeding to more topics in program semantics and proof, it is important to develop some basic Coq competence.
+All of the fully formal proofs in this book are worked out only in associated Rocq code.
+Therefore, before proceeding to more topics in program semantics and proof, it is important to develop some basic Rocq competence.
 Several heavily commented examples files are associated with this crucial point in the book.
-We won't discuss details of Coq proving in this document, outside Appendix \ref{coqref}.
-However, one of the possibilities shown off in the Coq code is worth drawing attention to, as a celebrated semantics idea in its own right, though we don't yet connect it to formalized syntax of programming languages.
+We won't discuss details of Rocq proving in this document, outside Appendix \ref{coqref}.
+However, one of the possibilities shown off in the Rocq code is worth drawing attention to, as a celebrated semantics idea in its own right, though we don't yet connect it to formalized syntax of programming languages.
 That idea is \emph{data abstraction}\index{data abstraction}, one of the most central ideas in program structuring.
 Let's consider the mathematical meaning of \emph{encapsulation}\index{encapsulation} in data structures.
 
@@ -481,7 +481,7 @@ Consider the humble queue\index{queues}, a classic data structure that allows us
 Perhaps surprisingly, there is already some complexity in efficient queue implementation.
 So-called \emph{client code}\index{client code} that relies on queues shouldn't need to know about that complexity, though.
 We should be able to formulate ``queue'' as an \emph{abstract data type}\index{abstract data type}, hiding implementation details.
-In the setting of pure functional programming, as in Coq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g. interfaces\index{interface} in Java\index{Java}.
+In the setting of pure functional programming, as in Rocq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g. interfaces\index{interface} in Java\index{Java}.
 Type $\mt{t}(\alpha)$ stands for queues holding data values in some type $\alpha$.
 \begin{eqnarray*}
   \mt{t}(\alpha) &:& \mt{Set} \\
@@ -538,7 +538,7 @@ There is also a dual implementation where we enqueue to list backs and dequeue f
   \mt{dequeue}(\concat{[x]}{q}) &=& (q, x)
 \end{eqnarray*}
 
-Proofs of the algebraic laws, for both implementations, appear in the associated Coq code.
+Proofs of the algebraic laws, for both implementations, appear in the associated Rocq code.
 Both versions actually take quadratic time in practice, assuming concatenation takes time linear in the length of its first argument.
 There is a famous, more clever implementation that achieves amortized\index{amortized time} constant time (linear time to run a whole sequence of operations), but we will need to expand our algebraic style to accommodate it.
 
@@ -834,7 +834,7 @@ e \arrow{r}{\compile{\ldots}} \arrow{dr}{\denote{\ldots}} & \compile{e} \arrow{d
 \end{tikzcd}
 \]
 
-As usual, we leave proof details for the associated Coq code, but the key insight of the proof is to strengthen the induction hypothesis via a lemma.
+As usual, we leave proof details for the associated Rocq code, but the key insight of the proof is to strengthen the induction hypothesis via a lemma.
 
 \begin{lemma}
   $\denote{\concat{\compile{e}}{\overline{i}}}(v, s) = \denote{\overline{i}}(v, \push{\denote{e}v}{s})$.
@@ -847,7 +847,7 @@ We strengthen the statement by considering both an arbitrary initial stack $s$ a
 \newcommand{\repet}[2]{\mathsf{repeat} \; #1 \; \mathsf{do} \; #2 \; \mathsf{done}}
 
 The interpreter approach to semantics is usually the most convenient one, when it applies.
-Coq requires that all programs terminate, and that requirement is effectively also present in informal math, though it is seldom called out with the same terms.
+Rocq requires that all programs terminate, and that requirement is effectively also present in informal math, though it is seldom called out with the same terms.
 Instead, with math, we worry about whether recursive systems of equations are well-founded, in appropriate senses.
 From either perspective, extra encoding tricks are required to write a well-formed interpreter for a Turing-complete\index{Turing-completeness} language.
 We will dodge those complexities for now by defining a simple imperative language with bounded loops, where termination is easy to prove.
@@ -983,7 +983,7 @@ A simple example:
 \end{proof}
 
 Note how it is quite natural to see rule induction as induction on proof trees, as if they were just any other tree data structure!
-Indeed, data and proofs are unified in Coq's mathematical foundation.
+Indeed, data and proofs are unified in Rocq's mathematical foundation.
 
 \section{Transitive Closure of Relations}
 
@@ -1237,7 +1237,7 @@ $$\infer{\Gamma \vdash \phi}{
   \Gamma \vdash \bot
 }$$
 
-Finally, the somewhat-controversial law of the excluded middle\index{law of the excluded middle}, which actually does not hold in general in Coq, though many developments postulate it as an extra axiom (which we take advantage of in our own Coq proof here).
+Finally, the somewhat-controversial law of the excluded middle\index{law of the excluded middle}, which actually does not hold in general in Rocq, though many developments postulate it as an extra axiom (which we take advantage of in our own Rocq proof here).
 We write negation $\neg \phi$ as shorthand for $\phi \Rightarrow \bot$.
 $$\infer{\Gamma \vdash \phi \lor \neg \phi}{}$$
 
@@ -1275,7 +1275,7 @@ To indicate that $\phi$ is a \emph{tautology}\index{tautology} (that is, true un
   By induction on the proof of $\Gamma \vdash \phi$, using propositional logic in the metalanguage to plumb together the case proofs.
 \end{proof}
 
-The other direction, completeness, is quite a bit more involved, and indeed its Coq proof strays outside the range of what is reasonable to ask students to construct at this point in the book, but it makes for an interesting exercise.
+The other direction, completeness, is quite a bit more involved, and indeed its Rocq proof strays outside the range of what is reasonable to ask students to construct at this point in the book, but it makes for an interesting exercise.
 The basic idea is to do a proof by exhaustive case analysis over the truth values of all propositional variables $p$ that appear in a formula.
 
 \begin{theorem}[Completeness]
@@ -1519,7 +1519,7 @@ As a simpler example than the invariant-induction theorem, consider transitivity
   \emph{Induction step:} Assume $s \to s_1$, $s_1 \to^* s'$, and $P(s_1, s')$.  We may apply the second rule defining $\to^*$, whose two premises become $s \to s_1$ and $s_1 \to^* s''$.  The first is one of the available premises of the induction step.  The second follows by the induction hypothesis about $P$.
 \end{proof}
 
-This sort of proof really is easier to follow in Coq code, so we especially encourage the reader to consult the mechanized version here!
+This sort of proof really is easier to follow in Rocq code, so we especially encourage the reader to consult the mechanized version here!
 
 
 \section{An Example with a Concurrent Program}
@@ -1641,7 +1641,7 @@ As is often the case, defining the invariant is the hard part of the proof, and 
 To recap that method, first we use Theorem \ref{invariant_induction} to show that $I$ really is an invariant of $\mathcal L \mid \mathcal L$.
 Next, we use Theorem \ref{invariant_weaken} to show that $I$ implies the original property of interest, that finished program states have value 2 for \texttt{global}.
 Most of the action is in the first step, where we must work through fussy details of all the different steps that could happen from a state within the invariant, using arithmetic reasoning in each case to either derive a contradiction (that step couldn't happen from this starting state) or show that a specific new state also belongs to the invariant.
-We leave those details to the Coq code, as usual.
+We leave those details to the Rocq code, as usual.
 
 The reader may be worried at this point that coming up with invariants can be rather tedious!
 In the next chapter, we meet a technique for finding invariants automatically, in some limited but important circumstances.
@@ -1944,7 +1944,7 @@ We first ``call the interpreter'' on the first subcommand $c_1$ with the origina
 The result of the ``recursive call'' is a new valuation $v_1$, which we then feed into another ``recursive call'' on $c_2$, whose result becomes the overall result.
 
 Why write this interpreter relationally instead of as a functional program?
-The most relevant answer applies to situations like ours as users of Coq or even of informal mathematics, where we must be very careful that all of our recursive definitions are well-founded.
+The most relevant answer applies to situations like ours as users of Rocq or even of informal mathematics, where we must be very careful that all of our recursive definitions are well-founded.
 The recursive version of this relation is clearly not well-founded, as it would run forever on a nonterminating $\mathsf{while}$ loop.
 It is also easier to incorporate \emph{nondeterminism}\index{nondeterminism} in the relational style, a possibility that we will return to at the end of the chapter.
 
@@ -2249,7 +2249,7 @@ $$\infer{\smallstepo{(v, \skipe || c)}{(v, c)}}{}$$
 And that's it!
 The new system faithfully captures our usual idea of threads executing in parallel.
 All of the theorems proved previously about contextual steps continue to hold.
-In fact, in the accompanying Coq code, literally the same proof scripts establish the new versions of the theorems, with no new human proof effort.
+In fact, in the accompanying Rocq code, literally the same proof scripts establish the new versions of the theorems, with no new human proof effort.
 It's not often that concurrency comes for free in a rigorous proof!
 
 
@@ -2729,7 +2729,7 @@ For nondeterministic languages, subtler conditions are called for, but we're hap
 As our first example compiler phase, we consider a limited form of \emph{constant folding}\index{constant folding}, where expressions with statically known values are replaced by constants.
 The whole of the optimization is (1) finding all maximal program subexpressions that don't contain variables and (2) replacing each such subexpression with its known constant value.
 We write $\cfold{c}$ for the result of applying this optimization on command $c$.
-(For the program transformations in this chapter, we stick to informal descriptions of how they operate, leaving the details to the accompanying Coq code.)
+(For the program transformations in this chapter, we stick to informal descriptions of how they operate, leaving the details to the accompanying Rocq code.)
 
 A program optimized in this way proceeds in a very regular manner, compared to executions of the original, unoptimized program.
 The small steps line up one-to-one.
@@ -2919,7 +2919,7 @@ We write $\smallstepcls{s}{\ell}{s'}$ to indicate that $s$ steps to $s'$ via zer
   \end{eqnarray*}
   The heart of this relation is a subrelation $\cong$ over valuations, capturing when they agree on all variables that are not reserved for temporaries, since the flattened program will feel free to scribble all over the temporaries.
   The details of $\cong$ are especially important to the key lemma, showing that flattening of expressions is sound, both taking in a $\cong$ premise and drawing a related $\cong$ conclusion.
-  The overall proof is not short, with quite a few lemmas, found in the Coq code.
+  The overall proof is not short, with quite a few lemmas, found in the Rocq code.
 \end{proof}
 
 \medskip
@@ -3130,7 +3130,7 @@ Following a very similar outline to what we used in Chapter \ref{operational_sem
   If $\bigstep{e}{v}$, then $\smallsteps{e}{v}$.
 \end{theorem}
 
-There are a few proof subtleties beyond what we encountered before, and the Coq formalization may be worth reading, to see those details.
+There are a few proof subtleties beyond what we encountered before, and the Rocq formalization may be worth reading, to see those details.
 
 Again as before, we have a natural way to build a transition system from any $\lambda$-term $e$, where $\mathcal L$ is the set of $\lambda$-terms.
 We define $\mathbb T(e) = \angled{\mathcal L, \{e\}, \to}$.
@@ -3263,7 +3263,7 @@ In Chapter \ref{operational_semantics}, we met \emph{evaluation contexts}\index{
 Though we showed off how easy they make it to add concurrency to a language, the payoff from this style may still not have been clear.
 In this chapter, we continue the theme of showing how evaluation contexts make it easy to \emph{add new features to a formal semantics with very concise descriptions}.
 That is, the game will be to continue extending a language definition \emph{modularly}, leaving unchanged as much of our old definitions and proofs as possible.
-Many of the concise conventions we adopt here do require explicit expansion in the associated Coq code, though fancier Coq frameworks would obviate that requirement as well.
+Many of the concise conventions we adopt here do require explicit expansion in the associated Rocq code, though fancier Rocq frameworks would obviate that requirement as well.
 
 \section{Last Chapter's Example Revisited}
 
@@ -3342,7 +3342,7 @@ $$\infer{\hasty{\Gamma}{(e_1, e_2)}{\tau_1 \times \tau_2}}{
 
 And that's the complete, unambiguous specification of this new feature!
 The type-soundness proof adapts very naturally.
-In fact, in the Coq code, almost exactly the same proof script as before keeps doing the job, a theme we will see continue throughout the chapter.
+In fact, in the Rocq code, almost exactly the same proof script as before keeps doing the job, a theme we will see continue throughout the chapter.
 
 \section{Sum Types}
 
@@ -3359,7 +3359,7 @@ $$\begin{array}{rrcl}
   \textrm{Types} & \tau &::=& \ldots \mid \tau + \tau
 \end{array}$$
 
-The $\mathsf{match}$ form, following pattern-matching in Coq and other languages, accounts for most of the syntactic complexity.
+The $\mathsf{match}$ form, following pattern-matching in Rocq and other languages, accounts for most of the syntactic complexity.
 Two new small-step rules explain its behavior.
 $$\infer{\smallstepo{\match{\inl{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{e_1}{x_1}{v}}}{}$$
 $$\infer{\smallstepo{\match{\inr{v}}{x_1}{e_1}{x_2}{e_2}}{\subst{e_2}{x_2}{v}}}{}$$
@@ -3514,7 +3514,7 @@ $$\infer{\rhasty{\Delta}{\Gamma}{e_1 || e_2}{\tau_1 \times \tau_2}}{
   & \rhasty{\Delta}{\Gamma}{e_2}{\tau_2}
 }$$
 
-After this change, literally the same Coq proof script as before establishes type soundness.
+After this change, literally the same Rocq proof script as before establishes type soundness.
 That's a pretty strong demonstration of modularity in semantics.
 
 
@@ -3964,7 +3964,7 @@ That lemma encapsulates once-and-for-all the use of induction in reasoning about
   By induction on the derivation of $\hoare{P}{c}{Q}$ and inversion on the derivation of $\bigstep{(h, v, c)}{(h', v')}$, appealing to Lemma \ref{hoare_while} in the appropriate case.
 \end{proof}
 
-We leave concrete example derivations to the accompanying Coq code, as that level of fiddly detail deserves to be machine-checked.
+We leave concrete example derivations to the accompanying Rocq code, as that level of fiddly detail deserves to be machine-checked.
 Note that there is a rather effective automated proof procedure lurking behind the rules introduced in this section:
 To prove a Hoare triple, first try applying the rule associated with its top-level syntax-tree constructor (e.g., assignment or loop rule).
 If the conclusion of that rule does unify with the goal, apply the rule and proceed recursively on its premises.
@@ -3973,7 +3973,7 @@ After a step like this one, it is guaranteed that the ``fundamental'' rule now a
 
 This process creates a pile of side conditions to be proved by other means, corresponding to the assertion implications generated by the rules for loops, assertions, and consequence.
 Many real-world tools based on Hoare logic discharge such goals using solvers for satisfiability modulo theories\index{satisfiability modulo theories}, otherwise known as SMT solvers\index{SMT solvers}.
-The accompanying Coq code just uses a modest Coq automation-tactic definition building on the proof steps we have been using all along.
+The accompanying Rocq code just uses a modest Rocq automation-tactic definition building on the proof steps we have been using all along.
 It is not complete by any means, but it does surprisingly well in the examples we step through, of low to moderate complexity.
 
 Before closing our discussion of the basics of Hoare logic, let's consider how it brings to bear some more of the general principles that we have met before.
@@ -4077,19 +4077,19 @@ In fact, we can prove that any other state is unstuck, though we won't bother he
 \label{embeddings}
 
 So far, in this book, we have followed the typographic conventions of ordinary mathematics and logic, as they would be worked out on whiteboards.
-In parallel, we have mechanized all of the definitions and proofs in Coq.
+In parallel, we have mechanized all of the definitions and proofs in Rocq.
 Often little tidbits of encoding challenge show up in mechanizing the proofs.
 As formal languages get more complex, it becomes more and more important to choose the right encoding.
 For instance, in the previous chapter, we repeatedly jumped through hoops to track the local variables of programs, threading variable valuations $v$ throughout everything.
-Coq already has built into it a respectable notion of variables; can we somehow reuse that mechanism, rather than roll our own new one?
+Rocq already has built into it a respectable notion of variables; can we somehow reuse that mechanism, rather than roll our own new one?
 This chapter gives a ``yes'' answer, working toward redefining last chapter's Hoare logic in a lighter-weight manner, along the way introducing some key terminology that is used to classify encoding choices.
 
 Since whiteboard math doesn't usually bother with encoding details, here we must break with our convention of using only standard notation in the book.
-Instead, we will use notation closer to literal Coq code, and, in fact, more of the technical action than usual is only found in the accompanying Coq source file.
+Instead, we will use notation closer to literal Rocq code, and, in fact, more of the technical action than usual is only found in the accompanying Rocq source file.
 
 \section{The Basics}\label{mixed}
 
-Recall some terminology introduced in Section \ref{metalanguage}: every formal proof is carried out in some \emph{metalanguage}\index{metalanguage}, which, in our case, is Coq's logic and programming language called Gallina\index{Gallina}.
+Recall some terminology introduced in Section \ref{metalanguage}: every formal proof is carried out in some \emph{metalanguage}\index{metalanguage}, which, in our case, is Rocq's logic and programming language called Gallina\index{Gallina}.
 A syntactic language that we formalize is called an \emph{object language}\index{object language}.
 Often it is convenient to do reasoning without any particular object language, as in this simple arithmetic function that can be defined directly in Gallina.
 \begin{eqnarray*}
@@ -4122,7 +4122,7 @@ We say that $\mt{foo}$ uses a \emph{shallow embedding}\index{shallow embedding},
 Conversely, $\mt{foo'}$ uses a \emph{deep embedding}\index{deep embedding}, since it goes via the inductively defined $\mt{exp}$ type.
 
 These extremes are not our only options.
-In higher-order logics like Coq's, we may also choose what might be called \emph{mixed embeddings}\index{mixed embedding}, which define syntax-tree types that allow some use of general functions from the metalanguage.
+In higher-order logics like Rocq's, we may also choose what might be called \emph{mixed embeddings}\index{mixed embedding}, which define syntax-tree types that allow some use of general functions from the metalanguage.
 Here's an example, as an alternative definition of $\mt{exp}$.
 \encoding
 \begin{eqnarray*}
@@ -4156,9 +4156,9 @@ With a bit of subtlety, we can define an interpreter for this language, too.
 
 Note how, in the $\mt{Let}$ case, since the body $e_2$ is a function, before evaluating it, we call it on the result of evaluating $e_1$.
 This language would actually be sufficient even if we removed the $\mt{Var}$ constructor and the $v$ argument of the interpreter.
-Coq's normal variable binding is enough to let us model interesting programs and prove things about them by induction on syntax.
+Rocq's normal variable binding is enough to let us model interesting programs and prove things about them by induction on syntax.
 
-It is important here that Coq's induction principles give us useful induction hypotheses, for constructors whose recursive arguments are functions.
+It is important here that Rocq's induction principles give us useful induction hypotheses, for constructors whose recursive arguments are functions.
 The second argument of $\mt{Let}$ above is an example.
 When we do induction on expression syntax to establish $\forall e. \; P(e)$, the case for $\mt{Let} \; e_1 \; e_2$ includes two induction hypotheses.
 The first one is standard: $P(e_1)$.
@@ -4222,7 +4222,7 @@ Much of the details are the same as last chapter, including in a rule of consequ
 The most interesting new wrinkle is in the rule for $\mt{Bind}$, where the premise about the body command $c_2$ starts with universal quantification over all possible results $r$ of executing $c_1$.
 That result is passed off, via function application, both to the body $c_2$ and to $Q$, which serves as the postcondition of $c_1$ and the precondition of $c_2$.
 
-This Hoare logic can be used to verify the two example programs from earlier in this section; see the accompanying Coq code for details.
+This Hoare logic can be used to verify the two example programs from earlier in this section; see the accompanying Rocq code for details.
 We also have a standard soundness theorem.
 \begin{theorem}
   If $\hoare{P}{c}{Q}$ and $P(h)$ for some heap $h$, then let $(h', r) = \denote{c}h$.  It follows that $Q(r, h')$.
@@ -4246,7 +4246,7 @@ Here's an example of looping in action, in a program that returns the address of
 \end{eqnarray*}
 
 With the addition of nontermination, it's no longer straightforward to write an interpreter for the language.
-Instead, we implement a small-step operational semantics $\to$; see the accompanying Coq code for details.
+Instead, we implement a small-step operational semantics $\to$; see the accompanying Rocq code for details.
 We build an extended Hoare logic, keeping all the rules from last section and adding this new one.
 \invariants
 Like before, it is parameterized on a loop invariant, but now the loop invariant takes a loop-body outcome as parameter.
@@ -4288,7 +4288,7 @@ Note that this version of the theorem still tells us interesting things about pr
 It is easy to implement runtime assertion checking with code that performs some test and runs $\mt{Fail}$ if the test does not pass.
 An infinite-looping program may perform such tests infinitely often, and we learn that none of the tests ever fail.
 
-The accompanying Coq code demonstrates another advantage of this mixed-embedding style: we can extract\index{extraction} our programs to OCaml\index{OCaml} and run them efficiently.
+The accompanying Rocq code demonstrates another advantage of this mixed-embedding style: we can extract\index{extraction} our programs to OCaml\index{OCaml} and run them efficiently.
 That is, rather than using functional programming to implement our three kinds of side effects, we implement them directly with OCaml's mutable heap, unbounded recursion, and exceptions, respectively.
 As a result, our extracted programs achieve the asymptotic performance that we would expect, thinking of them as C-like code, where interpreters in a pure functional language like Gallina would necessarily add at least an extra logarithmic factor in the modeling of unboundedly growing heaps.
 
@@ -4337,7 +4337,7 @@ $$\infer{\smallstep{(h, \mt{Alloc} \; n)}{(\mupd{h}{a}{0^n}, \mt{Return} \; a)}}
 A few remarks about the last four rules:
 The basic $\mt{Read}$ and $\mt{Write}$ operations now get \emph{stuck} when accessing unmapped addresses.
 The premise of the rule for $\mt{Alloc}$ enforces that address $a$ denotes a currently unmapped memory region of size $n$.
-We use a variety of convenient notations that we won't define in detail here, referring instead to the accompanying Coq code.
+We use a variety of convenient notations that we won't define in detail here, referring instead to the accompanying Rocq code.
 Another notation uses $0^n$ to refer informally to a sequence of $n$ zeroes to write into memory.
 Similarly, the conclusion of the $\mt{Free}$ rule unmaps a whole size-$n$ region, starting at $a$.
 We could also have chosen to enforce in this rule that the region starts out as mapped into $h$.
@@ -4481,7 +4481,7 @@ $$\infer{\hoare{P * R}{c}{\lambda r. \; Q(r) * R}}{
 In other words, any Hoare triple can be extended by conjoining an arbitrary predicate $R$ in both precondition and postcondition.
 Even more intuitively, when a program satisfies a spec, it also satisfies an extended spec that records the state of some other part of memory that is untouched (i.e., is outside the command's footprint).
 
-For the pragmatics of proving particular programs, we defer to the accompanying Coq code.
+For the pragmatics of proving particular programs, we defer to the accompanying Rocq code.
 \modularity
 However, for modular proofs, the frame rule has such an important role that we want to emphasize it here.
 It is possible to define (recursively) a predicate $\mt{llist}(\ell, p)$, capturing the idea that the heap contains exactly an imperative linked list, rooted at pointer $p$, representing functional linked list $\ell$.
@@ -4522,7 +4522,7 @@ In this case, we use the invariant $\lambda (h, c). \; \hoare{\{h\}}{c}{Q}$.
 That is, assert a Hoare triple where the precondition enforces exact heap equality with the current heap.
 The postcondition can remain the same throughout execution.
 
-A few key lemmas are interesting enough to mention here; we leave other details to the Coq code.
+A few key lemmas are interesting enough to mention here; we leave other details to the Rocq code.
 
 First, we need to prove that this fancier invariant implies the one from the theorem statement, and the most direct statement needs to be strengthened, to get the induction to go through.
 
@@ -4567,28 +4567,28 @@ Again, without the introduction of the $R$ variable, we would get stuck proving 
 Our exercises so far have been confined to proofs of programs in idealized programming languages.
 How can proof assistants be used to derive results about full-scale languages?
 Developers are already used to coordinating build processes\index{build processes} that plumb together multiple languages and tools.
-A proof assistant like Coq can become one tool in such a build flow.
+A proof assistant like Rocq can become one tool in such a build flow.
 However, the interesting wrinkle that arises is the chance to do more than just get tools cooperating on building executable code.
 We can also get tools cooperating on generating proofs of parts of the system.
 
 It is worth emphasizing that this whole subject is a very active area of research.
 There are many competing approaches, and it is not clear which will be most practical in the long run.
 With this chapter, we survey the interesting design dimensions and approaches to them that are known today.
-We also go into more detail on one avant-garde approach, of verified compilation of shallowly embedded programs to deeply embedded programs in Coq.
+We also go into more detail on one avant-garde approach, of verified compilation of shallowly embedded programs to deeply embedded programs in Rocq.
 
 \section{Where Does the Buck Stop?}
 
 For any system where we really care about correctness (or its special case of security\index{security}), it is common to delineate a \emph{trusted code base (TCB)}\index{trusted code base}\index{TCB}: the parts of the system where bugs could invalidate correctness.
 By implication, system components outside the TCB can be arbitrarily buggy without endangering correctness.
 
-When we use Coq, the Coq proof checker itself is in the TCB.
+When we use Rocq, the Rocq proof checker itself is in the TCB.
 Implicitly, all the infrastructure below the proof checker is also trusted.
-That includes the OCaml\index{OCaml} compiler (since Coq is implemented in OCaml), the operating-system kernel\index{operating systems}, the processor beneath\index{processors}, and so on.
-Interestingly, most of Coq is \emph{not} trusted.
+That includes the OCaml\index{OCaml} compiler (since Rocq is implemented in OCaml), the operating-system kernel\index{operating systems}, the processor beneath\index{processors}, and so on.
+Interestingly, most of Rocq is \emph{not} trusted.
 For instance, the tactic engine outputs proof terms\index{proof terms} in a core language, and we only need to trust the (relatively small) checker for that language.
 
 The point is, we always draw the trust boundary somewhere, and we always reason informally starting at some layer of a system.
-Our real-world-connecting examples of prior chapters have stopped at extracting OCaml code from Coq developments.
+Our real-world-connecting examples of prior chapters have stopped at extracting OCaml code from Rocq developments.
 We could avoid trusting extraction (and the OCaml compiler) by instead proving properties of C abstract syntax trees.
 However, then we are still trusting the C compiler!
 So we could verify that compiler and even the operating system its outputs run on.
@@ -4608,7 +4608,7 @@ Oversimplifying a bit, we are considering what is the ``last level'' of a proof 
 \subsection{Modes Based on Extraction}
 
 The easiest ``last level'' connection is via \emph{extraction}\index{extraction}, which translates Gallina programs into functional programs in languages like OCaml\index{OCaml}, Haskell\index{Haskell}, and Scheme\index{Scheme}.
-Other proof assistants than Coq tend to include similar extraction facilities.
+Other proof assistants than Rocq tend to include similar extraction facilities.
 When the formal object of study is already a purely functional program, extraction is a very natural fit.
 Its main downsides are TCB size and performance.
 On the TCB front, a variety of compilers, including the one for extraction itself, remain trusted.
@@ -4633,15 +4633,15 @@ However, the flexibility can be very appealing, with a straightforward means of 
 Another ``last level'' strategy is to do explicit translation between abstract syntax trees and concrete, textual code formats.
 These translations usually have nothing proved about them, meaning they belong to TCBs, but often the translators are simple enough that it is relatively unworrying to trust them.
 
-In one direction, we implement a tool that takes in, say, the textual syntax of C code, outputting Coq source code for corresponding explicit syntax trees.
-Now we can reason about these trees like any other mathematical objects coded manually in Coq.
+In one direction, we implement a tool that takes in, say, the textual syntax of C code, outputting Rocq source code for corresponding explicit syntax trees.
+Now we can reason about these trees like any other mathematical objects coded manually in Rocq.
 A downside of this approach is that it is relatively complex to parse mainstream programming languages, yet we are trusting just such a parser.
 However, this style often supports the smoothest integration with legacy code bases.
 
-In the other direction, we write a Coq function from syntax trees to strings of concrete code in some widely used language.
+In the other direction, we write a Rocq function from syntax trees to strings of concrete code in some widely used language.
 This function is still trusted, but it tends to be much shorter and worthy of trust than its inverse.
-Coq can be run as part of a build process, printing to the screen the string that has been computed from a syntax tree.
-A scripting language can be used to extract the string from Coq's output, write it to a file, and call a conventional compiler.
+Rocq can be run as part of a build process, printing to the screen the string that has been computed from a syntax tree.
+A scripting language can be used to extract the string from Rocq's output, write it to a file, and call a conventional compiler.
 A major challenge of this approach is that only deeply embedded languages have straightforward printing to concrete syntax, in practice, while shallowly embedded languages tend to be easier to do proofs about.
 
 
@@ -4652,11 +4652,11 @@ Our discussion so far leaves out an important dimension.
 Often significant projects are divided into libraries\index{libraries}, and we want to be able to prove libraries independently of each other.
 We have a few choices for facing this reality of large-scale development.
 
-The easiest approach is to use Coq pipelines to generate single libraries, which are linked outside of Coq.
+The easiest approach is to use Rocq pipelines to generate single libraries, which are linked outside of Rocq.
 Our libraries may even be linked\index{linking} with modules written in other languages or that would otherwise resist whatever proof methods we used.
 These connections across languages may enlarge the TCB significantly, but we can boost performance by linking with crucial but unverified code.
 
-We may also want to give modules first-class status in Coq and prove the correctness of linking mechanisms.
+We may also want to give modules first-class status in Rocq and prove the correctness of linking mechanisms.
 In concert with verified compilers\index{compiler verification}, possibilities open up to do linking across languages without expanding the TCB.
 All languages can be compiled to some common format, like assembly language, and the compiled version of each library can be given a specification in a common logical format, like a particular Hoare logic.
 With all the pieces in place, we wind up with the semantics of the common language in the TCB, but the compilers and all aspects of their source languages stay outside the TCB.
@@ -4664,7 +4664,7 @@ With all the pieces in place, we wind up with the semantics of the common langua
 
 \section{Case Study: From a Mixed Embedding to a Deep Embedding}
 
-This chapter's associated Coq code works out a case study of verified compilation from a mixed embedding to a deep embedding, realizing one of the ``last level'' options above that keeps the best of both worlds: straightforward program proof with a mixed embedding, but the smaller TCB and improved performance that comes from outputting concrete C\index{C programming language} syntax from Coq.
+This chapter's associated Rocq code works out a case study of verified compilation from a mixed embedding to a deep embedding, realizing one of the ``last level'' options above that keeps the best of both worlds: straightforward program proof with a mixed embedding, but the smaller TCB and improved performance that comes from outputting concrete C\index{C programming language} syntax from Rocq.
 
 \subsection{Source and Target Languages}
 
@@ -4679,7 +4679,7 @@ $$\begin{array}{rrcl}
   \textrm{Statements} &s &::=& \skipe \mid \assign{x}{e} \mid \writeto{e}{e} \mid s; s \mid \ifte{e}{s}{s} \mid \while{e}{s}
 \end{array}$$
 
-We assume standard small-step semantics for both languages, referring to the Coq code for details.
+We assume standard small-step semantics for both languages, referring to the Rocq code for details.
 A state of the source language takes the form $(h, c)$ for a heap $h$, while a state of the target language adds a variable valuation $v$, for triples $(h, v, c)$.
 
 \subsection{Formal Compilation}
@@ -4715,7 +4715,7 @@ That is, any numeric expression may be injected into the deep embedding \emph{as
 How can we hope to embed all Gallina expressions in C?
 The details of the command-compilation rules reveal why we are safe, so let us turn to those rules.
 
-The rules we show here are simplified from the full set in the Coq development, supporting an even smaller subset of the source language, to make the presentation easier to understand.
+The rules we show here are simplified from the full set in the Rocq development, supporting an even smaller subset of the source language, to make the presentation easier to understand.
 The rule for lone $\mt{Return}$ commands is simple, delegating most of the work to expression compilation, using a designated variable \texttt{result} to hold the final answer of a command.
 
 $$\infer{\dscomp{v}{\mt{Return} \; n}{\assign{\texttt{result}}{e}}}{
@@ -4749,7 +4749,7 @@ In other words, if we tried to use the constant rule directly to prove the quant
 
 Similar rules are present for $\mt{Read}$ and $\mt{Write}$, which interestingly are compiled the same way as $\mt{Return}$.
 From a syntactic, compilation standpoint, they do not behave differently from pure computation.
-More involved and raising new complications is the rule for loops; see the Coq code for details.
+More involved and raising new complications is the rule for loops; see the Rocq code for details.
 
 \subsection{Soundness Proof}
 
@@ -4779,7 +4779,7 @@ More involved and raising new complications is the rule for loops; see the Coq c
 \end{proof}
 
 This result can be composed with soundness of any Hoare logic for the source language.
-The associated Coq code defines one, essentially following our separation logic\index{separation logic} from last chapter.
+The associated Rocq code defines one, essentially following our separation logic\index{separation logic} from last chapter.
 
 \begin{theorem}
   If $\hoare{P}{c}{Q}$, $P(h)$, $\dscomp{v}{c}{s}$, and $\texttt{result} \notin \dom{v}$, then it is an invariant of the transition system starting in $(h, v, s)$ that execution never gets stuck.
@@ -4790,7 +4790,7 @@ The associated Coq code defines one, essentially following our separation logic\
 \end{proof}
 
 At this point, we can verify the high-level program conveniently while arriving at a low-level program automatically.
-That low-level program is easy to print as a string of concrete C code, as the associated Coq code demonstrates.
+That low-level program is easy to print as a string of concrete C code, as the associated Rocq code demonstrates.
 We only trust the simple printing process, not the compiler that got us from a mixed embedding to a C-like syntax tree.
 
 
@@ -4851,7 +4851,7 @@ When we descend into the first argument or second argument of a $\mt{bind}$, we 
 We also use transitivity of $\supseteq$ to chain together multiple rewritings.
 Finally, we use Theorem \ref{bindret} whenever we have reduced a prefix of a computation into deterministic code.
 
-The associated Coq code contains an example of this kind of refinement in action.
+The associated Rocq code contains an example of this kind of refinement in action.
 There are enough details that mechanized assistance is especially worthwhile.
 
 \section{Refinement for Abstract Data Types}
@@ -4941,7 +4941,7 @@ For instance, we can use Theorem \ref{refinemethod} to rewrite method bodies fur
 We will especially want to do so to replace subcomputations of the form $\{s' \mid A(s') = s\}$, which stand for calling $A^{-1}$ on particular values.
 Of course not every function has an inverse as a total relation, let alone a total function, so there is no purely mechanical way to rewrite inverse function calls into executable code.
 
-See the associated Coq code for some examples of these rules in action for concrete program derivations.
+See the associated Rocq code for some examples of these rules in action for concrete program derivations.
 It turns out that Theorems \ref{adtrefl} through \ref{repchange} are \emph{complete}: any correct refinement fact on ADTs can be proved using them alone.
 
 \section{Another Example Refinement Principle: Adding a Cache}
@@ -5025,7 +5025,7 @@ Though this kind of concurrent programming is very expressive and often achieves
 A popular name for this pitfall is \emph{the state-explosion problem}\index{state-explosion problem}.
 
 Note also that we have omitted any looping constructs from this object language, so all programs terminate.
-The Coq formalization uses the mixed-embedding\index{mixed embedding} style, making it not entirely obvious that all programs really do terminate.
+The Rocq formalization uses the mixed-embedding\index{mixed embedding} style, making it not entirely obvious that all programs really do terminate.
 In any case, if we must tame the state-explosion problem, we already have our work cut out for us, even when the state space rooted at any concrete state is finite!
 
 
@@ -5116,7 +5116,7 @@ This reordering is an example of commutativity in action.
 
 By recognizing and exploiting other varieties of commutativity, we can shrink state spaces even further, even reducing the spaces of certain interesting program families from exponential size to linear size.
 A popular technique of this kind is \emph{partial-order reduction}\index{partial-order reduction}.
-We formalize a simple variant of it in this section (and in the accompanying Coq code), then sketch a less formal generalization in the chapter's final section.
+We formalize a simple variant of it in this section (and in the accompanying Rocq code), then sketch a less formal generalization in the chapter's final section.
 
 \newcommand{\summ}[2]{\mt{summarize}(#1, #2)}
 
@@ -5228,7 +5228,7 @@ $$\infer{\tof{x \leftarrow c_1; c_2(x)}{n_1 + n_2 + 1}}{
 
 It may be surprising that, in our formal mixed embedding, there exist commands with no provable upper bounds, according to this relation.
 We leave it as an exercise to the reader to find a concrete example.
-(Actually, the Coq code includes an example and its proof of unboundedness.)
+(Actually, the Rocq code includes an example and its proof of unboundedness.)
 
 One last ingredient is to work with a relation $\to^i$, which is the $i$-way self-composition of $\to$.
 It is easy to show that whenever $x \to^* y$, there exists $i$ such that $x \to^i y$.
@@ -5463,7 +5463,7 @@ When a thread takes a lock, it appears as if \emph{a memory chunk satisfying tha
 Conversely, when a thread releases a lock, it appears as if \emph{the lock grabs a memory chunk satisfying the invariant out of the local memory space}.
 The rules are coordinating conceptual ownership transfers between local memory and the global lock memory.
 
-The accompanying Coq code shows a few example verifications of interesting programs.
+The accompanying Rocq code shows a few example verifications of interesting programs.
 
 \section{Soundness Proof}
 
@@ -5596,7 +5596,7 @@ The threads of the two complementary operations \emph{rendezvous} and pass the m
 Packages of semantics and proof techniques for such languages are often called \emph{process algebras}\index{process algebra}, as they support an algebraic style of reasoning about the source code of message-passing programs.
 That is, we prove laws very similar to the familiar equations of algebra and use those laws to ``rewrite'' inside larger processes, by replacing their subprocesses with others we have shown suitably equivalent.
 It's a powerful technique for highly modular proofs, which we develop in the rest of this chapter for one concrete synchronous language.
-Well-known process algebras include the $\pi$-calculus\index{$\pi$-calculus} and the Calculus of Communicating Systems\index{Calculus of Communicating Systems}; the one we focus on is idiosyncratic and designed partly to make the Coq proofs manageable.
+Well-known process algebras include the $\pi$-calculus\index{$\pi$-calculus} and the Calculus of Communicating Systems\index{Calculus of Communicating Systems}; the one we focus on is idiosyncratic and designed partly to make the Rocq proofs manageable.
 
 
 \section{An Object Language with Synchronous Message Passing}
@@ -5753,13 +5753,13 @@ Refinement is also a preorder\index{preorder}.
   Set the new simulation relation as $R_1 \circ R_2$, defined to contain a pair $(p, q)$ iff there exists $r$ with $p \; R_1 \; r$ and $r \; R_2 \; q$.
 \end{proof}
 
-The accompanying Coq code includes several examples of verifying moderately complex processes, by manual tailoring of simulation relations.
+The accompanying Rocq code includes several examples of verifying moderately complex processes, by manual tailoring of simulation relations.
 We leave those details to the code, turning now instead to further algebraic properties that allow us to \emph{compose} laborious manual proofs about components, in a black-box way.
 
 
 \section{The Algebra of Refinement}
 
-We finish the chapter with a tour through some algebraic properties of refinement that are proved in the Coq source.
+We finish the chapter with a tour through some algebraic properties of refinement that are proved in the Rocq source.
 We usually omit proof details here, though we work out one interesting example in more detail.
 
 Perhaps the greatest pay-off from the refinement approach is that \emph{refinement is a congruence for parallel composition}\index{congruence}.
@@ -5799,7 +5799,7 @@ A similar congruence property holds for duplication, and we'll take this opportu
 
 \newcommand{\neverUses}[2]{\mt{neverUses}(#1, #2)}
 
-We wrap up the chapter with a few more algebraic properties, which the Coq code puts to good use in larger examples.
+We wrap up the chapter with a few more algebraic properties, which the Rocq code puts to good use in larger examples.
 We sometimes rely on a predicate $\neverUses{c}{p}$, to express that, no matter how other threads interact with it, process $p$ will never perform a send or receive operation on channel $c$.
 
 \begin{theorem}
@@ -5877,7 +5877,7 @@ $$\infer{\send{c}{v}{p} : \; \send{c}{\sigma}{\tau}}{
 The only wrinkle in these rules is the use of universal quantification for the receive rule, to force the body to type-check under any well-typed value read from the channel.
 Actually, such proof obligations may be nontrivial when we encode this object language in the mixed-embedding\index{mixed embeddings} style of Section \ref{mixed}, where the body $p$ in the rule could include arbitrary metalanguage computation, to choose a body based on the value $v$ read from the channel.
 
-The associated Coq code demonstrates tactics to deal with that complication, for automatic type-checking of concrete programs.
+The associated Rocq code demonstrates tactics to deal with that complication, for automatic type-checking of concrete programs.
 That code is also where we keep all of our concrete examples of object-language programs.
 
 For the rest of this chapter, we will interpret last chapter's object language as a transition system with one small change: we only allow silent steps\index{silent steps}.
@@ -5940,13 +5940,13 @@ Our deadlock-freedom property is easy to reestablish.
   If $p_1 : \tau$ and $p_2 : \compl{\tau}$, then it is an invariant of $\parl{p_1}{p_2}$ that an intermediate process is either $\parl{\done}{\done}$ or can take a step.
 \end{theorem}
 \begin{proof}
-  Literally the same Coq proof script as for Theorem \ref{stsound1}!
+  Literally the same Rocq proof script as for Theorem \ref{stsound1}!
 \end{proof}
 
 \section{Multiparty Session Types}\index{multiparty session types}
 
 New complications arise when more than two parties are communicating in a protocol.
-The Coq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in stock.
+The Rocq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in stock.
 Many other such examples appear in the real world.
 
 Now it is no longer possible to start from one party's view of a protocol and compute any other party's view.
@@ -6071,9 +6071,9 @@ Here is a sketch of the key lemmas.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{\label{coqref}The Coq Proof Assistant}
+\chapter{\label{coqref}The Rocq Proof Assistant}
 
-Coq\index{Coq} is a proof-assistant software package developed as open source, primarily by Inria\index{Inria}, the French national computer-science lab.
+Rocq\index{Rocq} is a proof-assistant software package developed as open source, primarily by Inria\index{Inria}, the French national computer-science lab.
 
 \section{Installation and Basic Use}
 
@@ -6081,29 +6081,29 @@ The project home page is:
 \begin{center}
   \url{https://coq.inria.fr/}
 \end{center}
-The code associated with this book is designed to work with Coq versions 8.11 and higher.
+The code associated with this book is designed to work with Rocq versions 8.11 and higher.
 The project Web site makes a number of versions available, and versions are also available in popular OS package distributions, along with binaries for platforms where open-source package systems are less common.
-We assume that readers have installed Coq by one of those means or another.
-It will also be almost essential to use some graphical interface for Coq editing.
+We assume that readers have installed Rocq by one of those means or another.
+It will also be almost essential to use some graphical interface for Rocq editing.
 The author prefers Proof General\index{Proof General}, an Emacs\index{Emacs} mode:
 \begin{center}
   \url{http://proofgeneral.inf.ed.ac.uk/}
 \end{center}
-It should be possible to follow along using CoqIDE\index{CoqIDE}, a standalone tool distributed with Coq itself, but we will not give any CoqIDE-specific instructions.
+It should be possible to follow along using RocqIDE\index{RocqIDE}, a standalone tool distributed with Rocq itself, but we will not give any RocqIDE-specific instructions.
 
-The Proof General instructions are simple: after installing, within a regular Emacs session, open a file with the Coq extension \texttt{.v}.
+The Proof General instructions are simple: after installing, within a regular Emacs session, open a file with the Rocq extension \texttt{.v}.
 Move the point (cursor) to a position where you would like to examine the current state of a proof, etc.
-Then press C-C C-RET (``control-C, control-enter'') to run Coq up to that point.
-Several display panes will open, showing different aspects of Coq's state, any error messages it wants to report, etc.
+Then press C-C C-RET (``control-C, control-enter'') to run Rocq up to that point.
+Several display panes will open, showing different aspects of Rocq's state, any error messages it wants to report, etc.
 This feature is the main workhorse of Proof General.
-It can be used both to move \emph{forward}, checking that Coq accepts a command; and to move \emph{backward}, to undo commands processed previously.
+It can be used both to move \emph{forward}, checking that Rocq accepts a command; and to move \emph{backward}, to undo commands processed previously.
 
 Proof General has plenty of other bells and whistles, but we won't go into them here.
 
 \section{Tactic Reference}
 
-\emph{Tactics} are the commands run in Coq to advance the state of a proof, corresponding to deduction steps at different granularities.
-Here we collect all of the short explanations of tactics that appear in Coq source files associated with the chapters included in this document.
+\emph{Tactics} are the commands run in Rocq to advance the state of a proof, corresponding to deduction steps at different granularities.
+Here we collect all of the short explanations of tactics that appear in Rocq source files associated with the chapters included in this document.
 Note that many of these are specific to the \texttt{Frap} library distributed with this book, where built-in tactics often do quite similar things, but in a way that the author judges to be more of a hassle for beginners.
 
 \begin{description}
@@ -6138,21 +6138,21 @@ Note that many of these are specific to the \texttt{Frap} library distributed wi
   \item[\texttt{subst}] Remove all hypotheses like $x = e$ for variables $x$, simply replacing all uses of $x$ by $e$.
   \item[\texttt{symmetry}] When proving $X = Y$, switch to proving $Y = X$.
   \item[\texttt{transitivity} $X$] When proving $Y = Z$, switch to proving $Y = X$ and $X = Z$.
-  \item[\texttt{trivial}] Coq maintains a database of simple proof steps, such as proving a fact by direct appeal to a matching hypothesis.  \texttt{trivial} asks to try all such simple steps.
+  \item[\texttt{trivial}] Rocq maintains a database of simple proof steps, such as proving a fact by direct appeal to a matching hypothesis.  \texttt{trivial} asks to try all such simple steps.
   \item[\texttt{unfold} $X$] Replace $X$ by its definition.
   \item[\texttt{unfold} $X$ \texttt{in} \texttt{*}] Like the last one, but unfolds in hypotheses as well as conclusion.
 \end{description}
 
 \section{Further Reading}
 
-For more Coq information, we recommend a few books (beyond the Coq reference manual).  Some focus purely on introducing Coq:
+For more Rocq information, we recommend a few books (beyond the Rocq reference manual).  Some focus purely on introducing Rocq:
 
 \begin{itemize}
   \item Adam Chlipala, \emph{Certified Programming with Dependent Types}, MIT Press, \url{http://adam.chlipala.net/cpdt/}
-  \item Yves Bertot and Pierre Cast\'eran, \emph{Interactive Theorem Proving and Program Development: Coq'Art: The Calculus of Inductive Constructions}, Springer, \url{https://www.labri.fr/perso/casteran/CoqArt/}
+  \item Yves Bertot and Pierre Cast\'eran, \emph{Interactive Theorem Proving and Program Development: Rocq'Art: The Calculus of Inductive Constructions}, Springer, \url{https://www.labri.fr/perso/casteran/RocqArt/}
 \end{itemize}
 
-The first of these two, especially, goes in-depth on the automated proof-scripting principles showcased from time to time in the Coq example code associated with the present book.
+The first of these two, especially, goes in-depth on the automated proof-scripting principles showcased from time to time in the Rocq example code associated with the present book.
 
 There are also other sources that introduce program-reasoning principles at the same time, including:
 

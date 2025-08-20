@@ -1,4 +1,4 @@
-Require Import String.
+From Stdlib Require Import String.
 
 
 Notation var := string.

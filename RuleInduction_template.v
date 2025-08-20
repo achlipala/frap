@@ -90,7 +90,7 @@ Admitted.
 
 (** * Permutation *)
 
-(* Lifted from the Coq standard library: *)
+(* Lifted from the Rocq standard library: *)
 Inductive Permutation {A} : list A -> list A -> Prop :=
 | perm_nil :
     Permutation [] []
@@ -289,7 +289,7 @@ Proof.
   propositional.
 
   excluded_middle (interp vars p); propositional.
-  (* Note that use of excluded middle is a bit controversial in Coq,
+  (* Note that use of excluded middle is a bit controversial in Rocq,
    * and we'll generally be trying to avoid it,
    * but it helps enough with this example that we don't sweat the details. *)
 Qed.

@@ -326,11 +326,9 @@ Ltac model_check_step0 :=
 Ltac model_check_step :=
   match goal with
   | [ |- multiStepClosure _ ?inv1 _ ] =>
-    model_check_step0;
+    model_check_step0; simplify;
     match goal with
-    | [ |- multiStepClosure _ ?inv2 _ ] =>
-      (assert (inv1 = inv2) by compare_sets; fail 3)
-      || idtac
+    | [ |- multiStepClosure _ ?inv2 _ ] => sets_different inv1 inv2
     end
   end.
 
@@ -605,7 +603,7 @@ Proof.
   constructor.
 Qed.
 
-(* We ask Coq to remember this lemma as a hint, which will be used by the
+(* We ask Rocq to remember this lemma as a hint, which will be used by the
  * model-checking tactics that we refrain from explaining in detail. *)
 Local Hint Rewrite add2_init_is.
 

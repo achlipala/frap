@@ -10,7 +10,7 @@ Set Implicit Arguments.
 
 (* Let's look at another example of what we can model with operational
  * semantics: correctness of compiler transformations.  Our inspiration here is
- * the seminal project CompCert, which uses Coq to verify a realistic C
+ * the seminal project CompCert, which uses Rocq to verify a realistic C
  * compiler.  We will adopt the same *simulation*-based techniques as CompCert,
  * albeit on a simpler language and with simpler compiler phases.  We'll stick
  * to transformations from the source language to itself, since that's enough to
@@ -546,7 +546,7 @@ Compute cfold month_boundaries_in_days.
 
 (* It will be helpful to have a shorthand for steps that don't generate output.
  * [Notation] is a useful way to introduce a shorthand so that it looks exactly
- * the same as its expansion, to all Coq tactics. *)
+ * the same as its expansion, to all Rocq tactics. *)
 Notation silent_cstep := (fun a b => cstep a None b).
 
 (* Silent steps have a few interesting properties, proved here. *)
@@ -1354,7 +1354,7 @@ Qed.
 
 Local Hint Resolve self_prime_contra : core.
 
-(* We've now proved all properties of [tempVar] that we need, so let's ask Coq
+(* We've now proved all properties of [tempVar] that we need, so let's ask Rocq
  * not to reduce applications of it anymore, to keep goals simpler. *)
 Opaque tempVar.
 

@@ -1,4 +1,5 @@
-Require Import Frap Program.
+Require Import Frap.
+From Stdlib Require Import Program.
 
 
 (** * Some data fodder for us to compute with later *)
@@ -431,7 +432,7 @@ Fixpoint allSublists {A} (ls : list A) : list (list A) :=
 
 Compute allSublists [1; 2; 3].
 
-Fixpoint sublistSummingTo (ns : list nat) (target : nat) : option (list nat) :=
+Definition sublistSummingTo (ns : list nat) (target : nat) : option (list nat) :=
   match filter (fun ns' => if sum ns' ==n target then true else false) (allSublists ns) with
   | ns' :: _ => Some ns'
   | [] => None

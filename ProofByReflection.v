@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: proof by reflection
+  * Supplementary Rocq material: proof by reflection
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -10,10 +10,10 @@ Set Implicit Arguments.
 Set Asymmetric Patterns.
 
 
-(* Our last "aside" on effective Coq use (in IntroToProofScripting.v)
+(* Our last "aside" on effective Rocq use (in IntroToProofScripting.v)
  * highlighted a very heuristic approach to proving.  As an alternative, we will
  * study a technique called proof by reflection.  We will write, in Gallina (the
- * logical functional-programming language of Coq), decision procedures with
+ * logical functional-programming language of Rocq), decision procedures with
  * proofs of correctness, and we will appeal to these procedures in writing very
  * short proofs.  Such a proof is checked by running the decision procedure.
  * The term _reflection_ applies because we will need to translate Gallina
@@ -44,7 +44,7 @@ Set Printing All.
 Print even_256.
 Unset Printing All.
 
-(* Here we see a term of Coq's core proof language, which we don't explain in
+(* Here we see a term of Rocq's core proof language, which we don't explain in
  * detail, but roughly speaking such a term is a syntax tree recording which
  * lemmas were used, and how their quantifiers were instantiated, to prove a
  * theorem.  This Ltac procedure always works (at least on machines with
@@ -138,7 +138,7 @@ Theorem even_255 : isEven 255.
 Proof.
   Fail prove_even_reflective.
 Abort.
-(* Coq reports that [reflexivity] can't prove [false = true], which makes
+(* Rocq reports that [reflexivity] can't prove [false = true], which makes
  * perfect sense! *)
 
 (* Our tactic [prove_even_reflective] is reflective because it performs a
@@ -389,7 +389,7 @@ Section monoid.
 End monoid.
 
 (* Extensions of this basic approach are used in the implementations of the
- * [ring] and [field] tactics that come packaged with Coq. *)
+ * [ring] and [field] tactics that come packaged with Rocq. *)
 
 
 (** * Set Simplification for Model Checking *)
@@ -586,7 +586,7 @@ Fixpoint formulaDenote (atomics : asgn) (f : formula) : Prop :=
     | Imp f1 f2 => formulaDenote atomics f1 -> formulaDenote atomics f2
   end.
 
-Require Import ListSet.
+From Stdlib Require Import ListSet.
 
 Section my_tauto.
   Variable atomics : asgn.

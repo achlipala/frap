@@ -554,7 +554,7 @@ Module Stlc.
 
     right.
     (* Some automation is needed here to maintain compatibility with
-     * name generation in different Coq versions. *)
+     * name generation in different Rocq versions. *)
     match goal with
     | [ H1 : value e1, H2 : has_ty $0 e1 _ |- _ ] => invert H1; invert H2
     end.

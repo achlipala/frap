@@ -6,10 +6,10 @@
 Require Import Frap.
 (* This [Import] command is for including a library of code, theorems, tactics, etc.
  * Here we just include the standard library of the book.
- * We won't distinguish carefully between built-in Coq features and those provided by that library. *)
+ * We won't distinguish carefully between built-in Rocq features and those provided by that library. *)
 
 (* As a first example, let's look at the syntax of simple arithmetic expressions.
- * We use the Coq feature of modules, which let us group related definitions together.
+ * We use the Rocq feature of modules, which let us group related definitions together.
  * A key benefit is that names can be reused across modules,
  * which is helpful to define several variants of a suite of functionality,
  * within a single source file. *)
@@ -27,10 +27,10 @@ Module ArithWithConstants.
   Example ex2 := Plus (Const 1) (Times (Const 2) (Const 3)).
 
   (* How many nodes appear in the tree for an expression?
-   * Unlike in many programming languages, in Coq,
+   * Unlike in many programming languages, in Rocq,
    * recursive functions must be marked as recursive explicitly.
    * That marking comes with the [Fixpoint] command, as opposed to [Definition].
-   * Note also that Coq checks termination of each recursive definition.
+   * Note also that Rocq checks termination of each recursive definition.
    * Intuitively, recursive calls must be on subterms of the original argument. *)
   Fixpoint size (e : arith) : nat :=
     match e with
@@ -39,7 +39,7 @@ Module ArithWithConstants.
     | Times e1 e2 => 1 + size e1 + size e2
     end.
 
-  (* Here's how to run a program (evaluate a term) in Coq. *)
+  (* Here's how to run a program (evaluate a term) in Rocq. *)
   Compute size ex1.
   Compute size ex2.
 
@@ -60,7 +60,7 @@ Module ArithWithConstants.
   Proof.
     (* Within a proof, we apply commands called *tactics*.
      * Here's our first one.
-     * Throughout the book's Coq code, we give a brief note documenting each tactic,
+     * Throughout the book's Rocq code, we give a brief note documenting each tactic,
      * after its first use.
      * Keep in mind that the best way to understand what's going on
      * is to run the proof script for yourself, inspecting intermediate states! *)
@@ -345,7 +345,7 @@ Module ArithWithVariables.
   (* To define a further transformation, we first write a roundabout way of
    * testing whether an expression is a constant.
    * This detour happens to be useful to avoid overhead in concert with
-   * pattern matching, since Coq internally elaborates wildcard [_] patterns
+   * pattern matching, since Rocq internally elaborates wildcard [_] patterns
    * into separate cases for all constructors not considered beforehand.
    * That expansion can create serious code blow-ups, leading to serious
    * proof blow-ups! *)
@@ -415,7 +415,7 @@ Module ArithWithVariables.
     linear_arithmetic.
   Qed.
 
-  (* It can be remarkably hard to get Coq's automation to be dumb enough to
+  (* It can be remarkably hard to get Rocq's automation to be dumb enough to
    * help us demonstrate all of the primitive tactics. ;-)
    * In particular, we can redo the proof in an automated way, without the
    * explicit rewrites. *)

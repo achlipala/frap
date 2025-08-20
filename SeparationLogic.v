@@ -344,7 +344,6 @@ Lemma HtStrengthen : forall {result} (c : cmd result) P Q (Q' : _ -> hprop),
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : hprop),
@@ -354,7 +353,6 @@ Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : hprop),
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 (* Now, we carry out a moderately laborious soundness proof!  It's safe to skip
@@ -450,10 +448,6 @@ Lemma invert_Read : forall a P Q,
                /\ forall r, a |-> r * R r ===> Q r.
 Proof.
   induct 1; simp; eauto.
-
-  exists R; simp.
-  cancel; auto.
-  cancel; auto.
 
   apply unit_not_nat in x0; simp.
 
@@ -564,7 +558,7 @@ Lemma length_zeroes : forall n,
     length (zeroes n) = n.
 Proof.
   induct n; simplify; auto.
-  rewrite app_length; simplify.
+  rewrite length_app; simplify.
   linear_arithmetic.
 Qed.
 
@@ -1303,7 +1297,7 @@ Opaque linkedList linkedListSegment.
 
 (* A few algebraic properties of list operations: *)
 Local Hint Rewrite <- app_assoc.
-Local Hint Rewrite app_length app_nil_r.
+Local Hint Rewrite length_app app_nil_r.
 
 (* We tie a few of them together into this lemma. *)
 Lemma move_along : forall A (ls : list A) x2 x1 x0 x,

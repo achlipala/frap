@@ -187,7 +187,7 @@ Fail Fixpoint zip n A B (ls1 : ilist A n) (ls2 : ilist B n) {struct ls1} : ilist
                                     | S N' => ilist A N' -> ilist (A * B) N
                                     end with
       | Cons _ v2 ls2' => fun ls1' => Cons (v1, v2) (zip ls1' ls2')
-      | Nll => tt
+      | Nil => tt
       end ls1'
   | Nil => fun _ => Nil _
   end ls2.
@@ -418,7 +418,7 @@ Recursive Extraction insert.
 
 (** * A Certified Regular Expression Matcher *)
 
-Require Import Ascii String.
+From Stdlib Require Import Ascii String.
 Open Scope string_scope.
 
 Section star.
@@ -531,7 +531,7 @@ Proof.
   rewrite IHs1; auto.
 Qed.
 
-Local Hint Rewrite <- minus_n_O.
+Local Hint Rewrite Nat.sub_0_r.
 
 Lemma substring_app_snd : forall s2 s1 n,
   length s1 = n

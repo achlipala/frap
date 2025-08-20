@@ -371,7 +371,6 @@ Lemma HtStrengthen : forall linvs {result} (c : cmd result) P Q (Q' : _ -> hprop
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 Lemma HtStrengthenFalse : forall linvs {result} (c : cmd result) P (Q' : _ -> hprop),
@@ -393,7 +392,6 @@ Lemma HtWeaken : forall linvs {result} (c : cmd result) P Q (P' : hprop),
 Proof.
   simplify.
   eapply HtConsequence; eauto.
-  reflexivity.
 Qed.
 
 
@@ -1044,7 +1042,7 @@ Lemma length_zeroes : forall n,
     length (zeroes n) = n.
 Proof.
   induct n; simplify; auto.
-  rewrite app_length; simplify.
+  rewrite length_app; simplify.
   linear_arithmetic.
 Qed.
 

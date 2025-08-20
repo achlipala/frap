@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: dependent inductive types
+  * Supplementary Rocq material: dependent inductive types
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -20,7 +20,7 @@ Set Asymmetric Patterns.
  * certified program is hardly more complex than its uncertified counterpart in
  * Haskell or ML.
  *
- * In particular, we have only scratched the tip of the iceberg that is Coq's
+ * In particular, we have only scratched the tip of the iceberg that is Rocq's
  * inductive definition mechanism. *)
 
 
@@ -67,8 +67,8 @@ Section ilist.
       | Cons _ x ls1' => Cons x (app ls1' ls2)
     end.
 
-  (* Past Coq versions signalled an error for this definition.  The code is
-   * still invalid within Coq's core language, but current Coq versions
+  (* Past Rocq versions signalled an error for this definition.  The code is
+   * still invalid within Rocq's core language, but current Rocq versions
    * automatically add annotations to the original program, producing a valid
    * core program.  These are the annotations on [match] discriminees that we
    * began to study with subset types.  We can rewrite [app] to give the
@@ -93,7 +93,7 @@ Section ilist.
    * be underscores.  Parameters are those arguments declared with section
    * variables or with entries to the left of the first colon in an inductive
    * definition.  They cannot vary depending on which constructor was used to
-   * build the discriminee, so Coq prohibits pointless matches on them.  It is
+   * build the discriminee, so Rocq prohibits pointless matches on them.  It is
    * those arguments defined in the type to the right of the colon that we may
    * name with [in] clauses.
    *
@@ -124,7 +124,7 @@ Section ilist.
    * the list head function raises an exception when passed an empty list.  With
    * length-indexed lists, we can rule out such invalid calls statically, and
    * here is a first attempt at doing so.  We write [_] for a term that we wish
-   * Coq would fill in for us, but we'll have no such luck. *)
+   * Rocq would fill in for us, but we'll have no such luck. *)
 
   Fail Definition hd n (ls : ilist (S n)) : A :=
     match ls with
@@ -141,8 +141,8 @@ Section ilist.
     | Cons _ h _ => h
     end.
 
-  (* Actually, these days, Coq is smart enough to make that definition work!
-   * However, it will be educational to look at how Coq elaborates this code
+  (* Actually, these days, Rocq is smart enough to make that definition work!
+   * However, it will be educational to look at how Rocq elaborates this code
    * into its core language, where, unlike in ML, all pattern matching must be
    * _exhaustive_.  We might try using an [in] clause somehow. *)
 
@@ -151,10 +151,10 @@ Section ilist.
     | Cons _ h _ => h
     end.
 
-  (* Due to some relatively new heuristics, Coq does accept this code, but in
+  (* Due to some relatively new heuristics, Rocq does accept this code, but in
    * general it is not legal to write arbitrary patterns for the arguments of
    * inductive types in [in] clauses.  Only variables are permitted there, in
-   * Coq's core language.  A completely general mechanism could only be
+   * Rocq's core language.  A completely general mechanism could only be
    * supported with a solution to the problem of higher-order unification, which
    * is undecidable.
    *
@@ -177,7 +177,7 @@ Section ilist.
    * we just call [hd'].  Because the index of [ls] is known to be nonzero, the
    * type checker reduces the [match] in the type of [hd'] to [A]. *)
   
-  (* In fact, when we "got lucky" earlier with Coq accepting simpler
+  (* In fact, when we "got lucky" earlier with Rocq accepting simpler
    * definitions, under the hood it was desugaring _almost_ to this one. *)
   Definition easy_hd n (ls : ilist (S n)) : A :=
     match ls with
@@ -188,15 +188,15 @@ Section ilist.
 End ilist.
 
 
-(** * The One Rule of Dependent Pattern Matching in Coq *)
+(** * The One Rule of Dependent Pattern Matching in Rocq *)
 
 (* The rest of this chapter will demonstrate a few other elegant applications of
- * dependent types in Coq.  Readers encountering such ideas for the first time
+ * dependent types in Rocq.  Readers encountering such ideas for the first time
  * often feel overwhelmed, concluding that there is some magic at work whereby
- * Coq sometimes solves the halting problem for the programmer and sometimes
+ * Rocq sometimes solves the halting problem for the programmer and sometimes
  * does not, applying automated program understanding in a way far beyond what
  * is found in conventional languages.  The point of this section is to cut off
- * that sort of thinking right now!  Dependent type-checking in Coq follows just
+ * that sort of thinking right now!  Dependent type-checking in Rocq follows just
  * a few algorithmic rules, with just one for _dependent pattern matching_ of
  * the kind we met in the previous section.
  *
@@ -205,16 +205,16 @@ End ilist.
  * _discriminee_, the value being matched on.  In other words, the [match] type
  * _depends_ on the discriminee.
  *
- * When exactly will Coq accept a dependent pattern match as well-typed?  Some
+ * When exactly will Rocq accept a dependent pattern match as well-typed?  Some
  * other dependently typed languages employ fancy decision procedures to
  * determine when programs satisfy their very expressive types.  The situation
- * in Coq is just the opposite.  Only very straightforward symbolic rules are
+ * in Rocq is just the opposite.  Only very straightforward symbolic rules are
  * applied.  Such a design choice has its drawbacks, as it forces programmers to
  * do more work to convince the type checker of program validity.  However, the
  * great advantage of a simple type checking algorithm is that its action on
  * _invalid_ programs is easier to understand!
  *
- * We come now to the one rule of dependent pattern matching in Coq.  A general
+ * We come now to the one rule of dependent pattern matching in Rocq.  A general
  * dependent pattern match assumes this form (with unnecessary parentheses
  * included to make the syntax easier to parse):
  [[
@@ -236,7 +236,7 @@ End ilist.
  * In general, each case of a [match] may have a pattern built up in several
  * layers from the constructors of various inductive type families.  To keep
  * this exposition simple, we will focus on patterns that are just single
- * applications of inductive type constructors to lists of variables.  Coq
+ * applications of inductive type constructors to lists of variables.  Rocq
  * actually compiles the more general kind of pattern matching into this more
  * restricted kind automatically, so understanding the typing of [match]
  * requires understanding the typing of [match]es lowered to match one
@@ -260,9 +260,9 @@ End ilist.
  * A few details have been omitted above.  Inductive type families may have both
  * _parameters_ and regular arguments.  Within an [in] clause, a parameter
  * position must have the wildcard [_] written, instead of a variable.  (In
- * general, Coq uses wildcard [_]'s either to indicate pattern variables that
+ * general, Rocq uses wildcard [_]'s either to indicate pattern variables that
  * will not be mentioned again or to indicate positions where we would like type
- * inference to infer the appropriate terms.)  Furthermore, recent Coq versions
+ * inference to infer the appropriate terms.)  Furthermore, recent Rocq versions
  * are adding more and more heuristics to infer dependent [match] annotations in
  * certain conditions.  The general annotation-inference problem is undecidable,
  * so there will always be serious limitations on how much work these heuristics
@@ -322,8 +322,8 @@ Fixpoint typeDenote (t : type) : Set :=
   end%type.
 
 (* The [typeDenote] function compiles types of our object language into "native"
- * Coq types.  It is deceptively easy to implement.  The only new thing we see
- * is the [%type] annotation, which tells Coq to parse the [match] expression
+ * Rocq types.  It is deceptively easy to implement.  The only new thing we see
+ * is the [%type] annotation, which tells Rocq to parse the [match] expression
  * using the notations associated with types.  Without this annotation, the [*]
  * would be interpreted as multiplication on naturals, rather than as the
  * product type constructor.  The token [%type] is one example of an identifier
@@ -352,7 +352,7 @@ Fixpoint expDenote t (e : exp t) : typeDenote t :=
  * not need to worry about pushing final values in and out of an algebraic
  * datatype.  The only unusual thing is the use of an expression of the form
  * [if E then true else false] in the [Eq] case.  Remember that [==n] has
- * a rich dependent type, rather than a simple Boolean type.  Coq's native [if]
+ * a rich dependent type, rather than a simple Boolean type.  Rocq's native [if]
  * is overloaded to work on a test of any two-constructor type, so we can use
  * [if] to build a simple Boolean from the [sumbool] that [==n] returns.
  *
@@ -368,7 +368,7 @@ Fail Definition pairOut t1 t2 (e : exp (Prod t1 t2)) : option (exp t1 * exp t2) 
   end.
 
 (* We run again into the problem of not being able to specify non-variable
- * arguments in [in] clauses (and this time Coq's avant-garde heuristics don't
+ * arguments in [in] clauses (and this time Rocq's avant-garde heuristics don't
  * save us).  The problem would just be hopeless without a use of an [in]
  * clause, though, since the result type of the [match] depends on an argument
  * to [exp].  Our solution will be to use a more general type, as we did for
@@ -392,7 +392,7 @@ Definition pairOut t (e : exp t) :=
   end.
 
 (* With [pairOut] available, we can write [cfold] in a straightforward way.
- * There are really no surprises beyond that Coq verifies that this code has
+ * There are really no surprises beyond that Rocq verifies that this code has
  * such an expressive type, given the small annotation burden. *)
 
 Fixpoint cfold t (e : exp t) : exp t :=
@@ -519,7 +519,7 @@ Definition firstElements n A B (ls1 : ilist A n) (ls2 : ilist B n) : option (A *
   | Nil => fun _ => None
   end ls2.
 
-(* Note use of a [struct] annotation to tell Coq which argument should decrease
+(* Note use of a [struct] annotation to tell Rocq which argument should decrease
  * across recursive calls.  It's an artificial choice here, since usually those
  * annotations are inferred.  Here we are making an effort to demonstrate a
  * decently common problem! *)
@@ -532,7 +532,7 @@ Fail Fixpoint zip n A B (ls1 : ilist A n) (ls2 : ilist B n) {struct ls1} : ilist
                                     | S N' => ilist A N' -> ilist (A * B) N
                                     end with
       | Cons _ v2 ls2' => fun ls1' => Cons (v1, v2) (zip ls1' ls2')
-      | Nll => tt
+      | Nil => tt
       end ls1'
   | Nil => fun _ => Nil _
   end ls2.
@@ -546,7 +546,7 @@ Fixpoint zip n A B (ls1 : ilist A n) (ls2 : ilist B n) {struct ls1} : ilist (A *
                                     | S N' => (ilist B N' -> ilist (A * B) N') -> ilist (A * B) N
                                     end with
       | Cons _ v2 ls2' => fun zip_ls1' => Cons (v1, v2) (zip_ls1' ls2')
-      | Nll => tt
+      | Nil => tt
       end (zip ls1')
   | Nil => fun _ => Nil _
   end ls2.
@@ -973,9 +973,9 @@ End insert.
  * unsafe cast operator for tweaking the apparent type of an expression in an
  * arbitrary way.  Casts appear for this example because the return type of
  * [insert] depends on the _value_ of the function's argument, a pattern that
- * OCaml cannot handle.  Since Coq's type system is much more expressive than
+ * OCaml cannot handle.  Since Rocq's type system is much more expressive than
  * OCaml's, such casts are unavoidable in general.  Since the OCaml type-checker
- * is no longer checking full safety of programs, we must rely on Coq's
+ * is no longer checking full safety of programs, we must rely on Rocq's
  * extractor to use casts only in provably safe ways. *)
 
 Recursive Extraction insert.
@@ -992,14 +992,14 @@ Recursive Extraction insert.
  * Before defining the syntax of expressions, it is helpful to define an
  * inductive type capturing the meaning of the Kleene star.  That is, a string
  * [s] matches regular expression [star e] if and only if [s] can be decomposed
- * into a sequence of substrings that all match [e].  We use Coq's string
+ * into a sequence of substrings that all match [e].  We use Rocq's string
  * support, which comes through a combination of the [String] library and some
- * parsing notations built into Coq.  Operators like [++] and functions like
+ * parsing notations built into Rocq.  Operators like [++] and functions like
  * [length] that we know from lists are defined again for strings.  Notation
  * scopes help us control which versions we want to use in particular
  * contexts. *)
 
-Require Import Ascii String.
+From Stdlib Require Import Ascii String.
 Open Scope string_scope.
 
 Section star.
@@ -1026,8 +1026,8 @@ Fail Inductive regexp : (string -> Prop) -> Set :=
 | Concat : forall (P1 P2 : string -> Prop) (r1 : regexp P1) (r2 : regexp P2),
   regexp (fun s => exists s1, exists s2, s = s1 ++ s2 /\ P1 s1 /\ P2 s2).
 
-(* Coq complains that this "large inductive type" must be in [Type].  What is a
- * large inductive type?  In Coq, it is an inductive type that has a constructor
+(* Rocq complains that this "large inductive type" must be in [Type].  What is a
+ * large inductive type?  In Rocq, it is an inductive type that has a constructor
  * that quantifies over some type of type [Type].  We have not worked with
  * [Type] very much to this point.  Every term of CIC has a type, including [Set]
  * and [Prop], which are assigned type [Type].  The type [string -> Prop] from
@@ -1115,7 +1115,7 @@ Proof.
   rewrite IHs1; auto.
 Qed.
 
-Local Hint Rewrite <- minus_n_O.
+Local Hint Rewrite Nat.sub_0_r.
 
 Lemma substring_app_snd : forall s2 s1 n,
   length s1 = n
@@ -1199,7 +1199,7 @@ Section split.
    * tempted to write [n].  However, without further work to craft proper
    * [match] annotations, the type-checker does not use the equality between [n]
    * and [S n'].  Thus, it is common to see patterns repeated in [match] case
-   * bodies in dependently typed Coq code.  We can at least use a [let]
+   * bodies in dependently typed Rocq code.  We can at least use a [let]
    * expression to avoid copying the pattern more than once, replacing the first
    * case body with:
      [[

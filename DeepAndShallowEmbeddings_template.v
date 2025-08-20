@@ -398,6 +398,8 @@ Module Deep.
   Qed.
 End Deep.
 
+From Stdlib Require Extraction.
+Set Extraction Output Directory ".".
 Extraction "Deep.ml" Deep.array_max Deep.increment_all.
 
 

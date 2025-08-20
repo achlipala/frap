@@ -3,7 +3,8 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap Eqdep FunctionalExtensionality.
+Require Import Frap.
+From Stdlib Require Import Eqdep FunctionalExtensionality.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.
@@ -865,6 +866,7 @@ Theorem refines_add2 : forall input output,
     -> add2 input output <| addNs 2 input output.
 Proof.
   simplify.
+  unfold add2, addNs.
   apply refines_Dup.
   apply add2_once_refines_addN; auto.
 Qed.

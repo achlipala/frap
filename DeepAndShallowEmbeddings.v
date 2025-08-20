@@ -31,7 +31,7 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 (* We often have many options for how to encode some sort of formal expression.
  * The simplest way is to write it directly as a Gallina functional program,
- * which Coq knows how to evaluate directly.  That style is called
+ * which Rocq knows how to evaluate directly.  That style is called
  * *shallow embedding*. *)
 
 Module SimpleShallow.
@@ -80,7 +80,7 @@ Qed.
 
 (* More interestingly, we can mix characteristics of the two styles.  To explain
  * exactly how, it's important to introduce the distinction between the
- * *metalanguage*, in which we do our proofs (e.g., Coq for us); and the
+ * *metalanguage*, in which we do our proofs (e.g., Rocq for us); and the
  * *object language*, which we formalize explicitly (e.g., lambda calculus,
  * simple imperative programs, ...).  With *higher-order abstract syntax*, we
  * represent binders of the object language using the function types of the
@@ -495,13 +495,15 @@ Module Deep.
   Qed.
 End Deep.
 
-(* We use Coq's *extraction* feature to produce OCaml versions of our deeply
+(* We use Rocq's *extraction* feature to produce OCaml versions of our deeply
  * embedded programs.  Then we can run them using OCaml intepreters, which are
  * able to take advantage of the side effects built into OCaml, as a
  * performance optimization.  This command generates file "Deep.ml", which can
  * be loaded along with "DeepInterp.ml" to run the generated code.  Note how
  * the latter file uses OCaml's built-in mutable hash-table type for efficient
  * representation of program memories. *)
+From Stdlib Require Extraction.
+Set Extraction Output Directory ".".
 Extraction "Deep.ml" Deep.array_max Deep.increment_all.
 
 

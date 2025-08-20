@@ -1,11 +1,12 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: first-class functions and continuations
+  * Supplementary Rocq material: first-class functions and continuations
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap Program.
+Require Import Frap.
+From Stdlib Require Import Program.
 
-(* Next stop in touring the basic Coq ingredients of functional programming and
+(* Next stop in touring the basic Rocq ingredients of functional programming and
  * proof: functions as first-class data.  These days, most trendy programming
  * languages contain this feature, though it can't hurt to review; and we'll see
  * patterns in specification and proof that are helpful to handle first-class
@@ -233,7 +234,7 @@ Qed.
 (* Let's now work through an example of a language and its interpreter.
  * Specifically, we'll define a language of first-class functions and
  * higher-order functions.  It would be natural to make our language statically
- * typed, but it turns out we need a bit more Coq sophistication to implement a
+ * typed, but it turns out we need a bit more Rocq sophistication to implement a
  * proper interpreter for such an embedded language, which we'll postpone for
  * module DependentInductiveTypes.  Instead, here's a simple "universal type"
  * along the lines of dynamically typed languages like Python. *)
@@ -289,7 +290,7 @@ Inductive xform :=
 (* And here's our simple interpreter. *)
 Fixpoint transform (xf : xform) : dyn -> dyn :=
   match xf with
-  | Identity => id (* from the Coq standard library *)
+  | Identity => id (* from the Rocq standard library *)
   | Compose f1 f2 => compose (transform f1) (transform f2)
                      (* ditto for [compose] *)
   | Map f => dmap (transform f)
@@ -520,7 +521,7 @@ Proof.
   trivial.
 
   unfold compose.
-  eauto using le_trans.
+  eauto using Nat.le_trans.
 
   unfold dmap.
   cases x; trivial.
@@ -771,7 +772,7 @@ Compute allSublists [1; 2; 3].
 
 (* This is the main function we want to define.  It looks for a sublist whose
  * sum matches some target. *)
-Fixpoint sublistSummingTo (ns : list nat) (target : nat) : option (list nat) :=
+Definition sublistSummingTo (ns : list nat) (target : nat) : option (list nat) :=
   match filter (fun ns' => if sum ns' ==n target then true else false) (allSublists ns) with
   | ns' :: _ => Some ns'
   | [] => None
@@ -1088,8 +1089,8 @@ Definition apply_continuation {A} (acc : list A) (k : flatten_continuation A)
 
 (* Here's the overall function.  Note a pesky element: we add an extra [nat]
  * parameter of *fuel*, a count that goes down across recursive calls, just to
- * convince Coq that our function terminates.  Otherwise, the recursion
- * structure is too intricate for Coq to make sense of. *)
+ * convince Rocq that our function terminates.  Otherwise, the recursion
+ * structure is too intricate for Rocq to make sense of. *)
 Fixpoint flattenKD {A} (fuel : nat) (t : tree A) (acc : list A)
          (k : flatten_continuation A) : list A :=
   match fuel with

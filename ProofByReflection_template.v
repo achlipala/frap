@@ -273,7 +273,7 @@ Fixpoint formulaDenote (atomics : asgn) (f : formula) : Prop :=
     | Imp f1 f2 => formulaDenote atomics f1 -> formulaDenote atomics f2
   end.
 
-Require Import ListSet.
+From Stdlib Require Import ListSet.
 
 Section my_tauto.
   Variable atomics : asgn.

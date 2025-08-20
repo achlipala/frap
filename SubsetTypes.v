@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: subset types
+  * Supplementary Rocq material: subset types
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -16,7 +16,7 @@ Set Asymmetric Patterns.
 (* So far, we have seen many examples of what we might call "classical program
  * verification."  We write programs, write their specifications, and then prove
  * that the programs satisfy their specifications.  The programs that we have
- * written in Coq have been normal functional programs that we could just as
+ * written in Rocq have been normal functional programs that we could just as
  * well have written in Haskell or ML.  In this lecture, we start investigating
  * uses of _dependent types_ to integrate programming, specification, and
  * proving into a single phase.  The techniques we will learn make it possible
@@ -33,6 +33,7 @@ Compute pred.
 (* We can use a new command, [Extraction], to produce an OCaml version of this
  * function. *)
 
+From Stdlib Require Extraction.
 Extraction pred.
 
 (* Returning 0 as the predecessor of 0 can come across as somewhat of a hack.
@@ -58,7 +59,7 @@ Definition pred_strong1 (n : nat) : n > 0 -> nat :=
  * answer.  The proof argument can be said to have a _dependent_ type, because
  * its type depends on the _value_ of the argument [n].
  *
- * Coq's [Compute] command can execute particular invocations of [pred_strong1]
+ * Rocq's [Compute] command can execute particular invocations of [pred_strong1]
  * just as easily as it can execute more traditional functional programs. *)
 
 Theorem two_gt0 : 2 > 0.
@@ -93,7 +94,7 @@ Fail Definition pred_strong1' (n : nat) (pf : n > 0) : nat :=
  * delay the binding of [pf], so that we can use the [return] annotation to
  * express the needed relationship.
  *
- * We are lucky that Coq's heuristics infer the [return] clause (specifically,
+ * We are lucky that Rocq's heuristics infer the [return] clause (specifically,
  * [return n > 0 -> nat]) for us in the definition of [pred_strong1], leading to
  * the following elaborated code: *)
 
@@ -104,22 +105,22 @@ Definition pred_strong1' (n : nat) : n > 0 -> nat :=
   end.
 
 (* By making explicit the functional relationship between value [n] and the
- * result type of the [match], we guide Coq toward proper type checking.  The
+ * result type of the [match], we guide Rocq toward proper type checking.  The
  * clause for this example follows by simple copying of the original annotation
  * on the definition.  In general, however, the [match] annotation inference
  * problem is undecidable.  The known undecidable problem of
  * _higher-order unification_ reduces to the [match] type inference problem.
- * Over time, Coq is enhanced with more and more heuristics to get around this
- * problem, but there must always exist [match]es whose types Coq cannot infer
+ * Over time, Rocq is enhanced with more and more heuristics to get around this
+ * problem, but there must always exist [match]es whose types Rocq cannot infer
  * without annotations.
  *
- * Let us now take a look at the OCaml code Coq generates for [pred_strong1]. *)
+ * Let us now take a look at the OCaml code Rocq generates for [pred_strong1]. *)
 
 Extraction pred_strong1.
 
 (* The proof argument has disappeared!  We get exactly the OCaml code we would
  * have written manually.  This is our first demonstration of the main
- * technically interesting feature of Coq program extraction: proofs are erased
+ * technically interesting feature of Rocq program extraction: proofs are erased
  * systematically.
  *
  * We can reimplement our dependently typed [pred] based on _subset types_,
@@ -145,7 +146,7 @@ Definition pred_strong2 (s : {n : nat | n > 0} ) : nat :=
  * [pred_strong2] because _parameters_ of inductive types (like the predicate
  * [P] for [sig]) are not mentioned in pattern matching, but _are_ mentioned in
  * construction of terms (if they are not marked as implicit arguments).
- * (Actually, this behavior changed between Coq versions 8.4 and 8.5, hence the
+ * (Actually, this behavior changed between Rocq versions 8.4 and 8.5, hence the
  * command at the top of the file to revert to the old behavior.) *)
 
 Compute pred_strong2 (exist _ 2 two_gt0).
@@ -174,11 +175,11 @@ Compute pred_strong3 (exist _ 2 two_gt0).
 (* A value in a subset type can be thought of as a _dependent pair_ (or
  * _sigma type_) of a base value and a proof about it.  The function [proj1_sig]
  * extracts the first component of the pair.  It turns out that we need to
- * include an explicit [return] clause here, since Coq's heuristics are not
+ * include an explicit [return] clause here, since Rocq's heuristics are not
  * smart enough to propagate the result type that we wrote earlier.
  *
  * By now, the reader is probably ready to believe that the new [pred_strong]
- * leads to the same OCaml code as we have seen several times so far, and Coq
+ * leads to the same OCaml code as we have seen several times so far, and Rocq
  * does not disappoint. *)
 
 Extraction pred_strong3.
@@ -208,7 +209,7 @@ Definition pred_strong4 : forall (n : nat), n > 0 -> {m : nat | n = S m}.
    *
    * We do most of the work with the [refine] tactic, to which we pass a partial
    * "proof" of the type we are trying to prove.  There may be some pieces left
-   * to fill in, indicated by underscores.  Any underscore that Coq cannot
+   * to fill in, indicated by underscores.  Any underscore that Rocq cannot
    * reconstruct with type inference is added as a proof subgoal.  In this case,
    * we have two subgoals.
    *
@@ -241,10 +242,10 @@ Print pred_strong4.
 Compute pred_strong4 two_gt0.
 
 (* We are almost done with the ideal implementation of dependent predecessor.
- * We can use Coq's syntax-extension facility to arrive at code with almost no
+ * We can use Rocq's syntax-extension facility to arrive at code with almost no
  * complexity beyond a Haskell or ML program with a complete specification in a
  * comment.  In this book, we will not dwell on the details of syntax
- * extensions; the Coq manual gives a straightforward introduction to them. *)
+ * extensions; the Rocq manual gives a straightforward introduction to them. *)
 
 Notation "!" := (False_rec _ _).
 Notation "[ e ]" := (exist _ e _).
@@ -284,7 +285,7 @@ Notation "'No'" := (right _ _).
 Notation "'Reduce' x" := (if x then Yes else No) (at level 50).
 
 (* The [Reduce] notation is notable because it demonstrates how [if] is
- * overloaded in Coq.  The [if] form actually works when the test expression has
+ * overloaded in Rocq.  The [if] form actually works when the test expression has
  * any two-constructor inductive type.  Moreover, in the [then] and [else]
  * branches, the appropriate constructor arguments are bound.  This is important
  * when working with [sumbool]s, when we want to have the proof stored in the
@@ -313,7 +314,7 @@ Compute eq_nat_dec 2 3.
 
 Extraction eq_nat_dec.
 
-(* Proving this kind of decidable equality result is so common that Coq comes
+(* Proving this kind of decidable equality result is so common that Rocq comes
  * with a tactic for automating it. *)
 
 Definition eq_nat_dec' (n m : nat) : {n = m} + {n <> m}.
@@ -324,7 +325,7 @@ Defined.
  * same OCaml code as our more manual version does.  That OCaml code had one
  * undesirable property, which is that it uses [Left] and [Right] constructors
  * instead of the Boolean values built into OCaml.  We can fix this, by using
- * Coq's facility for mapping Coq inductive types to OCaml variant types. *)
+ * Rocq's facility for mapping Rocq inductive types to OCaml variant types. *)
 
 Extract Inductive sumbool => "bool" ["true" "false"].
 Extraction eq_nat_dec'.

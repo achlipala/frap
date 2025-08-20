@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: unification and logic programming
+  * Supplementary Rocq material: unification and logic programming
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -378,11 +378,11 @@ Example length_is_2 : exists ls : list nat, length ls = 2.
 Proof.
   eauto.
 
-  (* Coq leaves for us two subgoals to prove... [nat]?!  We are being asked to
+  (* Rocq leaves for us two subgoals to prove... [nat]?!  We are being asked to
    * show that natural numbers exists.  Why?  Some unification variables of that
    * type were left undetermined, by the end of the proof.  Specifically, these
    * variables stand for the 2 elements of the list we find.  Of course it makes
-   * sense that the list length follows without knowing the data values.  In Coq
+   * sense that the list length follows without knowing the data values.  In Rocq
    * 8.6 and up, the [Unshelve] command brings these goals to the forefront,
    * where we can solve each one with [exact O], but usually it is better to
    * avoid getting to such a point.
@@ -639,7 +639,7 @@ Section cheap_hints.
 End cheap_hints.
 
 (* Let's try that again, without using those hints that give away the answer.
- * We should be able to coerce Coq into doing more of the thinking for us. *)
+ * We should be able to coerce Rocq into doing more of the thinking for us. *)
 
 (* First, we will want to be able to use built-in tactic [ring_simplify] on
  * goals that contain unification variables, which will be the case at
@@ -667,7 +667,7 @@ Ltac robust_ring_simplify :=
   repeat match goal with
          | [ |- context[?X * ?Y] ] =>
            match goal with
-           | [ |- context[?Z * X] ] => rewrite (mult_comm Z X)
+           | [ |- context[?Z * X] ] => rewrite (Nat.mul_comm Z X)
            end
          end.
 
@@ -675,7 +675,7 @@ Ltac robust_ring_simplify :=
  * goal is an equality. *)
 Local Hint Extern 5 (_ = _) => robust_ring_simplify : core.
 
-(* The only other missing ingredient is priming Coq with some good ideas for
+(* The only other missing ingredient is priming Rocq with some good ideas for
  * instantiating existential quantifiers.  These will all be tried in some
  * order, in a particular proof search. *)
 Local Hint Extern 1 (exists n : nat, _) => exists 0 : core.
@@ -685,7 +685,7 @@ Local Hint Extern 1 (exists n : nat, _) => eexists (_ + _) : core.
  * wildcards inside it.  Each underscore is replaced with a fresh unification
  * variable. *)
 
-(* Now Coq figures out the recipe for us, and quite quickly, at that! *)
+(* Now Rocq figures out the recipe for us, and quite quickly, at that! *)
 Theorem linear_snazzy : forall e, exists k n,
   forall var, eval var e (k * var + n).
 Proof.
@@ -721,7 +721,7 @@ Definition params (e : exp) : nat * nat :=
 Compute params (Plus (Const 7) (Plus Var (Plus (Const 8) Var))).
 
 
-(* With Coq doing so much of the proof-search work for us, we might get
+(* With Rocq doing so much of the proof-search work for us, we might get
  * complacent and consider that any successful [eauto] invocation is as good as
  * any other.  However, because introduced unification variables may wind up
  * spread across multiple subgoals, running [eauto] can have a surprising kind
@@ -764,7 +764,7 @@ Section side_effect_sideshow.
   Qed.
 End side_effect_sideshow.
 
-(* Again, the moral of the story is: while proof search in Coq often feels
+(* Again, the moral of the story is: while proof search in Rocq often feels
  * purely functional, unification variables allow imperative side effects to
  * reach across subgoals.  That's a tremendously useful feature for effective
  * proof automation, but it can also sneak up on you at times. *)
@@ -861,7 +861,7 @@ Fail Local Hint Extern 1 (?P ?X) =>
     | [ H : forall x, P x /\ _ |- _ ] => apply (proj1 (H X))
   end : core.
 
-(* Coq's [auto] hint databases work as tables mapping _head symbols_ to lists of
+(* Rocq's [auto] hint databases work as tables mapping _head symbols_ to lists of
  * tactics to try.  Because of this, the constant head of an [Extern] pattern
  * must be determinable statically.  In our first [Extern] hint, the head symbol
  * was [not], since [x <> y] desugars to [not (x = y)]; and, in the second

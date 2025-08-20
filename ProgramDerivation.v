@@ -5,8 +5,8 @@
   * Some material borrowed from Fiat <http://plv.csail.mit.edu/fiat/> *)
 
 Require Import Frap.
-Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
-Require Import Eqdep.
+From Stdlib Require Import Program Setoids.Setoid Classes.RelationClasses Classes.Morphisms Morphisms_Prop.
+From Stdlib Require Import Eqdep.
 
 Set Warnings "-cannot-define-projection".
 
@@ -56,8 +56,8 @@ Definition refine {A} (c1 c2 : comp A) :=
   forall a, c2 a -> c1 a.
 (* Note how this definition is just subset inclusion, in the right direction. *)
 
-(* Next, we use Coq's *setoid* feature to declare compatibility of our
- * definitions with the [rewrite] tactic.  See the Coq manual on setoids for
+(* Next, we use Rocq's *setoid* feature to declare compatibility of our
+ * definitions with the [rewrite] tactic.  See the Rocq manual on setoids for
  * background on what we are doing and why. *)
 
 Ltac morphisms := unfold refine, impl, pointwise_relation, bind, ret, pick_; hnf; first_order; subst; eauto.

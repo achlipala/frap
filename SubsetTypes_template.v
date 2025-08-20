@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: subset types
+  * Supplementary Rocq material: subset types
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -20,6 +20,7 @@ Definition pred (n : nat) : nat :=
   | S n' => n'
   end.
 
+From Stdlib Require Extraction.
 Extraction pred.
 
 

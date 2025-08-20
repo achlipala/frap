@@ -738,7 +738,7 @@ Module Simple.
 
   (* This relation explains how to plug the hole in a context with a specific
    * term.  Note that we use an inductive relation instead of a recursive
-   * definition, because Coq's proof automation is better at working with
+   * definition, because Rocq's proof automation is better at working with
    * relations. *)
   Inductive plug : context -> cmd -> cmd -> Prop :=
   | PlugHole : forall c, plug Hole c c

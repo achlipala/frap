@@ -316,7 +316,7 @@ Proof.
   simplify; subst; auto.
 Qed.
 
-Local Hint Rewrite <- minus_n_O.
+Local Hint Rewrite Nat.sub_0_r.
 
 Lemma fact_rec : forall n,
   n > 0

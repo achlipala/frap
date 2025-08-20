@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: polymorphism and generic data structures
+  * Supplementary Rocq material: polymorphism and generic data structures
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
@@ -10,13 +10,13 @@ Set Implicit Arguments.
 
 (* One of the recurring ingredients in effective machine formalization is data
  * structures, and, as in general programming, we want to be able to define data
- * structures that are *generic* in the kinds of data they contain.  Coq
+ * structures that are *generic* in the kinds of data they contain.  Rocq
  * supports such things in roughly the same way as Haskell and OCaml, via
  * *parametric polymorphism*, which is closely related to the idea of *generics*
  * in languages like Java. *)
 
 (* Our first example: the [option] type family.  While Java and friends force
- * all sorts of different types to include the special value [null], in Coq we
+ * all sorts of different types to include the special value [null], in Rocq we
  * request that option explicitly by wrapping a type in [option].  Specifically,
  * any value of type [option A], for some type [A], is either [None] (sort of
  * like [null]) or [Some v] for a [v] of type [A]. *)
@@ -25,7 +25,7 @@ Inductive option (A : Set) : Set :=
 | Some (v : A).
 
 Arguments None {A}.
-(* This command asks Coq to *infer* the [A] type for each specific use of
+(* This command asks Rocq to *infer* the [A] type for each specific use of
  * [None]. *)
 
 (* Here are a few example terms using [option]. *)
@@ -55,7 +55,7 @@ Definition add_optional (po : option (nat * nat)) : option nat :=
 
 (** * Lists *)
 
-(* For functional programming (as in Coq), the king of all generic data
+(* For functional programming (as in Rocq), the king of all generic data
  * structures is the *list*. *)
 Inductive list (A : Set) : Set :=
 | nil
@@ -72,12 +72,12 @@ Example nats0 : list nat := nil.
 Example nats1 : list nat := cons 1 nil.
 Example nats2 : list nat := cons 1 (cons 2 nil).
 
-(* Coq features a wonderful notation system, to help us write more concise and
+(* Rocq features a wonderful notation system, to help us write more concise and
  * readable code after introducing new syntactic forms.  We will not give a
  * systematic presentation of the notation system, but we will show many
  * examples, from which it is possible to infer generality by scientific
  * induction.  And, of course, the interested reader can always check the
- * notations chapter of the Coq reference manual. *)
+ * notations chapter of the Rocq reference manual. *)
 
 (* First, our examples can get more readable with an infix operator for [cons]. *)
 
@@ -98,7 +98,7 @@ Example nats3'' : list nat := [1; 2; 3].
 
 (* Here are some classic recursive functions that operate over lists.
  * First, here is how to compute the length of a list.  We put *implicit*
- * function arguments in curly braces, asking Coq to infer them at call
+ * function arguments in curly braces, asking Rocq to infer them at call
  * sites. *)
 
 Fixpoint length {A} (ls : list A) : nat :=
@@ -445,7 +445,7 @@ Inductive statement : Set :=
 | WhileLoop (e : expression) (s : statement).
 
 (* First, here's a quick sample of nifty notations to write
- * almost-natural-looking embedded programs in Coq. *)
+ * almost-natural-looking embedded programs in Rocq. *)
 Coercion Const : nat >-> expression.
 Coercion Var : string >-> expression.
 Infix "+" := Plus : embedded_scope.

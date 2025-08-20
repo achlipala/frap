@@ -1,5 +1,5 @@
 (** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Supplementary Coq material: introduction to proof scripting and the Ltac language
+  * Supplementary Rocq material: introduction to proof scripting and the Ltac language
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/
   * Much of the material comes from CPDT <http://adam.chlipala.net/cpdt/> by the same author. *)
@@ -12,7 +12,7 @@ Set Implicit Arguments.
 (** * Ltac Programming Basics *)
 
 (* We have already seen a few examples of Ltac programs, without much explanation.
- * Ltac is the proof-scripting language built into Coq.  Actually, every
+ * Ltac is the proof-scripting language built into Rocq.  Actually, every
  * primitive step in our proofs has been a (degenerate, small) Ltac program.
  * Let's take a bottom-up look at more Ltac features.
  *
@@ -253,7 +253,7 @@ Locate "/\".
 Print and.
 Locate "\/".
 Print or.
-(* Implication ([->]) is built into Coq, so nothing to look up there. *)
+(* Implication ([->]) is built into Rocq, so nothing to look up there. *)
 
 Ltac my_tauto :=
   repeat match goal with
@@ -311,7 +311,7 @@ Proof.
             | [ H : _ |- _ ] => idtac H
           end.
 
-  (* Coq prints "[H1]".  By applying [idtac] with an argument, a convenient
+  (* Rocq prints "[H1]".  By applying [idtac] with an argument, a convenient
    * debugging tool for "leaking information out of [match]es," we see that
    * this [match] first tries binding [H] to [H1], which cannot be used to prove
    * [Q].  Nonetheless, the following variation on the tactic succeeds at

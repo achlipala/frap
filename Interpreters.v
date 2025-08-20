@@ -55,7 +55,7 @@ Definition valuation0 : valuation :=
  * convenience, they use uncomputable features.  The reason is that we need a
  * comparison function, a hash function, etc., to do computable finite-map
  * implementation, and such things are impossible to compute automatically for
- * all types in Coq.  However, we can still prove theorems about execution of
+ * all types in Rocq.  However, we can still prove theorems about execution of
  * finite-map programs, and the [simplify] tactic knows how to reduce the
  * key constructions. *)
 Theorem interp_ex1 : interp ex1 valuation0 = 42.
@@ -217,28 +217,28 @@ Proof.
   equality.
 
   (* Here we want to use associativity of [++], to get the conclusion to match
-   * an induction hypothesis.  Let's ask Coq to search its library for lemmas
+   * an induction hypothesis.  Let's ask Rocq to search its library for lemmas
    * that would justify such a rewrite, giving a pattern with wildcards, to
    * specify the essential structure that the rewrite should match. *)
   Search ((_ ++ _) ++ _).
   (* Ah, we see just the one! *)
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe1.
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe2.
   simplify.
   equality.
 
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe1.
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe2.
   simplify.
   equality.
 
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe1.
-  rewrite app_assoc_reverse.
+  rewrite <- app_assoc.
   rewrite IHe2.
   simplify.
   equality.
@@ -253,7 +253,7 @@ Proof.
    * [compile e ++ nil], adding a "pointless" concatenation of the empty list.
    * [Search] again helps us find a library lemma. *)
   Search (_ ++ nil).
-  rewrite (app_nil_end (compile e)).
+  rewrite <- (app_nil_r (compile e)).
   (* Note that we can use [rewrite] with explicit values of the first few
    * quantified variables of a lemma.  Otherwise, [rewrite] picks an
    * unhelpful place to rewrite.  (Try it and see!) *)
@@ -274,7 +274,7 @@ Inductive cmd :=
 
 (* That last constructor is for repeating a body command some number of
  * times.  Note that we sneakily avoid constructs that could introduce
- * nontermination, since Coq only accepts terminating programs, and we want to
+ * nontermination, since Rocq only accepts terminating programs, and we want to
  * write an interpreter for commands.
  * In contrast to our last one, this interpreter *transforms valuations*.
  * We use a helper function for self-composing a function some number of
@@ -306,7 +306,7 @@ Example factorial_ugly :=
 
 (* Ouch; that code is hard to read.  Let's introduce some notations to make the
  * concrete syntax more palatable.  We won't explain the general mechanisms on
- * display here, but see the Coq manual for details, or try to reverse-engineer
+ * display here, but see the Rocq manual for details, or try to reverse-engineer
  * them from our examples. *)
 Coercion Const : nat >-> arith.
 Coercion Var : var >-> arith.
@@ -365,7 +365,7 @@ Proof.
   linear_arithmetic.
 
   trivial.
-  (* [trivial]: Coq maintains a database of simple proof steps, such as proving
+  (* [trivial]: Rocq maintains a database of simple proof steps, such as proving
    *   a fact by direct appeal to a matching hypothesis.  [trivial] asks to try
    *   all such simple steps. *)
 

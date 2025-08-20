@@ -67,7 +67,7 @@ Module Make(Import S : SEP).
 
   Lemma heq_sym : forall p q, p === q -> q === p.
   Proof.
-    intros; apply himp_heq; apply himp_heq in H; intuition.
+    intros; apply himp_heq; apply himp_heq in H; intuition auto.
   Qed.
 
   Lemma heq_trans : forall p q r, p === q -> q === r -> p === r.
@@ -107,7 +107,7 @@ Module Make(Import S : SEP).
   Global Instance exis_iff_morphism (A : Type) :
     Proper (pointwise_relation A heq ==> heq) (@exis A).
   Proof.
-    hnf; intros; apply himp_heq; intuition.
+    hnf; intros; apply himp_heq; intuition auto.
     hnf in H.
     apply exis_left; intro.
     eapply exis_right.
@@ -181,14 +181,16 @@ Module Make(Import S : SEP).
   Ltac lift :=
     intros; apply himp_heq; split;
     repeat (apply lift_left; intro);
-    repeat (apply lift_right; intuition).
+    repeat (apply lift_right; intuition auto).
 
+  Hint Resolve himp_refl : core.
+  
   Lemma lift_combine : forall p Q R,
     p * [| Q |] * [| R |] === p * [| Q /\ R |].
   Proof.
     intros; apply himp_heq; split;
     repeat (apply lift_left; intro);
-    repeat (apply lift_right; intuition).
+    repeat (apply lift_right; intuition auto).
   Qed.
 
   Lemma lift1_left : forall (P : Prop) q,
@@ -301,11 +303,8 @@ Module Make(Import S : SEP).
     intros.
     eapply himp_trans.
     rewrite extra_lift with (P := True); auto.
-    instantiate (1 := p * q).
     rewrite star_comm.
     apply star_cancel; auto.
-    reflexivity.
-    reflexivity.
   Qed.
 
   Module Type TRY_ME_FIRST.

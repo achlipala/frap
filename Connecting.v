@@ -3,8 +3,8 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap SepCancel ModelCheck Classes.Morphisms.
-Require Import Arith.Div2 Eqdep.
+Require Import Frap SepCancel ModelCheck.
+From Stdlib Require Import Classes.Morphisms Arith Eqdep Eqdep_dec Nat.
 
 (** * Some odds and ends from past chapters *)
 
@@ -16,7 +16,7 @@ Ltac simp := repeat (simplify; subst; propositional;
 
 (** * Orientation *)
 
-(* We've now done plenty of Coq proofs that apply to idealizations of real-world
+(* We've now done plenty of Rocq proofs that apply to idealizations of real-world
  * programming languages.  What happens when we want to connect to real
  * development ecosystems?  The corresponding book chapter works through several
  * dimensions of variation across approaches.  The whole subject is an active
@@ -111,8 +111,6 @@ Proof.
 Qed.
 
 Local Hint Resolve shatter_word_0 : core.
-
-Require Import Coq.Logic.Eqdep_dec.
 
 Definition weq : forall {sz} (x y : word sz), sumbool (x = y) (x <> y).
   refine (fix weq sz (x : word sz) : forall y : word sz, sumbool (x = y) (x <> y) :=
@@ -430,7 +428,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   Proof.
     simplify.
     eapply HtConsequence; eauto.
-    reflexivity.
   Qed.
 
   Lemma HtWeaken : forall {result} (c : cmd result) P Q (P' : hprop),
@@ -440,7 +437,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
   Proof.
     simplify.
     eapply HtConsequence; eauto.
-    reflexivity.
   Qed.
 
   Lemma invert_Return : forall {result : Set} (r : result) P Q,
@@ -524,10 +520,6 @@ Module MixedEmbedded(Import BW : BIT_WIDTH).
                  /\ forall r, a |-> r * R r ===> Q r.
   Proof.
     induct 1; simp; eauto.
-
-    exists R; simp.
-    cancel; auto.
-    cancel; auto.
 
     apply unit_not_wrd in x0; simp.
 
@@ -948,7 +940,7 @@ End MixedEmbedded.
 (* In [DeepAndShallowEmbeddings], we saw how to extract programs from the last
  * language to OCaml and run them with an interpreter.  That interpreter needs
  * to be trusted, and its performance isn't so great.  It could be better to
- * generate C-like syntax trees in Coq and output them directly.  We will use
+ * generate C-like syntax trees in Rocq and output them directly.  We will use
  * this next language to that end. *)
 
 Module DeeplyEmbedded(Import BW : BIT_WIDTH).
@@ -1023,7 +1015,7 @@ Module DeeplyEmbedded(Import BW : BIT_WIDTH).
 
   (** ** Printing as C code *)
 
-  (* Here we have the pay-off: even within Coq, it is easy to print these syntax
+  (* Here we have the pay-off: even within Rocq, it is easy to print these syntax
    * trees as normal C (concrete) syntax.  The functions speak for
    * themselves! *)
 
@@ -1318,7 +1310,7 @@ Module MixedToDeep(Import BW : BIT_WIDTH).
     | [ |- translate_exp _ (_ ^+ _) _ ] => eapply TrAdd
     | [ |- translate_exp ?V ?v _ ] =>
       match V with
-      | context[add _ ?y v] => apply TrVar with (x := y); simplify; equality
+      | context[M.add _ ?y v] => apply TrVar with (x := y); simplify; equality
       end
     | [ |- translate_exp _ _ _ ] => eapply TrConst
 

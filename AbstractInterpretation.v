@@ -15,7 +15,7 @@ Set Implicit Arguments.
  * technique: abstract interpretation. *)
 
 (* Apologies for jumping right into abstract formal details, but that's what the
- * medium of Coq forces on us!  We will apply abstract interpretation to the
+ * medium of Rocq forces on us!  We will apply abstract interpretation to the
  * imperative language that we formalized in the last chapter.  Here's a record
  * capturing the idea of an abstract interpretation for that language. *)
 Record absint := {
@@ -1295,7 +1295,6 @@ Proof.
   invert H0.
   eexists; propositional.
   eauto.
-  apply subsumeds_add; eauto.
 
   cases (absint_step s c1 (fun c => wrap (c;; c2))).
 
@@ -1760,7 +1759,7 @@ Definition interval_absint := {|
   Represents := interval_rep
 |}.
 
-Local Hint Resolve mult_le_compat : core. (* Theorem from Coq standard library *)
+Local Hint Resolve Nat.mul_le_mono : core. (* Theorem from Rocq standard library *)
 
 (* When one interval implies another, and the first is possible, we can deduce
  * arithmetic relationships betwen their respective bounds. *)

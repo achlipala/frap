@@ -172,7 +172,7 @@ Locate "/\".
 Print and.
 Locate "\/".
 Print or.
-(* Implication ([->]) is built into Coq, so nothing to look up there. *)
+(* Implication ([->]) is built into Rocq, so nothing to look up there. *)
 
 Section propositional.
   Variables P Q R : Prop.

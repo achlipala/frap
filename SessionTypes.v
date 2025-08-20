@@ -3,7 +3,8 @@
   * Author: Adam Chlipala
   * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
 
-Require Import Frap FunctionalExtensionality MessagesAndRefinement.
+Require Import Frap MessagesAndRefinement.
+From Stdlib Require Import FunctionalExtensionality.
 
 Set Implicit Arguments.
 Set Asymmetric Patterns.

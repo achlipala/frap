@@ -976,10 +976,10 @@ In general, induction on proofs of relations is called \emph{rule induction}\ind
 A simple example:
 
 \begin{theorem}
-  All of my favorite numbers are below 50, i.e. $\forall x. \; \favs{x} \Rightarrow x < 50$.
+  All of my favorite numbers are below 50, i.e.\ $\forall x. \; \favs{x} \Rightarrow x < 50$.
 \end{theorem}
 \begin{proof}
-  By induction on the proof of $\favs{x}$, i.e. with $Q(x) = x < 50$.
+  By induction on the proof of $\favs{x}$, i.e.\ with $Q(x) = x < 50$.
 \end{proof}
 
 Note how it is quite natural to see rule induction as induction on proof trees, as if they were just any other tree data structure!
@@ -1015,7 +1015,7 @@ $$\infer{Q(x, y)}{
 
 As an example with transitive closure, consider an alternative definition of ``less-than'' for natural numbers.
 Let $\prec$ be the relation defined to accept $x$ and $y$ only when $x + 1 = y$.
-Now $\prec^+$ means ``less-than,'' i.e. the second argument is reachable from the first by some finite number of increments.
+Now $\prec^+$ means ``less-than,'' i.e.\ the second argument is reachable from the first by some finite number of increments.
 We can make the connection formal.
 
 \begin{theorem}
@@ -1478,7 +1478,7 @@ Thus, what we call invariants here needn't also be \emph{inductive invariants}\i
 
 Combining Theorems \ref{invariant_induction} and \ref{invariant_weaken}, it is now easy to prove Theorem \ref{factorial_ok}, establishing the correctness of our particular factorial system $\mathcal F$.
 First, we use Theorem \ref{invariant_induction} to deduce that $I$ is an invariant of $\mathcal F$.
-Then, we choose the very same $I'$ that we warned above is not an inductive invariant, but which is fairly easily shown to be a superset of $I$.
+Then, we choose the very same $I'$ that we warned above is not an inductive invariant but which is fairly easily shown to be a superset of $I$.
 Therefore, by Theorem \ref{invariant_weaken}, $I'$ is also an invariant of $\mathcal F$, and Theorem \ref{factorial_ok} follows quite directly from that fact, as $I'$ is essentially a restatement of Theorem \ref{factorial_ok}.
 
 \section{Rule Induction Applied}
@@ -1640,7 +1640,7 @@ Finally, we can write the invariant.
 As is often the case, defining the invariant is the hard part of the proof, and the rest follows by the standard methodology that we used for factorial.
 To recap that method, first we use Theorem \ref{invariant_induction} to show that $I$ really is an invariant of $\mathcal L \mid \mathcal L$.
 Next, we use Theorem \ref{invariant_weaken} to show that $I$ implies the original property of interest, that finished program states have value 2 for \texttt{global}.
-Most of the action is in the first step, where we must work through fussy details of all the different steps that could happen from a state within the invariant, using arithmetic reasoning in each case to either derive a contradiction (that step couldn't happen from this starting state) or show that a specific new state also belongs to the invariant.
+Most of the action is in the first step, where we must work through fussy details of all the different steps that could happen from a state within the invariant, using arithmetic reasoning in each case either to derive a contradiction (that step couldn't happen from this starting state) or show that a specific new state also belongs to the invariant.
 We leave those details to the Rocq code, as usual.
 
 The reader may be worried at this point that coming up with invariants can be rather tedious!

@@ -481,7 +481,7 @@ Consider the humble queue\index{queues}, a classic data structure that allows us
 Perhaps surprisingly, there is already some complexity in efficient queue implementation.
 So-called \emph{client code}\index{client code} that relies on queues shouldn't need to know about that complexity, though.
 We should be able to formulate ``queue'' as an \emph{abstract data type}\index{abstract data type}, hiding implementation details.
-In the setting of pure functional programming, as in Rocq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g. interfaces\index{interface} in Java\index{Java}.
+In the setting of pure functional programming, as in Rocq, here is our first cut at such a data type, as a set of types and operations, somewhat reminiscent of e.g.\ interfaces\index{interface} in Java\index{Java}.
 Type $\mt{t}(\alpha)$ stands for queues holding data values in some type $\alpha$.
 \begin{eqnarray*}
   \mt{t}(\alpha) &:& \mt{Set} \\
@@ -1022,7 +1022,7 @@ We can make the connection formal.
   If $x \prec^+ y$, then $x < y$.
 \end{theorem}
 \begin{proof}
-  By induction on the proof of $x \prec^+ y$, e.g. with $Q(x, y) = x < y$, considering cases for the two rules defining transitive closure.
+  By induction on the proof of $x \prec^+ y$, e.g.\ with $Q(x, y) = x < y$, considering cases for the two rules defining transitive closure.
 \end{proof}
 
 \begin{lemma}\label{lt_lt''}
@@ -1762,7 +1762,7 @@ s' \arrow{r}{\exists \to'} & s'_1
 \end{tikzcd}
 \]
 
-At an even higher intuitive level, what simulation says is that every execution of the concrete system may be matched, step for step, by an execution of the abstract system.
+At an even higher intuitive level, what simulation says is that every execution of the concrete system may be matched, step-for-step, by an execution of the abstract system.
 The relation $R$ explains the rules for which states match across systems.
 For our purposes, the key pay-off from this connection is that we may translate any invariant of the abstract system into an invariant of the concrete system.
 
@@ -5186,7 +5186,7 @@ This optimization is only safe when the first thread can take a step and when th
 Formally, we define $\pors{h, l, c_1, c_2, s}$ as follows, where $s$ should be a valid summary of $c_2$.
 \begin{itemize}
 \item There is some $c_0$ where $\na{c_1} = c_0$.  That is, thread $c_1$ has some uniquely determined atomic action lined up to run next.
-\item There exist $h'$, $l'$, and $c'_1$ such that $\smallstep{(h, l, c_1)}{(h', l', c'_1)}$.  That is, thread $c_1$ is actually able to take a step, which might not be possible if e.g. trying to take a lock that is already held.
+\item There exist $h'$, $l'$, and $c'_1$ such that $\smallstep{(h, l, c_1)}{(h', l', c'_1)}$.  That is, thread $c_1$ is actually able to take a step, which might not be possible if e.g.\ trying to take a lock that is already held.
 \item And the crucial compatibility condition: $\commu{c_0}{s}$.  That is, all actions that other threads might perform commute with $c_0$, the first action of $c_1$.
 \end{itemize}
 

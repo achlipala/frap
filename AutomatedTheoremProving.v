@@ -1,3 +1,4 @@
+
 Require Import Frap.
 
 Definition eclass := nat.
@@ -72,15 +73,15 @@ Definition assertEqual (x1 x2 : var) : M unit :=
 Definition checkEqual (x1 x2 : var) : M bool :=
   ec1 <- classOf x1;
   ec2 <- classOf x2;
-  ec1' <- followLinks ec1;
-  ec2' <- followLinks ec2;
-  ret (if ec1' ==n ec2' then true else false).
+  ret (if ec1 ==n ec2 then true else false).
 
 Record valid (g : egraph) : Prop := {
     LinksDecrease : forall ec1 ec2, g.(Links) $? ec1 = Some ec2 -> ec2 < ec1;
     VarsInBounds : forall x ec, g.(Vars) $? x = Some ec -> ec < g.(NextEclass);
     LinksInBounds : forall ec1 ec2, g.(Links) $? ec1 = Some ec2 -> ec1 < g.(NextEclass)
   }.
+
+Hint Resolve LinksDecrease VarsInBounds LinksInBounds : core.
 
 Section Semantics.
   Variable value : Set.
@@ -403,6 +404,7 @@ Section Semantics.
   Lemma wpre_followLinks : forall g ec Q,
       (forall g' r,
           rep g' = rep g
+          -> g'.(Vars) = g.(Vars)
           -> representative g ec r
           -> Q g' r)
       -> wpre g (followLinks ec) Q.
@@ -410,4 +412,171 @@ Section Semantics.
     simplify.
     apply wpre_followLinks'; auto.
   Qed.
+
+  Lemma representative_congruence : forall g g' e r,
+      rep g' = rep g
+      -> representative g e r
+      -> representative g' e r.
+  Proof.
+    induct 2.
+
+    apply RepDone.
+    cases (Links g' $? ec1); auto.
+  Admitted.    
+
+  Lemma representative_same_Links : forall g g' e r,
+      g.(Links) = g'.(Links)
+      -> representative g e r
+      -> representative g' e r.
+  Proof.
+    induct 2; simplify.
+    rewrite H in H0; eauto.
+    rewrite H in H0; eauto.
+  Qed.
+
+  Lemma wpre_classOf : forall g x Q,
+      (forall g' r,
+          rep g' = rep g
+          -> g.(Vars) $<= g'.(Vars)
+          -> varRepresentative g' x r
+          -> Q g' r)
+      -> wpre g (classOf x) Q.
+  Proof.
+    unfold classOf; simplify.
+    unfold wpre; simplify.
+    cases (Vars g $? x).
+    generalize H0.
+    change (wpre g (followLinks e) Q).
+    apply wpre_followLinks; simplify.
+    apply H; auto.
+    rewrite H2; apply includes_refl.
+    eexists; split; eauto.
+    rewrite H2.
+    eassumption.
+    eapply representative_congruence; eauto.
+
+    assert (Hvalid : valid {|
+                         NextEclass := S (NextEclass g);
+                         Vars := Vars g $+ (x, NextEclass g);
+                         Links := Links g
+                       |}).
+    {
+      constructor; simplify; eauto.
+      cases (x ==v x0); subst; simplify; eauto.
+      invert H1.
+      linear_arithmetic.
+      assert (ec < NextEclass g) by eauto.
+      linear_arithmetic.
+      assert (ec1 < NextEclass g) by eauto.
+      linear_arithmetic.
+    }
+    propositional.
+    apply H.
+    apply sets_equal; unfold rep; propositional.
+
+    cases (x1 ==v x); subst.
+    invert H2; propositional.
+    invert H2; propositional.
+    equality.
+    cases (x2 ==v x); subst.
+    invert H2; propositional.
+    invert H6; propositional.
+    equality.
+    apply H1 with (x1 := x1) (x2 := x2); auto.
+    invert H2; propositional.
+    exists x3; propositional.
+    invert H2; propositional.
+    exists x4; simplify; propositional.
+    eapply representative_same_Links; try eassumption.
+    auto.
+    invert H6; propositional.
+    exists x4; simplify; propositional.
+    eapply representative_same_Links; try eassumption.
+    auto.
+
+    cases (x1 ==v x); cases (x2 ==v x); subst; try equality.
+    invert H2; propositional.
+    invert H2; simplify; propositional.
+    invert H6; simplify; propositional.
+    invert H2.
+    invert H7; simplify.
+    apply representative_le in H8; auto.
+    assert (x4 < NextEclass g) by eauto.
+    linear_arithmetic.
+    assert (NextEclass g < NextEclass g) by eauto.
+    linear_arithmetic.
+
+    invert H2; propositional.
+    invert H6; simplify; propositional.
+    invert H6.
+    assert (x2 = NextEclass g).
+    invert H7; simplify; auto.
+    assert (NextEclass g < NextEclass g) by eauto.
+    linear_arithmetic.
+    subst.
+    invert H2; simplify; propositional.
+    apply representative_le in H6; auto.
+    assert (x2 < NextEclass g) by eauto.
+    linear_arithmetic.
+    invert H2; propositional.
+    invert H2; simplify; propositional.
+    invert H6; simplify; propositional.
+    apply H1 with (x1 := x1) (x2 := x2); auto.
+    exists x3; propositional.
+    exists x4; propositional.
+    eapply representative_same_Links; try eassumption; auto.
+    exists x5; propositional.
+    eapply representative_same_Links; try eassumption; auto.
+    simplify.
+    apply includes_intro; simplify; auto.
+
+    exists (NextEclass g); simplify; propositional.
+    constructor; simplify.
+    cases (Links g $? NextEclass g); auto.
+    assert (NextEclass g < NextEclass g) by eauto.
+    linear_arithmetic.
+  Qed.
+  
+  Theorem wpre_checkEqual : forall g x1 x2 Q,
+      (forall g' r,
+          rep g' = rep g
+          -> Vars g $<= Vars g'
+          -> (r = true <->
+                (forall v, rep g' v -> forall v1 v2,
+                      v $? x1 = Some v1
+                      -> v $? x2 = Some v2
+                      -> v1 = v2))
+          -> Q g' r)
+      -> wpre g (checkEqual x1 x2) Q.
+  Proof.
+    unfold checkEqual; simplify.
+    apply wpre_bind.
+    apply wpre_classOf; simplify.
+    apply wpre_bind.
+    apply wpre_classOf; simplify.
+    apply wpre_ret.
+    apply H; clear H; try equality.
+    apply includes_intro; simplify.
+    eapply includes_lookup; try apply H4.
+    eapply includes_lookup; eauto.
+    invert H2.
+    invert H.
+    invert H5.
+    invert H.
+    replace (Vars g' $? x1) with (Vars g'0 $? x1) in H2.
+    eapply representative_congruence in H6; try eassumption.
+    
+    cases (r ==n r0); subst; propositional; try equality.
+
+    apply H8 with (x1 := x1) (x2 := x2); auto.
+    exists r0; propositional.
+    unfold varRepresentative; eauto.
+    unfold varRepresentative; eauto.
+
+    admit.
+
+    rewrite H2.
+    erewrite includes_lookup; try eassumption.
+    auto.
+  Admitted.
 End Semantics.

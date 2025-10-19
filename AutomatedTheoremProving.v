@@ -65,8 +65,11 @@ Definition classOf (x : var) : M eclass := fun g =>
 Definition assertEqual (x1 x2 : var) : M unit :=
   ec1 <- classOf x1;
   ec2 <- classOf x2;
-  let (ec1, ec2) := (min ec1 ec2, max ec1 ec2) in
-  setLink ec2 ec1.
+  if ec1 ==n ec2 then
+    ret tt
+  else
+    let (ec1, ec2) := (min ec1 ec2, max ec1 ec2) in
+    setLink ec2 ec1.
 
 Definition checkEqual (x1 x2 : var) : M bool :=
   ec1 <- classOf x1;
@@ -106,12 +109,15 @@ Definition varsMustAgree (g : egraph) (x1 x2 : var) :=
     varRepresentative g x1 ec
     /\ varRepresentative g x2 ec.
 
-Definition rep (g : egraph) : valuations := fun v => forall x1 x2,
-  varsMustAgree g x1 x2
-  -> forall v1 v2,
+Definition varsDoAgree (x1 x2 : var) (v : valuation) :=
+  forall v1 v2,
     v.(Values) $? x1 = Some v1
     -> v.(Values) $? x2 = Some v2
     -> v1 = v2.
+
+Definition rep (g : egraph) : valuations := fun v => forall x1 x2,
+  varsMustAgree g x1 x2
+  -> varsDoAgree x1 x2 v.
 
 Definition all : valuations := fun _ => True.
 
@@ -122,7 +128,7 @@ Qed.
 
 Theorem rep_empty : rep empty = all.
 Proof.
-  unfold rep, varsMustAgree, all; simplify.
+  unfold rep, varsMustAgree, varsDoAgree, all; simplify.
   apply sets_equal; simplify; first_order.
   simplify.
   equality.
@@ -525,7 +531,7 @@ Lemma rep_literal_valuation : forall g vs,
     -> valid g
     -> rep g (literal_valuation g vs).
 Proof.
-  unfold rep; simplify.
+  unfold rep, varsDoAgree; simplify.
   invert H1; propositional.
   apply varRepresentative_literal_values_bwd in H2; auto.
   apply varRepresentative_literal_values_bwd in H3; auto.
@@ -558,18 +564,18 @@ Local Hint Resolve dom_Forall dom_In : core.
 
 Lemma preserve_varRepresentative : forall g g' x ec,
     preserve_reps g g'
-    -> g.(Vars) = g'.(Vars)
+    -> g.(Vars) $<= g'.(Vars)
     -> varRepresentative g x ec
     -> varRepresentative g' x ec.
 Proof.
   unfold preserve_reps, varRepresentative; first_order.
-  rewrite <- H0.
+  erewrite includes_lookup; eauto.
   first_order.
 Qed.
 
 Lemma preserve_varsMustAgree : forall g g' x1 x2,
     preserve_reps g g'
-    -> g.(Vars) = g'.(Vars)
+    -> g.(Vars) $<= g'.(Vars)
     -> varsMustAgree g x1 x2
     -> varsMustAgree g' x1 x2.
 Proof.
@@ -613,6 +619,7 @@ Lemma wpre_classOf : forall g x Q,
     (forall g' r,
         preserve_reps g g'
         -> g.(Vars) $<= g'.(Vars)
+        -> g.(NextEclass) <= g'.(NextEclass)
         -> (forall y z, y <> z -> varsMustAgree g y z <-> varsMustAgree g' y z)
         -> varRepresentative g' x r
         -> Q g' r)
@@ -627,8 +634,16 @@ Proof.
   apply wpre_followLinks; simplify.
   apply H; auto.
   rewrite H3; apply includes_refl.
+  linear_arithmetic.
   propositional; eauto using preserve_varsMustAgree, preserve_reps_symm.
+  eapply preserve_varsMustAgree; eauto.
+  rewrite H3.
+  apply includes_refl.
+  eapply preserve_varsMustAgree; eauto.
+  eauto using preserve_reps_symm.
+  rewrite H3; apply includes_refl.
   eapply preserve_varRepresentative; eauto.
+  rewrite H3; apply includes_refl.
   red; eauto.
   
   assert (Hvalid : valid {|
@@ -654,6 +669,7 @@ Proof.
   apply H; simplify.
   apply preserve_reps_Links; trivial.
   apply includes_intro; simplify; auto.
+  linear_arithmetic.
 
   propositional.
   invert H2; propositional.
@@ -707,10 +723,7 @@ Theorem wpre_checkEqual : forall g x1 x2 Q,
     (forall g' r,
         rep g' = rep g
         -> (r = true <->
-              (forall v, rep g' v -> forall v1 v2,
-                    v.(Values) $? x1 = Some v1
-                    -> v.(Values) $? x2 = Some v2
-                    -> v1 = v2))
+              (forall v, rep g' v -> varsDoAgree x1 x2 v))
         -> Q g' r)
     -> wpre g (checkEqual x1 x2) Q.
 Proof.
@@ -724,32 +737,33 @@ Proof.
 
   eapply preserve_rep; eauto using preserve_reps_trans, preserve_reps_symm.
   propositional.
-  apply H2; auto.
-  apply H6; auto.
-  apply H6; auto.
-  apply H2; auto.
+  apply H3; auto.
+  apply H8; auto.
+  apply H8; auto.
+  apply H3; auto.
 
   propositional.
 
   cases (r ==n r0); subst; try equality.
   assert (varsMustAgree g'0 x1 x2).
-  invert H3; propositional.
-  invert H7; propositional.
+  invert H4; propositional.
+  invert H9; propositional.
   do 4 esplit.
-  eapply includes_lookup; try apply H5.
+  eapply includes_lookup; try apply H6.
   eassumption.
   eapply preserve_reps_use; try eassumption.
   eassumption.
   assumption.
-  red in H10.
+  red in H12.
   eauto.
 
-  pose proof (FiniteVars _ H8).
-  invert H10.
+  unfold varsDoAgree in *.
+  pose proof (FiniteVars _ H10).
+  invert H12.
   assert (rep g'0 (literal_valuation g'0 x)) by eauto using rep_literal_valuation.
-  invert H3; propositional.
-  invert H7; propositional.
-  eapply H9 in H10; clear H9.
+  invert H4; propositional.
+  invert H9; propositional.
+  eapply H11 in H12; clear H11.
   2: apply varRepresentative_literal_values_fwd; auto.
   2: eapply dom_In; eauto.
   2: do 2 esplit; try eapply includes_lookup; try apply H5; eauto.
@@ -757,5 +771,46 @@ Proof.
   2: eapply dom_In; eauto.
   2: do 2 esplit; eauto.
   cases (r ==n r0); subst; try equality.
-  apply preserve_reps_use with (g' := g'0) in H13; eauto.
 Qed.
+
+Lemma cap_superset : forall A (x y : set A),
+    x \subseteq y
+    -> x = x \cap y.
+Proof.
+  sets.
+Qed.
+
+Theorem wpre_assertEqual : forall g x1 x2 Q,
+    (forall g',
+        rep g' = (rep g) \cap (varsDoAgree x1 x2)
+        -> Q g' tt)
+    -> wpre g (assertEqual x1 x2) Q.
+Proof.
+  unfold assertEqual; simplify.
+  apply wpre_bind.
+  apply wpre_classOf; simplify.
+  apply wpre_valid; intro.
+  apply wpre_bind.
+  apply wpre_classOf; simplify.
+  apply wpre_valid; intro.
+  cases (r ==n r0); subst.
+
+  apply wpre_ret; simplify.
+  apply H.
+  eapply preserve_varRepresentative in H4; eauto.
+  replace (rep g) with (rep g'0).
+  apply cap_superset.
+  intro; simplify.
+  apply H13.
+  invert H10; propositional.
+  invert H4; propositional.
+  do 4 esplit; eauto.
+  transitivity (rep g').
+  symmetry; eauto using preserve_rep.
+  symmetry; eauto using preserve_rep.
+
+  apply wpre_setLink.
+  apply varRepresentative_lt in H4; auto.
+  apply varRepresentative_lt in H10; auto.
+  linear_arithmetic.
+Admitted.

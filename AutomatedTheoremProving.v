@@ -290,6 +290,20 @@ Proof.
     eauto using preserve_reps_add_fwd, preserve_reps_add_bwd.
 Qed.
 
+Lemma wpre_setLink : forall g ec1 ec2 Q,
+    ec2 < ec1 < g.(NextEclass)
+    -> Q {| NextEclass := g.(NextEclass);
+           Vars := g.(Vars);
+           Links := g.(Links) $+ (ec1, ec2) |} tt
+    -> wpre g (setLink ec1 ec2) Q.
+Proof.
+  unfold wpre; simplify; propositional.
+  split; simplify; propositional; eauto.
+  cases (ec1 ==n ec0); subst; simplify; eauto.
+  equality.
+  cases (ec1 ==n ec0); subst; simplify; eauto.
+Qed.  
+
 Lemma wpre_followLinks' : forall fuel g ec Q,
     ec < fuel
     -> (forall g' r,
@@ -322,23 +336,13 @@ Proof.
   eauto.
 
   apply wpre_bind.
-  red; unfold setLink; simplify; propositional.
-  constructor; simplify.
-
-  cases (ec ==n ec1); subst; simplify.
-  invert H7.
+  apply wpre_setLink.
+  split.
   apply representative_le in H5; try assumption.
   apply LinksDecrease in Heq; try assumption.
   linear_arithmetic.
-  apply LinksDecrease in H7; assumption.
-  apply VarsInBounds in H7; assumption.
-
-  cases (ec ==n ec1); subst; simplify.
-  invert H7.
-  apply LinksInBounds in Heq; try assumption.
+  apply LinksInBounds in Heq; auto.
   linear_arithmetic.
-  apply LinksInBounds in H7; assumption.
-  rewrite H4; eauto.
 
   apply wpre_ret; intro.
   apply H0; simplify; eauto.

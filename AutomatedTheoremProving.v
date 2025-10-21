@@ -1139,3 +1139,10 @@ Proof.
   rewrite H2, H1, H0, H, rep_empty; clear.
   apply sets_equal; simplify; unfold intersection, all, rep; propositional.
 Qed.
+
+Example test_computed : snd (test empty) = true.
+Proof.
+  Local Transparent Init.Nat.min Init.Nat.max.
+  repeat (compute; simplify).
+  reflexivity.
+Qed.

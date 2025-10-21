@@ -1114,3 +1114,28 @@ Proof.
   eapply representative_gadd_bwd_unchanged; eauto using representative_None.
   eapply representative_gadd_bwd_unchanged; eauto using representative_None.
 Qed.
+
+Example test := (_ <- assertEqual "x" "y";
+                 _ <- assertEqual "u" "v";
+                 _ <- assertEqual "y" "z";
+                 checkEqual "z" "x").
+
+Example test_ok :
+  wpre empty test (fun g b => b = true /\ rep g = (fun v =>
+    v.(Values) $? "x" = v.(Values) $? "y"
+    /\ v.(Values) $? "y" = v.(Values) $? "z"
+    /\ v.(Values) $? "u" = v.(Values) $? "v")).
+Proof.
+  repeat ((apply wpre_assertEqual || apply wpre_checkEqual || apply wpre_bind); simplify).
+  split.
+
+  cases r; auto.
+  apply H3; simplify.
+  rewrite H2, H1, H0, H in H4.
+  unfold intersection in H4; propositional.
+  unfold varsDoAgree in *.
+  equality.
+
+  rewrite H2, H1, H0, H, rep_empty; clear.
+  apply sets_equal; simplify; unfold intersection, all, rep; propositional.
+Qed.

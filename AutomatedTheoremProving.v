@@ -110,10 +110,7 @@ Definition varsMustAgree (g : egraph) (x1 x2 : var) :=
     /\ varRepresentative g x2 ec.
 
 Definition varsDoAgree (x1 x2 : var) (v : valuation) :=
-  forall v1 v2,
-    v.(Values) $? x1 = Some v1
-    -> v.(Values) $? x2 = Some v2
-    -> v1 = v2.
+  v.(Values) $? x1 = v.(Values) $? x2.
 
 Definition rep (g : egraph) : valuations := fun v => forall x1 x2,
   varsMustAgree g x1 x2
@@ -526,19 +523,6 @@ Proof.
   eauto using representative_func.
 Qed.
 
-Lemma rep_literal_valuation : forall g vs,
-    dom g.(Vars) = constant vs
-    -> valid g
-    -> rep g (literal_valuation g vs).
-Proof.
-  unfold rep, varsDoAgree; simplify.
-  invert H1; propositional.
-  apply varRepresentative_literal_values_bwd in H2; auto.
-  apply varRepresentative_literal_values_bwd in H3; auto.
-  eapply varRepresentative_func in H2; try eassumption; subst.
-  eapply varRepresentative_func in H3; try eassumption; subst.
-Qed.  
-
 Lemma dom_Forall : forall (m : fmap var eclass) vs,
     dom m = constant vs
     -> Forall (fun y => m $? y <> None) vs.
@@ -561,6 +545,19 @@ Proof.
 Qed.
 
 Local Hint Resolve dom_Forall dom_In : core.
+
+Lemma rep_literal_valuation : forall g vs,
+    dom g.(Vars) = constant vs
+    -> valid g
+    -> rep g (literal_valuation g vs).
+Proof.
+  unfold rep, varsDoAgree; simplify.
+  invert H1; propositional.
+  erewrite varRepresentative_literal_values_fwd; eauto.
+  erewrite varRepresentative_literal_values_fwd; eauto.
+  invert H3; propositional; eauto.
+  invert H1; propositional; eauto.
+Qed.  
 
 Lemma preserve_varRepresentative : forall g g' x ec,
     preserve_reps g g'
@@ -764,13 +761,13 @@ Proof.
   invert H4; propositional.
   invert H9; propositional.
   eapply H11 in H12; clear H11.
-  2: apply varRepresentative_literal_values_fwd; auto.
-  2: eapply dom_In; eauto.
-  2: do 2 esplit; try eapply includes_lookup; try apply H5; eauto.
-  2: apply varRepresentative_literal_values_fwd; auto.
-  2: eapply dom_In; eauto.
-  2: do 2 esplit; eauto.
+  simpl in H12.
   cases (r ==n r0); subst; try equality.
+  erewrite varRepresentative_literal_values_fwd in H12; eauto.
+  2: do 2 esplit; try eapply includes_lookup; try apply H5; eauto.
+  rewrite varRepresentative_literal_values_fwd with (ec := r0) in H12; eauto.
+  2: do 2 esplit; eauto.
+  equality.
 Qed.
 
 Lemma cap_superset : forall A (x y : set A),
@@ -780,6 +777,81 @@ Proof.
   sets.
 Qed.
 
+Lemma representative_gadd_fwd_changed : forall g ec1 r1 r2,
+    representative g ec1 r1
+    -> g.(Links) $? r2 = None
+    -> r2 < r1
+    -> representative (gadd g r1 r2) ec1 r2.
+Proof.
+  induct 1; simplify.
+
+  econstructor; simplify; eauto.
+  constructor; simplify; auto.
+
+  cases (ec1 ==n ec3); subst; try equality.
+  econstructor; simplify; eauto.
+  constructor; simplify; auto.
+
+  econstructor; simplify; eauto.
+Qed.
+
+Lemma representative_gadd_bwd_changed : forall g ec1 r1 r2,
+    representative (gadd g r1 r2) ec1 r2
+    -> g.(Links) $? r1 = None
+    -> representative g ec1 r1 \/ representative g ec1 r2.
+Proof.
+  induct 1; simplify.
+
+  cases (r1 ==n ec1); subst; simplify; try equality.
+  eauto.
+
+  cases (r1 ==n ec1); subst; simplify; eauto.
+  propositional; eauto.
+Qed.
+
+Lemma representative_gadd_fwd_unchanged : forall g ec1 ec2 r1 r2,
+    representative g ec1 ec2
+    -> g.(Links) $? r1 = None
+    -> ec2 <> r1
+    -> representative (gadd g r1 r2) ec1 ec2.
+Proof.
+  induct 1; simplify.
+
+  constructor; simplify.
+  auto.
+
+  cases (ec1 ==n r1); try equality.
+  econstructor; simplify; eauto.
+Qed.
+
+Lemma representative_gadd_bwd_unchanged : forall g ec1 ec2 r1 r2,
+    representative (gadd g r1 r2) ec1 ec2
+    -> g.(Links) $? r2 = None
+    -> ec2 <> r2
+    -> r1 <> r2
+    -> representative g ec1 ec2.
+Proof.
+  induct 1; simplify.
+
+  cases (r1 ==n ec1); subst; simplify; try equality.
+  eauto.
+
+  cases (ec1 ==n r1); subst; simplify; eauto.
+
+  invert H.
+  invert H0; simplify; equality.
+Qed.
+
+Lemma representative_self : forall g ec1 ec2 ec2',
+    representative g ec1 ec2
+    -> representative g ec2 ec2'
+    -> ec2' = ec2.
+Proof.
+  simplify.
+  apply representative_None in H.
+  invert H0; equality.
+Qed.
+
 Theorem wpre_assertEqual : forall g x1 x2 Q,
     (forall g',
         rep g' = (rep g) \cap (varsDoAgree x1 x2)
@@ -787,6 +859,7 @@ Theorem wpre_assertEqual : forall g x1 x2 Q,
     -> wpre g (assertEqual x1 x2) Q.
 Proof.
   unfold assertEqual; simplify.
+  apply wpre_valid; intro Hg.
   apply wpre_bind.
   apply wpre_classOf; simplify.
   apply wpre_valid; intro.
@@ -813,4 +886,231 @@ Proof.
   apply varRepresentative_lt in H4; auto.
   apply varRepresentative_lt in H10; auto.
   linear_arithmetic.
-Admitted.
+  apply H; clear H.
+  eapply preserve_varRepresentative in H4; eauto using preserve_reps_symm.
+  invert H10; propositional.
+  invert H4; propositional.
+  apply sets_equal; simplify.
+  unfold rep.
+  propositional.
+  
+  split; simplify.
+
+  invert H14; propositional.
+  invert H14; propositional.
+  invert H16; propositional.
+  eapply includes_lookup in H14; try apply H1.
+  eapply includes_lookup in H14; try apply H7.
+  eapply includes_lookup in H16; try apply H1.
+  eapply includes_lookup in H16; try apply H7.
+  apply H.
+  cases (r <=? r0).
+
+  replace (max r r0) with r0 in * by linear_arithmetic.
+  replace (min r r0) with r in * by linear_arithmetic.
+  cases (x6 ==n r0); subst.
+
+  exists r; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  eapply preserve_reps_use; try apply H17; eauto using preserve_reps_symm, preserve_reps_trans.
+  linear_arithmetic.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  eapply preserve_reps_use; try apply H18; eauto using preserve_reps_symm, preserve_reps_trans.
+  linear_arithmetic.
+
+  exists x6; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+  eapply preserve_reps_use; try apply H17; eauto using preserve_reps_symm, preserve_reps_trans.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+  eapply preserve_reps_use; try apply H18; eauto using preserve_reps_symm, preserve_reps_trans.
+
+  replace (max r r0) with r in * by linear_arithmetic.
+  replace (min r r0) with r0 in * by linear_arithmetic.
+  cases (x6 ==n r); subst.
+
+  exists r0; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  eapply preserve_reps_use; try apply H17; eauto using preserve_reps_symm, preserve_reps_trans.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  eapply preserve_reps_use; try apply H18; eauto using preserve_reps_symm, preserve_reps_trans.
+
+  exists x6; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+  eapply preserve_reps_use; try apply H17; eauto using preserve_reps_symm, preserve_reps_trans.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+  eapply preserve_reps_use; try apply H18; eauto using preserve_reps_symm, preserve_reps_trans.
+
+  apply H; clear H.
+  cases (r <=? r0).
+
+  replace (max r r0) with r0 in * by linear_arithmetic.
+  replace (min r r0) with r in * by linear_arithmetic.
+  exists r; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  linear_arithmetic.
+
+  replace (max r r0) with r in * by linear_arithmetic.
+  replace (min r r0) with r0 in * by linear_arithmetic.
+  exists r0; split.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_changed; eauto using representative_None.
+  eexists; simplify; propositional; eauto.
+  eapply representative_gadd_fwd_unchanged; eauto using representative_None.
+
+  cases (x4 ==v x5); subst.
+  red; equality.
+
+  red in H; propositional.
+
+  invert H14; propositional.
+  invert H14; simplify; propositional.
+  invert H17; simplify; propositional.
+  cases (r <=? r0).
+
+  replace (max r r0) with r0 in * by linear_arithmetic.
+  replace (min r r0) with r in * by linear_arithmetic.
+
+  cases (x6 ==n r); subst.
+
+  apply representative_gadd_bwd_changed in H18; eauto using representative_None.
+  apply representative_gadd_bwd_changed in H19; eauto using representative_None.
+  propositional.
+
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r0; split.
+  eexists; simplify; propositional; eauto.
+  eexists; simplify; propositional; eauto.
+
+  assert (varsDoAgree x1 x5 x3).
+  cases (x1 ==v x5).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  assert (varsDoAgree x2 x4 x3).
+  cases (x2 ==v x4).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r0; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  unfold varsDoAgree in *; equality.
+
+  assert (varsDoAgree x1 x4 x3).
+  cases (x1 ==v x4).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  assert (varsDoAgree x2 x5 x3).
+  cases (x2 ==v x5).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r0; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  unfold varsDoAgree in *; equality.
+  
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  do 4 esplit; eauto.
+
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  do 4 esplit; try eassumption.
+  eapply representative_gadd_bwd_unchanged; eauto using representative_None.
+  eapply representative_gadd_bwd_unchanged; eauto using representative_None.
+
+  replace (max r r0) with r in * by linear_arithmetic.
+  replace (min r r0) with r0 in * by linear_arithmetic.
+
+  cases (x6 ==n r0); subst.
+
+  apply representative_gadd_bwd_changed in H18; eauto using representative_None.
+  apply representative_gadd_bwd_changed in H19; eauto using representative_None.
+  propositional.
+
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r; split.
+  eexists; simplify; propositional; eauto.
+  eexists; simplify; propositional; eauto.
+
+  assert (varsDoAgree x1 x4 x3).
+  cases (x1 ==v x4).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  assert (varsDoAgree x2 x5 x3).
+  cases (x2 ==v x5).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r0; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  unfold varsDoAgree in *; equality.
+
+  assert (varsDoAgree x1 x5 x3).
+  cases (x1 ==v x5).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  assert (varsDoAgree x2 x4 x3).
+  cases (x2 ==v x4).
+  unfold varsDoAgree; equality.
+  apply H15.
+  apply H3; auto.
+  apply H9; auto.
+  exists r0; split.
+  do 2 esplit; eauto.
+  do 2 esplit; eauto.
+  unfold varsDoAgree in *; equality.
+  
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  do 4 esplit; eauto.
+
+  apply H15; clear H15.
+  apply H3; auto.
+  apply H9; auto.
+  do 4 esplit; try eassumption.
+  eapply representative_gadd_bwd_unchanged; eauto using representative_None.
+  eapply representative_gadd_bwd_unchanged; eauto using representative_None.
+Qed.

@@ -1118,29 +1118,48 @@ Qed.
 Example test := (_ <- assertEqual "x" "y";
                  _ <- assertEqual "u" "v";
                  _ <- assertEqual "y" "z";
-                 checkEqual "z" "x").
+                 b1 <- checkEqual "z" "x";
+                 b2 <- checkEqual "z" "u";
+                 ret (b1, b2)).
 
 Example test_ok :
-  wpre empty test (fun g b => b = true /\ rep g = (fun v =>
-    v.(Values) $? "x" = v.(Values) $? "y"
-    /\ v.(Values) $? "y" = v.(Values) $? "z"
-    /\ v.(Values) $? "u" = v.(Values) $? "v")).
+  wpre empty test (fun g '(b1, b2) => b1 = true
+    /\ b2 = false
+    /\ rep g = (fun v =>
+                  v.(Values) $? "x" = v.(Values) $? "y"
+                  /\ v.(Values) $? "y" = v.(Values) $? "z"
+                  /\ v.(Values) $? "u" = v.(Values) $? "v")).
 Proof.
-  repeat ((apply wpre_assertEqual || apply wpre_checkEqual || apply wpre_bind); simplify).
+  repeat ((apply wpre_assertEqual || apply wpre_checkEqual
+           || apply wpre_bind || apply wpre_ret); simplify).
   split.
 
   cases r; auto.
   apply H3; simplify.
-  rewrite H2, H1, H0, H in H4.
-  unfold intersection in H4; propositional.
+  rewrite H2, H1, H0, H in H3.
+  unfold intersection in H3; propositional.
   unfold varsDoAgree in *.
+  assert (false = true); try equality.
+  apply H9; propositional.
   equality.
 
-  rewrite H2, H1, H0, H, rep_empty; clear.
+  split.
+
+  cases r0; propositional.
+  specialize (H5 {|Values := $0 $+ ("x", true) $+ ("y", true) $+ ("z", true)
+                               $+ ("u", false) $+ ("v", false)|}).
+  rewrite H4, H2, H1, H0, H, rep_empty in H5.
+  unfold varsDoAgree in *; simplify.
+  unfold intersection in H5; simplify; propositional.
+  assert (Some true = Some false); try equality.
+  apply H9; auto.
+  constructor.
+  
+  rewrite H4, H2, H1, H0, H, rep_empty; clear.
   apply sets_equal; simplify; unfold intersection, all, rep; propositional.
 Qed.
 
-Example test_computed : snd (test empty) = true.
+Example test_computed : snd (test empty) = (true, false).
 Proof.
   Local Transparent Init.Nat.min Init.Nat.max.
   repeat (compute; simplify).

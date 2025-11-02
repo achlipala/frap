@@ -1,28 +1,4 @@
-(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 15*: Automated Theorem Proving
-  * Author: Adam Chlipala
-  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
-
 Require Import Frap.
-
-(* Some of the most accessible formal-methods tools (and thus those most
- * commonly developed in or picked up in industry) rely on automated proving in
- * first-order logic.  The most common broad instantiation of the idea is
- * solvers for satisfiability modulo theories (SMT).  However, tactics we've
- * been relying on like [equality] and [linear_arithmetic] use similar
- * algorithms.  We'll look at an example of a prover for the theory of equality,
- * which can be generalized into the full-scale *congruence closure* algorithms
- * of SMT solvers and our [equality] tactic. *)
-
-(* First, though, we'll actually take a detour through a style of implementing
- * and verifying library code, to set us up for using that style to implement
- * our simple theorem prover.  Not only is this detour a good chance to practice
- * ideas from our initial study of Hoare logic, but it also lets us introduce a
- * variant of a central idea from functional programming, *monads*.  They have a
- * fearsome reputation for learnability, and we won't present monads in full
- * generality here, but we hope that practical payoff of our related methods
- * will be clear, as a way not only to simulate imperative coding within a
- * purely functional language but also a way to *verify* such programs. *)
 
 Module Counter.
   (* As a very tame flavor of imperativity, we'll think about programs that
@@ -71,45 +47,23 @@ Module Counter.
     : nat -> Prop :=
     fun n => let (n', v) := m n in Q n' v.
 
-  (* A simple lemma shows how to establish the weakest precondition of a
-   * "return". *)
-  Lemma wpre_ret : forall (A : Set) (x : A) n (Q : nat -> A -> Prop),
-      Q n x (* The future is now!  The postcondition had better hold already. *)
-      -> wpre (ret x) Q n.
-  Proof.
-    unfold wpre; simplify.
-    propositional.
-  Qed.
-
-  (* An analogous lemma for "bind" shows that we are allowed to nest "wpre"
-   * inside postconditions.  The premise basically says that, to establish that
-   * [bind m1 m2] establishes [Q], it suffices to establish that [m1]
-   * establishes that [m2] establishes [Q], with proper threading of results and
-   * counter values. *)
-  Lemma wpre_bind : forall A B (m1 : M A) (m2 : A -> M B) n Q,
-      wpre m1 (fun n' r => wpre (m2 r) Q n') n
-      -> wpre (bind m1 m2) Q n.
-  Proof.
-    unfold wpre, bind; simplify.
-    cases (m1 n); propositional.
-  Qed.
-
-  (* Our two operations for accessing the counter reduce to immediate
-   * requirements on the postcondition. *)
+  (* Now let's formulate useful rules for proving instances of [wpre]. *)
   
+  Lemma wpre_ret : forall (A : Set) (x : A) n (Q : nat -> A -> Prop),
+      wpre (ret x) Q n.
+  Admitted.
+
+  Lemma wpre_bind : forall A B (m1 : M A) (m2 : A -> M B) n Q,
+      wpre (bind m1 m2) Q n.
+  Admitted.
+
   Lemma wpre_read : forall n (Q : nat -> nat -> Prop),
-      Q n n
-      -> wpre read Q n.
-  Proof.
-    unfold wpre, read; trivial.
-  Qed.
+      wpre read Q n.
+  Admitted.
 
   Lemma wpre_write : forall n n' (Q : nat -> unit -> Prop),
-      Q n' tt
-      -> wpre (write n') Q n.
-  Proof.
-    unfold wpre, write; trivial.
-  Qed.
+      wpre (write n') Q n.
+  Admitted.
 
   (* Let's verify a simple example on binary trees that don't even store data
    * values. *)
@@ -141,65 +95,34 @@ Module Counter.
     read.
   (* So this overall computation should always return zero. *)
 
-  (* To prove it, we write a functional paren-balancer, as well. *)
-  Fixpoint sum (bs : list bool) (acc : nat) : nat :=
-    match bs with
-    | nil => acc
-    | b :: bs' => sum bs' (if b then pred acc else S acc)
-    end.
-
-  (* That last function is the key to writing a good [wpre] lemma for
-   * [tally']. *)
-  Theorem wpre_tally' : forall bs Q n,
-      Q (sum bs n) tt
-      -> wpre (tally' bs) Q n.
-  Proof.
-    induct bs; simplify.
-
-    apply wpre_ret.
-    assumption.
-
-    apply wpre_bind.
-    apply wpre_read.
-    apply wpre_bind.
-    apply wpre_write.
-    apply IHbs.
-    assumption.
-  Qed.
-  (* Note how mechnically we applied the different [wpre] lemmas, much like in
-   * our Hoare-logic proofs of the prior chapter, but now we avoid occasional
-   * weakening of postconditions. *)
-
-  (* Next, two lemmas on the purely functional side: *)
-  
-  Lemma sum_acc : forall ls1 ls2 acc,
-      sum (ls1 ++ ls2) acc = sum ls2 (sum ls1 acc).
-  Proof.
-    induct ls1; simplify; auto.
-  Qed.
-  
-  Lemma sum_flatten : forall tr acc,
-      sum (flatten tr) acc = acc.
-  Proof.
-    induct tr; simplify; auto.
-    rewrite sum_acc.
-    rewrite sum_acc.
-    simplify.
-    rewrite IHtr1, IHtr2.
-    auto.
-  Qed.
-
-  (* Put it all together and we have our main always-zero property. *)
   Theorem wpre_tally : forall tr,
       wpre (tally (flatten tr)) (fun _ r => r = 0) 0.
-  Proof.
-    unfold tally; simplify.
-    apply wpre_bind.
-    apply wpre_tally'.
-    apply wpre_read.
-    apply sum_flatten.
-  Qed.
+  Admitted.
 End Counter.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 (** * E-graphs *)
 

@@ -48,6 +48,8 @@ DependentInductiveTypes.v
 TypesAndMutation.v
 HoareLogic_template.v
 HoareLogic.v
+AutomatedTheoremProving_template.v
+AutomatedTheoremProving.v
 DeepAndShallowEmbeddings_template.v
 DeepAndShallowEmbeddings.v
 SepCancel.v

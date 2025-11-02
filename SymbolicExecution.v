@@ -65,7 +65,7 @@ Inductive predicate :=
 | Tru
 | Fals
 | Exp (e : bexp)
-| Not (p1 : predicate)
+| NotExp (e : bexp)
 | And (p1 p2 : predicate)
 | Or (p1 p2 : predicate)
 | Ex (x : var) (p1 : predicate).
@@ -75,7 +75,7 @@ Fixpoint evalPredicate (p : predicate) (v : valuation) : Prop :=
   | Tru => True
   | Fals => False
   | Exp e => beval e v = true
-  | Not p1 => ~evalPredicate p1 v
+  | NotExp e => beval e v = false
   | And p1 p2 => evalPredicate p1 v /\ evalPredicate p2 v
   | Or p1 p2 => evalPredicate p1 v \/ evalPredicate p2 v
   | Ex x p1 => exists xv, evalPredicate p1 (v $+ (x, xv))
@@ -100,7 +100,7 @@ Fixpoint subPredicate (inThis : predicate) (replaceThis : var) (withThis : exp) 
   match inThis with
   | Tru | Fals => inThis
   | Exp e => Exp (subBexp e replaceThis withThis)
-  | Not p => Not (subPredicate p replaceThis withThis)
+  | NotExp e => NotExp (subBexp e replaceThis withThis)
   | And p1 p2 => And (subPredicate p1 replaceThis withThis) (subPredicate p2 replaceThis withThis)
   | Or p1 p2 => Or (subPredicate p1 replaceThis withThis) (subPredicate p2 replaceThis withThis)
   | Ex x p1 => if x ==v replaceThis then
@@ -132,8 +132,7 @@ Fixpoint varInCmd (c : cmd) (x : var) : Prop :=
 Fixpoint varInPredicate (p : predicate) (x : var) : Prop :=
   match p with
   | Tru | Fals => False
-  | Exp e => varInBexp e x
-  | Not p1 => varInPredicate p1 x
+  | Exp e | NotExp e => varInBexp e x
   | And p1 p2 | Or p1 p2 => varInPredicate p1 x \/ varInPredicate p2 x
   | Ex y p1 => y = x \/ varInPredicate p1 x
   end.
@@ -154,7 +153,7 @@ Fixpoint spost (c : cmd) (nextVar : var) (p : predicate) : predicate * var :=
       spost c2 nextVar p
   | If_ e c1 c2 =>
       let (p1, nextVar) := spost c1 nextVar (And p (Exp e)) in
-      let (p2, nextVar) := spost c2 nextVar (And p (Not (Exp e))) in
+      let (p2, nextVar) := spost c2 nextVar (And p (NotExp e)) in
       (Or p1 p2, nextVar)
   end.
 
@@ -236,8 +235,6 @@ Lemma eval_subPredicate : forall replaceThis withThis inThis,
 Proof.
   induct inThis; simplify; auto.
 
-  rewrite IHinThis; auto.
-
   rewrite IHinThis1; eauto.
   rewrite IHinThis2; eauto.
 
@@ -293,8 +290,8 @@ Proof.
   cases (spost c1 nextVar (And p (Exp be))).
   specialize (IHc1 _ _ eq_refl).
   invert IHc1.
-  specialize (IHc2 (multibumpVar x nextVar) (And p (Not (Exp be)))).
-  cases (spost c2 (multibumpVar x nextVar) (And p (Not (Exp be)))).
+  specialize (IHc2 (multibumpVar x nextVar) (And p (NotExp be))).
+  cases (spost c2 (multibumpVar x nextVar) (And p (NotExp be))).
   specialize (IHc2 _ _ eq_refl).
   invert IHc2.
   invert H1.
@@ -404,8 +401,8 @@ Proof.
   specialize (IHc1 nextVar (And p (Exp be))).
   cases (spost c1 nextVar (And p (Exp be))).
   specialize (IHc1 _ _ eq_refl).
-  specialize (IHc2 s (And p (Not (Exp be)))).
-  cases (spost c2 s (And p (Not (Exp be)))).
+  specialize (IHc2 s (And p (NotExp be))).
+  cases (spost c2 s (And p (NotExp be))).
   invert H3.
   specialize (IHc2 _ _ eq_refl).
   apply spost_bumps in Heq; invert Heq.
@@ -458,14 +455,14 @@ Proof.
 
   specialize (IHexec nextVar (And p (Exp b))).
   cases (spost c1 nextVar (And p (Exp b))).
-  cases (spost c2 s (And p (Not (Exp b)))).
+  cases (spost c2 s (And p (NotExp b))).
   simplify.
   left.
   apply IHexec; propositional; subst; eauto.
 
   cases (spost c1 nextVar (And p (Exp b))).
-  specialize (IHexec s (And p (Not (Exp b)))).
-  cases (spost c2 s (And p (Not (Exp b)))).
+  specialize (IHexec s (And p (NotExp b))).
+  cases (spost c2 s (And p (NotExp b))).
   simplify.
   right.
   apply spost_bumps in Heq; invert Heq.
@@ -579,4 +576,654 @@ Proof.
   simplify.
   propositional; subst;
     eapply multibump_first; eauto; equality.
+Qed.
+
+Record atom := {
+    Condition : bexp;
+    Value : bool
+  }.
+
+Record scenario := {
+    ExVars : list var;
+    Atoms : list atom
+  }.
+
+Fixpoint cross {A} (f : A -> A -> A) (ls1 ls2 : list A) : list A :=
+  match ls1 with
+  | [] => []
+  | l1 :: ls1' => map (f l1) ls2 ++ cross f ls1' ls2
+  end.
+
+Fixpoint scenarios (p : predicate) : list scenario :=
+  match p with
+  | Tru => [{| ExVars := []; Atoms := [] |}]
+  | Fals => []
+  | Exp e => [{| ExVars := []; Atoms := {| Condition := e; Value := true |} :: [] |}]
+  | NotExp e => [{| ExVars := []; Atoms := {| Condition := e; Value := false |} :: [] |}]
+  | And p1 p2 => cross (fun sc1 sc2 => {| ExVars := sc1.(ExVars) ++ sc2.(ExVars);
+                                         Atoms := sc1.(Atoms) ++ sc2.(Atoms) |})
+                       (scenarios p1) (scenarios p2)
+  | Or p1 p2 => scenarios p1 ++ scenarios p2
+  | Ex x p1 => map (fun sc => {| ExVars := x :: sc.(ExVars);
+                                Atoms := sc.(Atoms) |}) (scenarios p1)
+  end.
+
+Compute scenarios (fst (spost ex1 "X" Tru)).
+Compute scenarios (fst (spost ex2 "X" Tru)).
+Compute scenarios (fst (spost ex3 "X" Tru)).
+
+Fixpoint boundVars (p : predicate) : list var :=
+  match p with
+  | Tru | Fals | Exp _ | NotExp _ => []
+  | And p1 p2 | Or p1 p2 => boundVars p1 ++ boundVars p2
+  | Ex x p1 => x :: boundVars p1
+  end.
+
+Local Hint Rewrite app_nil_r.
+
+Lemma boundVars_subPredicate : forall x e p,
+    boundVars (subPredicate p x e) = boundVars p.
+Proof.
+  induct p; simplify; try equality.
+  cases (x0 ==v x); simplify; equality.
+Qed.
+
+Local Hint Rewrite boundVars_subPredicate.
+
+Lemma In_boundVars : forall x p,
+    In x (boundVars p)
+    -> varInPredicate p x.
+Proof.
+  induct p; simplify; propositional.
+  apply in_app_or in H; propositional.
+  apply in_app_or in H; propositional.
+Qed.
+
+Local Hint Resolve In_boundVars : core.
+
+Lemma multibump_zero : forall x,
+    x = multibumpVar 0 x.
+Proof.
+  trivial.
+Qed.
+
+Local Hint Resolve multibump_zero : core.
+
+(* We must characterize the lack of duplicate bound ("exists") variables, with
+ * the catch that duplicates between branches of "or"s are fine. *)
+Fixpoint wfPredicate (p : predicate) : Prop :=
+  match p with
+  | Tru | Fals | Exp _ | NotExp _ => True
+  | And p1 p2 => wfPredicate p1 /\ wfPredicate p2
+                 /\ (forall x, In x (boundVars p1) -> varInPredicate p2 x -> False)
+                 /\ (forall x, In x (boundVars p2) -> varInPredicate p1 x -> False)
+  | Or p1 p2 => wfPredicate p1 /\ wfPredicate p2
+  | Ex x p1 => wfPredicate p1 /\ ~In x (boundVars p1)
+  end.
+
+Lemma varIn_subExp : forall x e' x' e,
+    varInExp (subExp e x e') x'
+    -> varInExp e x' \/ varInExp e' x'.
+Proof.
+  induct e; simplify; propositional.
+  cases (x0 ==v x); subst; simplify; auto.
+Qed.
+
+Lemma varIn_subBexp : forall x e' x' e,
+    varInBexp (subBexp e x e') x'
+    -> varInBexp e x' \/ varInExp e' x'.
+Proof.
+  induct e; simplify; propositional;
+    repeat match goal with
+           | [ H : varInExp _ _ |- _ ] => apply varIn_subExp in H; propositional
+           end.
+Qed.
+
+Lemma sub_wfPredicate : forall x e p,
+    wfPredicate p
+    -> (forall y, varInExp e y -> varInPredicate p y -> False)
+    -> wfPredicate (subPredicate p x e).
+Proof.
+  induct p; simplify; first_order.
+
+  apply varIn_subPredicate_fwd in H5; propositional; eauto.
+
+  apply varIn_subPredicate_fwd in H5; propositional; eauto.
+
+  cases (x0 ==v x); subst; simplify; auto.
+  first_order.
+Qed.
+
+Local Hint Resolve sub_wfPredicate : core.
+
+Theorem spost_binds : forall x c nextVar p,
+    In x (boundVars (fst (spost c nextVar p)))
+    -> In x (boundVars p) \/ exists n, x = multibumpVar n nextVar.
+Proof.
+  induct c; simplify; propositional; subst; eauto.
+
+  specialize (IHc1 nextVar p).
+  cases (spost c1 nextVar p); simplify.
+  specialize (IHc2 s p0).
+  cases (spost c2 s p0); simplify.
+  apply spost_bumps in Heq; invert Heq.
+  propositional.
+  invert H1.
+  right; exists (x1 + x0); simplify; trivial.
+
+  specialize (IHc1 nextVar (And p (Exp be))).
+  cases (spost c1 nextVar (And p (Exp be))).
+  specialize (IHc2 s (And p (NotExp be))).
+  cases (spost c2 s (And p (NotExp be))).
+  simplify.
+  apply in_app_or in H; first_order; subst.
+  apply spost_bumps in Heq; invert Heq.
+  right.
+  exists (x0 + x); simplify; trivial.
+Qed.
+
+Theorem spost_uses : forall x c nextVar p,
+    varInPredicate (fst (spost c nextVar p)) x
+    -> varInPredicate p x \/ varInCmd c x \/ exists n, x = multibumpVar n nextVar.
+Proof.
+  induct c; simplify; propositional; subst; eauto.
+
+  apply varIn_subPredicate_fwd in H; simplify; propositional; subst; eauto.
+
+  apply varIn_subExp_fwd in H0; simplify; propositional; subst; eauto.
+
+  specialize (IHc1 nextVar p).
+  cases (spost c1 nextVar p); simplify.
+  specialize (IHc2 s p0).
+  cases (spost c2 s p0); simplify.
+  apply spost_bumps in Heq; invert Heq.
+  first_order.
+  simplify.
+  eauto.
+
+  specialize (IHc1 nextVar (And p (Exp be))).
+  cases (spost c1 nextVar (And p (Exp be))).
+  specialize (IHc2 s (And p (NotExp be))).
+  cases (spost c2 s (And p (NotExp be))).
+  simplify.
+  first_order.
+  apply spost_bumps in Heq; invert Heq.
+  simplify.
+  eauto.
+Qed.
+
+Theorem spost_wf : forall c nextVar p,
+    wfPredicate p
+    -> (forall x n, varInCmd c x \/ varInPredicate p x
+                    -> x <> multibumpVar n nextVar)
+    -> (forall x, varInCmd c x -> In x (boundVars p) -> False)
+    -> wfPredicate (fst (spost c nextVar p)).
+Proof.
+  induct c; simplify; propositional; eauto.
+
+  apply sub_wfPredicate; auto.
+  simplify; subst; eauto.
+
+  apply varIn_subExp in H4; simplify; propositional; subst; eauto.
+
+  specialize (IHc1 nextVar p).
+  cases (spost c1 nextVar p); simplify; propositional.
+  specialize (spost_bumps _ _ _ _ _ Heq); invert 1.
+  apply IHc2; propositional; subst; simplify; eauto.
+  first_order.
+  eapply spost_avoids; eauto.
+  propositional; eauto.
+  simplify.
+  eassumption.
+
+  specialize (spost_binds x0 c1 nextVar p).
+  rewrite Heq; simplify.
+  first_order.
+  
+  specialize (IHc1 nextVar (And p (Exp be))).
+  cases (spost c1 nextVar (And p (Exp be))); simplify; propositional.
+  specialize (IHc2 s (And p (NotExp be))).
+  specialize (spost_bumps _ _ _ _ _ Heq); invert 1.
+  cases (spost c2 (multibumpVar x nextVar) (And p (NotExp be))); simplify; propositional.
+  apply H2; propositional; eauto.
+  apply H3; propositional; subst; simplify; eauto.
+Qed.
+
+Local Hint Resolve includes_refl : core.
+
+Lemma Exists_cross : forall A (f : A -> A -> A) (P P1 P2 : A -> Prop) (ls1 ls2 : list A),
+    Exists P1 ls1
+    -> Exists P2 ls2
+    -> (forall l1 l2,
+           In l1 ls1
+           -> P1 l1
+           -> In l2 ls2
+           -> P2 l2
+           -> P (f l1 l2))
+    -> Exists P (cross f ls1 ls2).
+Proof.
+  induct 1; simplify.
+
+  apply Exists_app.
+  left.
+  apply Exists_map.
+  apply Exists_exists in H0; invert H0; propositional.
+  apply Exists_exists; eauto.  
+
+  apply Exists_app.
+  auto.
+Qed.
+
+Lemma Forall_cross : forall A (f : A -> A -> A) (P P1 P2 : A -> Prop) (ls1 ls2 : list A),
+    Forall P1 ls1
+    -> Forall P2 ls2
+    -> (forall l1 l2,
+           P1 l1
+           -> P2 l2
+           -> P (f l1 l2))
+    -> Forall P (cross f ls1 ls2).
+Proof.
+  induct 1; simplify; eauto.
+
+  apply Forall_app; propositional.
+  apply Forall_map.
+  eapply Forall_impl; eauto.
+Qed.
+
+Local Hint Resolve in_or_app lookup_Some_dom lookup_None_dom : core.
+
+Lemma includes_join : forall {A B} (m m1 m2 : fmap A B),
+    m $<= m1
+    -> m $<= m2
+    -> m $<= m1 $++ m2.
+Proof.
+  simplify.
+  apply includes_intro; simplify.
+  rewrite lookup_join1.
+  eapply includes_lookup in H1; eassumption.
+  eauto.
+Qed.
+
+Local Hint Resolve includes_join : core.
+
+Theorem scenarios_dom : forall p,
+    List.Forall (fun sc =>
+                   List.Forall (fun a =>
+                                  forall x, varInBexp a.(Condition) x
+                                            -> varInPredicate p x) sc.(Atoms)) (scenarios p).
+Proof.
+  induct p; simplify; eauto.
+
+  constructor; simplify; auto.
+
+  constructor; simplify; auto.
+
+  eapply Forall_cross; eauto; simplify.
+  eapply Forall_app; propositional; eapply Forall_impl; try eassumption; simplify; eauto.
+
+  apply Forall_app; propositional; eapply Forall_impl; try eassumption; simplify;
+    eapply Forall_impl; try eassumption; eauto.
+
+  apply Forall_map.
+  eapply Forall_impl; try eassumption; eauto.
+  simplify; eapply Forall_impl; try eassumption; eauto.
+Qed.
+
+Local Hint Unfold incl : core.
+Local Hint Resolve incl_app_app : core.
+
+Theorem scenarios_bound : forall p,
+    List.Forall (fun sc => incl sc.(ExVars) (boundVars p)) (scenarios p).
+Proof.
+  induct p; simplify; eauto.
+
+  eapply Forall_cross; eauto; simplify; eauto.
+
+  apply Forall_app; unfold incl in *; propositional.
+  eapply Forall_impl; try eassumption; simplify; eauto.
+  eapply Forall_impl; try eassumption; simplify; eauto.
+
+  apply Forall_map; simplify.
+  eapply Forall_impl; try eassumption; simplify.
+  apply incl_cons; simplify; auto.
+  apply incl_tl; assumption.
+Qed.
+
+Lemma Forall_In : forall A (P : A -> Prop) x ls,
+    Forall P ls
+    -> In x ls
+    -> P x.
+Proof.
+  induct 1; simplify; propositional; subst; auto.
+Qed.
+
+Fixpoint zeroAll (xs : list var) (v : valuation) : valuation :=
+  match xs with
+  | nil => v
+  | x :: xs' => zeroAll xs' v $+ (x, 0)
+  end.
+
+Theorem includes_trans : forall A B (m1 m2 m3 : fmap A B),
+    m1 $<= m2
+    -> m2 $<= m3
+    -> m1 $<= m3.
+Proof.
+  simplify; apply includes_intro; eauto.
+Qed.
+
+Lemma lookup_zeroAll_changed : forall xs v x,
+    In x xs
+    -> zeroAll xs v $? x = Some 0.
+Proof.
+  induct xs; simplify; propositional; subst; simplify; auto.
+  cases (a ==v x); subst; simplify; auto.
+Qed.
+
+Lemma lookup_zeroAll_unchanged : forall xs v x,
+    ~In x xs
+    -> zeroAll xs v $? x = v $? x.
+Proof.
+  induct xs; simplify; propositional; subst; simplify; auto.
+Qed.
+
+Local Hint Rewrite lookup_zeroAll_changed lookup_zeroAll_unchanged using equality.
+
+Lemma includes_zeroAll : forall xs v,
+    List.Forall (fun x => v $? x = None) xs
+    -> v $<= zeroAll xs v.
+Proof.
+  simplify.
+  apply includes_intro; simplify.
+  cases (in_dec var_eq k xs); simplify; auto.
+  eapply Forall_forall in H; eauto.
+  equality.
+Qed.
+
+Definition evalCondition (v : valuation) (a : atom) :=
+  beval a.(Condition) v = a.(Value).
+
+Theorem scenarios_sound : forall p v,
+    evalPredicate p v
+    -> wfPredicate p
+    -> (forall x, In x (boundVars p) -> v $? x = None)
+    -> List.Exists (fun sc =>
+                      exists v', v $<= v'
+                                 /\ (forall x, v $? x = None
+                                               -> v' $? x <> None
+                                               -> In x sc.(ExVars))
+                                 /\ List.Forall (evalCondition v') sc.(Atoms)) (scenarios p).
+Proof.
+  induct p; simplify; propositional; eauto 7.
+
+  constructor.
+  eexists; propositional; eauto; simplify; eauto.
+
+  constructor.
+  eexists; propositional; eauto; simplify; eauto.
+
+  constructor.
+  eexists; propositional; eauto; simplify; eauto.
+  
+  apply IHp1 in H2; eauto.
+  apply IHp2 in H3; eauto.
+  eapply Exists_cross; try eassumption; simplify.
+  invert H7; invert H9; propositional.
+  exists (x $++ x0); propositional; eauto.
+  cases (x $? x1).
+  assert (x $? x1 <> None) by equality.
+  eauto.
+  rewrite lookup_join2 in H15 by eauto.
+  apply in_or_app; eauto.
+  apply Forall_app; propositional.
+
+  unfold evalCondition in *.
+  apply Forall_forall; simplify.
+  eapply Forall_In in H13; try eassumption.
+  rewrite <- H13.
+  apply beval_relevant; simplify.
+  cases (v $? x2).
+  rewrite lookup_join1 by eauto.
+  trivial.
+  cases (x $? x2).
+  rewrite lookup_join1 by eauto.
+  rewrite Heq0; trivial.
+  rewrite lookup_join2 by eauto.
+  cases (x0 $? x2); auto.
+  exfalso.
+  assert (x0 $? x2 <> None) by equality.
+  specialize (scenarios_bound p2); intro Hforall.
+  eapply Forall_forall in Hforall; try eassumption.
+  eapply H6; eauto.
+  specialize (scenarios_dom p1); intro Hdom.
+  do 2 (eapply Forall_forall in Hdom; try eassumption).
+  eauto.
+
+  unfold evalCondition in *.
+  apply Forall_forall; simplify.
+  eapply Forall_In in H14; try eassumption.
+  rewrite <- H14.
+  apply beval_relevant; simplify.
+  cases (v $? x2).
+  rewrite lookup_join1 by eauto.
+  eapply includes_lookup in H10; eauto.
+  eapply includes_lookup in H9; eauto.
+  rewrite H9, H10; trivial.
+  cases (x $? x2).
+  rewrite lookup_join1 by eauto.
+  exfalso.
+  assert (x $? x2 <> None) by equality.
+  specialize (scenarios_bound p1); intro Hforall.
+  eapply Forall_forall in Hforall; try eassumption.
+  eapply H4; eauto.
+  specialize (scenarios_dom p2); intro Hdom.
+  do 2 (eapply Forall_forall in Hdom; try eassumption).
+  eauto.
+  rewrite lookup_join2 by eauto.
+  trivial.
+
+  apply Exists_app; eauto 6.
+
+  apply Exists_app; eauto 6.
+
+  apply Exists_map; simplify.
+  invert H.
+  eapply Exists_impl; try apply IHp; eauto.
+  simplify.
+  invert H.
+  propositional.
+  exists x1; propositional.
+  apply includes_intro; simplify.
+  cases (k ==v x); subst; simplify; auto.
+  rewrite H1 in H5; equality.
+  eapply includes_lookup in H; eauto.
+  simplify; assumption.
+  cases (x ==v x2); auto.
+  right.
+  apply H4; simplify; auto.
+  
+  simplify; eauto.
+Qed.
+
+Definition verify (pre : predicate) (c : cmd) (post : predicate) :=
+  exists apost, scenarios post = [{| ExVars := []; Atoms := apost |}]
+                /\ List.Forall (fun sc => forall v,
+                                    List.Forall (evalCondition v) sc.(Atoms)
+                                    -> List.Forall (evalCondition v) apost)
+                               (scenarios (fst (spost c "X" pre))).
+
+Lemma cross_nil : forall A (f : A -> A -> A) ls1,
+    cross f ls1 [] = [].
+Proof.
+  induct ls1; simplify; auto.
+Qed.
+
+Local Hint Rewrite cross_nil length_map length_app.
+
+Lemma length_cross : forall A (f : A -> A -> A) ls1 ls2,
+    length (cross f ls1 ls2) = length ls1 * length ls2.
+Proof.
+  induct ls1; simplify; auto.
+Qed.
+
+Lemma cross_singleton : forall A (f : A -> A -> A) ls1 ls2 v,
+    cross f ls1 ls2 = [v]
+    -> exists l1 l2, ls1 = [l1] /\ ls2 = [l2] /\ v = f l1 l2.
+Proof.
+  simplify.
+  specialize (length_cross _ f ls1 ls2).
+  rewrite H.
+  simplify.
+  cases ls1; simplify; try equality.
+  cases ls2; simplify; try equality.
+  cases ls2; simplify; try equality.
+  cases ls1; simplify; try equality.
+  invert H.
+  eauto.
+Qed.  
+
+Lemma scenarios_bwd : forall p ats v,
+    scenarios p = [{| ExVars := []; Atoms := ats |}]
+    -> List.Forall (evalCondition v) ats
+    -> evalPredicate p v.
+Proof.
+  induct p; simplify; propositional; try equality.
+
+  invert H.
+  invert H0.
+  assumption.
+
+  invert H.
+  invert H0.
+  assumption.
+
+  apply cross_singleton in H; first_order.
+  invert H2.
+  cases x; cases x0; simplify.
+  cases ExVars0; simplify; try equality.
+  subst.
+  apply Forall_app in H0.
+  propositional.
+  eauto.
+
+  apply cross_singleton in H; first_order.
+  invert H2.
+  cases x; cases x0; simplify.
+  cases ExVars0; simplify; try equality.
+  subst.
+  apply Forall_app in H0.
+  propositional.
+  eauto.
+
+  cases (scenarios p1); simplify; eauto.
+  invert H.
+  cases l; simplify; try equality.
+  eauto.
+
+  cases (scenarios p); simplify; equality.
+Qed.
+
+Local Hint Resolve spost_wf : core.
+
+Lemma exec_changes : forall x v c v',
+    exec v c v'
+    -> v' $? x <> v $? x
+    -> varInCmd c x.
+Proof.
+  induct 1; simplify; try equality.
+
+  cases (x ==v x0); subst; simplify; equality.
+
+  cases (v3 $? x); cases (v2 $? x); try equality.
+  cases (n ==n n0); subst; auto.
+  right; apply IHexec2; equality.
+Qed.
+
+Theorem verify_correct : forall pre c post,
+    verify pre c post
+    -> forall v v', evalPredicate pre v
+                    -> wfPredicate pre
+                    -> (forall x n, varInCmd c x \/ varInPredicate pre x \/ varInPredicate post x
+                                    -> x <> multibumpVar n "X")
+                    -> (forall x, varInCmd c x \/ varInPredicate post x
+                                  -> In x (boundVars pre) -> False)
+                    -> exec v c v'
+                    -> (forall x, In x (boundVars pre) -> v $? x = None)
+                    -> (forall n, v $? multibumpVar n "X" = None)
+                    -> evalPredicate post v'.
+Proof.
+  simplify.
+  pose proof (fun x => exec_changes x _ _ _ H4) as Hchange.
+  apply spost_sound with (nextVar := "X") (p := pre) in H4; auto.
+  2: first_order.
+  hnf in H.
+  first_order.
+  eapply scenarios_bwd; eauto.
+  apply scenarios_sound in H4; auto.
+  2: apply spost_wf; auto; first_order.
+  apply Exists_exists in H4; first_order.
+  eapply Forall_forall in H7; eauto.
+  apply H7 in H10.
+  apply Forall_forall; simplify.
+  assert (evalCondition x1 x2).
+  eapply Forall_forall; eauto.
+  unfold evalCondition in H12; unfold evalCondition.
+  rewrite <- H12.
+  apply beval_relevant; simplify.
+  specialize (scenarios_dom post); intro Hdom.
+  rewrite H in Hdom.
+  invert Hdom.
+  clear H17.
+  simplify.
+  eapply Forall_forall in H16; eauto.
+  specialize (H16 _ H13).
+  cases (v' $? x3).
+  eapply includes_lookup in H8; eauto.
+  rewrite H8; trivial.
+  cases (x1 $? x3); auto.
+  assert (In x3 (ExVars x0)) by (apply H9; equality).
+  specialize (scenarios_bound (fst (spost c "X" pre))); intro Hforall.
+  eapply Forall_forall in Hforall; eauto.
+  apply Hforall in H14.
+  apply spost_binds in H14; first_order.
+
+  simplify.
+  specialize (Hchange x0).
+  apply spost_binds in H8; first_order.
+  rewrite H5 in Hchange; auto.
+  cases (v' $? x0); auto.
+  assert (varInCmd c x0) by (apply Hchange; equality).
+  exfalso; eauto.
+  cases (v' $? x0); auto.
+  subst.
+  rewrite H6 in Hchange.
+  assert (varInCmd c (multibumpVar x1 "X")) by (apply Hchange; equality).
+  exfalso; eapply H2; eauto.
+Qed.
+
+Local Hint Extern 1 False => eapply multibump_first; [ eassumption | equality ] : core.
+
+Theorem ex1_correct' : forall v v',
+    exec v ex1 v'
+    -> (forall n, v $? multibumpVar n "X" = None)
+    -> v' $! "y" = 40.
+Proof.
+  simplify.
+  apply verify_correct with (pre := Tru) (post := Exp (Equal (Var "y") (Const 40))) in H; simplify; propositional; subst; try equality; eauto.
+
+  cases (v' $! "y" ==n 40); equality.
+
+  red; simplify.
+  do 2 esplit; eauto.
+  constructor; auto.
+  simplify.
+  invert H1.
+  invert H5.
+  clear H6.
+  constructor; auto.
+  unfold evalCondition in *; simplify.
+  repeat match goal with
+         | [ H : context[if ?E then _ else _] |- _ ] => cases E; try equality
+         | [ |- context[if ?E then _ else _] ] => cases E; try equality
+         end.
+  linear_arithmetic.
 Qed.

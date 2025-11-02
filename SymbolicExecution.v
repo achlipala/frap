@@ -62,6 +62,8 @@ Inductive exec : valuation -> cmd -> valuation -> Prop :=
  * will use in program specifications. *)
 
 Inductive predicate :=
+| Tru
+| Fals
 | Exp (e : bexp)
 | Not (p1 : predicate)
 | And (p1 p2 : predicate)
@@ -70,6 +72,8 @@ Inductive predicate :=
 
 Fixpoint evalPredicate (p : predicate) (v : valuation) : Prop :=
   match p with
+  | Tru => True
+  | Fals => False
   | Exp e => beval e v = true
   | Not p1 => ~evalPredicate p1 v
   | And p1 p2 => evalPredicate p1 v /\ evalPredicate p2 v
@@ -94,6 +98,7 @@ Definition subBexp (inThis : bexp) (replaceThis : var) (withThis : exp) : bexp :
 
 Fixpoint subPredicate (inThis : predicate) (replaceThis : var) (withThis : exp) : predicate :=
   match inThis with
+  | Tru | Fals => inThis
   | Exp e => Exp (subBexp e replaceThis withThis)
   | Not p => Not (subPredicate p replaceThis withThis)
   | And p1 p2 => And (subPredicate p1 replaceThis withThis) (subPredicate p2 replaceThis withThis)
@@ -126,6 +131,7 @@ Fixpoint varInCmd (c : cmd) (x : var) : Prop :=
 
 Fixpoint varInPredicate (p : predicate) (x : var) : Prop :=
   match p with
+  | Tru | Fals => False
   | Exp e => varInBexp e x
   | Not p1 => varInPredicate p1 x
   | And p1 p2 | Or p1 p2 => varInPredicate p1 x \/ varInPredicate p2 x
@@ -464,4 +470,113 @@ Proof.
   right.
   apply spost_bumps in Heq; invert Heq.
   apply IHexec; propositional; subst; simplify; eauto; equality.
+Qed.
+
+Example ex1 := Seq (Assign "x" (Const 17)) (Assign "y" (Plus (Var "x") (Const 23))).
+Compute fst (spost ex1 "X" Tru).
+
+Example ex2 := Seq
+                 (Seq (Assign "x" (Const 17)) (Assign "y" (Plus (Var "x") (Var "z"))))
+                 (Assign "x" (Mult (Var "y") (Const 3))).
+Compute fst (spost ex2 "X" Tru).
+
+Example ex3 := If_ (Equal (Var "x") (Var "y"))
+                   (Assign "z" (Mult (Var "x") (Const 2)))
+                   (Assign "z" (Plus (Var "x") (Var "y"))).
+Compute fst (spost ex3 "X" Tru).
+
+Lemma multibump_first' : forall x0 x n,
+    multibumpVar n (String x0 x) = String x0 (multibumpVar n x).
+Proof.
+  induction n; simplify; auto.
+  rewrite IHn.
+  unfold bumpVar.
+  simplify.
+  auto.
+Qed.
+
+Lemma multibump_first : forall x0 x n y0 y,
+    String x0 x = multibumpVar n (String y0 y)
+    -> x0 <> y0
+    -> False.
+Proof.
+  simplify.
+  rewrite multibump_first' in H.
+  equality.
+Qed.
+
+Theorem ex1_correct : forall v v',
+    exec v ex1 v'
+    -> v' $! "y" = 40.
+Proof.
+  simplify.
+  apply spost_sound with (nextVar := "X") (p := Tru) in H.
+
+  simplify.
+  unfold bumpVar in *; simplify.
+  first_order.
+  simplify.
+  repeat match goal with
+         | [ H : context[if ?E then _ else _] |- _ ] => cases E; try equality
+         end.
+  linear_arithmetic.
+
+  simplify.
+  trivial.
+
+  simplify.
+  propositional; subst;
+    eapply multibump_first; eauto; equality.
+Qed.
+
+Theorem ex2_correct : forall v v',
+    exec v ex2 v'
+    -> v' $! "y" = 17 + v $! "z".
+Proof.
+  simplify.
+  apply spost_sound with (nextVar := "X") (p := Exp (Equal (Var "z") (Const (v $! "z")))) in H.
+
+  simplify.
+  unfold bumpVar in *; simplify.
+  first_order.
+  simplify.
+  repeat match goal with
+         | [ H : context[if ?E then _ else _] |- _ ] => cases E; try equality
+         end.
+  linear_arithmetic.
+
+  simplify.
+  repeat match goal with
+         | [ |- context[if ?E then _ else _] ] => cases E; equality
+         end.
+
+  simplify.
+  propositional; subst;
+    eapply multibump_first; eauto; equality.
+Qed.
+
+Theorem ex3_correct : forall v v',
+    exec v ex3 v'
+    -> v' $! "z" = v $! "x" + v $! "y".
+Proof.
+  simplify.
+  apply spost_sound with (nextVar := "X")
+                         (p := And (Exp (Equal (Var "x") (Const (v $! "x"))))
+                                   (Exp (Equal (Var "y") (Const (v $! "y"))))) in H.
+
+  simplify.
+  unfold bumpVar in *; simplify.
+  first_order; simplify;
+  repeat match goal with
+         | [ H : context[if ?E then _ else _] |- _ ] => cases E; try equality
+         end; linear_arithmetic.
+
+  simplify.
+  repeat match goal with
+         | [ |- context[if ?E then _ else _] ] => cases E; try equality
+         end.
+
+  simplify.
+  propositional; subst;
+    eapply multibump_first; eauto; equality.
 Qed.

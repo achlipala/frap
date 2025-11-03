@@ -1,3 +1,8 @@
+(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
+  * Chapter 16*: Symbolic Execution
+  * Author: Adam Chlipala
+  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
+
 Require Import Frap AutomatedTheoremProving.
 From Stdlib Require Import FunctionalExtensionality.
 

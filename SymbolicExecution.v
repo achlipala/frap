@@ -1894,3 +1894,176 @@ Proof.
   repeat (compute; simplify).
   reflexivity.
 Qed.
+
+(* Now a third method: going backward, with weakest preconditions *)
+
+Fixpoint wprec (c : cmd) (post : predicate) : predicate :=
+  match c with
+  | Skip => post
+  | Assign x e => subPredicate post x e
+  | Seq c1 c2 => wprec c1 (wprec c2 post)
+  | If_ e c1 c2 => Or (And (Exp e) (wprec c1 post))
+                      (And (NotExp e) (wprec c2 post))
+  end.
+
+Lemma eval_subPredicate_noquant : forall replaceThis withThis inThis,
+    boundVars inThis = []
+    -> forall v, evalPredicate (subPredicate inThis replaceThis withThis) v
+                 = evalPredicate inThis (v $+ (replaceThis, eval withThis v)).
+Proof.
+  induct inThis; simplify; auto.
+
+  apply app_eq_nil in H; propositional.
+  rewrite H; eauto.
+  rewrite H2; eauto.
+
+  apply app_eq_nil in H; propositional.
+  rewrite H; eauto.
+  rewrite H2; eauto.
+
+  equality.
+Qed.
+
+Lemma wprec_bound : forall c p,
+    boundVars p = []
+    -> boundVars (wprec c p) = [].
+Proof.
+  induct c; simplify; auto.
+  rewrite IHc1, IHc2; auto.
+Qed.
+
+Theorem wprec_sound : forall v c v',
+    exec v c v'
+    -> forall post, evalPredicate (wprec c post) v
+                    -> boundVars post = []
+                    -> evalPredicate post v'.
+Proof.
+  induct 1; simplify; propositional; eauto; try equality.
+
+  rewrite eval_subPredicate_noquant in H; auto.
+
+  apply IHexec2; auto.
+  apply IHexec1; auto.
+  apply wprec_bound; auto.
+Qed.
+  
+Definition verifyP_computable (pre : predicate) (c : cmd) (post : predicate) :=
+  forallb (fun lhs => existsb (fun rhs => entailment lhs.(Atoms) rhs.(Atoms))
+                              (scenarios (wprec c post)))
+          (scenarios pre).
+
+Lemma In_cross : forall A (f : A -> A -> A) x (ls1 ls2 : list A),
+    In x (cross f ls1 ls2)
+    -> exists v1 v2, In v1 ls1 /\ In v2 ls2 /\ x = f v1 v2.
+Proof.
+  induct ls1; simplify; propositional.
+
+  apply in_app_or in H; first_order.
+  eapply in_map_iff in H; first_order; subst.
+  eauto 6.
+Qed.
+
+Lemma scenarios_bwd_multi : forall p ats v,
+    In {| ExVars := []; Atoms := ats |} (scenarios p)
+    -> List.Forall (evalCondition v) ats
+    -> evalPredicate p v.
+Proof.
+  induct p; simplify; propositional; try equality.
+
+  invert H1.
+  invert H0.
+  assumption.
+
+  invert H1.
+  invert H0.
+  assumption.
+
+  apply In_cross in H; first_order.
+  invert H2.
+  symmetry in H4.
+  apply app_eq_nil in H4; propositional.
+  cases x; cases x0; simplify; subst.
+  apply Forall_app in H0; first_order.
+
+  apply In_cross in H; first_order.
+  invert H2.
+  symmetry in H4.
+  apply app_eq_nil in H4; propositional.
+  cases x; cases x0; simplify; subst.
+  apply Forall_app in H0; first_order.
+
+  apply in_app_or in H; first_order.
+
+  apply in_map_iff in H; first_order.
+  equality.
+Qed.
+
+Theorem verifyP_computed : forall pre c post,
+    verifyP_computable pre c post = true
+    -> forall v v', evalPredicate pre v
+                    -> exec v c v'
+                    -> boundVars pre = []
+                    -> boundVars post = []
+                    -> evalPredicate post v'.
+Proof.
+  unfold verifyP_computable; simplify.
+  eapply wprec_sound; eauto.
+  eapply scenarios_sound in H0; eauto.
+  2: rewrite H2; simplify; propositional.
+  apply Exists_exists in H0; first_order.
+  eapply forallb_forall in H; eauto.
+  apply existsb_exists in H; first_order.
+  cases x1; simplify.
+  specialize (scenarios_bound (wprec c post)); intro Hbound.
+  eapply Forall_forall in Hbound; eauto; simplify.
+  rewrite wprec_bound in Hbound; auto.
+  apply incl_l_nil in Hbound; subst.  
+  eapply scenarios_bwd_multi; eauto.
+  replace (evalCondition x0) with (evalCondition (ensureAtomVars x0 (Atoms x))) in H6.
+  2: apply functional_extensionality; auto.  
+  eapply entailment_correct in H6; eauto.
+  unfold evalCondition in H6; unfold evalCondition.
+  apply Forall_forall; intros.
+  eapply Forall_forall in H6; eauto.
+  rewrite <- H6.
+  apply beval_relevant; intros.
+  rewrite ensureAtomVars_read.
+  cases (v $? x2).
+  eapply includes_lookup in H4; eauto.
+  rewrite H4.
+  trivial.
+  cases (x0 $? x2); auto.
+  assert (In x2 (ExVars x)) by (apply H5; equality).
+  specialize (scenarios_bound pre); intro Hbound.
+  eapply Forall_forall in Hbound; eauto.
+  apply Hbound in H10.
+  rewrite H2 in H10.
+  simplify.
+  propositional.
+Qed.
+
+Lemma use_equal' : forall a b,
+    a = b
+    -> (if a ==n b then true else false) = true.
+Proof.
+  simplify.
+  cases (a ==n b); equality.
+Qed.
+
+Local Hint Resolve use_equal' : core.
+
+(* Note that we need a nontrivial but *tautological* precondition here!
+ * Try executing [wprec] on the relevant inputs to see why our automated theorem
+ * prover isn't up to the challenge with [Tru] as precondition. *)
+
+Theorem ex4_correctP : forall v v',
+    exec v ex4 v'
+    -> v $! "x" = v $! "a"
+    -> v' $! "x" = v' $! "a".
+Proof.
+  intros.
+  apply verifyP_computed with (pre := Exp (Equal (Var "x") (Var "a"))) (post := Exp (Equal (Var "x") (Var "a"))) in H; try solve [ simplify; auto ].
+
+  repeat (compute; simplify).
+  reflexivity.
+Qed.

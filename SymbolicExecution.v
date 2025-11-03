@@ -1563,3 +1563,334 @@ Proof.
   repeat (compute; simplify).
   reflexivity.
 Qed.
+
+(** * A more-clever strongest-post that avoids introducing quantifiers *)
+
+Definition mapping := fmap var exp.
+
+Fixpoint expM (e : exp) (m : mapping) : exp :=
+  match e with
+  | Const _ => e
+  | Var x => match m $? x with None => Const 0 | Some e => e end
+  | Plus e1 e2 => Plus (expM e1 m) (expM e2 m)
+  | Minus e1 e2 => Minus (expM e1 m) (expM e2 m)
+  | Mult e1 e2 => Mult (expM e1 m) (expM e2 m)
+  end.
+
+Definition bexpM (e : bexp) (m : mapping) : bexp :=
+  match e with
+  | Equal e1 e2 => Equal (expM e1 m) (expM e2 m)
+  | Less e1 e2 => Less (expM e1 m) (expM e2 m)
+  end.
+
+Fixpoint predM (p : predicate) (m : mapping) : predicate :=
+  match p with
+  | Tru | Fals => p
+  | Exp e => Exp (bexpM e m)
+  | NotExp e => NotExp (bexpM e m)
+  | And p1 p2 => And (predM p1 m) (predM p2 m)
+  | Or p1 p2 => Or (predM p1 m) (predM p2 m)
+  | Ex x p1 => Ex x (predM p1 m)
+  end.
+
+Fixpoint flatmap {A B} (f : A -> list B) (ls : list A) : list B :=
+  match ls with
+  | nil => nil
+  | x :: ls' => f x ++ flatmap f ls'
+  end.
+
+Fixpoint spostM (c : cmd) (p : predicate) (m : mapping) : list (predicate * mapping) :=
+  match c with
+  | Skip => [(p, m)]
+  | Assign x e => [(p, m $+ (x, expM e m))]
+  | Seq c1 c2 =>
+      flatmap (fun '(p, m) => spostM c2 p m) (spostM c1 p m)
+  | If_ e c1 c2 =>
+      spostM c1 (And p (Exp (bexpM e m))) m
+      ++ spostM c2 (And p (NotExp (bexpM e m))) m
+  end.
+
+Fixpoint cmdVars (c : cmd) : list var :=
+  match c with
+  | Skip => []
+  | Assign x e => x :: expVars e
+  | Seq c1 c2 => cmdVars c1 ++ cmdVars c2
+  | If_ e c1 c2 => bexpVars e ++ cmdVars c1 ++ cmdVars c2
+  end.
+
+Fixpoint initMapping (xs : list var) : mapping :=
+  match xs with
+  | [] => $0
+  | x :: xs' => initMapping xs' $+ (x, Var x)
+  end.
+
+Definition mappingAgrees (m : mapping) (v0 v : valuation) :=
+  forall x, v $! x = match m $? x with
+                     | None => 0
+                     | Some e => eval e v0
+                     end.
+
+Lemma expM_correct : forall v0 v m e,
+    mappingAgrees m v0 v
+    -> eval e v = eval (expM e m) v0.
+Proof.
+  induct e; simplify; auto.
+  rewrite H.
+  cases (m $? x); auto.
+Qed.
+
+Lemma bexpM_correct : forall v0 v m e,
+    mappingAgrees m v0 v
+    -> beval e v = beval (bexpM e m) v0.
+Proof.
+  induct e; simplify; auto.
+  erewrite expM_correct; eauto.
+  erewrite expM_correct with (e := e2); eauto.
+  erewrite expM_correct; eauto.
+  erewrite expM_correct with (e := e1); eauto.
+Qed.
+
+Lemma Exists_flatmap : forall A B P P1 (f : A -> list B) ls,
+    Exists P1 ls
+    -> (forall x, P1 x -> Exists P (f x))
+    -> Exists P (flatmap f ls).
+Proof.
+  induct 1; simplify.
+
+  apply Exists_app; auto.
+
+  apply Exists_app; auto.
+Qed.
+
+Theorem spostM_sound : forall v0 v c v',
+    exec v c v'
+    -> forall m p, evalPredicate p v0
+                   -> mappingAgrees m v0 v
+                   -> Exists (fun '(p', m') =>
+                                evalPredicate p' v0
+                                /\ mappingAgrees m' v0 v') (spostM c p m).
+Proof.
+  induct 1; simplify; auto.
+
+  constructor; propositional.
+  red; simplify.
+  cases (x ==v x0); subst; simplify.
+  apply expM_correct; auto.
+  rewrite H0; trivial.
+
+  eapply IHexec1 in H2; eauto; clear IHexec1.
+  eapply Exists_flatmap; eauto.
+  simplify.
+  cases x.
+  propositional.
+  eauto.
+
+  assert (evalPredicate (And p (Exp (bexpM b m))) v0).
+  simplify; propositional.
+  erewrite <- bexpM_correct; eauto.
+  clear H1.
+  eapply IHexec in H2; eauto.
+  apply Exists_app; auto.
+
+  assert (evalPredicate (And p (NotExp (bexpM b m))) v0).
+  simplify; propositional.
+  erewrite <- bexpM_correct; eauto.
+  clear H1.
+  eapply IHexec in H2; eauto.
+  apply Exists_app; auto.
+Qed.
+
+Definition verifyM_computable (pre : predicate) (c : cmd) (post : predicate) :=
+  forallb (fun '(p, m) =>
+             match scenarios (predM post m) with
+             | [{| ExVars := []; Atoms := apost |}] =>
+                 forallb (fun lhs => entailment lhs.(Atoms) apost)
+                         (scenarios p)
+             | _ => false
+             end) (spostM c pre (initMapping (cmdVars c))).
+
+Lemma initMapping_In : forall x xs,
+    In x xs
+    -> initMapping xs $? x = Some (Var x).
+Proof.
+  induct xs; simplify; propositional; subst; simplify; auto.
+  cases (x ==v a); subst; simplify; auto.
+Qed.
+
+Lemma initMapping_not_In : forall x xs,
+    ~In x xs
+    -> initMapping xs $? x = None.
+Proof.
+  induct xs; simplify; propositional; subst; simplify; auto.
+Qed.
+
+Lemma mappingAgrees_initMapping : forall v xs,
+    (forall x, ~In x xs -> v $? x = None)
+    -> mappingAgrees (initMapping xs) v v.
+Proof.
+  induct xs; simplify.
+
+  red; simplify.
+  rewrite H; propositional.
+
+  red; simplify.
+  cases (x ==v a); subst; simplify; auto.
+  cases (in_dec var_eq x xs).
+  rewrite initMapping_In by auto.
+  simplify.
+  trivial.
+  rewrite initMapping_not_In; auto.
+  rewrite H; auto.
+  equality.
+Qed.
+
+Local Hint Resolve mappingAgrees_initMapping : core.
+
+Lemma In_flatmap : forall A B (f : A -> list B) x ls,
+    In x (flatmap f ls)
+    -> exists y, In y ls /\ In x (f y).
+Proof.
+  induct ls; simplify; propositional.
+
+  apply in_app_or in H; first_order.
+Qed.
+  
+Lemma spostM_noquant : forall c pre m p m',
+    boundVars pre = []
+    -> In (p, m') (spostM c pre m)
+    -> boundVars p = [].
+Proof.
+  induct c; simplify; propositional; try equality.
+
+  apply In_flatmap in H0.
+  first_order.
+  cases x.
+  eauto.
+
+  apply in_app_or in H0.
+  propositional.
+  eapply IHc1; try apply H1.
+  simplify.
+  assumption.
+  eapply IHc2; try apply H1.
+  simplify.
+  assumption.
+Qed.
+
+Lemma noquant_wf : forall p,
+    boundVars p = []
+    -> wfPredicate p.
+Proof.
+  induct p; simplify; auto.
+
+  apply app_eq_nil in H; propositional.
+  rewrite H0 in H3; simplify; propositional.
+  rewrite H1 in H3; simplify; propositional.
+
+  apply app_eq_nil in H; propositional.
+
+  equality.
+Qed.  
+
+Local Hint Resolve spostM_noquant noquant_wf : core.
+
+Lemma mappingAgrees_evalPredicate : forall m v' p v,
+    mappingAgrees m v v'
+    -> evalPredicate (predM p m) v
+    -> boundVars p = []
+    -> evalPredicate p v'.
+Proof.
+  induct p; simplify; first_order.
+
+  erewrite <- bexpM_correct in *; eauto.
+
+  erewrite <- bexpM_correct in *; eauto.
+
+  apply app_eq_nil in H1; propositional; eauto.
+
+  apply app_eq_nil in H1; propositional; eauto.
+
+  apply app_eq_nil in H1; propositional; eauto.
+
+  apply app_eq_nil in H1; propositional; eauto.
+
+  equality.
+Qed.  
+
+Lemma evalPredicate_ensureAtomVars : forall ats p v,
+    evalPredicate p (ensureAtomVars v ats)
+    -> evalPredicate p v.
+Proof.
+  induct p; simplify; first_order.
+
+  rewrite <- H.
+  apply beval_relevant; intros.
+  symmetry; apply ensureAtomVars_read.
+
+  rewrite <- H.
+  apply beval_relevant; intros.
+  symmetry; apply ensureAtomVars_read.
+
+  exists x0.
+  apply IHp.
+  erewrite evalPredicate_relevant; eauto.
+  simplify.
+  cases (x ==v x1); subst; simplify; auto.
+Qed.
+
+Theorem verifyM_computed : forall pre c post,
+    verifyM_computable pre c post = true
+    -> forall v v', evalPredicate pre v
+                    -> exec v c v'
+                    -> boundVars pre = []
+                    -> boundVars post = []
+                    -> (forall x, ~In x (cmdVars c) -> v $? x = None)
+                    -> evalPredicate post v'.
+Proof.
+  unfold verifyM_computable; simplify.
+  eapply spostM_sound with (m := initMapping (cmdVars c)) in H1; eauto.
+  apply Exists_exists in H1; first_order.
+  cases x; propositional.
+  specialize (proj1 (forallb_forall _ _) H _ H1); clear H; simplify.
+  cases (scenarios (predM post m)); try equality.
+  cases s.
+  cases ExVars0; try equality.
+  cases l; try equality.
+  eapply scenarios_sound in H6; eauto.
+  2: erewrite spostM_noquant; try apply H1; eauto.
+  apply Exists_exists in H6; first_order.
+  eapply forallb_forall in H; eauto.
+  replace (evalCondition x0) with (evalCondition (ensureAtomVars x0 (Atoms x))) in H9.
+  2: apply functional_extensionality; auto.
+  eapply entailment_correct in H9; eauto.
+  eapply scenarios_bwd in Heq; eauto.
+  eapply mappingAgrees_evalPredicate; eauto.
+  apply evalPredicate_ensureAtomVars in Heq.
+  erewrite evalPredicate_relevant; eauto.
+  intros.
+  cases (v $? x1).
+  eapply includes_lookup in H6; eauto.
+  rewrite H6.
+  trivial.
+  cases (x0 $? x1); auto.
+  assert (In x1 (ExVars x)) by (apply H8; equality).
+  specialize (scenarios_bound p); intro Hbound.
+  eapply Forall_forall in Hbound; eauto.
+  apply Hbound in H11.
+  assert (boundVars p = []) by eauto.
+  rewrite H12 in H11.
+  simplify.
+  propositional.
+Qed.
+
+Theorem ex4_correctM : forall v v',
+    exec v ex4 v'
+    -> (forall x, ~In x (cmdVars ex4) -> v $? x = None)
+    -> v' $! "x" = v' $! "a".
+Proof.
+  intros.
+  apply verifyM_computed with (pre := Tru) (post := Exp (Equal (Var "x") (Var "a"))) in H; auto; try solve [ simplify; propositional; subst; eauto ].
+
+  repeat (compute; simplify).
+  reflexivity.
+Qed.

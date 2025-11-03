@@ -1,4 +1,4 @@
-Require Import Frap.
+Require Import Frap AutomatedTheoremProving.
 From Stdlib Require Import FunctionalExtensionality.
 
 (* Let's make a reduced copy of our language from the HoareLogic chapter. *)
@@ -1047,7 +1047,9 @@ Qed.
 Definition verify (pre : predicate) (c : cmd) (post : predicate) :=
   exists apost, scenarios post = [{| ExVars := []; Atoms := apost |}]
                 /\ List.Forall (fun sc => forall v,
-                                    List.Forall (evalCondition v) sc.(Atoms)
+                                    Forall (fun a => forall x, varInBexp a.(Condition) x
+                                                               -> v $? x <> None) sc.(Atoms)
+                                    -> List.Forall (evalCondition v) sc.(Atoms)
                                     -> List.Forall (evalCondition v) apost)
                                (scenarios (fst (spost c "X" pre))).
 
@@ -1138,92 +1140,426 @@ Proof.
   right; apply IHexec2; equality.
 Qed.
 
-Theorem verify_correct : forall pre c post,
-    verify pre c post
+Fixpoint assertAll (ats : list atom) : M unit :=
+  match ats with
+  | nil => ret tt
+  | {| Condition := Equal (Var x) (Var y); Value := true |} :: ats' =>
+      (_ <- assertEqual x y; assertAll ats')
+  | _ :: ats' => assertAll ats'
+  end.
+
+Fixpoint checkAll (ats : list atom) : M bool :=
+  match ats with
+  | nil => ret true
+  | {| Condition := Equal (Var x) (Var y); Value := true |} :: ats' =>
+      (b <- checkEqual x y;
+       if b then
+         checkAll ats'
+       else
+         ret false)
+  | _ :: ats' => ret false
+  end.
+
+Definition entailment (lhs rhs : list atom) : bool :=
+  snd ((_ <- assertAll lhs;
+        checkAll rhs) empty).
+
+Definition verify_computable (pre : predicate) (c : cmd) (post : predicate) :=
+  match scenarios post with
+  | [{| ExVars := []; Atoms := apost |}] =>
+      forallb (fun lhs => entailment lhs.(Atoms) apost)
+              (scenarios (fst (spost c "X" pre)))
+  | _ => false
+  end.
+
+Local Hint Resolve Forall_inv_tail : core.
+
+Lemma wpre_assertAll : forall ats Q g,
+    (forall g',
+        (forall v, rep g {| Values := v |}
+                   -> Forall (fun a => forall x, varInBexp a.(Condition) x
+                                                 -> v $? x <> None) ats
+                   -> Forall (evalCondition v) ats
+                   -> rep g' {| Values := v |})
+        -> Q g' tt)
+    -> wpre (assertAll ats) Q g.
+Proof.
+  induct ats; simplify.
+
+  apply wpre_ret; auto.
+
+  cases a.
+  cases Condition0; eauto 6.
+  cases e1; eauto 6.
+  cases e2; eauto 6.
+  cases Value0; eauto 6.
+  apply wpre_bind.
+  apply wpre_assertEqual; simplify.
+  apply IHats; simplify.
+  apply H; simplify.
+  apply H1; eauto.
+  rewrite H0.
+  split; auto.
+  invert H3.
+  invert H4.
+  simplify.
+  red in H6; red.
+  simplify.
+  cases (v $! x ==n v $! x0); try equality.
+  cases (v $? x).
+  cases (v $? x0).
+  equality.
+  exfalso; eapply H7; eauto.
+  exfalso; eapply H7; [ | eauto ]; auto.
+Qed.
+
+Lemma wpre_checkAll : forall ats Q g,
+    (forall g' b,
+        (b = true
+         -> forall v, rep g {| Values := v |}
+                   -> Forall (evalCondition v) ats)
+        -> Q g' b)
+    -> wpre (checkAll ats) Q g.
+Proof.
+  induct ats; simplify.
+
+  apply wpre_ret; auto.
+
+  cases a.
+  cases Condition0; try (apply wpre_ret; simplify; apply H; equality).
+  cases e1; try (apply wpre_ret; simplify; apply H; equality).
+  cases e2; try (apply wpre_ret; simplify; apply H; equality).
+  cases Value0; try (apply wpre_ret; simplify; apply H; equality).
+  apply wpre_bind.
+  apply wpre_checkEqual; simplify.
+  cases r; try (apply wpre_ret; simplify; apply H; equality).
+  propositional.
+  apply IHats; simplify.
+  cases b; try (apply H; equality).
+  propositional.
+  apply H; simplify.
+  constructor.
+  red; simplify.
+  rewrite H0 in *.
+  apply H1 in H5.
+  red in H5.
+  simplify.
+  rewrite H5.
+  cases (v $! x0 ==n v $! x0); equality.
+  rewrite H0 in *.
+  auto.
+Qed.
+
+Lemma entailment_correct : forall ats1 ats2,
+    entailment ats1 ats2 = true
+    -> forall v, Forall (evalCondition v) ats1
+                 -> Forall (fun a => forall x, varInBexp a.(Condition) x
+                                               -> v $? x <> None) ats1
+                 -> Forall (evalCondition v) ats2.
+Proof.
+  unfold entailment; simplify.
+  assert (wpre (_ <- assertAll ats1; checkAll ats2)
+               (fun g b =>
+                  b = true
+                  -> forall v, Forall (fun a => forall x, varInBexp a.(Condition) x
+                                                          -> v $? x <> None) ats1
+                               -> Forall (evalCondition v) ats1
+                               -> Forall (evalCondition v) ats2)
+               empty).
+
+  apply wpre_bind.
+  apply wpre_assertAll; simplify.
+  apply wpre_checkAll; simplify; propositional.
+  apply H7.
+  apply H2; auto.
+  rewrite rep_empty.
+  constructor.
+  red in H2.
+  cases ((_ <- assertAll ats1; checkAll ats2) empty); simplify; subst.
+  specialize (H2 valid_empty); propositional.
+  auto.
+Qed.  
+
+Fixpoint expVars (e : exp) : list var :=
+  match e with
+  | Const _ => []
+  | Var x => [x]
+  | Plus e1 e2 | Minus e1 e2 | Mult e1 e2 => expVars e1 ++ expVars e2
+  end.  
+
+Definition bexpVars (e : bexp) : list var :=
+  match e with
+  | Equal e1 e2 | Less e1 e2 => expVars e1 ++ expVars e2
+  end.
+
+Definition atomVars (a : atom) : list var :=
+  bexpVars a.(Condition).
+
+Definition ensureVar (v : valuation) (x : var) : valuation :=
+  match v $? x with
+  | None => v $+ (x, 0)
+  | Some _ => v
+  end.
+
+Fixpoint ensureAtomVars (v : valuation) (ats : list atom) : valuation :=
+  match ats with
+  | nil => v
+  | a :: ats' =>
+      let v := fold_left ensureVar (atomVars a) v in
+      ensureAtomVars v ats'
+  end.
+
+Lemma evalCondition_ensureVar : forall v x a,
+    evalCondition (ensureVar v x) a = evalCondition v a.
+Proof.
+  simplify.
+  unfold evalCondition, ensureVar.
+  cases (v $? x); auto.
+  f_equal.
+  apply beval_relevant; simplify.
+  cases (x ==v x0); subst; simplify; auto.
+  rewrite Heq.
+  trivial.
+Qed.
+
+Local Hint Resolve evalCondition_ensureVar : core.
+
+Lemma evalCondition_ensureVars : forall a ats v,
+    evalCondition (fold_left ensureVar ats v) a = evalCondition v a.
+Proof.
+  induct ats; simplify; auto.
+  rewrite IHats.
+  auto.
+Qed.
+
+Local Hint Resolve evalCondition_ensureVars : core.
+
+Theorem evalCondition_ensureAtomVars : forall a ats v,
+    evalCondition (ensureAtomVars v ats) a = evalCondition v a.
+Proof.
+  induct ats; simplify; auto.
+
+  rewrite IHats.
+  auto.
+Qed.
+
+Local Hint Resolve evalCondition_ensureAtomVars : core.
+
+Lemma ensureVars_mono : forall x xs v,
+    v $? x <> None
+    -> fold_left ensureVar xs v $? x = v $? x.
+Proof.
+  induct xs; simplify; auto.
+  rewrite IHxs.
+  unfold ensureVar.
+  cases (v $? a); simplify; auto.
+  unfold ensureVar.
+  cases (v $? a); simplify; auto.
+Qed.
+
+Lemma ensureAtomVars_mono : forall x ats v,
+    v $? x <> None
+    -> ensureAtomVars v ats $? x = v $? x.
+Proof.
+  induct ats; simplify; auto.
+  rewrite IHats.
+  apply ensureVars_mono; auto.
+  rewrite ensureVars_mono; auto.
+Qed.
+
+Local Hint Resolve ensureAtomVars_mono : core.
+
+Local Hint Rewrite fold_left_app.
+
+Lemma ensureVar_fix : forall v x,
+    ensureVar v x $? x <> None.
+Proof.
+  simplify.
+  unfold ensureVar.
+  cases (v $? x); simplify; equality.
+Qed.
+
+Lemma ensureVars_fix : forall x xs v,
+    In x xs
+    -> fold_left ensureVar xs v $? x <> None.
+Proof.
+  induct xs; simplify.
+
+  propositional.
+
+  invert H; auto.
+  rewrite ensureVars_mono.
+  apply ensureVar_fix.
+  apply ensureVar_fix.
+Qed.
+
+Local Hint Resolve ensureVars_fix : core.
+
+Lemma varInExp_expVars : forall x e,
+    varInExp e x
+    -> In x (expVars e).
+Proof.
+  induct e; simplify; propositional; eauto.
+Qed.
+
+Local Hint Resolve varInExp_expVars : core.
+
+Lemma varInBexp_bexpVars : forall x e,
+    varInBexp e x
+    -> In x (bexpVars e).
+Proof.
+  induct e; simplify; propositional; eauto.
+Qed.
+
+Local Hint Resolve varInBexp_bexpVars : core.
+
+Lemma ensureAtomVars_complete : forall ats v,
+    Forall (fun a => forall x, varInBexp (Condition a) x
+                               -> ensureAtomVars v ats $? x <> None) ats.
+Proof.
+  induct ats; simplify; constructor; simplify; auto.
+
+  unfold atomVars; auto.
+  rewrite ensureAtomVars_mono; eauto.
+Qed.
+
+Local Hint Resolve ensureAtomVars_complete : core.
+
+Lemma ensureVar_read : forall v a x,
+    ensureVar v a $! x = v $! x.
+Proof.
+  unfold ensureVar; simplify.
+  cases (v $? a); simplify; auto.
+  cases (a ==v x); subst; simplify; auto.
+  rewrite Heq; trivial.
+Qed.
+
+Lemma ensureVars_read : forall x xs v,
+    fold_left ensureVar xs v $! x = v $! x.
+Proof.
+  induct xs; simplify; auto.
+
+  rewrite IHxs.
+  apply ensureVar_read.
+Qed.
+
+Lemma ensureAtomVars_read : forall x ats v,
+    ensureAtomVars v ats $! x = v $! x.
+Proof.
+  induct ats; simplify; auto.
+
+  rewrite IHats.
+  apply ensureVars_read.
+Qed.
+
+Local Hint Rewrite ensureAtomVars_read.
+
+Lemma verify_computed : forall pre c post,
+    verify_computable pre c post = true
     -> forall v v', evalPredicate pre v
+                    -> exec v c v'
                     -> wfPredicate pre
                     -> (forall x n, varInCmd c x \/ varInPredicate pre x \/ varInPredicate post x
                                     -> x <> multibumpVar n "X")
-                    -> (forall x, varInCmd c x \/ varInPredicate post x
-                                  -> In x (boundVars pre) -> False)
-                    -> exec v c v'
+                    -> (forall x, varInCmd c x \/ varInPredicate post x -> In x (boundVars pre) -> False)
                     -> (forall x, In x (boundVars pre) -> v $? x = None)
                     -> (forall n, v $? multibumpVar n "X" = None)
                     -> evalPredicate post v'.
 Proof.
-  simplify.
-  pose proof (fun x => exec_changes x _ _ _ H4) as Hchange.
-  apply spost_sound with (nextVar := "X") (p := pre) in H4; auto.
-  2: first_order.
-  hnf in H.
-  first_order.
+  unfold verify_computable; simplify.
+  pose proof (fun x => exec_changes x _ _ _ H1) as Hchange.
+  cases (scenarios post); try equality.
+  cases s.
+  cases ExVars0; try equality.
+  cases l; try equality.
   eapply scenarios_bwd; eauto.
-  apply scenarios_sound in H4; auto.
+  eapply spost_sound with (nextVar := "X") in H1; eauto.
+  2: first_order.
+  eapply scenarios_sound in H1.
   2: apply spost_wf; auto; first_order.
-  apply Exists_exists in H4; first_order.
-  eapply Forall_forall in H7; eauto.
-  apply H7 in H10.
+  apply Exists_exists in H1.
+  first_order.
+  pose proof (proj1 (forallb_forall _ _) H _ H1).
+  simplify.
+  replace (evalCondition x0) with (evalCondition (ensureAtomVars x0 (Atoms x))) in H9.
+  2: apply functional_extensionality; auto.
+  eapply entailment_correct in H9; eauto.
   apply Forall_forall; simplify.
-  assert (evalCondition x1 x2).
-  eapply Forall_forall; eauto.
-  unfold evalCondition in H12; unfold evalCondition.
+  pose proof (proj1 (Forall_forall _ _) H9 _ H11).
+  red; red in H12.
   rewrite <- H12.
   apply beval_relevant; simplify.
-  specialize (scenarios_dom post); intro Hdom.
-  rewrite H in Hdom.
+  cases (v' $? x2).
+  eapply includes_lookup in H7; eauto.
+  rewrite H7; trivial.
+  cases (x0 $? x2); auto.
+  assert (In x2 (ExVars x)) by (apply H8; equality).
+  specialize (scenarios_dom post).
+  rewrite Heq.
+  intro Hdom.
   invert Hdom.
-  clear H17.
+  clear H18.
   simplify.
-  eapply Forall_forall in H16; eauto.
-  specialize (H16 _ H13).
-  cases (v' $? x3).
-  eapply includes_lookup in H8; eauto.
-  rewrite H8; trivial.
-  cases (x1 $? x3); auto.
-  assert (In x3 (ExVars x0)) by (apply H9; equality).
-  specialize (scenarios_bound (fst (spost c "X" pre))); intro Hforall.
-  eapply Forall_forall in Hforall; eauto.
-  apply Hforall in H14.
-  apply spost_binds in H14; first_order.
-
-  simplify.
-  specialize (Hchange x0).
-  apply spost_binds in H8; first_order.
-  rewrite H5 in Hchange; auto.
-  cases (v' $? x0); auto.
-  assert (varInCmd c x0) by (apply Hchange; equality).
+  eapply Forall_forall in H17; eauto.
+  apply H17 in H13.
+  specialize (scenarios_bound (fst (spost c "X" pre))).
+  intro Hbound.
+  eapply Forall_forall in Hbound; eauto.
+  apply Hbound in H14.
+  apply spost_binds in H14.
+  invert H14.
   exfalso; eauto.
-  cases (v' $? x0); auto.
-  subst.
-  rewrite H6 in Hchange.
-  assert (varInCmd c (multibumpVar x1 "X")) by (apply Hchange; equality).
-  exfalso; eapply H2; eauto.
+  invert H15.
+  exfalso; eapply H3; eauto.
+  
+  simplify.
+  cases (v' $? x); auto.
+  exfalso.
+  apply spost_binds in H7.
+  first_order; subst.
+  assert (varInCmd c x).
+  apply Hchange.
+  propositional.
+  rewrite H5 in H8 by auto.
+  equality.
+  eauto.
+  assert (varInCmd c (multibumpVar x0 "X")).
+  apply Hchange.
+  propositional.
+  rewrite H6 in H7.
+  equality.
+  eapply H3; eauto.
 Qed.
+
+Lemma use_equal : forall a b,
+    (if a ==n b then true else false) = true
+    -> a = b.
+Proof.
+  simplify.
+  cases (a ==n b); equality.
+Qed.
+
+Local Hint Resolve use_equal : core.
+
+Example ex4 := Seq (Assign "y" (Var "a"))
+                   (Seq (If_ (Equal (Var "x") (Var "y"))
+                             (Assign "z" (Var "x"))
+                             (Assign "z" (Var "y")))
+                        (Assign "x" (Var "z"))).
+Compute fst (spost ex4 "X" Tru).
 
 Local Hint Extern 1 False => eapply multibump_first; [ eassumption | equality ] : core.
 
-Theorem ex1_correct' : forall v v',
-    exec v ex1 v'
+Local Transparent min max.
+
+Theorem ex4_correct : forall v v',
+    exec v ex4 v'
     -> (forall n, v $? multibumpVar n "X" = None)
-    -> v' $! "y" = 40.
+    -> v' $! "x" = v' $! "a".
 Proof.
   simplify.
-  apply verify_correct with (pre := Tru) (post := Exp (Equal (Var "y") (Const 40))) in H; simplify; propositional; subst; try equality; eauto.
+  apply verify_computed with (pre := Tru) (post := Exp (Equal (Var "x") (Var "a"))) in H; simplify; propositional; subst; eauto.
 
-  cases (v' $! "y" ==n 40); equality.
-
-  red; simplify.
-  do 2 esplit; eauto.
-  constructor; auto.
-  simplify.
-  invert H1.
-  invert H5.
-  clear H6.
-  constructor; auto.
-  unfold evalCondition in *; simplify.
-  repeat match goal with
-         | [ H : context[if ?E then _ else _] |- _ ] => cases E; try equality
-         | [ |- context[if ?E then _ else _] ] => cases E; try equality
-         end.
-  linear_arithmetic.
+  repeat (compute; simplify).
+  reflexivity.
 Qed.

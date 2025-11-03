@@ -6,7 +6,21 @@
 Require Import Frap AutomatedTheoremProving.
 From Stdlib Require Import FunctionalExtensionality.
 
-(* Let's make a reduced copy of our language from the HoareLogic chapter. *)
+(* The last chapter explained (the beginnings of) how to automate proofs in
+ * simple fragments of first-order logic, one part of the established recipe for
+ * automating verification of imperative programs.  We now turn to the other
+ * part: symbolic execution and other ways of algorithmically reducing program
+ * correctness to problems in first-order logic. *)
+
+(** * Our object language *)
+
+(* Let's make a reduced copy of our language from the HoareLogic chapter.  We'll
+ * omit both loops and memory access.  Loops can be handled (exercise for the
+ * reader!) by interpreting a loopy program as a number of related loop-free
+ * programs, connected in using loop invariants as intermediate preconditions
+ * and postconditions.  We'll return to memory in the SeparationLogic chapter,
+ * since there are enough nonobvious ideas there to deserve our main
+ * attention. *)
 
 Inductive exp :=
 | Const (n : nat)
@@ -64,7 +78,13 @@ Inductive exec : valuation -> cmd -> valuation -> Prop :=
   -> exec v1 (If_ b c1 c2) v2.
 
 (* Now we define a further syntactic language of logical predicates, which we
- * will use in program specifications. *)
+ * will use in program specifications.  Recall that, in the HoareLogic chapter,
+ * we used native Rocq predicates, which is convenient for integration with
+ * Rocq, but now we want to show how similar functionality can be provided by
+ * highly automated, standalone programs.  There is no good way for functional
+ * programs in Rocq (technically the language is called "Gallina") to introspect
+ * into the structure of native predicates, but we need introspection to
+ * implement our automation. *)
 
 Inductive predicate :=
 | Tru
@@ -74,6 +94,11 @@ Inductive predicate :=
 | And (p1 p2 : predicate)
 | Or (p1 p2 : predicate)
 | Ex (x : var) (p1 : predicate).
+(* Note that we make our lives a *little* easy by restricting negation to apply
+ * to atomic predicates only.  However, we also make our lives more than a
+ * *little* tough by supporting existential quantifiers.  Below, we'll see
+ * examples of how variable binding is often the biggest source of
+ * administrative headache in mechanized proofs! *)
 
 Fixpoint evalPredicate (p : predicate) (v : valuation) : Prop :=
   match p with
@@ -85,6 +110,9 @@ Fixpoint evalPredicate (p : predicate) (v : valuation) : Prop :=
   | Or p1 p2 => evalPredicate p1 v \/ evalPredicate p2 v
   | Ex x p1 => exists xv, evalPredicate p1 (v $+ (x, xv))
   end.
+
+(* The start of the administrative bonanza: different functions to substitute
+ * expressions for variables *)
 
 Fixpoint subExp (inThis : exp) (replaceThis : var) (withThis : exp) : exp :=
   match inThis with
@@ -114,6 +142,8 @@ Fixpoint subPredicate (inThis : predicate) (replaceThis : var) (withThis : exp) 
                  Ex x (subPredicate p1 replaceThis withThis)
   end.
 
+(* We must also define which variables appear in which places. *)
+
 Fixpoint varInExp (e : exp) (x : var) : Prop :=
   match e with
   | Const _ => False
@@ -142,12 +172,30 @@ Fixpoint varInPredicate (p : predicate) (x : var) : Prop :=
   | Ex y p1 => y = x \/ varInPredicate p1 x
   end.
 
+(* Now the grungiest part of all: *generating fresh variable names*.  Following
+ * a long mathematical tradition, we'll start with one base variable and keep
+ * adding apostrophes at the end of its name, which get pronounced with
+ * successively many copies of the word "prime."  (The only detail that matters
+ * here is that we are able to produce a countably infinite sequence of distinct
+ * variable names.) *)
+
 Definition bumpVar (x : string) : string := x ++ "'".
 Fixpoint multibumpVar (n : nat) (x : string) : string :=
   match n with
   | O => x
   | S n' => bumpVar (multibumpVar n' x)
   end.
+
+(** * TECHNIQUE #1: Strongest Postconditions *)
+
+(* Finally, here's our first method to automate reducing program correctness to
+ * queries in first-order logic.  A *strongest-postcondition* function
+ * transforms a precondition into a postcondition guaranteed to be true, after
+ * running the program in an initial state satisfying the precondition.  Note
+ * the bureaucratic hassle of threading through a record of which temporary
+ * variable name we should use next.  You'll see that such variables are only
+ * used with "exists" in explaining variable assignment, essentially the same
+ * way as we built into our Hoare-logic rule for assignment. *)
 
 Fixpoint spost (c : cmd) (nextVar : var) (p : predicate) : predicate * var :=
   match c with
@@ -161,6 +209,10 @@ Fixpoint spost (c : cmd) (nextVar : var) (p : predicate) : predicate * var :=
       let (p2, nextVar) := spost c2 nextVar (And p (NotExp e)) in
       (Or p1 p2, nextVar)
   end.
+(* In fact, all of these rules should look pretty familiar from Hoare logic. *)
+
+(* OK, now we are going to need a host of bureaucratic facts about these
+ * definitions.  Feel free to skip down to the next [Theorem]. *)
 
 Lemma eval_subExp : forall replaceThis withThis v inThis,
     eval (subExp inThis replaceThis withThis) v
@@ -420,11 +472,20 @@ Proof.
   propositional; eauto.
 Qed.
 
+(* The fundamental soundness property of strongest postcondition!  We even
+ * manage to write it with just one little administrative condition on variable
+ * names. *)
+
 Theorem spost_sound : forall v c v',
     exec v c v'
     -> forall nextVar p, evalPredicate p v
+
                          -> (forall x n, varInCmd c x \/ varInPredicate p x
                                          -> x <> multibumpVar n nextVar)
+                         (* In other words, none of the temporary variable names
+                          * we might generate is in the command or
+                          * precondition. *)
+
                          -> evalPredicate (fst (spost c nextVar p)) v'.
 Proof.
   induct 1; simplify; auto.
@@ -474,6 +535,8 @@ Proof.
   apply IHexec; propositional; subst; simplify; eauto; equality.
 Qed.
 
+(* OK, let's see our machinery in action on a few example programs. *)
+
 Example ex1 := Seq (Assign "x" (Const 17)) (Assign "y" (Plus (Var "x") (Const 23))).
 Compute fst (spost ex1 "X" Tru).
 
@@ -486,6 +549,9 @@ Example ex3 := If_ (Equal (Var "x") (Var "y"))
                    (Assign "z" (Mult (Var "x") (Const 2)))
                    (Assign "z" (Plus (Var "x") (Var "y"))).
 Compute fst (spost ex3 "X" Tru).
+
+(* These next two facts will be useful for automating proof of the side
+ * condition we included in the soundness theorem. *)
 
 Lemma multibump_first' : forall x0 x n,
     multibumpVar n (String x0 x) = String x0 (multibumpVar n x).
@@ -507,6 +573,8 @@ Proof.
   equality.
 Qed.
 
+Local Hint Extern 1 False => eapply multibump_first; [ eassumption | equality ] : core.
+
 Theorem ex1_correct : forall v v',
     exec v ex1 v'
     -> v' $! "y" = 40.
@@ -527,8 +595,7 @@ Proof.
   trivial.
 
   simplify.
-  propositional; subst;
-    eapply multibump_first; eauto; equality.
+  propositional; subst; auto.
 Qed.
 
 Theorem ex2_correct : forall v v',
@@ -553,8 +620,7 @@ Proof.
          end.
 
   simplify.
-  propositional; subst;
-    eapply multibump_first; eauto; equality.
+  propositional; subst; auto.
 Qed.
 
 Theorem ex3_correct : forall v v',
@@ -579,30 +645,48 @@ Proof.
          end.
 
   simplify.
-  propositional; subst;
-    eapply multibump_first; eauto; equality.
+  propositional; subst; auto.
 Qed.
 
+(* We did those proofs moderately manually, because the story isn't over yet.
+ * We still proved an important implication from the calculated strongest
+ * postcondition to the postcondition of interest.  We want to automate that
+ * step, too. *)
+
+(** * SHARED TOOL: A Simple First-Order Theorem Prover *)
+
+(* Last chapter, we built a simple automated theorem prover that only
+ * understands equality on variables.  We can wrap it to create an incomplete
+ * but sound prover for the predicate language we have just defined. *)
+
+(* We will consider all of the conjunctions of *atoms* implied by a larger
+ * predicate. *)
 Record atom := {
     Condition : bexp;
     Value : bool
   }.
 
+(* A *scenario* pairs atoms with existential quantifiers. *)
 Record scenario := {
     ExVars : list var;
     Atoms : list atom
   }.
 
+(* Sometimes we want to combine two lists of scenarios into lists of larger
+ * scenarios, each formed by combining a scenario from each list.  This function
+ * generalizes that process, in the style of Cartesian products. *)
 Fixpoint cross {A} (f : A -> A -> A) (ls1 ls2 : list A) : list A :=
   match ls1 with
   | [] => []
   | l1 :: ls1' => map (f l1) ls2 ++ cross f ls1' ls2
   end.
 
+(* Now it is not too bad to translate a predicate into a list of flat
+ * scenarios. *)
 Fixpoint scenarios (p : predicate) : list scenario :=
   match p with
   | Tru => [{| ExVars := []; Atoms := [] |}]
-  | Fals => []
+  | Fals => [] (* A contradictory situation has no possible scenarios! *)
   | Exp e => [{| ExVars := []; Atoms := {| Condition := e; Value := true |} :: [] |}]
   | NotExp e => [{| ExVars := []; Atoms := {| Condition := e; Value := false |} :: [] |}]
   | And p1 p2 => cross (fun sc1 sc2 => {| ExVars := sc1.(ExVars) ++ sc2.(ExVars);
@@ -616,6 +700,10 @@ Fixpoint scenarios (p : predicate) : list scenario :=
 Compute scenarios (fst (spost ex1 "X" Tru)).
 Compute scenarios (fst (spost ex2 "X" Tru)).
 Compute scenarios (fst (spost ex3 "X" Tru)).
+
+(* While we already defined how to compute which variables appear in a
+ * predicate, let's now distinguish the *bound* variables that occur as
+ * immediate arguments to quantifiers. *)
 
 Fixpoint boundVars (p : predicate) : list var :=
   match p with
@@ -655,7 +743,8 @@ Qed.
 Local Hint Resolve multibump_zero : core.
 
 (* We must characterize the lack of duplicate bound ("exists") variables, with
- * the catch that duplicates between branches of "or"s are fine. *)
+ * the catch that duplicates between branches of "or"s are fine.  (Abbreviation
+ * "wf" by convention stands for "well-formed.") *)
 Fixpoint wfPredicate (p : predicate) : Prop :=
   match p with
   | Tru | Fals | Exp _ | NotExp _ => True
@@ -665,6 +754,8 @@ Fixpoint wfPredicate (p : predicate) : Prop :=
   | Or p1 p2 => wfPredicate p1 /\ wfPredicate p2
   | Ex x p1 => wfPredicate p1 /\ ~In x (boundVars p1)
   end.
+
+(* Now another sea of lemmas.  Meet me at [Theorem]? *)
 
 Lemma varIn_subExp : forall x e' x' e,
     varInExp (subExp e x e') x'
@@ -701,7 +792,7 @@ Qed.
 
 Local Hint Resolve sub_wfPredicate : core.
 
-Theorem spost_binds : forall x c nextVar p,
+Lemma spost_binds : forall x c nextVar p,
     In x (boundVars (fst (spost c nextVar p)))
     -> In x (boundVars p) \/ exists n, x = multibumpVar n nextVar.
 Proof.
@@ -727,7 +818,7 @@ Proof.
   exists (x0 + x); simplify; trivial.
 Qed.
 
-Theorem spost_uses : forall x c nextVar p,
+Lemma spost_uses : forall x c nextVar p,
     varInPredicate (fst (spost c nextVar p)) x
     -> varInPredicate p x \/ varInCmd c x \/ exists n, x = multibumpVar n nextVar.
 Proof.
@@ -757,7 +848,7 @@ Proof.
   eauto.
 Qed.
 
-Theorem spost_wf : forall c nextVar p,
+Lemma spost_wf : forall c nextVar p,
     wfPredicate p
     -> (forall x n, varInCmd c x \/ varInPredicate p x
                     -> x <> multibumpVar n nextVar)
@@ -851,7 +942,7 @@ Qed.
 
 Local Hint Resolve includes_join : core.
 
-Theorem scenarios_dom : forall p,
+Lemma scenarios_dom : forall p,
     List.Forall (fun sc =>
                    List.Forall (fun a =>
                                   forall x, varInBexp a.(Condition) x
@@ -877,7 +968,7 @@ Qed.
 Local Hint Unfold incl : core.
 Local Hint Resolve incl_app_app : core.
 
-Theorem scenarios_bound : forall p,
+Lemma scenarios_bound : forall p,
     List.Forall (fun sc => incl sc.(ExVars) (boundVars p)) (scenarios p).
 Proof.
   induct p; simplify; eauto.
@@ -902,13 +993,17 @@ Proof.
   induct 1; simplify; propositional; subst; auto.
 Qed.
 
+(* This next little bit was one of the most surprising detours in the proof.  To
+ * be compatible with assumptions by the AutomatedTheoremProving library, we
+ * have to make sure valuations include values for all variables that predicates
+ * might mention; so we zero out any variables not yet included. *)
 Fixpoint zeroAll (xs : list var) (v : valuation) : valuation :=
   match xs with
   | nil => v
   | x :: xs' => zeroAll xs' v $+ (x, 0)
   end.
 
-Theorem includes_trans : forall A B (m1 m2 m3 : fmap A B),
+Lemma includes_trans : forall A B (m1 m2 m3 : fmap A B),
     m1 $<= m2
     -> m2 $<= m3
     -> m1 $<= m3.
@@ -947,15 +1042,26 @@ Qed.
 Definition evalCondition (v : valuation) (a : atom) :=
   beval a.(Condition) v = a.(Value).
 
+(* OK, what does it mean for scenarios to be implemented correctly to use in
+ * analyzing the *lefthand* side of an implication? *)
 Theorem scenarios_sound : forall p v,
     evalPredicate p v
     -> wfPredicate p
     -> (forall x, In x (boundVars p) -> v $? x = None)
+
+    (* First, we use [Exists] to capture how there is *some* scenario compatible
+     * with any valuation that the predicate accepts.  All other scenarios could
+     * be incompatible, or there could be multiple options. *)
     -> List.Exists (fun sc =>
+                      (* Second, we assert there exists an *extension* of the
+                       * valuation, stocked with the right values for
+                       * existential variables. *)
                       exists v', v $<= v'
                                  /\ (forall x, v $? x = None
                                                -> v' $? x <> None
                                                -> In x sc.(ExVars))
+
+                                 (* In this extension, all atoms are valid. *)
                                  /\ List.Forall (evalCondition v') sc.(Atoms)) (scenarios p).
 Proof.
   induct p; simplify; propositional; eauto 7.
@@ -1049,14 +1155,7 @@ Proof.
   simplify; eauto.
 Qed.
 
-Definition verify (pre : predicate) (c : cmd) (post : predicate) :=
-  exists apost, scenarios post = [{| ExVars := []; Atoms := apost |}]
-                /\ List.Forall (fun sc => forall v,
-                                    Forall (fun a => forall x, varInBexp a.(Condition) x
-                                                               -> v $? x <> None) sc.(Atoms)
-                                    -> List.Forall (evalCondition v) sc.(Atoms)
-                                    -> List.Forall (evalCondition v) apost)
-                               (scenarios (fst (spost c "X" pre))).
+(* A few lemmas before we move on *)
 
 Lemma cross_nil : forall A (f : A -> A -> A) ls1,
     cross f ls1 [] = [].
@@ -1086,9 +1185,14 @@ Proof.
   cases ls1; simplify; try equality.
   invert H.
   eauto.
-Qed.  
+Qed.
 
-Lemma scenarios_bwd : forall p ats v,
+(* Here is a characterization of [scenarios] soundness when used to prove the
+ * *righthand* side of an implication.  We focus on the simple case of one
+ * scenario with no quantifiers (just to make the proofs easier while showing
+ * off the main ideas of the approach). *)
+
+Theorem scenarios_bwd : forall p ats v,
     scenarios p = [{| ExVars := []; Atoms := ats |}]
     -> List.Forall (evalCondition v) ats
     -> evalPredicate p v.
@@ -1145,6 +1249,12 @@ Proof.
   right; apply IHexec2; equality.
 Qed.
 
+(* Now we are ready to define our automated prover.  First, two functions that
+ * respectively record all known equalities and confirm provability of all
+ * required equalities.  They use the monadic notation and library functions
+ * from last chapter, which we are glad now to treat as black boxes, in the
+ * style of data abstraction. *)
+
 Fixpoint assertAll (ats : list atom) : M unit :=
   match ats with
   | nil => ret tt
@@ -1152,6 +1262,9 @@ Fixpoint assertAll (ats : list atom) : M unit :=
       (_ <- assertEqual x y; assertAll ats')
   | _ :: ats' => assertAll ats'
   end.
+(* Note that we conservatively ignore all atoms that our prover doesn't know how
+ * to handle.  In dealing with the *lefthand* side of an implication, it is
+ * always sound to forget information. *)
 
 Fixpoint checkAll (ats : list atom) : M bool :=
   match ats with
@@ -1164,18 +1277,27 @@ Fixpoint checkAll (ats : list atom) : M bool :=
          ret false)
   | _ :: ats' => ret false
   end.
+(* In contrast, here the checker must abort (return [false]) when it encounters
+ * a fact not supported by the prover. *)
 
+(* Our overall entailment checker combines the two routines and kicks off the
+ * monadic computation in an empty e-graph. *)
 Definition entailment (lhs rhs : list atom) : bool :=
   snd ((_ <- assertAll lhs;
         checkAll rhs) empty).
 
+(* One more little wrapper implements our checker for a claimed Hoare triple. *)
 Definition verify_computable (pre : predicate) (c : cmd) (post : predicate) :=
   match scenarios post with
   | [{| ExVars := []; Atoms := apost |}] =>
+      (* Note above: we simplify by forcing the postcondition to have a very
+       * regular, quantifier-free structure. *)
       forallb (fun lhs => entailment lhs.(Atoms) apost)
               (scenarios (fst (spost c "X" pre)))
   | _ => false
   end.
+
+(* Now a nontrivial proof of soundness for that checker: *)
 
 Local Hint Resolve Forall_inv_tail : core.
 
@@ -1285,6 +1407,9 @@ Proof.
   auto.
 Qed.  
 
+(* We find ourselves wanting more directly executable ways to find variables
+ * appearing in different terms. *)
+
 Fixpoint expVars (e : exp) : list var :=
   match e with
   | Const _ => []
@@ -1299,6 +1424,9 @@ Definition bexpVars (e : bexp) : list var :=
 
 Definition atomVars (a : atom) : list var :=
   bexpVars a.(Condition).
+
+(* The following routines make sure certain variables are included in
+ * valuations, adding zero mappings for the ones we missed. *)
 
 Definition ensureVar (v : valuation) (x : var) : valuation :=
   match v $? x with
@@ -1459,7 +1587,9 @@ Qed.
 
 Local Hint Rewrite ensureAtomVars_read.
 
-Lemma verify_computed : forall pre c post,
+(* The big theorem for our first automated verifier!  Sorry for all the side
+ * conditions about variable names. *)
+Theorem verify_computed : forall pre c post,
     verify_computable pre c post = true
     -> forall v v', evalPredicate pre v
                     -> exec v c v'
@@ -1546,14 +1676,15 @@ Qed.
 
 Local Hint Resolve use_equal : core.
 
+(* Let's do an example that is a good fit for showing off this prover. *)
+
 Example ex4 := Seq (Assign "y" (Var "a"))
                    (Seq (If_ (Equal (Var "x") (Var "y"))
                              (Assign "z" (Var "x"))
                              (Assign "z" (Var "y")))
                         (Assign "x" (Var "z"))).
 Compute fst (spost ex4 "X" Tru).
-
-Local Hint Extern 1 False => eapply multibump_first; [ eassumption | equality ] : core.
+(* Yup, plenty of quantifiers and nontrivial structure there! *)
 
 Local Transparent min max.
 
@@ -1565,13 +1696,27 @@ Proof.
   simplify.
   apply verify_computed with (pre := Tru) (post := Exp (Equal (Var "x") (Var "a"))) in H; simplify; propositional; subst; eauto.
 
+  (* This subgoal is the main action: showing that our checker returns [true].
+   * Oh, the suspense! *)
   repeat (compute; simplify).
   reflexivity.
+  (* As you can see, outside those annoying variable side conditions, we
+   * delegated all the "real work" to our computable procedure. *)
 Qed.
 
-(** * A more-clever strongest-post that avoids introducing quantifiers *)
+(** * TECHNIQUE #2: Symbolic Execution *)
 
+(* Those quantifiers sure are a pain.  A technique often called *symbolic
+ * execution* will let us avoid them. *)
+
+(* The main idea is that, while we traverse the program syntax in the forward
+ * direction, we maintain a *mapping* of program variables to logical
+ * expressions over the *initial* values of variables.  Every predicate we
+ * generate will be in terms of those initial values only. *)
 Definition mapping := fmap var exp.
+
+(* We must explain how to evaluate different kinds of terms with respect to
+ * mappings. *)
 
 Fixpoint expM (e : exp) (m : mapping) : exp :=
   match e with
@@ -1598,12 +1743,17 @@ Fixpoint predM (p : predicate) (m : mapping) : predicate :=
   | Ex x p1 => Ex x (predM p1 m)
   end.
 
+(* A classic higher-order function that will come in handy *)
 Fixpoint flatmap {A B} (f : A -> list B) (ls : list A) : list B :=
   match ls with
   | nil => nil
   | x :: ls' => f x ++ flatmap f ls'
   end.
 
+(* Now our modified forward-direction program explorer: it takes in a mapping,
+ * and it returns *a list of possible control-flow paths*, each with a predicate
+ * (called a *path condition* and mapping) to explain state at the end of the
+ * path. *)
 Fixpoint spostM (c : cmd) (p : predicate) (m : mapping) : list (predicate * mapping) :=
   match c with
   | Skip => [(p, m)]
@@ -1614,7 +1764,12 @@ Fixpoint spostM (c : cmd) (p : predicate) (m : mapping) : list (predicate * mapp
       spostM c1 (And p (Exp (bexpM e m))) m
       ++ spostM c2 (And p (NotExp (bexpM e m))) m
   end.
+(* Note that, every time we extend predicates or mappings, we substitute
+ * mappings into terms that will be used.  We maintain the invariant that all
+ * logical expressions and predicates are in terms of the *initial* values of
+ * variables. *)
 
+(* One more computable version of a useful operation: *)
 Fixpoint cmdVars (c : cmd) : list var :=
   match c with
   | Skip => []
@@ -1623,6 +1778,9 @@ Fixpoint cmdVars (c : cmd) : list var :=
   | If_ e c1 c2 => bexpVars e ++ cmdVars c1 ++ cmdVars c2
   end.
 
+(* We will use this function to create the mapping at the start of symbolic
+ * execution: every program variable contains itself, since there have not been
+ * any mutations yet. *)
 Fixpoint initMapping (xs : list var) : mapping :=
   match xs with
   | [] => $0
@@ -1667,6 +1825,8 @@ Proof.
   apply Exists_app; auto.
 Qed.
 
+(* Here's what correctness means for our symbolic executor.  Nice: fewer side
+ * conditions about variables!  We just need to mention accuracy of mappings. *)
 Theorem spostM_sound : forall v0 v c v',
     exec v c v'
     -> forall m p, evalPredicate p v0
@@ -1705,6 +1865,8 @@ Proof.
   apply Exists_app; auto.
 Qed.
 
+(* Let's combine that procedure with the same automated theorem prover we used
+ * with strongest postconditions. *)
 Definition verifyM_computable (pre : predicate) (c : cmd) (post : predicate) :=
   forallb (fun '(p, m) =>
              match scenarios (predM post m) with
@@ -1713,6 +1875,9 @@ Definition verifyM_computable (pre : predicate) (c : cmd) (post : predicate) :=
                          (scenarios p)
              | _ => false
              end) (spostM c pre (initMapping (cmdVars c))).
+(* Note careful substitution with mappings above. *)
+
+(* Now a moderate journey to prove overall soundness: *)
 
 Lemma initMapping_In : forall x xs,
     In x xs
@@ -1843,6 +2008,8 @@ Proof.
   cases (x ==v x1); subst; simplify; auto.
 Qed.
 
+(* And here is our new version, again going pretty light on side conditions
+ * about variable names. *)
 Theorem verifyM_computed : forall pre c post,
     verifyM_computable pre c post = true
     -> forall v v', evalPredicate pre v
@@ -1900,16 +2067,24 @@ Proof.
   reflexivity.
 Qed.
 
-(* Now a third method: going backward, with weakest preconditions *)
+(** * TECHNIQUE #3: Weakest Preconditions *)
+
+(* Our last approach lines up with the weakest preconditions from
+ * AutomatedTheoremProving, though now we implement the operation as a
+ * computable function on syntactic predicates. *)
 
 Fixpoint wprec (c : cmd) (post : predicate) : predicate :=
   match c with
   | Skip => post
-  | Assign x e => subPredicate post x e
+  | Assign x e => subPredicate post x e (* This case is where the magic happens,
+                                         * in simplifying vs. strongest
+                                         * postconditions. *)
   | Seq c1 c2 => wprec c1 (wprec c2 post)
   | If_ e c1 c2 => Or (And (Exp e) (wprec c1 post))
                       (And (NotExp e) (wprec c2 post))
   end.
+
+(* More lemmas before the main soundness theorems: *)
 
 Lemma eval_subPredicate_noquant : forall replaceThis withThis inThis,
     boundVars inThis = []
@@ -1937,6 +2112,7 @@ Proof.
   rewrite IHc1, IHc2; auto.
 Qed.
 
+(* Nice simple theorem statement *and* proof here. *)
 Theorem wprec_sound : forall v c v',
     exec v c v'
     -> forall post, evalPredicate (wprec c post) v
@@ -1951,7 +2127,8 @@ Proof.
   apply IHexec1; auto.
   apply wprec_bound; auto.
 Qed.
-  
+
+(* Simple wrapper into an overall checker for Hoare triples *)
 Definition verifyP_computable (pre : predicate) (c : cmd) (post : predicate) :=
   forallb (fun lhs => existsb (fun rhs => entailment lhs.(Atoms) rhs.(Atoms))
                               (scenarios (wprec c post)))
@@ -2003,6 +2180,7 @@ Proof.
   equality.
 Qed.
 
+(* Simple side conditions here, too. *)
 Theorem verifyP_computed : forall pre c post,
     verifyP_computable pre c post = true
     -> forall v v', evalPredicate pre v
@@ -2057,9 +2235,9 @@ Qed.
 
 Local Hint Resolve use_equal' : core.
 
-(* Note that we need a nontrivial but *tautological* precondition here!
- * Try executing [wprec] on the relevant inputs to see why our automated theorem
- * prover isn't up to the challenge with [Tru] as precondition. *)
+(* Note that we need a nontrivial precondition in the following!  Try executing
+ * [wprec] on the relevant inputs to see why our automated theorem prover isn't
+ * up to the challenge with [Tru] as precondition. *)
 
 Theorem ex4_correctP : forall v v',
     exec v ex4 v'

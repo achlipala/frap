@@ -6398,9 +6398,9 @@ $$\infer{e_1 \; e_2 \equiv e'_1 \; e'_2}{
 Now it may not be surprising that the $\forall$ built into the language models the normal $\forall$ of logic very well, with $\lambda$ representing the rule to derive a $\forall$ fact and function application representing quantifier instantiation.
 We can also Church-encode $\exists$ without too much fuss.
 \begin{eqnarray*}
-  \lc{exists} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \forall \alpha : \ty. \; (\forall x : a. \; f \; x \to \alpha) \to \alpha \\
-  \lc{exists\_intro} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : a. \; \lambda y : f \; x. \; \lambda \alpha : \ty. \; \lambda k : (\forall x : a. \; f \; x \to \alpha). \; k \; x \; y \\
-  \lc{exists\_elim} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : \lc{exists} \; a \; f. \; x
+  \lc{ex} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \forall \alpha : \ty. \; (\forall x : a. \; f \; x \to \alpha) \to \alpha \\
+  \lc{ex\_intro} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : a. \; \lambda y : f \; x. \; \lambda \alpha : \ty. \; \lambda k : (\forall x : a. \; f \; x \to \alpha). \; k \; x \; y \\
+  \lc{ex\_elim} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : \lc{ex} \; a \; f. \; x
 \end{eqnarray*}
 
 It is also interesting to see how to encode (propositional) equality.
@@ -6408,7 +6408,7 @@ We follow logician Gottfried Leibniz\index{Leibniz, Gottfried} in defining equal
 \begin{eqnarray*}
   \lc{eq} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda y : a. \; \forall \; f : a \to \ty. \; f \; x \to f \; y \\
   \lc{eq\_refl} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda f : a \to \ty. \; \lambda \; p : f \; x. \; p \\
-  \lc{eq\_symm} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda y : a. \; \lambda e : \lc{eq} \; x \; y. \; \lambda f : a \to \ty. \; \lambda \; p : f \; x. \; e \; (\lambda v : a. \; \lc{eq} \; a \; v \; x) \; (\lc{eq\_refl} \; a \; x)
+  \lc{eq\_sym} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda y : a. \; \lambda e : \lc{eq} \; x \; y. \; e \; (\lambda v : a. \; \lc{eq} \; a \; v \; x) \; (\lc{eq\_refl} \; a \; x)
 \end{eqnarray*}
 
 Note how we again make critical use of $\forall$ impredicativity, instantiating an equality proof with an equality proposition.
@@ -6535,7 +6535,7 @@ Not coincidentally, we are using a typed version of the $\Omega$ from Section \r
 This rule is important to maintain the benefits of predicativity for consistency.
 Now we prevent a constructor of an inductive type from being passed that very inductive type as an argument.
 
-\emph{\textbf{Rule:} we must block certain \emph{large eliminations}\index{large eliminations}: pattern matching of an expression whose type belongs to some universe ($\prop$ or $\tyn{i}$) must produce a result type that itself belongs to the same universe.}
+\emph{\textbf{Rule:} we must block certain \emph{large eliminations}\index{large eliminations}: pattern matching of an expression whose type belongs to $\prop$ must produce a result type that itself belongs to $\prop$.}
 The intuition behind this rule is that it prevents sneaky ways to launder types into universes where they don't belong, which can lead to behavior that simulates $\ty : \ty$ and breaks consistency.
 By the way, fully understanding this rule depends on understanding how dependent pattern matching works, with specification of how the result type may depend on the type and value of the expression being matched on (the \emph{discriminee}\index{discriminee}).
 Typically dependent matches are encoded internally with arbitrary functions provided explicitly, over both the discriminee and the indices of the inductive type family it belongs to.

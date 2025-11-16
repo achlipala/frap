@@ -6347,7 +6347,7 @@ With a little more work, we can define conjunction and disjunction explicitly.
 
 We are now able to encode propositional tautologies and their proofs, but how can we handle first-order logic and beyond?
 We need quantifiers to be able to refer to mathematical objects beyond just propositions.
-To that end, we add \emph{dependent typing}\index{dependent types} via the \emph{Calculus of Constructions}\index{Calculus of Constructions} (\emph{CoC}), invented by Theirry Coquand\index{Coquand, Thierry} and applied very shortly after at the genesis of the Rocq project (called Coq at the time, in an allusion to the inventor).
+To that end, we add \emph{dependent typing}\index{dependent types} via the \emph{calculus of constructions}\index{calculus of constructions} (\emph{CoC}), invented by Theirry Coquand\index{Coquand, Thierry} and applied very shortly after at the genesis of the Rocq project (called Coq at the time, in an allusion to the inventor).
 We will now allow types to mention not just a special kind of type variables but also \emph{any} program variables, in a sense depending on \emph{runtime values} in a way that breaks the \emph{phase distinction}\index{phase distinction} common to most typed programming languages.
 In fact, we will now collapse the syntactic classes of kinds, types, and expressions into one, leading ironically to a \emph{simpler} language grammar than in the previous sections.
 We will actually need to make one element more complex to reach the real CoC, but let us start with a more naive variant first for didactic purposes.
@@ -6540,6 +6540,40 @@ The intuition behind this rule is that it prevents sneaky ways to launder types 
 By the way, fully understanding this rule depends on understanding how dependent pattern matching works, with specification of how the result type may depend on the type and value of the expression being matched on (the \emph{discriminee}\index{discriminee}).
 Typically dependent matches are encoded internally with arbitrary functions provided explicitly, over both the discriminee and the indices of the inductive type family it belongs to.
 If the programmer \emph{did not} provide such a function in each case, reconstructing them turns out to be uncomputable.
+
+\section{Proof Engines}
+
+The above discussion should give a sense of how essentially all theorems of mathematics can be established via \emph{proof terms}\index{proof terms}, programs in these type theories, which can then be validated with decidable type checking.
+However, writing proof terms directly can be tedious, which is why our usage of Rocq has leaned heavily on \emph{tactics}\index{tactics}, programs that find proof terms for us.
+Rocq comes with a whole Turing-complete tactic language called Ltac\index{Ltac}.
+At its heart is a \emph{proof engine}\index{proof engine} that keeps track of open proof goals.
+It also keeps track of \emph{existential variables}\index{existential variables}, which are displayed in Rocq with question marks before their names.
+We must find instantiations for these variables before completing a proof.
+For instance, we may set out to prove $\exists x : \mathbb N. \; x > 7$, which we begin with the \texttt{eexists} tactic, changing the goal to $?x > 7$.
+Eventually, we realize that $?x = 8$ is a good setting.
+
+A proof engine tracks open goals and existential variables throughout the user's journey of proving a theorem, but upon proof completion, it must generate a proof term.
+Said proof terms no longer contain any concept of existential variables.
+Instead, the \texttt{eexists} tactic above leaves a record saying to generate, say, an $\lc{ex\_intro}$ application on whatever value for $?x$ is found later.
+This approach helps build our confidence in proof checking via type checking, by avoiding the complexities of existential variables in the trusted checker.
+
+Interestingly enough, thanks to Curry-Howard, tracking open proof goals is actually a special case of tracking existential variables!
+These existential variables just happen to have types in $\prop$; that is, they are variables standing for proofs.
+As a result, the design of a proof engine can be simplified by treating these elements identically.
+
+An important job for the proof engine is enforcing scoping rules, to prevent bogus proofs.
+Consider the following false property in first-order logic: $(\forall x. \; \exists y. \; P(x, y)) \to (\exists y. \; \forall x. \; P(x, y))$.
+Intuitively, while every $x$ may have a matching $y$ (according to $P$), there may not exist a $y$ that matches every $x$.
+A malfunctioning proof engine could let the user start proving the conclusion of the implication by introducting an existential variable for $y$, which later is instantiated by a $y$ value that the premise guarantees exists.
+The proof engine should detect that such a $y$ value is \emph{not in-scope} for the existential variable, blocking the instantiation.
+
+Designing a proof engine for good performance is challenging, and the asymptotics of key operations are critical for scaling a proof engine to e.g.\ verification of long programs.
+As of this writing, all of the popular proof assistants based on type theory provide at least some of these operations such that they take superlinear time in common cases.
+Actually, it's a bit subtle what we measure in a proof state to determine what counts as superlinear behavior.
+One reasonable request is for creation of an existential variable to take time linear in the type being asserted for it, \emph{not} depending on the whole context of the current subgoal.
+After all, proof automation may repeatedly allocate new existential variables in a performance-critical inner loop, and we want to avoid quadratic behavior.
+We also care about performance of the operation to instantiate an existential variable, which intuitively should take time proportional just to type-checking the term being substituted for the variable.
+Stress-testing proof assistants often reveals significant superlinearities in these operations and their relatives, indicating an important dimension for improvement in scaling to real-world verification problems.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

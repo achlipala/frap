@@ -161,3 +161,31 @@ Fail Definition exists_positive_out (P : Z -> Prop) (e : exists_positive P) : Ty
   | ExP _ _ _ _ => dyn
   end.
 (* This one is a true large elimination. *)
+
+
+(** * Seeing what the Rocq proof engine is up to *)
+
+Goal (exists n : Z, n > 0 /\ n > 1)%Z.
+Proof.
+  eexists.
+  split.
+  Show Existentials.
+  (* Note one existential for [n] and two for the open subgoals. *)
+Abort.
+
+(* This next theorem is false!  Let's see how Rocq helps us avoid a bogus
+ * proof. *)
+Goal forall (A B : Set) (P : A -> B -> Prop),
+    (forall x : A, exists y : B, P x y) -> (exists y : B, forall x : A, P x y).
+Proof.
+  intros.
+  eexists.
+  intro.
+  specialize (H x).
+  invert H.
+  Fail apply H0.
+  (* Phew!  This step failed. *)
+  Show Existentials.
+  (* Now we can see that [?y] exists in a context that doesn't contain [x0],
+   * hence our inability to instantiate [?y = x0]. *)
+Abort.

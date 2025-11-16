@@ -1,14 +1,5 @@
-(** Formal Reasoning About Programs <http://adam.chlipala.net/frap/>
-  * Chapter 23: Type-Theoretic Foundations of Proof Assistants
-  * Author: Adam Chlipala
-  * License: https://creativecommons.org/licenses/by-nc-nd/4.0/ *)
-
 Require Import Frap.
 From Stdlib Require Import ZArith.
-
-(* This book chapter introduces a lot of language metatheory, which we will
- * *not* mechanize here because surprisingly much bureaucracy would be required.
- * Instead, we will port the various examples into Rocq itself. *)
 
 (** * Simulating System F *)
 
@@ -61,8 +52,8 @@ Definition and_elim2 : forall A1 A2 : Prop, and A1 A2 -> A2 :=
     x A2 (fun (x1 : A1) (x2 : A2) => x2).
 
 (* Example of the encoding in action: *)
-Definition and_comm (A B : Prop) (p : and A B) : and B A :=
-  and_intro B A (and_elim2 A B p) (and_elim1 A B p).
+Definition and_comm (A B : Prop) (p : and A B) : and B A.
+Admitted.
 
 Definition or : Prop -> Prop -> Prop :=
   fun A1 A2 : Prop => forall A : Prop, (A1 -> A) -> (A2 -> A) -> A.
@@ -77,8 +68,8 @@ Definition or_elim : forall A1 A2 : Prop, or A1 A2
   fun (A1 A2 : Prop) (x : or A1 A2) => x.
 
 (* Example of the encoding in action: *)
-Definition or_comm (A B : Prop) (p : or A B) : or B A :=
-  or_elim A B p (or B A) (fun p1 => or_intro2 B A p1) (fun p2 => or_intro1 B A p2).
+Definition or_comm (A B : Prop) (p : or A B) : or B A.
+Admitted.
 
 
 (** * Simulating the Calculus of Constructions *)
@@ -95,11 +86,8 @@ Definition ex_elim : forall (a : Set) (f : a -> Prop), ex a f
 (* Example of the encoding in action: *)
 Definition quant_commute (a : Set) (f : a -> a -> Prop)
            (p : ex a (fun x => forall y : a, f x y))
-  : forall y : a, ex a (fun x => f x y) :=
-  fun y : a => ex_elim a (fun x => forall y : a, f x y) p
-                       (ex a (fun x => f x y))
-                       (fun (x : a) (p : forall y : a, f x y) =>
-                          ex_intro a (fun x => f x y) x (p y)).
+  : forall y : a, ex a (fun x => f x y).
+Admitted.
 
 Definition eq : forall a : Set, a -> a -> Prop :=
   fun (a : Set) (x y : a) => forall f : a -> Prop, f x -> f y.
@@ -122,8 +110,8 @@ Section Omega.
   Variable Make : (Omega -> False) -> Omega.
   Variable Out : Omega -> (Omega -> False).
 
-  Definition omega : Omega := Make (fun x => (Out x) x).
-  Definition contra : False := (Out omega) omega.
+  Definition contra : False.
+  Admitted.
 End Omega.
 
 (** * Universe levels in constructor arguments *)
@@ -189,21 +177,3 @@ Proof.
   (* Now we can see that [?y] exists in a context that doesn't contain [x0],
    * hence our inability to instantiate [?y = x0]. *)
 Abort.
-
-(* Just in case you weren't convinced the last theorem statement was false: *)
-Goal ~forall (A B : Set) (P : A -> B -> Prop),
-    (forall x : A, exists y : B, P x y) -> (exists y : B, forall x : A, P x y).
-Proof.
-  intro Hbad.
-  specialize (Hbad bool bool (fun b1 b2 => b1 = b2)).
-  assert (forall x : bool, exists y, x = y) as Hobvious.
-  intro x.
-  exists x.
-  reflexivity.
-  first_order.
-  cases x.
-  specialize (H false).
-  equality.
-  specialize (H true).
-  equality.
-Qed.

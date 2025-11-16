@@ -64,4 +64,5 @@ ConcurrentSeparationLogic_template.v
 ConcurrentSeparationLogic.v
 MessagesAndRefinement.v
 SessionTypes.v
+Foundations_template.v
 Foundations.v

@@ -3015,7 +3015,7 @@ Note that we only ever need to evaluate \emph{closed} terms\index{closed terms},
 
 It may be surprising that these two rules are enough to define the full semantics of a Turing-complete language!
 Indeed, $\lambda$-calculus is Turing-complete, and we must be able to find nonterminating programs.
-Here is one example.
+Here is one example. \label{Omega}
 \begin{eqnarray*}
   \Omega &=& (\lambda x. \; x \; x) \; (\lambda x. \; x \; x) \\
 \end{eqnarray*}
@@ -3027,7 +3027,7 @@ Here is one example.
 \end{proof}
 
 
-\section{A Quick Case Study in Program Verification: Church Numerals}
+\section{A Quick Case Study in Program Verification: Church Numerals}\label{churchenc}
 
 \newcommand{\church}[1]{\underline{#1}}
 
@@ -6063,6 +6063,483 @@ Here is a sketch of the key lemmas.
   The reasoning is quite similar to in the inductive case, but where instead of showing that any possible step preserves typing, we demonstrate that a particular step exists.
   The head of the session type telegraphs what step it is: for the communication at the head of the type, the assigned sending party sends to the assigned receiving party.
 \end{proof}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Type-Theoretic Foundations of Proof Assistants}
+
+Plenty of other introductions to Rocq and its relatives give bottom-up presentations starting with their logical foundations, while in this book we have focused on starting from the motivation of applications to reasoning about programs and programming languages.
+We can wrap up with a quick survey of the issues that go into designing and implementing expressive logics based on type theory.
+There will be interesting overlap of these \emph{meta}-level concerns\index{metalanguage} with what we have studied about type systems in \emph{object} languages\index{object language}, starting in Chapter \ref{types}.
+
+\section{Warm-Up: A Slight Variation of Simply Typed Lambda Calculus}
+
+The big idea of proof assistants based on type theory is the \emph{Curry-Howard isomorphism}\index{Curry-Howard isomorphism}, a way to see logical propositions and proofs as the types and terms of functional programming languages.
+To realize that isomorphism, we will need to add a succession of features to the type systems we studied previously.
+Let us begin with a small variation of simply typed lambda calculus from Chapter \ref{types}.
+We make a small but important change that matters more for more-advanced function languages: while before we gave the grammar of expressions \emph{without} mentioning types anywhere (called \emph{Church-style}\index{Church-style} for historical reasons after Alonzo Church\index{Church, Alonzo}), now we will include types in some important positions within expressions (called \emph{Curry-style} after logican Haskell Curry\index{Curry, Haskell}, both known for the aforementioned isomorphism and also the namesake for functional programming language Haskell\index{Haskell}).
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Numbers} & n &\in& \mathbb N \\
+  \textrm{Expressions} & e &::=& n \mid e + e \mid x \mid \lambda x : \tau. \; e \mid e \; e \\
+  \textrm{Types} & \tau &::=& \mathbb N \mid \tau \to \tau
+\end{array}$$
+
+We adopt the old typing rules almost unchanged, though now the syntax of a $\lambda$ expression forces a choice of its argument type.
+$$\infer{\hasty{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\hasty{\Gamma}{n}{\mathbb N}}{}
+\quad \infer{\hasty{\Gamma}{e_1 + e_2}{\mathbb N}}{
+    \hasty{\Gamma}{e_1}{\mathbb N}
+    & \hasty{\Gamma}{e_2}{\mathbb N}
+}$$
+$$\infer{\hasty{\Gamma}{\lambda x : \tau_1. \; e}{\tau_1 \to \tau_2}}{
+  \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\tau_2}}{
+  \hasty{\Gamma}{e_1}{\tau_1 \to \tau_2}
+  & \hasty{\Gamma}{e_2}{\tau_1}
+}$$
+
+We present the semantics of expressions in a different style than before.
+Rather than giving an operational semantics in either big-step or small-step style, we present an \emph{equational theory}\index{equational theory} axiomatizing which equalities between terms are provable.
+Such a relation is also often called a \emph{definitional equality}\index{definitional equality} in type theory.
+We start with the most interesting equations, explaining how particular language constructs can execute just as they do in operational semantics.
+$$\infer{(\lambda x : \tau. \; e_1) \; e_2 \equiv \subst{e_1}{x}{e_2}}{}
+\quad \infer{n + m \equiv n \textbf{+} m}{}$$
+One notable divergence from Chapter \ref{types} is allowing $\lambda$ applications to reduce even when the arguments are not yet values.
+
+Next, \emph{congruence} rules\index{congruence rules} explain how to push equality reasoning inside the structure of terms.
+$$\infer{e_1 \; e_2 \equiv e'_1 \; e'_2}{
+  e_1 \equiv e'_1
+  & e_2 \equiv e'_2
+}
+\quad \infer{e_1 + e_2 \equiv e'_1 + e'_2}{
+  e_1 \equiv e'_1
+  & e_2 \equiv e'_2
+}$$
+
+Finally, we axiomatize definitional equality as an equivalence relation.
+$$\infer{e \equiv e}{}
+\quad \infer{e_2 \equiv e_1}{e_1 \equiv e_2}
+\quad \infer{e_1 \equiv e_3}{
+  e_1 \equiv e_2
+  & e_2 \equiv e_3
+}$$
+
+An important property of this relation is that it is \emph{decidable}\index{decidable}: that exists an algorithm that takes in two expressions and decides if they are equal according to the relation.
+In contrast, in Rocq we have proved many complex equalities laboriously, using \emph{propositional equality}\index{propositional equality} based on a more-expressive proof language.
+We will see shortly why a decidable equality relation is handy to keep around.
+
+\section{System F: First-Class Polymorphism}
+
+Let us now extend simply typed lambda calculus into \emph{System F}\index{System F}, an idealized implementation of type polymorphism\index{polymorphism} invented independently by logician Jean-Yves Girard\index{Girard, Jean-Yves} and computer scientist John Reynolds\index{Reynolds, John}.
+Here we deal with polymorphism in the sense from functional languages like Haskell\index{Haskell} and OCaml\index{OCaml}, corresponding to what is called \emph{generics}\index{generics} in many other programming languages.
+The idea is to allow functions to take types as arguments, using those types to constrain the allowed types of arguments and return values.
+
+Let us now remove numbers from the type system, as we will see that they can be defined with a ``library'' rather than built-in.
+We arrive at the following syntax.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Type Variables} & \alpha &\in& \mathsf{Strings} \\  
+  \textrm{Expressions} & e &::=& x \mid \lambda x : \tau. \; e \mid e \; e \mid \Lambda \alpha. \; e \mid e[\tau] \\
+  \textrm{Types} & \tau &::=& \tau \to \tau \mid \alpha \mid \forall \alpha. \; \tau
+\end{array}$$
+
+\newcommand{\pwf}[2]{#1 \vdash #2}
+\newcommand{\phasty}[4]{#1; #2 \vdash #3 : #4}
+
+The crucial new construct is \emph{type abstraction}\index{type abstraction}.
+A function over types is written with capital Greek lambda as $\Lambda \alpha. \; e$ and receives a type like $\forall \alpha. \; \tau$.
+Then such functions are applied to types with $e[\tau]$.
+Let us see how it comes together in the type system, now parameterized over an additional context $\Delta$ (capital Greek delta) of \emph{type variables}\index{type variable}.
+$$\infer{\phasty{\Delta}{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{\lambda x : \tau_1. \; e}{\tau_1 \to \tau_2}}{
+  \phasty{\Delta}{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{e_1 \; e_2}{\tau_2}}{
+  \phasty{\Delta}{\Gamma}{e_1}{\tau_1 \to \tau_2}
+  & \phasty{\Delta}{\Gamma}{e_2}{\tau_1}
+}$$
+$$\infer{\phasty{\Delta}{\Gamma}{\Lambda \alpha. \; e}{\forall \alpha. \; \tau}}{
+  \phasty{\Delta, \alpha}{\Gamma}{e}{\tau}
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{e[\tau]}{\subst{\tau'}{\alpha}{\tau}}}{
+  \phasty{\Delta}{\Gamma}{e}{\forall \alpha. \; \tau'}
+  & \pwf{\Delta}{\tau}
+}$$
+
+The last rule refers to a \emph{type well-formedness}\index{type well-formedness} judgment $\pwf{\Delta}{\tau}$ defined as follows, basically just checking that all type variables reference enclosing $\forall$ binders.
+$$\infer{\pwf{\Delta}{\alpha}}{
+  \alpha \in \Delta
+}
+\quad \infer{\pwf{\Delta}{\tau_1 \to \tau_2}}{
+  \pwf{\Delta}{\tau_1}
+  & \pwf{\Delta}{\tau_2}
+}
+\quad \infer{\pwf{\Delta}{\forall \alpha. \; \tau}}{
+  \pwf{\Delta, \alpha}{\tau}
+}$$
+
+Here is the revised definitional equality (omitting the rules shared by all equivalence relations).
+$$\infer{(\lambda x : \tau. \; e_1) \; e_2 \equiv \subst{e_1}{x}{e_2}}{}
+\quad \infer{(\Lambda \alpha. \; e)[\tau] \equiv \subst{e}{\alpha}{\tau}}{}$$
+$$\infer{e_1 \; e_2 \equiv e'_1 \; e'_2}{
+  e_1 \equiv e'_1
+  & e_2 \equiv e'_2
+}
+\quad \infer{\Lambda \alpha. \; e \equiv \Lambda \alpha. \; e'}{
+  e \equiv e'
+}$$
+
+Importantly, both the typing judgment and the definitional equality remain decidable, allowing for practical implementations of System F.
+We could also reexpress the definitional equality as an operational semantics, indicating an interpreter for running System F programs to values -- which is guaranteed to terminate for any initial program.
+However, perhaps counterintuitively, \emph{type inference}\index{type inference} for System F is already undecidable.
+That is, if we leave out the types that appear explicitly in program syntax, there is no algorithm able to do a complete job filling them back in.
+(The further type theories we define in this chapter will thus have ``even less decidable'' type inference, in a fuzzy sense, which through Curry-Howard corresponds with undecidability of problems in automated theorem proving.)
+
+Let us now make good on our promise to implement natural numbers on top of this core calculus.
+We actually already studied the related problem for untyped lambda calculus in Section \ref{churchenc}.
+The Church encodings we developed there could not be typed in simply typed lambda calculus, but System F provides the missing features.
+Here are our prior definitions rewritten to use types.
+\begin{eqnarray*}
+  \lc{nat} &=& \forall \alpha. \; (\alpha \to \alpha) \to \alpha \to \alpha \\
+  \lc{zero} &=& \Lambda \alpha. \; \lambda f : \alpha \to \alpha. \; \lambda x : \alpha. \; x \\
+  \lc{plus1} &=& \lambda n : \lc{nat}. \; \Lambda \alpha. \; \lambda f : \alpha \to \alpha. \; \lambda x : \alpha. \; f \; (n[\alpha] \; f \; x) \\
+  \lc{add} &=& \lambda n : \lc{nat}. \; \lambda m : \lc{nat}. \; n[\lc{nat}] \; \lc{plus1} \; m \\
+  \lc{mult} &=& \lambda n : \lc{nat}. \; \lambda m : \lc{nat}. \; n[\lc{nat}] \; (\lc{add} \; m) \; \lc{zero}
+\end{eqnarray*}
+
+It is important that we can instantiate a $\lc{nat}$ with the type $\lc{nat}$ itself, providing a good illustration of how System F supports \emph{impredicative} polymorphism\index{impredicative polymorphism}, where a quantified type is allowed to be instantiated with itself.
+It turns out this same style can be used to encode all of the usual datatypes of functional programming.
+The feature is appealingly versatile, though we will see it is hard to maintain in full generality as we build out the language further.
+
+We can already define some simple logical constructs and their proofs, too.
+That is, we write System F types that stand for logical propositions, and \emph{the programs that type-check against those types count as the proofs of the associated propositions}.
+Here are truth and falsehood.
+\begin{eqnarray*}
+  \lc{True} &=& \forall \alpha. \; \alpha \to \alpha \\
+  \lc{I} &=& \Lambda \alpha. \; \lambda x : \alpha. \; x \\
+  \lc{False} &=& \forall \alpha. \; \alpha \\
+  \lc{False\_elim} &=& \Lambda \alpha. \; \lambda x : \lc{False}. \; x[\alpha]
+\end{eqnarray*}
+
+$\lc{True}$ can have any inhabited type, since there is nothing useful we do with $\lc{True}$ proofs.
+In contrast, the point of a $\lc{False}$ proof is that we can use it to derive any other proposition by contradiction, an idea that we build into the definition of $\lc{False}$ and wrap trivially with $\lc{False\_elim}$.
+(The Rocq code associated with this chapter is mostly definitions of all of these Church encodings, and consulting that code may be helpful to get a clearer sense of how it all works.)
+
+
+\section{System F$_\omega$: Adding Type-Level Computation}
+
+\newcommand{\ty}[0]{\lc{Type}}
+
+We are now ready to start encoding logical connectives and their proofs, starting with examples from propositional logic\index{propositional logic}.
+How can we write propositional tautologies\index{tautologies} as types in functional programs?
+The $\forall$ quantifier we already introduced is named suggestively and can be used to quantify over propositions just as in more-standard logic.
+But what is the right way to define logical connectives with first-class status in the language?
+The solution is \emph{type operators}\index{type operators}, as emboded in the classic language System F$_\omega$ (pronounced ``System F omega'').
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Type Variables} & \alpha &\in& \mathsf{Strings} \\  
+  \textrm{Expressions} & e &::=& x \mid \lambda x : \tau. \; e \mid e \; e \mid \Lambda \alpha :: \kappa. \; e \mid e[\tau] \\
+  \textrm{Types} & \tau &::=& \tau \to \tau \mid \alpha \mid \forall \alpha :: \kappa. \; \tau \mid \Lambda \alpha :: \kappa. \; \tau \mid \tau \; \tau \\
+  \textrm{Kinds} & \kappa &::=& \ty \mid \kappa \to \kappa
+\end{array}$$
+
+\newcommand{\haskind}[3]{#1 \vdash #2 :: #3}
+
+One critical new ingredient is \emph{kinds}\index{kinds}, which classify types the way that types classify expressions.
+We now allow types to exist at \emph{higher kinds}\index{higher kinds}: e.g.\ types may be functions over other types.
+In fact, we have effectively embedded a copy of the simply typed lambda calculus at the type level.
+Let us see how it plays out by revisiting all of our judgments, starting with typing, modified only to track the kinds of type variables and invoke a \emph{kinding judgment} for types, rather than simple well-formedness.
+$$\infer{\phasty{\Delta}{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{\lambda x : \tau_1. \; e}{\tau_1 \to \tau_2}}{
+  \haskind{\Delta}{\tau_1}{\ty}
+  & \phasty{\Delta}{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{e_1 \; e_2}{\tau_2}}{
+  \phasty{\Delta}{\Gamma}{e_1}{\tau_1 \to \tau_2}
+  & \phasty{\Delta}{\Gamma}{e_2}{\tau_1}
+}$$
+$$\infer{\phasty{\Delta}{\Gamma}{\Lambda \alpha :: \kappa. \; e}{\forall \alpha. \; \tau}}{
+  \phasty{\Delta, \alpha :: \kappa}{\Gamma}{e}{\tau}
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{e[\tau]}{\subst{\tau'}{\alpha}{\tau}}}{
+  \phasty{\Delta}{\Gamma}{e}{\forall \alpha :: \kappa. \; \tau'}
+  & \haskind{\Delta}{\tau}{\kappa}
+}
+\quad \infer{\phasty{\Delta}{\Gamma}{e}{\tau'}}{
+  \phasty{\Delta}{\Gamma}{e}{\tau}
+  & \tau \equiv \tau'
+}$$
+Note the use in the last rule of definitional equality for types.
+Our type language has gotten interesting enough that we need a type-checker to reason about executing type programs.
+
+We replace kind well-formedness with kinding, which, as promised, looks much like an embedded copy of typing from simply typed lambda calculus.
+$$\infer{\haskind{\Delta}{\alpha}{\kappa}}{
+  \Delta(\alpha) = \kappa
+}
+\quad \infer{\haskind{\Delta}{\tau_1 \to \tau_2}{\ty}}{
+  \haskind{\Delta}{\tau_1}{\ty}
+  & \haskind{\Delta}{\tau_2}{\ty}
+}
+\quad \infer{\haskind{\Delta}{\forall \alpha :: \kappa. \; \tau}{\ty}}{
+  \haskind{\Delta, \alpha :: \kappa}{\tau}{\ty}
+}$$
+$$\infer{\haskind{\Delta}{\Lambda \alpha :: \kappa_1. \; \tau}{\kappa_2}}{
+  \haskind{\Delta, \alpha :: \kappa_1}{\tau}{\kappa_2}
+}
+\quad \infer{\haskind{\Delta}{\tau_1 \; \tau_2}{\kappa_2}}{
+  \haskind{\Delta}{\tau_1}{\kappa_1 \to \kappa_2}
+  & \haskind{\Delta}{\tau_2}{\kappa_1}
+}$$
+
+Next, we revise definitional equality, now provided for both expressions and types.
+$$\infer{(\lambda x : \tau. \; e_1) \; e_2 \equiv \subst{e_1}{x}{e_2}}{}
+\quad \infer{(\Lambda \alpha :: \kappa. \; e)[\tau] \equiv \subst{e}{\alpha}{\tau}}{}$$
+$$\infer{e_1 \; e_2 \equiv e'_1 \; e'_2}{
+  e_1 \equiv e'_1
+  & e_2 \equiv e'_2
+}
+\quad \infer{\lambda x : \tau. \; e \equiv \lambda x : \tau'. \; e'}{
+  \tau \equiv \tau'
+  & e \equiv e'
+}
+\quad \infer{\Lambda \alpha. \; e \equiv \Lambda \alpha. \; e'}{
+  e \equiv e'
+}
+\quad \infer{e[\tau] \equiv e'[\tau']}{
+  e \equiv e'
+  & \tau \equiv \tau'
+}$$
+$$\infer{(\Lambda \alpha :: \kappa. \; \tau_1) \; \tau_2 \equiv \subst{\tau_1}{\alpha}{\tau_2}}{}$$
+$$\infer{\tau_1 \; \tau_2 \equiv \tau'_1 \; \tau'_2}{
+  \tau_1 \equiv \tau'_1
+  & \tau_2 \equiv \tau'_2
+}
+\quad \infer{\Lambda \alpha :: \kappa. \; \tau \equiv \Lambda \alpha :: \kappa. \; \tau'}{
+  \tau \equiv \tau'
+}$$
+
+System F$_\omega$ lets us Church-encode familiar logical connectives.
+In fact, the built-in $\to$ corresponds to implication in logic, with no further definitions required.
+Function abstraction corresponds to introducing a new implication, while function application corresponds to modus ponens\index{modus ponens}.
+
+With a little more work, we can define conjunction and disjunction explicitly.
+\begin{eqnarray*}
+  \lc{and} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \forall \alpha :: \ty. \; (\alpha_1 \to \alpha_2 \to \alpha) \to \alpha \\
+  \lc{and\_intro} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x_1 : \alpha_1. \; \lambda x_2 : \alpha_2. \; \Lambda \alpha :: \ty. \; \lambda f : \alpha_1 \to \alpha_2 \to \alpha. \; f \; x_1 \; x_2 \\
+  \lc{and\_elim1} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x : \lc{and} \; \alpha_1 \; \alpha_2. \; x[\alpha_1] \; (\lambda x_1 : \alpha_1. \; \lambda x_2 : \alpha_2. \; x_1) \\
+  \lc{and\_elim2} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x : \lc{and} \; \alpha_1 \; \alpha_2. \; x[\alpha_1] \; (\lambda x_1 : \alpha_1. \; \lambda x_2 : \alpha_2. \; x_2) \\
+  \lc{or} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \forall \alpha :: \ty. \; (\alpha_1 \to \alpha) \to (\alpha_2 \to \alpha) \to \alpha \\
+  \lc{or\_intro1} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x : \alpha_1. \; \Lambda \alpha :: \ty. \; \lambda f_1 : \alpha_1 \to \alpha. \; \lambda f_2 : \alpha_2 \to \alpha. \; f_1 \; x \\
+  \lc{or\_intro2} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x : \alpha_2. \; \Lambda \alpha :: \ty. \; \lambda f_1 : \alpha_1 \to \alpha. \; \lambda f_2 : \alpha_2 \to \alpha. \; f_2 \; x \\
+  \lc{or\_elim} &=& \Lambda \alpha_1 :: \ty. \; \Lambda \alpha_2 :: \ty. \; \lambda x : \lc{or} \; \alpha_1 \; \alpha_2. \; x
+\end{eqnarray*}
+
+\section{The (Naive) Calculus of Constructions: Adding Dependent Types}
+
+We are now able to encode propositional tautologies and their proofs, but how can we handle first-order logic and beyond?
+We need quantifiers to be able to refer to mathematical objects beyond just propositions.
+To that end, we add \emph{dependent typing}\index{dependent types} via the \emph{Calculus of Constructions}\index{Calculus of Constructions} (\emph{CoC}), invented by Theirry Coquand\index{Coquand, Thierry} and applied very shortly after at the genesis of the Rocq project (called Coq at the time, in an allusion to the inventor).
+We will now allow types to mention not just a special kind of type variables but also \emph{any} program variables, in a sense depending on \emph{runtime values} in a way that breaks the \emph{phase distinction}\index{phase distinction} common to most typed programming languages.
+In fact, we will now collapse the syntactic classes of kinds, types, and expressions into one, leading ironically to a \emph{simpler} language grammar than in the previous sections.
+We will actually need to make one element more complex to reach the real CoC, but let us start with a more naive variant first for didactic purposes.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Expressions} & e, \tau &::=& x \mid \lambda x : \tau. \; e \mid e \; e \mid \ty \mid \forall x : \tau. \; e
+\end{array}$$
+We also reintroduce the function-type arrow $\to$ as syntactic sugar: $\forall x : \tau_1. \; \tau_2$ may be written $\tau_1 \to \tau_2$ when $x$ does not appear free in $\tau_2$.
+(This idea can be a bit mind-bending, that implication is a special case of universal quantification when proofs themselves are legal to quantify over.)
+
+There is similar collapsing of typing and kinding judgments into typing.
+$$\infer{\hasty{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\hasty{\Gamma}{\lambda x : \tau_1. \; e}{\forall x : \tau_1. \; \tau_2}}{
+  \hasty{\Gamma}{\tau_1}{\ty}
+  & \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\subst{\tau_2}{x}{e_2}}}{
+  \hasty{\Gamma}{e_1}{\forall x : \tau_1. \; \tau_2}
+  & \hasty{\Gamma}{e_2}{\tau_1}
+}$$
+$$\infer{\hasty{\Gamma}{\ty}{\ty}}{}
+\quad \infer{\hasty{\Gamma}{\forall x : \tau_1. \; \tau_2}{\ty}}{
+  \hasty{\Gamma}{\tau_1}{\ty}
+  & \hasty{\Gamma, x : \tau_1}{\tau_2}{\ty}
+}
+\quad \infer{\hasty{\Gamma}{e}{\tau'}}{
+  \hasty{\Gamma}{e}{\tau}
+  & \tau \equiv \tau'
+}$$
+
+\noindent ...and likewise for definitional equality.
+$$\infer{(\lambda x : \tau. \; e_1) \; e_2 \equiv \subst{e_1}{x}{e_2}}{}$$
+$$\infer{e_1 \; e_2 \equiv e'_1 \; e'_2}{
+  e_1 \equiv e'_1
+  & e_2 \equiv e'_2
+}
+\quad \infer{\lambda x : \tau. \; e \equiv \lambda x : \tau'. \; e'}{
+  \tau \equiv \tau'
+  & e \equiv e'
+}
+\quad \infer{\forall x : \tau_1. \; \tau_2 \equiv \forall x : \tau'_1. \; \tau'_2}{
+  \tau_1 \equiv \tau'_1
+  & \tau_2 \equiv \tau'_2
+}$$
+
+Now it may not be surprising that the $\forall$ built into the language models the normal $\forall$ of logic very well, with $\lambda$ representing the rule to derive a $\forall$ fact and function application representing quantifier instantiation.
+We can also Church-encode $\exists$ without too much fuss.
+\begin{eqnarray*}
+  \lc{exists} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \forall \alpha : \ty. \; (\forall x : a. \; f \; x \to \alpha) \to \alpha \\
+  \lc{exists\_intro} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : a. \; \lambda y : f \; x. \; \lambda \alpha : \ty. \; \lambda k : (\forall x : a. \; f \; x \to \alpha). \; k \; x \; y \\
+  \lc{exists\_elim} &=& \lambda a : \ty. \; \lambda f : a \to \ty. \; \lambda x : \lc{exists} \; a \; f. \; x
+\end{eqnarray*}
+
+It is also interesting to see how to encode (propositional) equality.
+We follow logician Gottfried Leibniz\index{Leibniz, Gottfried} in defining equality in terms of the ability to \emph{substitute} equals for equals in arbitrary propositions.
+\begin{eqnarray*}
+  \lc{eq} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda y : a. \; \forall \; f : a \to \ty. \; f \; x \to f \; y \\
+  \lc{eq\_refl} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda f : a \to \ty. \; \lambda \; p : f \; x. \; p \\
+  \lc{eq\_symm} &=& \lambda a : \ty. \; \lambda x : a. \; \lambda y : a. \; \lambda e : \lc{eq} \; x \; y. \; \lambda f : a \to \ty. \; \lambda \; p : f \; x. \; e \; (\lambda v : a. \; \lc{eq} \; a \; v \; x) \; (\lc{eq\_refl} \; a \; x)
+\end{eqnarray*}
+
+Note how we again make critical use of $\forall$ impredicativity, instantiating an equality proof with an equality proposition.
+Unfortunately, something about this system is too good to be true.
+In our progression of languages so far through System F$_\omega$, each language was \emph{consistent}\index{consistent} interpreted as a logic.
+Through the Curry-Howard isomorphism, there are a few ways to state consistency.
+\begin{itemize}
+\item There is no proof of $\lc{False}$.  (The downside of this statement is that we must explain how to define $\lc{False}$.)
+\item There exists a proposition with no proof.  (Now we avoid needing to call out a special $\lc{False}$ proposition.)
+\item All programs terminate.
+\end{itemize}
+
+The final version requires us to spell out an operational semantics, which we have mostly been avoiding in favor of equational theories for definitional equality.
+We will rely on the reader's intuitions here, about how to write interpreters for the languages we present.
+The languages from before this section all have natural interpreters that are guaranteed to terminate for arbitary \emph{well-typed} programs.
+With the naive version of CoC, our luck runs out: the natural interpreter runs forever, even on some well-typed programs, hence (roughly) \emph{any nonterminating program can be used as a proof of any proposition}, invalidating the language as a proof system.
+
+While we demonstrated in Section \ref{Omega} a short nonterminating program $\Omega$ in untyped lambda calculus, the shortest-known nonterminating programs in naive CoC are actually rather long and complex.
+A 1995 paper by Hurkens\index{Hurkens, Antonius} announced a simplification of the previous shortest-known example to a mere 2039 symbols in his notation!
+Unfortunately, 2039 is plenty short enough to invalidate use as a proof system.
+
+\section{The Actual Calculus of Constructions: Universe Levels}
+
+\newcommand{\tyn}[1]{\lc{Type}_{#1}}
+\newcommand{\prop}[0]{\lc{Prop}}
+
+Russell and Whitehead\index{Russell and Whitehead} had identified, way back in the 1910s, the hazards of allowing flexible self-reference in logics.
+They invented type theory precisely to limit self-reference and preserve consistency.
+Today's standard type-theoretical tool to regain consistency with dependent types is \emph{stratifying by universe levels}\index{stratification}\index{universe levels}.
+That is, instead of providing a single type called $\ty$, we provide a countable infinity of them, $\tyn{i}$, plus a special impredicative universe for propositions called $\prop$ (because impredicativity remains safe and rather useful within proofs, if not for the mathematical objects that proofs reference).
+
+Here is the revised CoC.
+$$\begin{array}{rrcl}
+  \textrm{Variables} & x &\in& \mathsf{Strings} \\
+  \textrm{Universe Levels} & i &\in& \mathbb{N} \\
+  \textrm{Expressions} & e, \tau &::=& x \mid \lambda x : \tau. \; e \mid e \; e \mid \prop \mid \tyn{i} \mid \forall x : \tau. \; e
+\end{array}$$
+
+Now for the typing rules.
+We define an infinite hierarchy among the universe levels, and we split the rule for type-checking $\forall$s to allow impredicativity only for $\prop$.
+One new rule mentions a $\leq$ relation that we turn to explaining shortly.
+$$\infer{\hasty{\Gamma}{x}{\tau}}{
+  \msel{\Gamma}{x} = \tau
+}
+\quad \infer{\hasty{\Gamma}{\prop}{\tyn{0}}}{}
+\quad \infer{\hasty{\Gamma}{\tyn{i}}{\tyn{i+1}}}{}$$
+$$\infer{\hasty{\Gamma}{\lambda x : \tau_1. \; e}{\forall x : \tau_1. \; \tau_2}}{
+  \hasty{\Gamma}{\tau_1}{\tyn{i}}
+  & \hasty{\Gamma, x : \tau_1}{e}{\tau_2}
+}
+\quad \infer{\hasty{\Gamma}{e_1 \; e_2}{\subst{\tau_2}{x}{e_2}}}{
+  \hasty{\Gamma}{e_1}{\forall x : \tau_1. \; \tau_2}
+  & \hasty{\Gamma}{e_2}{\tau_1}
+}$$
+$$\infer{\hasty{\Gamma}{\forall x : \tau_1. \; \tau_2}{\tyn{i}}}{
+  \hasty{\Gamma}{\tau_1}{\tyn{i}}
+  & \hasty{\Gamma, x : \tau_1}{\tau_2}{\tyn{i}}
+}
+\quad \infer{\hasty{\Gamma}{\forall x : \tau_1. \; \tau_2}{\prop}}{
+  \hasty{\Gamma}{\tau_1}{\tyn{i}}
+  & \hasty{\Gamma, x : \tau_1}{\tau_2}{\prop}
+}$$
+$$\infer{\hasty{\Gamma}{e}{\tau'}}{
+  \hasty{\Gamma}{e}{\tau}
+  & \tau \equiv \tau'
+}
+\quad \infer{\hasty{\Gamma}{e}{\tau'}}{
+  \hasty{\Gamma}{e}{\tau}
+  & \tau \leq \tau'
+}$$
+
+How do these rules enforce predicativity outside $\prop$?
+The rule for checking a non-$\prop$ $\forall$ requires that both types $\tau_1$ and $\tau_2$ belong to some universe level $\tyn{i}$.
+As a result, $\tau_1$ itself cannot be, for instance, $\tyn{i}$, which would allow later instantiatiation with this very $\forall$ type.
+The reason is that $\tyn{i}$ belongs to $\tyn{i+1}$ but not to any lower universe level.
+In fact, thanks to the final typing rule above, we may also treat $\tyn{i}$ as belonging to any universe level at $i+1$ \emph{or above}, thanks to a \emph{cumulativity}\index{cumulativity} relation defined next.
+$$\infer{\tau \leq \tau}{}
+\quad \infer{\tau_1 \leq \tau_3}{
+  \tau_1 \leq \tau_2
+  & \tau_2 \leq \tau_3
+}
+\quad \infer{\prop \leq \tyn{0}}{}
+\quad \infer{\tyn{i} \leq \tyn{i+1}}{}
+\quad \infer{\forall x : \tau_1. \; \tau_2 \leq \forall x : \tau'_1. \; \tau'_2}{
+  \tau'_1 \leq \tau_1
+  & \tau_2 \leq \tau'_2
+}$$
+
+Note how the final rule pushed cumulatively through $\forall$ types, following a similar pattern to subtyping of functions\index{subtyping} in other languages.
+The definitional-equality rules remain precisely the same as from the naive version of CoC, so we don't restate them here.
+
+Taken together, this set of rules enforces consistency.
+It's quite a journey to prove as much.
+In fact, G\"odel's incompleteness theorems\index{G\"odel's incompleteness theorems} tell us that we can't prove consistency of a consistent logic within itself, which indicates how involved a proof must get, considering that we have now reached the point of logics that can be considered quite expressive and general-purpose.
+One usual trick is to prove consistency of a bounded version of CoC, meaning limiting $\tyn{i}$ to $i \leq n$ for some bound $n$, allowing the proof to be carried out in e.g.\ set theory with $n$ inaccessible cardinals\index{inaccessible cardinals} -- though, in fact, we expect proofs to exist in type theory itself, with the bound increased by one.
+
+We should also mention at this point a popular framework called the \emph{lambda cube}\index{lambda cube} for thinking about variations of type theory.
+It organizes type theories in three orthogonal dimensions, which we have traversed one-section-at-a-time: polymorphism, type operators, and dependent types.
+
+\section{The Calculus of Inductive Constructions}
+
+Inductive type definitions are central to Rocq, but so far in this chapter, we have only mimicked inductive definitions through Church encodings.
+There are a few downsides to that approach.
+Most importantly, we cannot do proofs by induction properly in that style.
+Programs based on Church encodings will also tend to run slowly, and even type-checking depends on execution via definitional equality.
+As a result, Pfenning\index{Pfenning, Frank} and Paulin-Mohring\index{Paulin-Mohring, Christine} proposed the \emph{Calculus of Inductive Constructions}\index{Calculus of Inductive Constructions} (\emph{CIC}), finally taking us to essentially the same logical foundation used by Rocq today.
+
+Spelling out all of the rules formally for inductive and recursive definitions gets much more verbose than for the languages we dealt with previously, so we will be a bit more wishy-washy explaining.
+In fact, we assume the reader's familiarity with Rocq and just describe the rules that Rocq itself enforces.
+
+\emph{\textbf{Rule:} a recursive (\texttt{Fixpoint}) definition must terminate, checked by a syntactic criterion like primitive recursion (recursive calls allowed only on variables coming directly out of pattern-matching on function arguments declared as decreasing).}
+It is relatively easy to see why this rule is important: a function that never terminates could declare any return type, hence a call to that function inhabits any type, even $\lc{False}$, breaking consistency.
+
+\emph{\textbf{Rule:} an inductive type definition must observe \emph{strict positivity}, meaning that the only way the type $T$ itself may be mentioned in its own definition is as (1) the return type of a constructor or (2) within an argument type of a constructor, where the full argument type is expressed as some number of $\forall$s whose domains don't mention $T$, ending finally in a use of $T$ itself in the overall range type.}
+The need for this rule is a little less clear.
+Assume, however, that it did not exist.
+Then we would be able to create an inductive type definition like so (we assume a single constructor and elide naming it, instead just describing a type isomorphism):
+$$\Omega \equiv \Omega \to \lc{False}$$
+Once this type definition is admitted, it is easy to inhabit $\lc{False}$:
+$$(\lambda x : \Omega. \; x \; x) \; (\lambda x : \Omega. \; x \; x)$$
+Not coincidentally, we are using a typed version of the $\Omega$ from Section \ref{Omega}.
+
+\emph{\textbf{Rule:} when a constructor of an inductive definition involves a $\forall$ over a type at some universe level, the inductive type being defined must live at \emph{at least} that universe level.}
+This rule is important to maintain the benefits of predicativity for consistency.
+Now we prevent a constructor of an inductive type from being passed that very inductive type as an argument.
+
+\emph{\textbf{Rule:} we must block certain \emph{large eliminations}\index{large eliminations}: pattern matching of an expression whose type belongs to some universe ($\prop$ or $\tyn{i}$) must produce a result type that itself belongs to the same universe.}
+The intuition behind this rule is that it prevents sneaky ways to launder types into universes where they don't belong, which can lead to behavior that simulates $\ty : \ty$ and breaks consistency.
+By the way, fully understanding this rule depends on understanding how dependent pattern matching works, with specification of how the result type may depend on the type and value of the expression being matched on (the \emph{discriminee}\index{discriminee}).
+Typically dependent matches are encoded internally with arbitrary functions provided explicitly, over both the discriminee and the indices of the inductive type family it belongs to.
+If the programmer \emph{did not} provide such a function in each case, reconstructing them turns out to be uncomputable.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

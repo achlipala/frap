@@ -4586,6 +4586,7 @@ Implicitly, all the infrastructure below the proof checker is also trusted.
 That includes the OCaml\index{OCaml} compiler (since Rocq is implemented in OCaml), the operating-system kernel\index{operating systems}, the processor beneath\index{processors}, and so on.
 Interestingly, most of Rocq is \emph{not} trusted.
 For instance, the tactic engine outputs proof terms\index{proof terms} in a core language, and we only need to trust the (relatively small) checker for that language.
+(See Chapter \ref{foundations} for a sense of good proof-term languages and how to check their proofs.)
 
 The point is, we always draw the trust boundary somewhere, and we always reason informally starting at some layer of a system.
 Our real-world-connecting examples of prior chapters have stopped at extracting OCaml code from Rocq developments.
@@ -6067,7 +6068,7 @@ Here is a sketch of the key lemmas.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Type-Theoretic Foundations of Proof Assistants}
+\chapter{Type-Theoretic Foundations of Proof Assistants}\label{foundations}
 
 Plenty of other introductions to Rocq and its relatives give bottom-up presentations starting with their logical foundations, while in this book we have focused on starting from the motivation of applications to reasoning about programs and programming languages.
 We can wrap up with a quick survey of the issues that go into designing and implementing expressive logics based on type theory.
@@ -6129,7 +6130,7 @@ $$\infer{e \equiv e}{}
   & e_2 \equiv e_3
 }$$
 
-An important property of this relation is that it is \emph{decidable}\index{decidable}: that exists an algorithm that takes in two expressions and decides if they are equal according to the relation.
+An important property of this relation is that it is \emph{decidable}\index{decidable}: there exists an algorithm that takes in two expressions and decides if they are equal according to the relation.
 In contrast, in Rocq we have proved many complex equalities laboriously, using \emph{propositional equality}\index{propositional equality} based on a more-expressive proof language.
 We will see shortly why a decidable equality relation is handy to keep around.
 
@@ -6497,7 +6498,7 @@ $$\infer{\tau \leq \tau}{}
   & \tau_2 \leq \tau'_2
 }$$
 
-Note how the final rule pushed cumulatively through $\forall$ types, following a similar pattern to subtyping of functions\index{subtyping} in other languages.
+Note how the final rule pushed cumulativity through $\forall$ types, following a similar pattern to subtyping of functions\index{subtyping} in other languages.
 The definitional-equality rules remain precisely the same as from the naive version of CoC, so we don't restate them here.
 
 Taken together, this set of rules enforces consistency.

@@ -6,13 +6,6 @@
 Require Import Frap SepCancel ModelCheck.
 From Stdlib Require Import Classes.Morphisms Arith Eqdep Eqdep_dec Nat.
 
-(** * Some odds and ends from past chapters *)
-
-Ltac simp := repeat (simplify; subst; propositional;
-                     try match goal with
-                         | [ H : ex _ |- _ ] => invert H
-                         end); try linear_arithmetic.
-
 
 (** * Orientation *)
 

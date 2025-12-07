@@ -717,7 +717,6 @@ Proof.
   assumption.
 Qed.
 
-
 Lemma output_is_first : forall (party : Type) pr pr' ch (A : Type) (v : A),
     lstep pr (Action (Output {| Channel := ch; Value := v |})) pr'
     -> forall (channels : _ -> parties party) all_parties ch' (A' : Type) (k : A' -> _),

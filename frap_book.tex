@@ -5849,7 +5849,7 @@ A buggy party might introduce a \emph{deadlock}\index{deadlock}, where, say, par
 \emph{Session types} are a style of static type system\index{type system} that rule out deadlock while allowing convenient separate checking of each party, given a shared protocol type.
 
 There is an almost unlimited variation of different versions of session types.
-We still step through a progression of three variants here, and even by the end there will be obvious protocols that don't fit the framework.
+We step through a progression of three variants here, and even by the end there will be obvious protocols that don't fit the framework.
 Still, we aim to convey the core ideas of the approach.
 
 \section{Basic Two-Party Session Types}
@@ -5947,7 +5947,7 @@ Our deadlock-freedom property is easy to reestablish.
 \section{Multiparty Session Types}\index{multiparty session types}
 
 New complications arise when more than two parties are communicating in a protocol.
-The Rocq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in stock.
+The Rocq code demonstrates a case of an online merchant, a customer sending it orders, and a warehouse being queried by the merchant to be sure a product is in-stock.
 Many other such examples appear in the real world.
 
 Now it is no longer possible to start from one party's view of a protocol and compute any other party's view.

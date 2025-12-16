@@ -4770,7 +4770,7 @@ More involved and raising new complications is the rule for loops; see the Rocq 
 
   Actually, we need to modify our translation judgment so that it also applies to ``silly'' intermediate states of execution in the target language.
   For instance, we wind up with $\skipe$s that are quickly stepped away, yet those configurations must be related to source configurations by $\sim$.
-  Here is one example of the extra rules that we need to add to make our induction hypothsis strong enough.
+  Here is one example of the extra rules that we need to add to make our induction hypothesis strong enough.
   $$\infer{\dscomp{v}{x \leftarrow \mt{Return} \; n; c(x)}{\mt{skip}; s}}{
     v(y) = n
     & \dscomp{v}{c(n)}{s}

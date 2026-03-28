@@ -1052,198 +1052,13 @@ Proof.
   equality.
 Qed.
 
-(* That proof was pretty straightforward, because we could construct the
- * simulation using only the first rule of [stepWithInterference], ignoring the
- * possibility for steps by other threads.  We go next for a theorem with an
- * intimidating statement and a much more interesting proof, whose details we
- * nonetheless won't comment on in text.  It may make sense to skip past the
- * next two lemma statements to the main theorem [withInterference_parallel]. *)
-Lemma withInterference_parallel_init : forall shared private1 private2
-                                          (invs : shared -> Prop)
-                                          (sys1 : trsys (threaded_state shared private1))
-                                          (sys2 : trsys (threaded_state shared private2))
-                                          st st',
-  (withInterference invs (parallel sys1 sys2)).(Step)^* st st'
-  -> forall st1 st2,
-      (forall st1', (withInterference invs sys1).(Step)^* st1 st1' -> invs st1'.(Shared))
-      -> (forall st2', (withInterference invs sys2).(Step)^* st2 st2' -> invs st2'.(Shared))
-      -> (withInterference invs sys1).(Step)^* st1
-                                            {| Shared := st.(Shared);
-                                               Private := fst st.(Private) |}
-      -> (withInterference invs sys2).(Step)^* st2
-                                            {| Shared := st.(Shared);
-                                               Private := snd st.(Private) |}
-      -> (withInterference invs sys1).(Step)^* st1
-                                            {| Shared := st'.(Shared);
-                                               Private := fst st'.(Private) |}.
+Lemma reachable_step state (sys : trsys state) s s' :
+  reachable sys s ->
+  sys.(Step) s s' ->
+  reachable sys s'.
 Proof.
-  induct 1; simplify.
-
-  assumption.
-
-  invert H; simplify.
-  invert H5; simplify.
-
-  apply IHtrc with (st2 := {| Shared := sh'; Private := pr2 |}).
-  simplify.
-  apply H1.
-  assumption.
-  simplify.
-  eapply H2.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  apply H1 with (st1' := {| Shared := sh'; Private := pr1' |}).
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  econstructor.
-  eassumption.
-  constructor.
-  assumption.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  econstructor.
-  eassumption.
-  constructor.
-  constructor.
-
-  apply IHtrc with (st2 := {| Shared := sh'; Private := pr2' |}).
-  assumption.
-  simplify.
-  apply H2.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  constructor.
-  eassumption.
-  eassumption.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  apply H2 with (st2' := {| Shared := sh'; Private := pr2' |}).
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  econstructor.
-  eassumption.
-  constructor.
-  constructor.
-  constructor.
-
-  apply IHtrc with (st2 := {| Shared := sh'; Private := snd pr |}).
-  assumption.
-  simplify.
-  eapply H2.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  assumption.
-  assumption.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').  
-  assumption.
-  constructor.
-  constructor.
-Qed.
-
-Lemma withInterference_parallel_step : forall shared private1 private2
-                                              (invs : shared -> Prop)
-                                              (sys1 : trsys (threaded_state shared private1))
-                                              (sys2 : trsys (threaded_state shared private2))
-                                              st st',
-  (withInterference invs (parallel sys1 sys2)).(Step)^* st st'
-  -> forall st1 st2,
-      (forall st1', (withInterference invs sys1).(Step)^* st1 st1' -> invs st1'.(Shared))
-      -> (forall st2', (withInterference invs sys2).(Step)^* st2 st2' -> invs st2'.(Shared))
-      -> (withInterference invs sys1).(Step)^* st1
-                                            {| Shared := st.(Shared);
-                                               Private := fst st.(Private) |}
-      -> (withInterference invs sys2).(Step)^* st2
-                                            {| Shared := st.(Shared);
-                                               Private := snd st.(Private) |}
-      -> (withInterference invs sys2).(Step)^* st2
-                                            {| Shared := st'.(Shared);
-                                               Private := snd st'.(Private) |}.
-Proof.
-  induct 1; simplify.
-
-  assumption.
-
-  invert H; simplify.
-  invert H5; simplify.
-
-  apply IHtrc with (st1 := {| Shared := sh'; Private := pr1' |}).
-  simplify.
-  apply H1.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  econstructor.
-  eassumption.
-  assumption.
-  assumption.
-  constructor.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  apply H1 with (st1' := {| Shared := sh'; Private := pr1' |}).
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  econstructor.
-  eassumption.
-  constructor.
-  constructor.
-
-  apply IHtrc with (st1 := {| Shared := sh'; Private := pr1 |}).
-  simplify.
-  apply H1.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  apply H2 with (st2' := {| Shared := sh'; Private := pr2' |}).
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  constructor.
-  eassumption.
-  constructor.
-  assumption.
-  assumption.
-  constructor.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  constructor.
-  eassumption.
-  constructor.
-
-  apply IHtrc with (st1 := {| Shared := sh'; Private := fst pr |}).
-  simplify.
-  eapply H1.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').
-  assumption.
-  assumption.
-  assumption.
-  constructor.
-  eapply trc_trans.
-  eassumption.
-  eapply TrcFront.
-  apply StepEnvironment with (sh' := sh').  
-  assumption.
-  constructor.
+  intros H1 H2. invert H1. econstructor; eauto. eapply trc_trans; eauto.
+  econstructor; eauto. constructor.
 Qed.
 
 (* OK, we made it to the main theorem.  It helps us find an invariant for a
@@ -1263,37 +1078,29 @@ Theorem withInterference_parallel : forall shared private1 private2
     -> invariantFor (withInterference invs (parallel sys1 sys2))
                     (fun st => invs st.(Shared)).
 Proof.
-  unfold invariantFor.
-  simplify.
-  invert H1.
-
-  (* [assert P]: first prove proposition [P], then continue with it as a new
-   *   hypothesis. *)
-  assert ((withInterference invs sys1).(Step)^*
-             {| Shared := sh; Private := pr1 |}
-             {| Shared := s'.(Shared); Private := fst s'.(Private) |}).
-  apply withInterference_parallel_init with (sys2 := sys2)
-                                            (st := {| Shared := sh; Private := (pr1, pr2) |})
-                                            (st2 := {| Shared := sh; Private := pr2 |});
-    simplify; propositional.
-  apply H in H1; propositional.
-  apply H0 in H1; propositional.
-  constructor.
-  constructor.
-
-  assert ((withInterference invs sys2).(Step)^*
-             {| Shared := sh; Private := pr2 |}
-             {| Shared := s'.(Shared); Private := snd s'.(Private) |}).
-  apply withInterference_parallel_step with (sys1 := sys1)
-                                            (st := {| Shared := sh; Private := (pr1, pr2) |})
-                                            (st1 := {| Shared := sh; Private := pr1 |});
-    simplify; propositional.
-  apply H in H5; propositional.
-  apply H0 in H5; propositional.
-  constructor.
-  constructor.
-
-  apply H in H1; try assumption.
+  intros.
+  apply invariant_weaken with
+    (invariant1 := fun st =>
+                     reachable (withInterference invs sys1) {| Shared := st.(Shared); Private := fst st.(Private) |} /\
+                       reachable (withInterference invs sys2) {| Shared := st.(Shared); Private := snd st.(Private) |}).
+  { apply invariant_induction.
+    - intros s H1. invert H1. split; (econstructor; [eassumption|apply TrcRefl]).
+    - intros s H1 s' H2. destruct H1 as (H1&H3). invert H2; simplify.
+      + invert H4; simplify.
+        -- split.
+           ++ eapply reachable_step; eauto. simpl. apply StepSelf. assumption.
+           ++ eapply reachable_step; eauto. simpl.
+              apply StepEnvironment. eapply use_invariant in H.
+              2: { eapply reachable_step; eauto. apply StepSelf. eassumption. }
+              apply H.
+        -- split.
+           ++ eapply reachable_step; eauto. simpl. apply StepEnvironment.
+              eapply use_invariant in H0.
+              2: { eapply reachable_step; eauto. apply StepSelf. eassumption. }
+              apply H0.
+         ++ eapply reachable_step; eauto. simpl. apply StepSelf. assumption.
+      + split; eapply reachable_step; eauto; apply StepEnvironment; eauto. }
+  intros s (Hs&_). eapply use_invariant in H; eauto. simplify. assumption.
 Qed.
 
 (* Let's apply this principle on a concrete example.  Consider a program with
